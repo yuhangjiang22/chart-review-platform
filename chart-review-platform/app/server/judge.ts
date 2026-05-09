@@ -14,6 +14,7 @@
 import path from "path";
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import { composeAgentOptions } from "./compose-agent.js";
+import { modelFor } from "./model-config.js";
 import { patientDir, PLATFORM_ROOT, isPhiPatient } from "./patients.js";
 import { phenotypeSkillDir } from "./domain/rubric/index.js";
 import type { EvidenceRef, FieldAssessment } from "./disagreements.js";
@@ -73,12 +74,11 @@ export interface JudgeOutput {
   model?: string;
 }
 
-/** Override default for a more capable model than the agents use.
- *  Falls back to CHART_REVIEW_MODEL if not set. The agents typically run
- *  haiku; the judge benefits from sonnet for harder triage. */
-const JUDGE_MODEL =
-  process.env.CHART_REVIEW_JUDGE_MODEL ??
-  "anthropic/claude-sonnet-4.6";
+/** Resolve the judge model via the shared model-config seam. The judge
+ *  typically runs Sonnet (more capable triage) while the per-patient
+ *  agents run Haiku (cheaper); operators override via
+ *  CHART_REVIEW_JUDGE_MODEL or by editing model-config.ts DEFAULTS. */
+const JUDGE_MODEL = modelFor("judge") ?? modelFor("default");
 
 const PROMPT_PREAMBLE = [
   "Activate the `chart-review-judge` skill via the Skill tool. Operate in",

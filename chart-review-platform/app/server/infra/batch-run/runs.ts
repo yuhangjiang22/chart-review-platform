@@ -284,6 +284,7 @@ export function generateRunId(now = new Date()): string {
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import { withReviewsRoot } from "../../domain/review/index.js";
 import { composeAgentOptions } from "../../compose-agent.js";
+import { modelFor } from "../../model-config.js";
 import { makeReviewMcpServer } from "../../mcp-tools.js";
 import { buildAuditHooks } from "../../audit-trail.js";
 import { loadCompiledTask } from "../../tasks.js";
@@ -443,7 +444,7 @@ export function startBatchRun(opts: StartBatchRunOptions): StartBatchRunResult {
     patient_ids: opts.patient_ids,
     max_concurrency: opts.max_concurrency ?? DEFAULT_MAX_CONCURRENCY,
     max_turns_per_patient: opts.max_turns_per_patient ?? DEFAULT_MAX_TURNS_PER_PATIENT,
-    model: process.env.CHART_REVIEW_MODEL ?? "(default)",
+    model: modelFor("default") ?? "(unset)",
     cost_cap_usd: opts.cost_cap_usd ?? DEFAULT_COST_CAP_USD,
     kind: "agent_batch_run",
     agent_specs: specs,
