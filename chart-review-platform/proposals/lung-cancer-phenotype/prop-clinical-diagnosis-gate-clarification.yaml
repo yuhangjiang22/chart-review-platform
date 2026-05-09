@@ -1,0 +1,44 @@
+id: prop-clinical-diag-derivation-20260507
+guideline_id: lung-cancer-phenotype
+created_at: 2026-05-07T19:40:00Z
+created_by: chart-review-improve skill
+target_field: clinical_diagnosis_lung_cancer
+change_kind: derivation_revise
+motivating_patients:
+  - patient_easy_probable_02
+evidence:
+  - patient: patient_easy_probable_02
+    agent_answer: false
+    reviewer_answer: false
+    edit_reason: type_mismatch
+    reviewer_evidence: >
+      imaging_lung_lesion=true AND oncologist_lung_cancer_diagnosis_in_note=yes
+      per review_state.json; both prerequisites met, so derived field should be true,
+      not false. Agent 1 produced false; Agent 2 correctly produced true.
+
+proposal:
+  derivation:
+    criterion_id: clinical_diagnosis_lung_cancer
+    old_expression: "imaging_lung_lesion == 'yes' AND oncologist_lung_cancer_diagnosis_in_note == 'yes'"
+    new_expression: "imaging_lung_lesion == 'yes' AND oncologist_lung_cancer_diagnosis_in_note == 'yes'"
+    reason: >
+      The derivation expression is correct as stated. The issue is inconsistent
+      execution by agents: Agent 1 produces false when both inputs are true
+      (boolean/type comparison bug), while Agent 2 correctly produces true.
+      This proposal flags the systematic execution bug and serves as a marker
+      to audit and fix agent derivation logic before proceeding.
+
+rationale: >
+  The derived field clinical_diagnosis_lung_cancer has inconsistent execution
+  across agents despite a clear, deterministic formula. Both imaging_lung_lesion
+  and oncologist_lung_cancer_diagnosis_in_note are true in patient_easy_probable_02,
+  yet Agent 1 derived false while Agent 2 derived true. This indicates a
+  systematic bug in how one agent evaluates the derivation (likely a type
+  coercion or comparison error: boolean true vs. string 'yes'). The derivation
+  expression itself is sound; the bug is in execution. Correcting agent
+  implementation is critical because this error cascades to lung_cancer_status,
+  causing downstream phenotype mislabeling (absent vs. probable).
+
+provenance:
+  source: override_pattern
+  status: draft

@@ -1,0 +1,36 @@
+.DS_Store
+
+# Local tool/runtime state
+.claude/settings.local.json
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+build/
+
+# Node/Vite
+node_modules/
+dist/
+*.log
+
+# Environment secrets
+.env
+.env.*
+!.env.example
+
+# Generated review artifacts
+runs/
+reviews/
+# Test fixtures under reviews/ are NOT generated; commit them.
+!chart-review-platform/lib/tests/fixtures/codify/reviews/
+!chart-review-platform/lib/tests/fixtures/codify/reviews/**
+cohorts/
+
+# Runtime artifacts (eval / scripts output)
+chart-review-platform/app/scripts/eval-parity-results.json
+.claude/worktrees/
+workspace/

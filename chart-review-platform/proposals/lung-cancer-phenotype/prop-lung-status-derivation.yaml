@@ -1,0 +1,39 @@
+id: prop-lung-status-derivation-20260507
+guideline_id: lung-cancer-phenotype
+created_at: 2026-05-07T19:35:36Z
+created_by: chart-review-improve skill
+target_field: lung_cancer_status
+change_kind: derivation_revise
+motivating_patients:
+  - patient_easy_probable_02
+evidence:
+  - patient: patient_easy_probable_02
+    agent_answer: absent
+    reviewer_answer: absent
+    edit_reason: wrong_rule
+    reviewer_evidence: >
+      Final derivation for lung_cancer_status contains a type mismatch on the icd_lung_cancer_present
+      comparison. The field answer_schema uses boolean [true, false] (stored as 'yes', 'no'),
+      but derivation checks == 'yes' inconsistently with other boolean fields.
+proposal:
+  derivation:
+    criterion_id: lung_cancer_status
+    old_expression: "pathology_confirms_lung_cancer == true ? 'confirmed' : (clinical_diagnosis_lung_cancer == true OR icd_lung_cancer_present == 'yes') ? 'probable' : 'absent'"
+    new_expression: "pathology_confirms_lung_cancer == true ? 'confirmed' : (clinical_diagnosis_lung_cancer == true OR icd_lung_cancer_present == true) ? 'probable' : 'absent'"
+    reason: >
+      The icd_lung_cancer_present field uses answer_schema enum [true, false] (semantically 'yes'/'no')
+      but should be compared as boolean true, not string 'yes', for consistency with the other
+      boolean comparisons in the same expression (pathology_confirms_lung_cancer and
+      clinical_diagnosis_lung_cancer). Changing icd_lung_cancer_present == 'yes' to
+      == true ensures type consistency throughout the derivation.
+rationale: >
+  The final lung_cancer_status derivation has an internal type inconsistency. The expression
+  compares pathology_confirms_lung_cancer and clinical_diagnosis_lung_cancer using boolean literals
+  (== true), but compares icd_lung_cancer_present using a string literal (== 'yes'). While
+  icd_lung_cancer_present uses a boolean answer_schema, this string comparison will fail.
+  Standardizing all three comparisons to use boolean literals (== true) ensures the derivation
+  logic works correctly across all three paths to a 'probable' classification, and maintains
+  consistency with the fixed clinical_diagnosis_lung_cancer derivation (prop-clinical-diag-derivation).
+provenance:
+  source: override_pattern
+  status: draft

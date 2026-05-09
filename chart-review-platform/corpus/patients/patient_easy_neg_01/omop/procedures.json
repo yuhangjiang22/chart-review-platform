@@ -1,0 +1,22 @@
+[
+  {
+    "row_id": "510001",
+    "procedure_occurrence_id": 510001,
+    "person_id": "patient_easy_neg_01",
+    "procedure_concept_id": 4171038,
+    "procedure_concept_name": "Screening mammography",
+    "procedure_date": "2025-08-10",
+    "icd10_pcs_code": null,
+    "cpt_code": "77067"
+  },
+  {
+    "row_id": "510002",
+    "procedure_occurrence_id": 510002,
+    "person_id": "patient_easy_neg_01",
+    "procedure_concept_id": 4074695,
+    "procedure_concept_name": "Annual preventive health examination",
+    "procedure_date": "2025-07-15",
+    "icd10_pcs_code": null,
+    "cpt_code": "99396"
+  }
+]

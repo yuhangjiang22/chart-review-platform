@@ -1,0 +1,33 @@
+THORACIC ONCOLOGY CONSULTATION
+Provider: K. Chen, MD — Hematology/Oncology
+Encounter date: 2024-12-04
+
+REASON FOR CONSULTATION
+New 2.6 cm spiculated lingular mass with mediastinal lymphadenopathy,
+suspicious for primary lung malignancy. Requesting expedited evaluation
+and treatment planning.
+
+HISTORY
+64-year-old never-smoker with significant secondhand-smoke exposure
+presenting with cough and weight loss. CT chest 2024-11-22 demonstrates
+a 2.6 cm spiculated lingular mass with level 4L lymphadenopathy. Family
+history significant for a father with lung cancer.
+
+PAST ONCOLOGIC HISTORY
+Stage I colorectal adenocarcinoma resected 2019, no recurrence on
+surveillance.
+
+ASSESSMENT
+This is a new primary lung cancer in a never-smoker with strong family
+history and secondhand-smoke exposure. Imaging features and clinical
+context are highly suspicious for primary non-small cell lung carcinoma.
+We will proceed with CT-guided core biopsy and PET-CT. Pending tissue,
+clinical impression is primary lung cancer.
+
+PLAN
+1. Refer for CT-guided core biopsy of lingular mass.
+2. PET-CT for staging.
+3. Return to clinic with results in 2 weeks.
+4. Discuss molecular testing (EGFR, ALK, ROS1, PD-L1) once tissue available.
+
+K. Chen, MD — electronically signed 2024-12-04

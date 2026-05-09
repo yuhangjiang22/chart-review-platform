@@ -1,0 +1,5 @@
+[
+  { "row_id": 10001, "encounter_id": "enc_4581", "type": "Outpatient", "department": "Pulmonology", "primary_provider": "D. Yamada, MD", "start_date": "2024-08-22", "end_date": "2024-08-22" },
+  { "row_id": 10002, "encounter_id": "enc_4612", "type": "ED", "department": "Emergency", "primary_provider": "J. Holloway, DO", "start_date": "2024-09-12", "end_date": "2024-09-12" },
+  { "row_id": 10003, "encounter_id": "enc_4670", "type": "Outpatient", "department": "Primary Care", "primary_provider": "T. Anand, MD", "start_date": "2024-10-04", "end_date": "2024-10-04" }
+]

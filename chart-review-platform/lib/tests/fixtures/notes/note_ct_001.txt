@@ -1,0 +1,45 @@
+CT CHEST WITH CONTRAST
+Memorial Regional Medical Center — Department of Radiology
+Study date: 2025-09-08
+Ordering provider: R. Patel, MD (Pulmonology)
+Indication: Chronic cough, weight loss, abnormal chest x-ray.
+
+TECHNIQUE
+Helical CT of the chest was performed following intravenous administration
+of 100 mL of iohexol. Images were reconstructed at 1.25 mm and 5 mm slice
+thickness in axial, coronal, and sagittal planes.
+
+COMPARISON
+Chest x-ray dated 2025-08-30.
+
+FINDINGS
+Lungs: There is a 3.2 x 2.8 cm spiculated mass in the posterior segment of
+the right upper lobe, with pleural tagging and an associated small focus of
+adjacent ground-glass opacity. The mass is highly suspicious for primary
+lung malignancy. No additional pulmonary nodules are identified. Background
+lung demonstrates centrilobular emphysematous change, predominantly upper-
+lobe distributed.
+
+Mediastinum and hila: A 1.4 cm short-axis right hilar lymph node is
+present. Subcarinal nodes measure up to 0.9 cm. No pathologically enlarged
+left hilar or contralateral mediastinal nodes. No pericardial effusion.
+
+Pleura: No pleural effusion. No pleural thickening or nodularity.
+
+Chest wall and bony thorax: No lytic or sclerotic osseous lesions to
+suggest metastatic disease. Mild degenerative changes of the thoracic
+spine.
+
+Upper abdomen (limited): The visualized portions of the liver, spleen,
+adrenal glands, and kidneys appear within normal limits. No adrenal
+nodules.
+
+IMPRESSION
+1. 3.2 cm spiculated right upper lobe mass, highly suspicious for primary
+   bronchogenic carcinoma. Tissue diagnosis recommended.
+2. Right hilar lymphadenopathy (1.4 cm), suspicious for nodal involvement.
+3. Background centrilobular emphysema.
+
+Recommend CT-guided core biopsy and PET-CT for staging.
+
+Electronically signed: K. Yamamoto, MD — Thoracic Radiology — 2025-09-08

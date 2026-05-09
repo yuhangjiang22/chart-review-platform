@@ -1,0 +1,56 @@
+.venv/
+build/
+__pycache__/
+*.egg-info/
+*.pyc
+.DS_Store
+
+# Async batch runner outputs — ephemeral test artifacts, not source-of-truth.
+runs/
+
+# Per-patient×task live review state — mutable, written by both the
+# chat agent and the reviewer. Source of truth at runtime; should not
+# be committed.
+reviews/
+
+# Cohort feedback artifacts produced by Role C — regenerated per run.
+cohorts/
+
+# Production-deployment issue queue (per-guideline-sha JSONL logs).
+# Append-only runtime data, not source-of-truth.
+deployment-issues/
+
+# Methods-section drafts — run-keyed bundles regenerated on demand.
+methods/
+
+# Per-reviewer notifications inbox.
+notifications/
+
+# Streaming-job transcripts (authoring/cohort/methods agent runs).
+jobs/
+
+# Reproducibility bundle exports — large, regenerated on demand.
+exports/
+
+# Calibration runs — each invocation creates a new ISO-timestamped
+# subdirectory under calibration/<task>/. The reports and raw outputs
+# are ephemeral test artifacts; the directory roots stay (only the
+# timestamp subdirs are produced by tests).
+calibration/*/*/
+
+# On-disk bundle export tarballs (bundleId.tar.gz and friends).
+*.tar.gz
+
+# Draft tasks produced by Role A — committed selectively, not as a
+# group; uncomment if you want to track drafts in this repo.
+# tasks/drafts/
+
+# Node deps + Vite build for the conversational app under app/
+app/node_modules/
+app/dist/
+app/.env
+app/.env.local
+app/*.log
+
+# Git worktrees for feature branches.
+.worktrees/

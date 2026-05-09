@@ -1,0 +1,25 @@
+THORACIC ONCOLOGY PROGRESS NOTE
+Provider: K. Chen, MD — Hematology/Oncology
+Encounter date: 2024-12-19
+
+INTERVAL HISTORY
+Patient returns following imaging and biopsy referral. CT-guided core
+biopsy was attempted on 2024-12-12 but was non-diagnostic; the radiology
+team noted significant patient motion. PET-CT performed 2024-12-16 shows
+intense FDG uptake in the lingular mass and the level 4L node. No
+evidence of distant disease.
+
+ASSESSMENT
+Lung cancer, clinical stage IIIA, awaiting tissue confirmation. Initial
+biopsy was non-diagnostic; will repeat with bronchoscopic approach.
+Patient reports increasing fatigue and persistent cough. Discussed with
+patient that we are treating this as lung cancer pending tissue.
+
+PLAN
+1. Re-biopsy via EBUS bronchoscopy scheduled 2024-12-30.
+2. Continue supportive care.
+3. Once tissue confirms histology, will initiate definitive therapy.
+4. Patient is well-informed; understands working diagnosis is primary
+   lung cancer.
+
+K. Chen, MD — electronically signed 2024-12-19

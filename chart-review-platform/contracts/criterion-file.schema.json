@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chart-review-platform/contracts/criterion-file.schema.json",
+  "title": "CriterionFile",
+  "description": "YAML frontmatter shape for references/criteria/<id>.md files.",
+  "type": "object",
+  "required": ["field_id", "prompt", "answer_schema"],
+  "properties": {
+    "field_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "prompt": {
+      "type": "string",
+      "minLength": 1
+    },
+    "answer_schema": {
+      "type": "object",
+      "description": "Type and (optional) enum for the answer."
+    },
+    "is_final_output": { "type": "boolean" },
+    "cardinality": { "type": "string", "enum": ["one", "many"] },
+    "time_window": { "type": "string" },
+    "group": { "type": "string" },
+    "is_applicable_when": { "type": "string" },
+    "derivation": {
+      "type": "object",
+      "required": ["kind", "expr"],
+      "properties": {
+        "kind": { "type": "string", "enum": ["expression", "rule_table"] },
+        "expr": { "type": "string", "minLength": 1 }
+      }
+    },
+    "derivation_truth_table": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Optional. Each row asserts that derivation(inputs) == expected. Authors are encouraged to include boundary rows (off-by-one thresholds) and any-null defaults.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["inputs", "expected"],
+        "properties": {
+          "inputs":   { "type": "object" },
+          "expected": {},
+          "label":    { "type": "string" }
+        }
+      }
+    },
+    "time_window_check": {
+      "type": "string",
+      "enum": ["skip"],
+      "description": "Optional. Set to 'skip' to suppress the time-window discipline heuristic for this criterion (e.g. when an enum value literally contains a phrase like 'history of')."
+    },
+    "uses": {
+      "type": "object",
+      "properties": {
+        "code_sets": { "type": "array", "items": { "type": "string" } },
+        "edge_cases": { "type": "array", "items": { "type": "string" } },
+        "exemplars": { "type": "array", "items": { "type": "string" } },
+        "keyword_sets": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "open_questions": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "description": "Open questions the build skill could not resolve (e.g. specific code sets for a rare condition). Surfaced by Author pre-flight; must be empty before LOCK."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "is_final_output": { "const": true } },
+        "required": ["is_final_output"]
+      },
+      "then": {
+        "required": ["derivation"]
+      }
+    }
+  ]
+}

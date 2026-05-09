@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chart-review-platform/contracts/review_record.schema.json",
+  "title": "ReviewRecord",
+  "type": "object",
+  "required": ["record_id", "task_document_sha", "review_unit_id", "patient_id", "task_metadata_snapshot", "started_at", "criterion_assessments"],
+  "properties": {
+    "record_id": { "type": "string" },
+    "task_document_sha": { "type": "string" },
+    "review_unit_id": { "type": "string" },
+    "patient_id": { "type": "string" },
+    "task_metadata_snapshot": { "type": "object" },
+    "started_at": { "type": "string" },
+    "completed_at": { "type": "string" },
+    "criterion_assessments": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/CriterionAssessment" }
+    },
+    "derived_assessments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["field_id", "value", "derivation_inputs"],
+        "properties": {
+          "field_id": { "type": "string" },
+          "value": {},
+          "derivation_inputs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["field_id", "value"],
+              "properties": {
+                "field_id": { "type": "string" },
+                "value": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "cross_criterion_alerts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["fields", "description", "severity"],
+        "properties": {
+          "fields": { "type": "array", "items": { "type": "string" } },
+          "description": { "type": "string" },
+          "severity": { "type": "string", "enum": ["info", "warning", "error"] }
+        }
+      }
+    },
+    "final_output": {
+      "type": "object",
+      "required": ["field_id", "value"],
+      "properties": {
+        "field_id": { "type": "string" },
+        "value": {},
+        "derivation_chain": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "audit_trail": {
+      "type": "array",
+      "items": { "$ref": "trace.schema.json#/$defs/AuditEntry" }
+    },
+    "reviewer_overrides": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["field_id", "original_value", "corrected_value", "error_category", "reviewer_id", "timestamp"],
+        "properties": {
+          "field_id": { "type": "string" },
+          "original_value": {},
+          "corrected_value": {},
+          "supporting_evidence": { "type": "array", "items": { "$ref": "evidence.schema.json" } },
+          "error_category": { "type": "string", "enum": ["missed_evidence", "misinterpreted", "wrong_rule", "criterion_ambiguous", "other"] },
+          "free_text": { "type": "string" },
+          "reviewer_id": { "type": "string" },
+          "timestamp": { "type": "string" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "CriterionAssessment": {
+      "type": "object",
+      "required": ["field_id", "answer", "evidence", "confidence"],
+      "properties": {
+        "field_id": { "type": "string" },
+        "answer": {},
+        "evidence": { "type": "array", "items": { "$ref": "evidence.schema.json" } },
+        "alternatives_considered": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["value", "reason_rejected"],
+            "properties": {
+              "value": {},
+              "reason_rejected": { "type": "string" }
+            }
+          }
+        },
+        "contradicting_evidence": {
+          "description": "Evidence the agent retrieved and read but weighed against its answer. Distinct from `coverage.excluded` (notes filtered out before reading) and `alternatives_considered` (rejected answer values). Required for honest multi-source synthesis (irAE, BARC, conflict-resolution criteria).",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["evidence", "reason_not_decisive"],
+            "properties": {
+              "evidence": { "$ref": "evidence.schema.json" },
+              "reason_not_decisive": { "type": "string" }
+            }
+          }
+        },
+        "coverage": {
+          "type": "object",
+          "properties": {
+            "notes_in_scope": { "type": "integer", "minimum": 0 },
+            "notes_searched": { "type": "integer", "minimum": 0 },
+            "notes_read_in_full": { "type": "integer", "minimum": 0 },
+            "queries_run": { "type": "array", "items": { "type": "string" } },
+            "structured_queries_run": { "type": "array", "items": { "type": "string" } },
+            "excluded": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["note_id", "reason"],
+                "properties": {
+                  "note_id": { "type": "string" },
+                  "reason": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "applied_rule": { "type": ["string", "null"] },
+        "confidence": { "type": "string", "enum": ["low", "medium", "high"] },
+        "missingness_reason": {
+          "type": "string",
+          "enum": ["not_documented", "not_assessed", "contradictory", "external_care", "illegible", "not_applicable"]
+        },
+        "faithfulness_check": {
+          "type": "object",
+          "required": ["status"],
+          "properties": {
+            "status": { "type": "string", "enum": ["pass", "partial", "fail"] },
+            "details": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "schema_validation": {
+          "type": "object",
+          "required": ["status"],
+          "properties": {
+            "status": { "type": "string", "enum": ["pass", "fail"] },
+            "errors": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "trace_summary": { "$ref": "trace.schema.json#/$defs/TraceSummary" },
+        "reasoning_summary": { "type": "string" }
+      }
+    }
+  }
+}

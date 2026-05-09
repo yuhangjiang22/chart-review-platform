@@ -1,0 +1,126 @@
+{
+  "generated_at": "2026-04-29T04:52:52.732149Z",
+  "model_id": "claude-sonnet-4-6",
+  "patients": [
+    {
+      "patient_id": "patient_neg_hard_01",
+      "category": "negative",
+      "difficulty": "hard",
+      "headline": "71M, smoking history, hedged language across pulm/CT/ED notes; final absent."
+    },
+    {
+      "patient_id": "patient_probable_fhx_01",
+      "category": "probable",
+      "difficulty": "hard",
+      "headline": "64F, never-smoker with secondhand exposure; family history of lung cancer + Z85.118 decoys; oncologist active diagnosis; final probable."
+    },
+    {
+      "patient_id": "patient_confirmed_reread_01",
+      "category": "confirmed_nsclc",
+      "difficulty": "hard",
+      "headline": "73M, original path SCLC, re-read addendum NSCLC adenocarcinoma; final confirmed nsclc with contradicting_evidence."
+    },
+    {
+      "patient_id": "patient_probable_cytology_01",
+      "category": "probable",
+      "difficulty": "hard",
+      "headline": "81F, COPD precludes core biopsy; cytology FNA favors adenocarcinoma; tests is_applicable_when cytology gate; final probable."
+    },
+    {
+      "patient_id": "patient_icd_z85_coexist_01",
+      "category": "icd_only",
+      "difficulty": "hard",
+      "headline": "67M, C34.10 + Z85.118 coexist on chart; no path/imaging/oncologist note; final probable via ICD path."
+    },
+    {
+      "patient_id": "patient_easy_nsclc_01",
+      "category": "confirmed_nsclc",
+      "difficulty": "easy",
+      "headline": ""
+    },
+    {
+      "patient_id": "patient_easy_nsclc_02",
+      "category": "confirmed_nsclc",
+      "difficulty": "easy",
+      "headline": ""
+    },
+    {
+      "patient_id": "patient_easy_nsclc_03",
+      "category": "confirmed_nsclc",
+      "difficulty": "easy",
+      "headline": ""
+    },
+    {
+      "patient_id": "patient_easy_nsclc_04",
+      "category": "confirmed_nsclc",
+      "difficulty": "easy",
+      "headline": ""
+    },
+    {
+      "patient_id": "patient_easy_sclc_01",
+      "category": "sclc",
+      "difficulty": "easy",
+      "headline": ""
+    },
+    {
+      "patient_id": "patient_easy_sclc_02",
+      "category": "sclc",
+      "difficulty": "easy",
+      "headline": ""
+    },
+    {
+      "patient_id": "patient_easy_sclc_03",
+      "category": "sclc",
+      "difficulty": "easy",
+      "headline": ""
+    },
+    {
+      "patient_id": "patient_easy_probable_01",
+      "category": "probable",
+      "difficulty": "easy",
+      "headline": ""
+    },
+    {
+      "patient_id": "patient_easy_probable_02",
+      "category": "probable",
+      "difficulty": "easy",
+      "headline": ""
+    },
+    {
+      "patient_id": "patient_easy_icd_01",
+      "category": "icd_only",
+      "difficulty": "easy",
+      "headline": ""
+    },
+    {
+      "patient_id": "patient_easy_icd_02",
+      "category": "icd_only",
+      "difficulty": "easy",
+      "headline": ""
+    },
+    {
+      "patient_id": "patient_easy_neg_01",
+      "category": "negative",
+      "difficulty": "easy",
+      "headline": ""
+    },
+    {
+      "patient_id": "patient_easy_neg_02",
+      "category": "negative",
+      "difficulty": "easy",
+      "headline": ""
+    },
+    {
+      "patient_id": "patient_easy_neg_03",
+      "category": "negative",
+      "difficulty": "easy",
+      "headline": ""
+    },
+    {
+      "patient_id": "patient_easy_neg_04",
+      "category": "negative",
+      "difficulty": "easy",
+      "headline": ""
+    }
+  ]
+}

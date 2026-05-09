@@ -1,0 +1,13 @@
+[
+  {
+    "patient_id": "patient_demo",
+    "display_name": "Patient · 72M · former smoker",
+    "task_id": "lung_cancer_phenotype",
+    "task_title": "Lung cancer phenotype review",
+    "review_unit_id": "patient_demo",
+    "started_at": "2026-04-28T09:14:22Z",
+    "status": "in_progress",
+    "n_criteria": 8,
+    "n_completed": 0
+  }
+]

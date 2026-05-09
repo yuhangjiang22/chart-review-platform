@@ -1,0 +1,11 @@
+---
+name: lung-cancer-who-has-it
+title: Lung Cancer Phenotyping
+description: >
+  Identifies patients with lung cancer.
+population: All patients in corpus, no eligibility filter.
+index_date_definition: Most recent chart encounter date per patient.
+output_shape: outcome-first
+final_output_field: lung_cancer_status
+version: "0.1.0"
+status: draft

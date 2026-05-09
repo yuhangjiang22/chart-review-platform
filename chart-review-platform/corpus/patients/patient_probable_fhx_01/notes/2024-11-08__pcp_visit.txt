@@ -1,0 +1,23 @@
+PRIMARY CARE VISIT
+Provider: L. Brennan, MD — Internal Medicine
+Encounter date: 2024-11-08
+
+HISTORY OF PRESENT ILLNESS
+64-year-old never-smoker presents with a 7-week dry cough and unintentional
+6-pound weight loss. Significant secondhand-smoke exposure (childhood
+home, both parents smoked). Family history notable for a father with
+lung cancer who died at age 67. Patient denies hemoptysis but reports
+fatigue and reduced exercise tolerance.
+
+PAST MEDICAL HISTORY
+- Colorectal adenocarcinoma, stage I, surgically resected 2019. In
+  ongoing surveillance, no recurrence.
+- Hypertension.
+
+ASSESSMENT AND PLAN
+Subacute cough with weight loss in a never-smoker with significant
+secondhand-smoke exposure and concerning family history. Will obtain
+diagnostic CT chest with contrast and refer to thoracic oncology for
+expedited evaluation given prior cancer history.
+
+L. Brennan, MD — electronically signed 2024-11-08

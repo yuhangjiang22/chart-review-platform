@@ -1,0 +1,47 @@
+[
+  {
+    "row_id": "410021",
+    "patient_id": "patient_easy_icd_01",
+    "measurement_source_value": "8480-6",
+    "measurement_source_concept_name": "Systolic blood pressure",
+    "measurement_date": "2025-03-12",
+    "value_as_number": 128,
+    "unit_source_value": "mmHg"
+  },
+  {
+    "row_id": "410022",
+    "patient_id": "patient_easy_icd_01",
+    "measurement_source_value": "8462-4",
+    "measurement_source_concept_name": "Diastolic blood pressure",
+    "measurement_date": "2025-03-12",
+    "value_as_number": 78,
+    "unit_source_value": "mmHg"
+  },
+  {
+    "row_id": "410023",
+    "patient_id": "patient_easy_icd_01",
+    "measurement_source_value": "4548-4",
+    "measurement_source_concept_name": "Hemoglobin A1c/Hemoglobin.total in Blood",
+    "measurement_date": "2025-03-12",
+    "value_as_number": 6.9,
+    "unit_source_value": "%"
+  },
+  {
+    "row_id": "410024",
+    "patient_id": "patient_easy_icd_01",
+    "measurement_source_value": "2089-1",
+    "measurement_source_concept_name": "Cholesterol in LDL [Mass/volume] in Serum or Plasma",
+    "measurement_date": "2025-03-12",
+    "value_as_number": 82,
+    "unit_source_value": "mg/dL"
+  },
+  {
+    "row_id": "410025",
+    "patient_id": "patient_easy_icd_01",
+    "measurement_source_value": "29463-7",
+    "measurement_source_concept_name": "Body weight",
+    "measurement_date": "2025-03-12",
+    "value_as_number": 187,
+    "unit_source_value": "lbs"
+  }
+]

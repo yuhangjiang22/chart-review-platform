@@ -1,0 +1,32 @@
+[
+  {
+    "row_id": "220001",
+    "condition_occurrence_id": 220001,
+    "person_id": "sclc_02",
+    "condition_concept_id": 4115276,
+    "condition_concept_name": "Small cell carcinoma of lung",
+    "condition_start_date": "2025-04-25",
+    "condition_end_date": null,
+    "condition_type_concept_id": 32817,
+    "condition_type": "EHR",
+    "icd_code": "C34.10",
+    "icd_description": "Malignant neoplasm of upper lobe, bronchus or lung, unspecified side",
+    "condition_source_value": "C34.10",
+    "stop_reason": null
+  },
+  {
+    "row_id": "220002",
+    "condition_occurrence_id": 220002,
+    "person_id": "sclc_02",
+    "condition_concept_id": 438331,
+    "condition_concept_name": "Superior vena cava syndrome",
+    "condition_start_date": "2025-04-09",
+    "condition_end_date": null,
+    "condition_type_concept_id": 32817,
+    "condition_type": "EHR",
+    "icd_code": "I87.1",
+    "icd_description": "Compression of vein",
+    "condition_source_value": "I87.1",
+    "stop_reason": null
+  }
+]

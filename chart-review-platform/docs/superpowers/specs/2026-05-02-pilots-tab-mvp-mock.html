@@ -1,0 +1,588 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Pilots tab — MVP mock</title>
+  <meta name="viewport" content="width=1280" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+    rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            paper:     "hsl(36 30% 96%)",
+            ink:       "hsl(24 15% 8%)",
+            card:      "hsl(0 0% 100%)",
+            mute:      "hsl(24 12% 38%)",
+            border:    "hsl(34 18% 84%)",
+            oxblood:   "hsl(353 60% 31%)",
+            sage:      "hsl(105 28% 32%)",
+            ochre:     "hsl(40 65% 38%)",
+          },
+          fontFamily: {
+            display: ['"Fraunces"', "Georgia", "serif"],
+            body:    ['"IBM Plex Sans"', "ui-sans-serif", "system-ui"],
+            mono:    ['"IBM Plex Mono"', "ui-monospace", "monospace"],
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    html { font-feature-settings: "ss01" on, "ss02" on, "cv11" on; }
+    body {
+      background: hsl(36 30% 96%);
+      color: hsl(24 15% 8%);
+      font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
+    }
+    h1, h2, h3, .font-display {
+      font-family: "Fraunces", Georgia, serif;
+      font-variation-settings: "SOFT" 50, "WONK" 0;
+      letter-spacing: -0.01em;
+    }
+    code, .font-mono { font-family: "IBM Plex Mono", ui-monospace, monospace; }
+    .tabular-nums { font-variant-numeric: tabular-nums; }
+
+    .ledger-bg {
+      background-image: repeating-linear-gradient(
+        0deg, transparent 0, transparent 31px,
+        hsl(34 18% 84% / 0.45) 31px, hsl(34 18% 84% / 0.45) 32px);
+    }
+    .seal {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 1.25rem; height: 1.25rem; border-radius: 0.25rem;
+      background: hsl(353 60% 31%); color: hsl(36 30% 96%);
+      font-family: "Fraunces"; font-weight: 600; font-size: 0.7rem;
+      box-shadow: 0 1px 0 hsl(0 60% 25% / 0.18);
+    }
+    kbd {
+      font-size: 0.72em; padding: 0.1em 0.4em;
+      border: 1px solid hsl(34 18% 84%); border-radius: 0.3em;
+      background: hsl(32 18% 90%); color: hsl(24 12% 38%);
+      box-shadow: 0 1px 0 hsl(34 18% 84%);
+      font-family: "IBM Plex Mono", monospace;
+    }
+    .caps  { font-size: 10px; text-transform: uppercase; letter-spacing: 0.22em; color: hsl(24 12% 38%); }
+    .caps2 { font-size: 10px; text-transform: uppercase; letter-spacing: 0.18em; color: hsl(24 12% 38%); }
+
+    .badge {
+      display: inline-flex; align-items: center; gap: 0.25rem;
+      padding: 0.1rem 0.5rem; border-radius: 0.3rem;
+      font-size: 10px; font-weight: 500; letter-spacing: 0.02em;
+    }
+    .b-validated { background: hsl(105 28% 32% / 0.10); color: hsl(105 28% 22%); border: 1px solid hsl(105 28% 32% / 0.25); }
+    .b-warning   { background: hsl(40 65% 38% / 0.12); color: hsl(40 65% 26%); border: 1px solid hsl(40 65% 38% / 0.30); }
+    .b-running   { background: hsl(353 60% 31%); color: hsl(36 30% 96%); }
+    .b-outline   { border: 1px solid hsl(34 18% 84%); color: hsl(24 12% 38%); }
+
+    @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    .animate-rise { animation: rise 360ms cubic-bezier(.2,.6,.2,1) both; }
+
+    /* Three-state switcher pill */
+    .state-pill {
+      padding: 0.45rem 1rem; font-size: 12px; letter-spacing: 0.12em;
+      text-transform: uppercase; color: hsl(24 12% 38%);
+      border: 1px solid hsl(34 18% 84%); background: hsl(0 0% 100%);
+      border-radius: 999px; cursor: pointer; transition: all .15s ease;
+    }
+    .state-pill:hover { border-color: hsl(353 60% 31% / 0.4); color: hsl(24 15% 8%); }
+    .state-pill[data-active="true"] {
+      background: hsl(353 60% 31%); color: hsl(36 30% 96%);
+      border-color: hsl(353 60% 31%);
+    }
+
+    .state { display: none; }
+    .state[data-active="true"] { display: block; }
+  </style>
+</head>
+
+<body>
+
+<!-- ── Mock-level header & state switcher ──────────────────────── -->
+<div class="mx-auto max-w-[1080px] px-10 pt-10 pb-6">
+  <div class="caps mb-2">Design review · Studio › Pilots tab</div>
+  <h1 class="font-display text-[34px] leading-[1.1] tracking-tight" style="font-variation-settings:'opsz' 60, 'SOFT' 60;">
+    Pilots tab — MVP additions
+  </h1>
+  <p class="mt-2 max-w-[60ch] text-[13.5px] text-mute">
+    One visual focal point per state. Switch between them with the pills below.
+  </p>
+  <div class="mt-5 flex flex-wrap items-center gap-2">
+    <button class="state-pill" data-active="true" data-target="state-dev">1 · Dev iteration</button>
+    <button class="state-pill" data-target="state-lock">2 · Lock test running</button>
+    <button class="state-pill" data-target="state-handoff">3 · Authoring handoff</button>
+  </div>
+</div>
+
+<!-- ════════════════════ STATE 1 · dev iteration ════════════════════ -->
+<section id="state-dev" class="state animate-rise" data-active="true">
+  <div class="mx-auto max-w-[1240px] mb-12 rounded-lg border border-border overflow-hidden bg-paper ledger-bg shadow-sm">
+    <div class="flex">
+      <!-- Left rail -->
+      <aside class="w-[240px] shrink-0 flex flex-col border-r border-border bg-paper/60">
+        <div class="flex h-14 items-center gap-2 px-5">
+          <span class="seal" aria-hidden>R</span>
+          <div class="leading-tight">
+            <div class="text-[15px] font-display font-semibold tracking-tight" style="font-variation-settings:'SOFT' 100, 'WONK' 1;">Chart Review</div>
+            <div class="caps2">scholarly · scalable</div>
+          </div>
+        </div>
+        <hr class="border-border" />
+        <nav class="flex flex-1 flex-col gap-0.5 px-2 pt-3 text-[13px]">
+          <a class="relative flex h-9 items-center gap-2.5 rounded-md px-3 text-mute"><span class="absolute left-0 top-1.5 h-6 w-[3px] rounded-full bg-transparent"></span>Queue</a>
+          <a class="relative flex h-9 items-center gap-2.5 rounded-md px-3 text-mute"><span class="absolute left-0 top-1.5 h-6 w-[3px] rounded-full bg-transparent"></span>Patient</a>
+          <a class="relative flex h-9 items-center gap-2.5 rounded-md px-3 bg-card text-ink shadow-sm"><span class="absolute left-0 top-1.5 h-6 w-[3px] rounded-full bg-oxblood"></span>Studio</a>
+          <a class="relative flex h-9 items-center gap-2.5 rounded-md px-3 text-mute"><span class="absolute left-0 top-1.5 h-6 w-[3px] rounded-full bg-transparent"></span>Audit</a>
+          <a class="relative flex h-9 items-center gap-2.5 rounded-md px-3 text-mute"><span class="absolute left-0 top-1.5 h-6 w-[3px] rounded-full bg-transparent"></span>Help</a>
+        </nav>
+        <div class="px-3 pb-4 pt-3">
+          <hr class="border-border mb-3" />
+          <div class="rounded-md border border-border/70 bg-card/60 px-3 py-2.5">
+            <div class="caps2">Active task</div>
+            <div class="mt-1 font-mono text-[12px] text-ink">lung-cancer-phenotype</div>
+            <div class="mt-0.5 text-[11px] text-mute tabular-nums">14 fields</div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Main column -->
+      <div class="flex-1 flex flex-col">
+        <header class="h-14 flex items-center gap-4 border-b border-border bg-paper/80 px-5">
+          <div class="flex-1 flex items-center gap-2 text-[13px]">
+            <span class="text-mute">Studio</span>
+            <span class="text-mute/50">/</span>
+            <span class="text-ink">Pilots</span>
+          </div>
+          <button class="h-8 px-2.5 rounded-md border border-border text-mute flex items-center gap-2 text-[12px] bg-card">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="11" cy="11" r="7"/><path d="m20 20-3-3"/></svg>
+            <span>Search</span>
+            <kbd class="ml-2">⌘K</kbd>
+          </button>
+          <div class="flex items-center gap-1.5 rounded-md border border-border bg-card px-2 py-1 text-[12px]">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="hsl(105 28% 32%)" stroke="hsl(105 28% 32%)" stroke-width="1.5"><path d="M12 2 4 5v6c0 5 3.5 9.5 8 11 4.5-1.5 8-6 8-11V5z"/></svg>
+            <span class="font-mono text-ink">test_pi</span>
+          </div>
+        </header>
+
+        <main class="px-12 py-12 max-w-[1080px] mx-auto w-full">
+          <!-- Tab bar -->
+          <div class="border-b border-border">
+            <div class="flex items-end gap-1 overflow-x-auto">
+              <button class="relative px-4 py-2.5 text-[12px] uppercase tracking-[0.18em] text-ink">
+                Pilots
+                <span class="absolute inset-x-2 -bottom-px h-[2px] bg-oxblood"></span>
+              </button>
+              <button class="relative px-4 py-2.5 text-[12px] uppercase tracking-[0.18em] text-mute">Calibration</button>
+              <button class="relative px-4 py-2.5 text-[12px] uppercase tracking-[0.18em] text-mute">Rules</button>
+              <button class="relative px-4 py-2.5 text-[12px] uppercase tracking-[0.18em] text-mute">Methods</button>
+              <button class="relative px-4 py-2.5 text-[12px] uppercase tracking-[0.18em] text-mute">Bundles</button>
+              <button class="relative px-4 py-2.5 text-[12px] uppercase tracking-[0.18em] text-mute">Authoring</button>
+            </div>
+          </div>
+
+          <!-- Figure header -->
+          <article class="mt-12">
+            <div class="caps">Figure 1 · Convergence</div>
+            <h2 class="mt-2 font-display text-[30px] leading-tight tracking-tight" style="font-variation-settings:'opsz' 32, 'SOFT' 50;">
+              Iteration trajectory
+            </h2>
+            <p class="mt-2 max-w-[58ch] text-[13.5px] leading-relaxed text-mute">
+              Per-criterion accuracy across iterations. The lock-test threshold is 0.90. The rubric is converging when every line clears the bar for two consecutive iterations.
+            </p>
+
+            <!-- ── VISUAL CENTRAL · trajectory chart ── -->
+            <figure class="mt-12 mb-10">
+              <svg viewBox="0 0 720 320" class="w-full h-auto" role="img" aria-label="Per-criterion accuracy across iterations 01–04">
+                <!-- Plot area: x 80→700, y 30→260 -->
+                <!-- Y-axis labels -->
+                <g font-family="IBM Plex Mono" font-size="10" fill="hsl(24 12% 38%)">
+                  <text x="68" y="37"  text-anchor="end">1.00</text>
+                  <text x="68" y="84"  text-anchor="end">0.90</text>
+                  <text x="68" y="135" text-anchor="end">0.80</text>
+                  <text x="68" y="186" text-anchor="end">0.70</text>
+                  <text x="68" y="237" text-anchor="end">0.60</text>
+                  <text x="68" y="263" text-anchor="end">0.50</text>
+                </g>
+                <!-- Gridlines -->
+                <g stroke="hsl(34 18% 84%)" stroke-width="0.6" stroke-dasharray="2 4">
+                  <line x1="80" y1="33" x2="700" y2="33"/>
+                  <line x1="80" y1="135" x2="700" y2="135"/>
+                  <line x1="80" y1="186" x2="700" y2="186"/>
+                  <line x1="80" y1="237" x2="700" y2="237"/>
+                  <line x1="80" y1="260" x2="700" y2="260"/>
+                </g>
+                <!-- Threshold line at y=84 (0.90) -->
+                <line x1="80" y1="84" x2="700" y2="84" stroke="hsl(353 60% 31%)" stroke-width="1.25" stroke-dasharray="6 3" opacity="0.6"/>
+                <text x="704" y="87" font-family="IBM Plex Mono" font-size="10" fill="hsl(353 60% 31%)">threshold</text>
+
+                <!-- X-axis ticks -->
+                <g font-family="IBM Plex Mono" font-size="10" fill="hsl(24 12% 38%)">
+                  <text x="155" y="280" text-anchor="middle">iter 01</text>
+                  <text x="335" y="280" text-anchor="middle">iter 02</text>
+                  <text x="515" y="280" text-anchor="middle">iter 03</text>
+                  <text x="640" y="280" text-anchor="middle">iter 04 · running</text>
+                </g>
+
+                <!-- Background lines (the 7 non-worst criteria, faded sage) -->
+                <g stroke="hsl(105 28% 32%)" stroke-opacity="0.22" stroke-width="1.25" fill="none">
+                  <polyline points="155,140  335,120  515,100  640,84"/>   <!-- icd -->
+                  <polyline points="155,135  335,125  515,90   640,84"/>   <!-- treatment -->
+                  <polyline points="155,250  335,196  515,135  640,135"/>  <!-- stage_at_index -->
+                  <polyline points="155,170  335,155  515,135  640,84"/>   <!-- remission -->
+                  <polyline points="155,165  335,135  515,100  640,33"/>   <!-- active_disease -->
+                  <polyline points="155,90   335,90   515,33   640,33"/>   <!-- smoking -->
+                  <polyline points="155,84   335,84   515,33   640,33"/>   <!-- index_anchor -->
+                </g>
+
+                <!-- Worst-criterion line (oxblood, prominent) -->
+                <polyline points="155,225  335,210  515,196  640,186"
+                          stroke="hsl(353 60% 31%)" stroke-width="2.25" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                <!-- Worst-criterion endpoints -->
+                <circle cx="155" cy="225" r="3" fill="hsl(353 60% 31%)"/>
+                <circle cx="335" cy="210" r="3" fill="hsl(353 60% 31%)"/>
+                <circle cx="515" cy="196" r="3" fill="hsl(353 60% 31%)"/>
+                <circle cx="640" cy="186" r="4" fill="hsl(353 60% 31%)" stroke="hsl(36 30% 96%)" stroke-width="2"/>
+
+                <!-- Label for the oxblood line -->
+                <text x="155" y="217" font-family="IBM Plex Mono" font-size="10" fill="hsl(353 60% 31%)">pathology_lung_primary</text>
+                <text x="155" y="205" font-family="IBM Plex Mono" font-size="9" fill="hsl(353 60% 31%)" opacity="0.7">— worst criterion across iters</text>
+
+                <!-- Y-axis line -->
+                <line x1="80" y1="33" x2="80" y2="260" stroke="hsl(24 15% 8%)" stroke-width="1"/>
+              </svg>
+            </figure>
+
+            <!-- One-line status under the figure -->
+            <div class="text-center text-[13px] text-mute max-w-[60ch] mx-auto">
+              <span class="font-mono text-ink">iter_004</span> in progress · oracle has validated <span class="font-mono text-ink">7 / 10</span> patients ·
+              <span class="font-mono text-oxblood">pathology_lung_primary</span> at <span class="font-mono text-oxblood">0.70</span> is the bottleneck.
+            </div>
+
+            <!-- Eligibility pip -->
+            <div class="mt-7 flex items-center justify-center gap-3 text-[12px] text-mute">
+              <span class="caps2">Lock-test eligibility</span>
+              <span class="inline-flex items-center gap-1.5">
+                <span class="block h-2.5 w-2.5 rounded-full bg-sage"></span>
+                <span class="block h-2.5 w-2.5 rounded-full border border-border bg-paper"></span>
+              </span>
+              <span class="font-mono">1 of 2 consecutive iters</span>
+            </div>
+
+            <!-- Compact iter list -->
+            <div class="mt-12">
+              <div class="caps2 mb-3">Recent iterations</div>
+              <ol>
+                <li class="grid grid-cols-[40px_1fr_auto_24px] items-baseline gap-6 border-b border-border/60 py-3">
+                  <div class="font-display text-[20px] tabular-nums text-ink/40" style="font-variation-settings:'opsz' 24, 'SOFT' 50;">04</div>
+                  <div class="flex items-center gap-3">
+                    <span class="font-mono text-[12.5px]">iter_004</span>
+                    <span class="badge b-running">running</span>
+                  </div>
+                  <div class="font-mono text-[11.5px] tabular-nums text-mute">0.70 / 0.86</div>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="hsl(24 12% 38%)" stroke-width="1.5"><path d="m9 6 6 6-6 6"/></svg>
+                </li>
+                <li class="grid grid-cols-[40px_1fr_auto_24px] items-baseline gap-6 border-b border-border/60 py-3">
+                  <div class="font-display text-[20px] tabular-nums text-ink/40" style="font-variation-settings:'opsz' 24, 'SOFT' 50;">03</div>
+                  <div class="flex items-center gap-3">
+                    <span class="font-mono text-[12.5px]">iter_003</span>
+                    <span class="badge b-validated">complete</span>
+                  </div>
+                  <div class="font-mono text-[11.5px] tabular-nums text-mute">0.60 / 0.81</div>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="hsl(24 12% 38%)" stroke-width="1.5"><path d="m9 6 6 6-6 6"/></svg>
+                </li>
+                <li class="grid grid-cols-[40px_1fr_auto_24px] items-baseline gap-6 border-b border-border/60 py-3">
+                  <div class="font-display text-[20px] tabular-nums text-ink/40" style="font-variation-settings:'opsz' 24, 'SOFT' 50;">02</div>
+                  <div class="flex items-center gap-3">
+                    <span class="font-mono text-[12.5px]">iter_002</span>
+                    <span class="badge b-validated">complete</span>
+                  </div>
+                  <div class="font-mono text-[11.5px] tabular-nums text-mute">0.55 / 0.74</div>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="hsl(24 12% 38%)" stroke-width="1.5"><path d="m9 6 6 6-6 6"/></svg>
+                </li>
+                <li class="grid grid-cols-[40px_1fr_auto_24px] items-baseline gap-6 py-3">
+                  <div class="font-display text-[20px] tabular-nums text-ink/40" style="font-variation-settings:'opsz' 24, 'SOFT' 50;">01</div>
+                  <div class="flex items-center gap-3">
+                    <span class="font-mono text-[12.5px]">iter_001</span>
+                    <span class="badge b-validated">complete</span>
+                  </div>
+                  <div class="font-mono text-[11.5px] tabular-nums text-mute">0.42 / 0.65</div>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="hsl(24 12% 38%)" stroke-width="1.5"><path d="m9 6 6 6-6 6"/></svg>
+                </li>
+              </ol>
+              <p class="mt-3 caps2">worst / avg per-criterion accuracy · click a row to drill into validation, accuracy table, and override clusters</p>
+            </div>
+          </article>
+        </main>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════ STATE 2 · lock test running ════════════════════ -->
+<section id="state-lock" class="state animate-rise">
+  <div class="mx-auto max-w-[1240px] mb-12 rounded-lg border border-border overflow-hidden bg-paper ledger-bg shadow-sm">
+    <div class="flex">
+      <aside class="w-[240px] shrink-0 flex flex-col border-r border-border bg-paper/60">
+        <div class="flex h-14 items-center gap-2 px-5">
+          <span class="seal" aria-hidden>R</span>
+          <div class="leading-tight">
+            <div class="text-[15px] font-display font-semibold tracking-tight" style="font-variation-settings:'SOFT' 100, 'WONK' 1;">Chart Review</div>
+            <div class="caps2">scholarly · scalable</div>
+          </div>
+        </div>
+        <hr class="border-border" />
+        <nav class="flex flex-1 flex-col gap-0.5 px-2 pt-3 text-[13px]">
+          <a class="relative flex h-9 items-center gap-2.5 rounded-md px-3 text-mute"><span class="absolute left-0 top-1.5 h-6 w-[3px] rounded-full bg-transparent"></span>Queue</a>
+          <a class="relative flex h-9 items-center gap-2.5 rounded-md px-3 text-mute"><span class="absolute left-0 top-1.5 h-6 w-[3px] rounded-full bg-transparent"></span>Patient</a>
+          <a class="relative flex h-9 items-center gap-2.5 rounded-md px-3 bg-card text-ink shadow-sm"><span class="absolute left-0 top-1.5 h-6 w-[3px] rounded-full bg-oxblood"></span>Studio</a>
+          <a class="relative flex h-9 items-center gap-2.5 rounded-md px-3 text-mute"><span class="absolute left-0 top-1.5 h-6 w-[3px] rounded-full bg-transparent"></span>Audit</a>
+          <a class="relative flex h-9 items-center gap-2.5 rounded-md px-3 text-mute"><span class="absolute left-0 top-1.5 h-6 w-[3px] rounded-full bg-transparent"></span>Help</a>
+        </nav>
+        <div class="px-3 pb-4 pt-3">
+          <hr class="border-border mb-3" />
+          <div class="rounded-md border border-border/70 bg-card/60 px-3 py-2.5">
+            <div class="caps2">Active task</div>
+            <div class="mt-1 font-mono text-[12px] text-ink">lung-cancer-phenotype</div>
+            <div class="mt-0.5 text-[11px] text-mute tabular-nums">14 fields · piloted</div>
+          </div>
+        </div>
+      </aside>
+
+      <div class="flex-1 flex flex-col">
+        <header class="h-14 flex items-center gap-4 border-b border-border bg-paper/80 px-5">
+          <div class="flex-1 flex items-center gap-2 text-[13px]">
+            <span class="text-mute">Studio</span>
+            <span class="text-mute/50">/</span>
+            <span class="text-mute">Pilots</span>
+            <span class="text-mute/50">/</span>
+            <span class="text-ink font-mono">lock test</span>
+          </div>
+          <div class="flex items-center gap-1.5 rounded-md border border-border bg-card px-2 py-1 text-[12px]">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="hsl(105 28% 32%)" stroke="hsl(105 28% 32%)" stroke-width="1.5"><path d="M12 2 4 5v6c0 5 3.5 9.5 8 11 4.5-1.5 8-6 8-11V5z"/></svg>
+            <span class="font-mono text-ink">test_pi</span>
+          </div>
+        </header>
+
+        <main class="px-12 py-12 max-w-[1080px] mx-auto w-full">
+          <div class="border-b border-border">
+            <div class="flex items-end gap-1 overflow-x-auto">
+              <button class="relative px-4 py-2.5 text-[12px] uppercase tracking-[0.18em] text-ink">Pilots<span class="absolute inset-x-2 -bottom-px h-[2px] bg-oxblood"></span></button>
+              <button class="relative px-4 py-2.5 text-[12px] uppercase tracking-[0.18em] text-mute">Calibration</button>
+              <button class="relative px-4 py-2.5 text-[12px] uppercase tracking-[0.18em] text-mute">Rules</button>
+              <button class="relative px-4 py-2.5 text-[12px] uppercase tracking-[0.18em] text-mute">Methods</button>
+              <button class="relative px-4 py-2.5 text-[12px] uppercase tracking-[0.18em] text-mute">Bundles</button>
+              <button class="relative px-4 py-2.5 text-[12px] uppercase tracking-[0.18em] text-mute">Authoring</button>
+            </div>
+          </div>
+
+          <article class="mt-12">
+            <div class="caps">Figure 1 · Lock test</div>
+            <h2 class="mt-2 font-display text-[30px] leading-tight tracking-tight" style="font-variation-settings:'opsz' 32, 'SOFT' 50;">
+              Held-out validation
+            </h2>
+            <p class="mt-2 max-w-[58ch] text-[13.5px] leading-relaxed text-mute">
+              30 patients the authoring loop has never seen. Every primary criterion must clear 0.90 to lock the guideline. Copilot operates in blind mode — the oracle does not see the agent's draft.
+            </p>
+
+            <!-- ── VISUAL CENTRAL · 30 patient grid ── -->
+            <figure class="mt-12 mb-8">
+              <div class="mx-auto" style="max-width: 540px;">
+                <!-- 6 cols × 5 rows = 30 dots, generously spaced -->
+                <div class="grid gap-3" style="grid-template-columns: repeat(6, minmax(0, 1fr));">
+                  <!-- 22 done (sage), 1 in-progress (oxblood), 7 pending (border) -->
+                  <!-- Row 1 -->
+                  <div class="aspect-square rounded-md bg-sage/[0.85]"></div>
+                  <div class="aspect-square rounded-md bg-sage/[0.85]"></div>
+                  <div class="aspect-square rounded-md bg-sage/[0.85]"></div>
+                  <div class="aspect-square rounded-md bg-sage/[0.85]"></div>
+                  <div class="aspect-square rounded-md bg-sage/[0.85]"></div>
+                  <div class="aspect-square rounded-md bg-sage/[0.85]"></div>
+                  <!-- Row 2 -->
+                  <div class="aspect-square rounded-md bg-sage/[0.85]"></div>
+                  <div class="aspect-square rounded-md bg-sage/[0.85]"></div>
+                  <div class="aspect-square rounded-md bg-sage/[0.85]"></div>
+                  <div class="aspect-square rounded-md bg-sage/[0.85]"></div>
+                  <div class="aspect-square rounded-md bg-sage/[0.85]"></div>
+                  <div class="aspect-square rounded-md bg-sage/[0.85]"></div>
+                  <!-- Row 3 -->
+                  <div class="aspect-square rounded-md bg-sage/[0.85]"></div>
+                  <div class="aspect-square rounded-md bg-sage/[0.85]"></div>
+                  <div class="aspect-square rounded-md bg-sage/[0.85]"></div>
+                  <div class="aspect-square rounded-md bg-sage/[0.85]"></div>
+                  <div class="aspect-square rounded-md bg-sage/[0.85]"></div>
+                  <div class="aspect-square rounded-md bg-sage/[0.85]"></div>
+                  <!-- Row 4 -->
+                  <div class="aspect-square rounded-md bg-sage/[0.85]"></div>
+                  <div class="aspect-square rounded-md bg-sage/[0.85]"></div>
+                  <div class="aspect-square rounded-md bg-sage/[0.85]"></div>
+                  <div class="aspect-square rounded-md bg-sage/[0.85]"></div>
+                  <div class="aspect-square rounded-md bg-oxblood ring-4 ring-oxblood/20"></div>
+                  <div class="aspect-square rounded-md border border-border bg-paper"></div>
+                  <!-- Row 5 -->
+                  <div class="aspect-square rounded-md border border-border bg-paper"></div>
+                  <div class="aspect-square rounded-md border border-border bg-paper"></div>
+                  <div class="aspect-square rounded-md border border-border bg-paper"></div>
+                  <div class="aspect-square rounded-md border border-border bg-paper"></div>
+                  <div class="aspect-square rounded-md border border-border bg-paper"></div>
+                  <div class="aspect-square rounded-md border border-border bg-paper"></div>
+                </div>
+                <!-- Caption -->
+                <div class="mt-5 grid grid-cols-3 gap-4 text-center">
+                  <div>
+                    <div class="font-display text-[28px] leading-none tabular-nums text-sage" style="font-variation-settings:'opsz' 30, 'SOFT' 50;">22</div>
+                    <div class="caps2 mt-1">validated</div>
+                  </div>
+                  <div>
+                    <div class="font-display text-[28px] leading-none tabular-nums text-oxblood" style="font-variation-settings:'opsz' 30, 'SOFT' 50;">1</div>
+                    <div class="caps2 mt-1">in progress</div>
+                  </div>
+                  <div>
+                    <div class="font-display text-[28px] leading-none tabular-nums text-mute" style="font-variation-settings:'opsz' 30, 'SOFT' 50;">7</div>
+                    <div class="caps2 mt-1">pending</div>
+                  </div>
+                </div>
+              </div>
+            </figure>
+
+            <!-- Verdict line -->
+            <div class="mt-10 text-center text-[13.5px] max-w-[60ch] mx-auto">
+              <span class="caps2">Tentative · pending completion</span>
+              <p class="mt-2 text-ink">
+                <span class="font-display text-[18px]" style="font-variation-settings:'opsz' 20, 'SOFT' 50;">7 of 8</span> primary criteria currently passing.
+                <span class="font-mono text-oxblood">stage_at_index</span> at <span class="font-mono text-oxblood">0.86</span> is below threshold — partial signal on 14 / 22 evaluable patients.
+              </p>
+              <p class="mt-2 text-mute text-[12px] font-mono">eta · 1h 42m</p>
+            </div>
+          </article>
+        </main>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════ STATE 3 · authoring handoff ════════════════════ -->
+<section id="state-handoff" class="state animate-rise">
+  <div class="mx-auto max-w-[1240px] mb-12 rounded-lg border border-border overflow-hidden bg-paper ledger-bg shadow-sm">
+    <div class="flex">
+      <aside class="w-[240px] shrink-0 flex flex-col border-r border-border bg-paper/60">
+        <div class="flex h-14 items-center gap-2 px-5">
+          <span class="seal" aria-hidden>R</span>
+          <div class="leading-tight">
+            <div class="text-[15px] font-display font-semibold tracking-tight" style="font-variation-settings:'SOFT' 100, 'WONK' 1;">Chart Review</div>
+            <div class="caps2">scholarly · scalable</div>
+          </div>
+        </div>
+        <hr class="border-border" />
+        <nav class="flex flex-1 flex-col gap-0.5 px-2 pt-3 text-[13px]">
+          <a class="relative flex h-9 items-center gap-2.5 rounded-md px-3 text-mute"><span class="absolute left-0 top-1.5 h-6 w-[3px] rounded-full bg-transparent"></span>Queue</a>
+          <a class="relative flex h-9 items-center gap-2.5 rounded-md px-3 text-mute"><span class="absolute left-0 top-1.5 h-6 w-[3px] rounded-full bg-transparent"></span>Patient</a>
+          <a class="relative flex h-9 items-center gap-2.5 rounded-md px-3 bg-card text-ink shadow-sm"><span class="absolute left-0 top-1.5 h-6 w-[3px] rounded-full bg-oxblood"></span>Studio</a>
+          <a class="relative flex h-9 items-center gap-2.5 rounded-md px-3 text-mute"><span class="absolute left-0 top-1.5 h-6 w-[3px] rounded-full bg-transparent"></span>Audit</a>
+          <a class="relative flex h-9 items-center gap-2.5 rounded-md px-3 text-mute"><span class="absolute left-0 top-1.5 h-6 w-[3px] rounded-full bg-transparent"></span>Help</a>
+        </nav>
+        <div class="px-3 pb-4 pt-3">
+          <hr class="border-border mb-3" />
+          <div class="rounded-md border border-border/70 bg-card/60 px-3 py-2.5">
+            <div class="caps2">Active task</div>
+            <div class="mt-1 font-mono text-[12px] text-ink">copd-exacerbation</div>
+            <div class="mt-0.5 text-[11px] text-mute tabular-nums">9 fields · just promoted</div>
+          </div>
+        </div>
+      </aside>
+
+      <div class="flex-1 flex flex-col">
+        <header class="h-14 flex items-center gap-4 border-b border-border bg-paper/80 px-5">
+          <div class="flex-1 flex items-center gap-2 text-[13px]">
+            <span class="text-mute">Studio</span>
+            <span class="text-mute/50">/</span>
+            <span class="text-ink">Pilots</span>
+          </div>
+          <div class="flex items-center gap-1.5 rounded-md border border-border bg-card px-2 py-1 text-[12px]">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="hsl(105 28% 32%)" stroke="hsl(105 28% 32%)" stroke-width="1.5"><path d="M12 2 4 5v6c0 5 3.5 9.5 8 11 4.5-1.5 8-6 8-11V5z"/></svg>
+            <span class="font-mono text-ink">test_pi</span>
+          </div>
+        </header>
+
+        <main class="px-12 py-12 max-w-[1080px] mx-auto w-full">
+          <div class="border-b border-border">
+            <div class="flex items-end gap-1 overflow-x-auto">
+              <button class="relative px-4 py-2.5 text-[12px] uppercase tracking-[0.18em] text-ink">Pilots<span class="absolute inset-x-2 -bottom-px h-[2px] bg-oxblood"></span></button>
+              <button class="relative px-4 py-2.5 text-[12px] uppercase tracking-[0.18em] text-mute">Calibration</button>
+              <button class="relative px-4 py-2.5 text-[12px] uppercase tracking-[0.18em] text-mute">Rules</button>
+              <button class="relative px-4 py-2.5 text-[12px] uppercase tracking-[0.18em] text-mute">Methods</button>
+              <button class="relative px-4 py-2.5 text-[12px] uppercase tracking-[0.18em] text-mute">Bundles</button>
+              <button class="relative px-4 py-2.5 text-[12px] uppercase tracking-[0.18em] text-mute">Authoring</button>
+            </div>
+          </div>
+
+          <article class="mt-12">
+            <div class="caps">Figure 1 · New guideline</div>
+            <h2 class="mt-2 font-display text-[30px] leading-tight tracking-tight" style="font-variation-settings:'opsz' 32, 'SOFT' 50;">
+              Promoted from Authoring
+            </h2>
+            <p class="mt-2 max-w-[58ch] text-[13.5px] leading-relaxed text-mute">
+              The draft is frozen as iter 00 — a baseline for trajectory comparison. Curate the cohorts, then start iter 01.
+            </p>
+
+            <!-- ── VISUAL CENTRAL · single hero card ── -->
+            <div class="mt-12 mb-10 mx-auto" style="max-width: 520px;">
+              <div class="rounded-lg border border-oxblood/25 bg-card px-8 py-9 text-center" style="box-shadow: 0 1px 0 hsl(353 60% 31% / 0.10), 0 12px 32px -16px hsl(353 60% 31% / 0.18);">
+                <div class="seal mx-auto" style="width:1.6rem;height:1.6rem;font-size:0.85rem;" aria-hidden>R</div>
+                <div class="caps mt-5">copd-exacerbation</div>
+                <div class="mt-2 font-display text-[24px] leading-tight" style="font-variation-settings:'opsz' 28, 'SOFT' 50;">
+                  9 criteria · sha <span class="font-mono text-[19px]">d12c08a4</span>
+                </div>
+                <p class="mt-3 text-[13px] text-mute max-w-[40ch] mx-auto">
+                  Pick 10 dev + 30 lock patients, stratified to cover at least one positive, one negative, and one edge case per primary criterion.
+                </p>
+                <button class="mt-7 inline-flex items-center gap-2 rounded-md bg-oxblood text-paper px-5 py-2.5 text-[13px] font-medium hover:opacity-90">
+                  Curate cohorts
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="m9 6 6 6-6 6"/></svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- Compact iter list with seed iter -->
+            <div class="mt-14">
+              <div class="caps2 mb-3 text-center">Iterations</div>
+              <ol class="max-w-[520px] mx-auto">
+                <li class="grid grid-cols-[40px_1fr_auto] items-baseline gap-6 py-3">
+                  <div class="font-display text-[20px] tabular-nums text-ink/40" style="font-variation-settings:'opsz' 24, 'SOFT' 50;">00</div>
+                  <div class="flex items-center gap-3">
+                    <span class="font-mono text-[12.5px]">iter_000</span>
+                    <span class="badge b-outline">seed · not validated</span>
+                  </div>
+                  <span class="caps2">from authoring</span>
+                </li>
+              </ol>
+            </div>
+          </article>
+        </main>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  document.querySelectorAll(".state-pill").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".state-pill").forEach((b) => b.setAttribute("data-active", "false"));
+      document.querySelectorAll(".state").forEach((s) => s.setAttribute("data-active", "false"));
+      btn.setAttribute("data-active", "true");
+      const target = document.getElementById(btn.dataset.target);
+      if (target) target.setAttribute("data-active", "true");
+    });
+  });
+</script>
+
+</body>
+</html>

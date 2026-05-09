@@ -1,0 +1,34 @@
+[
+  {
+    "row_id": 130050,
+    "concept_id": 9202,
+    "concept_name": "Outpatient Visit",
+    "type": "Outpatient",
+    "department": "Radiology",
+    "date": "2024-06-30"
+  },
+  {
+    "row_id": 130051,
+    "concept_id": 9202,
+    "concept_name": "Outpatient Visit",
+    "type": "Outpatient",
+    "department": "Pulmonary Medicine",
+    "date": "2024-07-08"
+  },
+  {
+    "row_id": 130052,
+    "concept_id": 9201,
+    "concept_name": "Inpatient Visit",
+    "type": "Inpatient / Same-Day Surgery",
+    "department": "Thoracic Surgery",
+    "date": "2024-07-19"
+  },
+  {
+    "row_id": 130053,
+    "concept_id": 9202,
+    "concept_name": "Outpatient Visit",
+    "type": "Outpatient",
+    "department": "Thoracic Oncology",
+    "date": "2024-08-14"
+  }
+]

@@ -1,0 +1,1626 @@
+{
+  "iter_id": "iter_009",
+  "task_id": "lung-cancer-phenotype",
+  "generated_at": "2026-05-09T20:13:13.990Z",
+  "generated_by": "yuhang",
+  "model": "anthropic/claude-sonnet-4.6",
+  "total_cost_usd": 2.50922305,
+  "total_duration_ms": 315503,
+  "cells_analyzed": 23,
+  "cells_failed": 0,
+  "analyses": [
+    {
+      "patient_id": "patient_easy_icd_02",
+      "field_id": "cytology_supports_lung_primary",
+      "kind": "type_drift",
+      "agent_a": {
+        "agent_id": "agent_1",
+        "answer": false,
+        "confidence": "high",
+        "rationale": "No cytology findings or specimens are documented in the chart. The hospitalization record contains no references to lung biopsies, sputum cytology, or any other cytologic examination. The chart focuses exclusively on orthopedic trauma management.",
+        "evidence": [
+          {
+            "source": "note",
+            "note_id": "2024-10-22__er_visit",
+            "span_offsets": [
+              468,
+              544
+            ],
+            "verbatim_quote": "No head injury, LOC, neck pain, or chest trauma. No fever or recent illness."
+          },
+          {
+            "source": "note",
+            "note_id": "2024-11-04__pcp_followup",
+            "span_offsets": [
+              527,
+              581
+            ],
+            "verbatim_quote": "No fever, no wound drainage, no chest pain or dyspnea."
+          }
+        ]
+      },
+      "agent_b": {
+        "agent_id": "agent_2",
+        "answer": "no",
+        "confidence": "high",
+        "rationale": "No cytology specimens or cytologic evidence supporting a lung cancer diagnosis is documented in the chart. The clinical activity centers entirely on orthopedic trauma management (hip fracture ORIF). No respiratory specimens, sputum samples, or other cytologic studies are mentioned.",
+        "evidence": [
+          {
+            "source": "note",
+            "note_id": "2024-10-26__discharge_summary",
+            "span_offsets": [
+              445,
+              568
+            ],
+            "verbatim_quote": "C34.10 — Bronchus/lung upper lobe, unspecified (chronic, problem list carry-forward per billing practice; no active workup)",
+            "doc_type": "discharge_summary",
+            "evidence_date": "2024-10-26"
+          }
+        ]
+      },
+      "analysis": {
+        "suggested_answer": false,
+        "reasoning": "This is a type_drift cell: both agents correctly determined that no cytology specimens, FNA reports, sputum cytology, or pleural fluid cytology are documented anywhere in the chart — the clinical record is exclusively an orthopedic trauma encounter. The criterion's answer_schema defines the enum as [true, false, no_info] (boolean values), making boolean false the canonical form. Agent A emitted the canonical boolean false. Agent B emitted the string \"no\", which deviates from the schema's enum. No clinical or guideline disagreement exists.",
+        "evidence_pointers": [
+          {
+            "note_id": "cytology_supports_lung_primary",
+            "what_to_look_for": "answer_schema.enum: [true, false, no_info] — boolean types, not strings",
+            "offsets": null
+          },
+          {
+            "note_id": "2024-10-26__discharge_summary",
+            "what_to_look_for": "C34.10 carry-forward annotation: 'no active workup' — confirms absence of cytology",
+            "offsets": [
+              445,
+              568
+            ]
+          }
+        ],
+        "agent_correctness": "both",
+        "classification_hint": "n_a",
+        "judge_confidence": "high"
+      },
+      "cost_usd": 0.10704865000000001,
+      "duration_ms": 26138,
+      "generated_at": "2026-05-09T20:11:01.466Z"
+    },
+    {
+      "patient_id": "patient_easy_icd_02",
+      "field_id": "icd_lung_cancer_present",
+      "kind": "type_drift",
+      "agent_a": {
+        "agent_id": "agent_1",
+        "answer": true,
+        "confidence": "high",
+        "rationale": "ICD code C34.10 (Malignant neoplasm of upper lobe, bronchus or lung, unspecified side) is present in the patient's problem list and discharge diagnoses. The code was imported from prior records during ED registration and carried forward per institutional billing practice, but it is documented as active in the OMOP conditions data (condition_start_date: 2021-05-17, condition_status: active).",
+        "evidence": [
+          {
+            "source": "note",
+            "note_id": "2024-10-22__er_visit",
+            "span_offsets": [
+              546,
+              766
+            ],
+            "verbatim_quote": "PAST MEDICAL HISTORY (registration records):\n- Osteoporosis (M81.0), osteoarthritis right hip (M16.11)\n- Hypertension (I10), hypothyroidism (E03.9), GERD (K21.0)\n- C34.10 — imported from prior records during registration"
+          },
+          {
+            "source": "note",
+            "note_id": "2024-10-26__discharge_summary",
+            "span_offsets": [
+              235,
+              568
+            ],
+            "verbatim_quote": "DISCHARGE DIAGNOSES:\n1. S72.141A — Right intertrochanteric femur fracture (primary)\n2. M81.0 — Age-related osteoporosis\n3. I10 — Essential hypertension\n4. E03.9 — Hypothyroidism, unspecified\n5. K21.0 — GERD\n6. C34.10 — Bronchus/lung upper lobe, unspecified (chronic, problem list carry-forward per billing practice; no active workup)"
+          },
+          {
+            "source": "omop",
+            "table": "conditions",
+            "row_id": "420001",
+            "concept_name": "Malignant neoplasm of upper lobe, bronchus or lung, unspecified side",
+            "value": "C34.10",
+            "evidence_date": "2021-05-17"
+          }
+        ]
+      },
+      "agent_b": {
+        "agent_id": "agent_2",
+        "answer": "yes",
+        "confidence": "high",
+        "rationale": "ICD-10 code C34.10 (Malignant neoplasm of upper lobe, bronchus or lung, unspecified side) is documented in the discharge diagnoses and OMOP conditions table. The code is carried forward from prior records as a problem-list entry with no active oncologic workup documented during the current hospitalization. Per the coding hierarchy, ICD-lung-cancer is present in the chart even though it is not clinically validated.",
+        "evidence": [
+          {
+            "source": "note",
+            "note_id": "2024-10-26__discharge_summary",
+            "span_offsets": [
+              442,
+              568
+            ],
+            "verbatim_quote": "6. C34.10 — Bronchus/lung upper lobe, unspecified (chronic, problem list carry-forward per billing practice; no active workup)",
+            "doc_type": "discharge_summary",
+            "evidence_date": "2024-10-26"
+          },
+          {
+            "source": "omop",
+            "table": "conditions",
+            "row_id": "420001",
+            "concept_id": 4115276,
+            "concept_name": "Malignant neoplasm of upper lobe, bronchus or lung, unspecified side",
+            "value": "C34.10"
+          }
+        ]
+      },
+      "analysis": {
+        "suggested_answer": true,
+        "reasoning": "Both agents agree that ICD-10 code C34.10 appears on the discharge diagnoses list ('6. C34.10 — Bronchus/lung upper lobe, unspecified (chronic, problem list carry-forward per billing practice; no active workup)') and in the ED registration history ('C34.10 — imported from prior records during registration'). The criterion asks only whether a C34.* code is present on the problem list or any encounter diagnosis, and C34.10 unambiguously satisfies that. This is not a clinical disagreement — it is a type-drift: the criterion's answer_schema.enum specifies boolean values [true, false], so the canonical answer is boolean true. Agent A emitted the canonical boolean true; Agent B emitted the non-canonical string 'yes', which does not validate against the schema.",
+        "evidence_pointers": [
+          {
+            "note_id": "2024-10-26__discharge_summary",
+            "what_to_look_for": "C34.10 in discharge diagnoses list (item 6)",
+            "offsets": [
+              442,
+              568
+            ]
+          },
+          {
+            "note_id": "2024-10-22__er_visit",
+            "what_to_look_for": "C34.10 imported from prior records in past medical history",
+            "offsets": [
+              546,
+              600
+            ]
+          }
+        ],
+        "agent_correctness": "both",
+        "classification_hint": "n_a",
+        "judge_confidence": "high"
+      },
+      "cost_usd": 0.0907131,
+      "duration_ms": 30884,
+      "generated_at": "2026-05-09T20:11:45.537Z"
+    },
+    {
+      "patient_id": "patient_easy_icd_02",
+      "field_id": "imaging_lung_lesion",
+      "kind": "type_drift",
+      "agent_a": {
+        "agent_id": "agent_1",
+        "answer": false,
+        "confidence": "high",
+        "rationale": "No imaging of the lungs was performed during this hospitalization. Imaging was limited to right hip X-ray for fracture assessment. Follow-up pulmonary examination shows clear lungs bilaterally with no mention of lesions or abnormalities.",
+        "evidence": [
+          {
+            "source": "note",
+            "note_id": "2024-10-22__er_visit",
+            "span_offsets": [
+              1177,
+              1320
+            ],
+            "verbatim_quote": "RESULTS:\nRight hip X-ray: Right intertrochanteric femur fracture with varus angulation.\nLabs: Hgb 11.8, Cr 0.88, INR 1.0. Type and Screen sent."
+          },
+          {
+            "source": "note",
+            "note_id": "2024-11-04__pcp_followup",
+            "span_offsets": [
+              1061,
+              1090
+            ],
+            "verbatim_quote": "Pulmonary: Clear bilaterally."
+          }
+        ]
+      },
+      "agent_b": {
+        "agent_id": "agent_2",
+        "answer": "no",
+        "confidence": "high",
+        "rationale": "No chest imaging (CT, PET-CT, chest X-ray) or lung lesion documentation is present in the chart. All imaging performed during the hospitalization and follow-up concerns the hip fracture (hip/pelvis X-rays, ORIF surgical imaging). No pulmonary imaging or findings are documented.",
+        "evidence": [
+          {
+            "source": "note",
+            "note_id": "2024-10-22__er_visit",
+            "span_offsets": [
+              1177,
+              1264
+            ],
+            "verbatim_quote": "RESULTS:\nRight hip X-ray: Right intertrochanteric femur fracture with varus angulation.",
+            "doc_type": "er_visit",
+            "evidence_date": "2024-10-22"
+          }
+        ]
+      },
+      "analysis": {
+        "suggested_answer": false,
+        "reasoning": "Both agents agree there is no chest imaging and no lung lesion documented anywhere in the chart; all imaging was limited to right hip X-ray. This is a type_drift cell: both agents reached the same clinical answer but emitted it in different formats. Agent A emitted boolean `false`, which matches the criterion's `answer_schema.enum: [true, false, no_info]`. Agent B emitted the string `\"no\"`, which is not a valid enum value and represents format drift. The canonical form per the schema is the boolean `false`.",
+        "evidence_pointers": [
+          {
+            "note_id": "imaging_lung_lesion",
+            "what_to_look_for": "answer_schema.enum specifying boolean true/false/no_info (not string yes/no)",
+            "offsets": null
+          }
+        ],
+        "agent_correctness": "both",
+        "classification_hint": "n_a",
+        "judge_confidence": "high"
+      },
+      "cost_usd": 0.1102269,
+      "duration_ms": 25261,
+      "generated_at": "2026-05-09T20:11:14.653Z"
+    },
+    {
+      "patient_id": "patient_easy_icd_02",
+      "field_id": "oncologist_lung_cancer_diagnosis_in_note",
+      "kind": "type_drift",
+      "agent_a": {
+        "agent_id": "agent_1",
+        "answer": false,
+        "confidence": "high",
+        "rationale": "No oncologist is documented in the clinical notes, and no explicit lung cancer diagnosis or assessment is made by any clinician. The C34.10 code appears as a chronic problem list carry-forward with an explicit note stating \"no active workup.\" The clinical focus is entirely on orthopedic trauma and hip fracture management.",
+        "evidence": [
+          {
+            "source": "note",
+            "note_id": "2024-10-26__discharge_summary",
+            "span_offsets": [
+              235,
+              568
+            ],
+            "verbatim_quote": "DISCHARGE DIAGNOSES:\n1. S72.141A — Right intertrochanteric femur fracture (primary)\n2. M81.0 — Age-related osteoporosis\n3. I10 — Essential hypertension\n4. E03.9 — Hypothyroidism, unspecified\n5. K21.0 — GERD\n6. C34.10 — Bronchus/lung upper lobe, unspecified (chronic, problem list carry-forward per billing practice; no active workup)"
+          },
+          {
+            "source": "note",
+            "note_id": "2024-11-04__pcp_followup",
+            "span_offsets": [
+              1092,
+              1219
+            ],
+            "verbatim_quote": "ASSESSMENT AND PLAN:\n1. Post-op hip fracture ORIF — recovering well. Continue PT. Orthopedics follow-up in 5 days as scheduled."
+          }
+        ]
+      },
+      "agent_b": {
+        "agent_id": "agent_2",
+        "answer": "no",
+        "confidence": "high",
+        "rationale": "No treating-oncologist documentation or oncology consultation notes are present in the chart. All clinical providers documented are emergency medicine, orthopedic surgery, cardiology (for surgical clearance), and internal medicine. The entire clinical course focuses on hip fracture management and post-operative recovery, with no oncologic evaluation documented.",
+        "evidence": [
+          {
+            "source": "note",
+            "note_id": "2024-10-26__discharge_summary",
+            "span_offsets": [
+              680,
+              747
+            ],
+            "verbatim_quote": "Medically optimized hospital day 1; cardiology cleared for surgery.",
+            "doc_type": "discharge_summary",
+            "evidence_date": "2024-10-26"
+          }
+        ]
+      },
+      "analysis": {
+        "suggested_answer": false,
+        "reasoning": "This is a format/data-quality drift, not a clinical disagreement. Both agents correctly found that no oncologist or pulmonologist authored any note in this chart — all three notes are authored by Emergency Medicine (Dr. Okafor), Orthopedic Surgery (Dr. Sandoval), and Internal Medicine (Dr. Abrams) — and C34.10 appears only as a billing carry-forward with the explicit qualifier 'no active workup', not as a diagnosis documented by a treating oncologist or pulmonologist. The criterion's answer_schema.enum is [true, false, no_info] (booleans), so the canonical form is the boolean false. Agent A emitted the canonical boolean false; Agent B deviated by emitting the string \"no\", which is not a valid enum value for this criterion.",
+        "evidence_pointers": [
+          {
+            "note_id": "oncologist_lung_cancer_diagnosis_in_note",
+            "what_to_look_for": "answer_schema.enum values — [true, false, no_info] confirming boolean required",
+            "offsets": [
+              5,
+              9
+            ]
+          },
+          {
+            "note_id": "2024-10-26__discharge_summary",
+            "what_to_look_for": "C34.10 listed as chronic problem-list carry-forward with 'no active workup'; author is Orthopedic Surgery, not oncologist/pulmonologist",
+            "offsets": [
+              235,
+              568
+            ]
+          }
+        ],
+        "agent_correctness": "both",
+        "classification_hint": "n_a",
+        "judge_confidence": "high"
+      },
+      "cost_usd": 0.09077940000000001,
+      "duration_ms": 23801,
+      "generated_at": "2026-05-09T20:11:25.267Z"
+    },
+    {
+      "patient_id": "patient_easy_icd_02",
+      "field_id": "pathology_report_present",
+      "kind": "type_drift",
+      "agent_a": {
+        "agent_id": "agent_1",
+        "answer": false,
+        "confidence": "high",
+        "rationale": "No pathology report is present in the patient's chart. The entire hospitalization was for orthopedic hip fracture treatment, with no pathology specimens or reports related to lung tissue documented.",
+        "evidence": [
+          {
+            "source": "note",
+            "note_id": "2024-10-22__er_visit",
+            "span_offsets": [
+              1186,
+              1264
+            ],
+            "verbatim_quote": "Right hip X-ray: Right intertrochanteric femur fracture with varus angulation."
+          },
+          {
+            "source": "note",
+            "note_id": "2024-10-26__discharge_summary",
+            "span_offsets": [
+              570,
+              679
+            ],
+            "verbatim_quote": "HOSPITAL COURSE: Mrs. E.W. admitted from ED with right intertrochanteric femur fracture from mechanical fall."
+          },
+          {
+            "source": "note",
+            "note_id": "2024-11-04__pcp_followup",
+            "span_offsets": [
+              158,
+              216
+            ],
+            "verbatim_quote": "REASON FOR VISIT: Follow-up after right hip fracture ORIF."
+          }
+        ]
+      },
+      "agent_b": {
+        "agent_id": "agent_2",
+        "answer": "no",
+        "confidence": "high",
+        "rationale": "No pathology report, biopsy report, cytology specimen, or surgical pathology documentation is present in the 24-month lookback window. The only lung cancer-related code (C34.10) is documented as a problem-list carry-forward with no active oncologic workup. All clinical documentation concerns orthopedic hospitalization for hip fracture repair and follow-up.",
+        "evidence": [
+          {
+            "source": "note",
+            "note_id": "2024-10-26__discharge_summary",
+            "span_offsets": [
+              445,
+              568
+            ],
+            "verbatim_quote": "C34.10 — Bronchus/lung upper lobe, unspecified (chronic, problem list carry-forward per billing practice; no active workup)",
+            "doc_type": "discharge_summary",
+            "evidence_date": "2024-10-26"
+          }
+        ]
+      },
+      "analysis": {
+        "suggested_answer": false,
+        "reasoning": "The criterion's answer_schema.enum is [true, false, no_info] — boolean values only. Both agents agree clinically: no pathology report authored by a credentialed pathologist exists in the 24-month lookback window; all three notes concern an orthopedic hip fracture hospitalization and follow-up, and the lone C34.10 code is explicitly flagged as a problem-list carry-forward with no active oncologic workup. Agent A emitted the canonical boolean false; Agent B emitted the string \"no\", which is not a member of the schema enum. This is a format/data-quality drift, not a clinical disagreement.",
+        "evidence_pointers": [
+          {
+            "note_id": "pathology_report_present",
+            "what_to_look_for": "answer_schema.enum — values are [true, false, no_info] (booleans, not strings)",
+            "offsets": [
+              5,
+              9
+            ]
+          },
+          {
+            "note_id": "2024-10-26__discharge_summary",
+            "what_to_look_for": "C34.10 noted as chronic problem-list carry-forward with no active workup; no pathology document present",
+            "offsets": [
+              445,
+              568
+            ]
+          }
+        ],
+        "agent_correctness": "both",
+        "classification_hint": "n_a",
+        "judge_confidence": "high"
+      },
+      "cost_usd": 0.10113785,
+      "duration_ms": 24249,
+      "generated_at": "2026-05-09T20:10:49.392Z"
+    },
+    {
+      "patient_id": "patient_easy_neg_02",
+      "field_id": "cytology_supports_lung_primary",
+      "kind": "type_drift",
+      "agent_a": {
+        "agent_id": "agent_1",
+        "answer": false,
+        "confidence": "high",
+        "rationale": "No cytology reports (FNA, sputum, or pleural fluid) are documented in the chart. The criterion applies when pathology_report_present is false, which is the case here. No cytology specimen evidence is found.",
+        "evidence": [
+          {
+            "source": "note",
+            "note_id": "2025-01-19__pcp_visit",
+            "span_offsets": [
+              519,
+              540
+            ],
+            "verbatim_quote": "No malignancy history"
+          }
+        ]
+      },
+      "agent_b": {
+        "agent_id": "agent_2",
+        "answer": "no",
+        "confidence": "high",
+        "rationale": "No cytology, fluid analysis, or cellular specimens mentioned anywhere in the patient's chart. The patient has no respiratory complaints documented (ROS explicitly notes absence of cough, dyspnea, and no malignancy history). No pleural fluid, pericardial fluid, sputum, or other fluid samples documented. OMOP observations include only tobacco smoking status; no cytology results present.",
+        "evidence": [
+          {
+            "source": "note",
+            "note_id": "2025-01-19__pcp_visit.txt",
+            "span_offsets": [
+              455,
+              541
+            ],
+            "verbatim_quote": "ROS: No fevers, weight loss, night sweats. No cough or dyspnea. No malignancy history.",
+            "doc_type": "pcp_visit",
+            "evidence_date": "2025-01-19"
+          }
+        ]
+      },
+      "analysis": {
+        "suggested_answer": false,
+        "reasoning": "This is a format/data-quality drift, not a clinical disagreement. Both agents correctly concluded that no cytology specimens (FNA, sputum, or pleural fluid) are documented anywhere in the chart — all three notes concern right knee OA/injury, hypertension, and an ED fall, with no respiratory or oncologic workup. The criterion's answer_schema.enum is [true, false, no_info] — boolean values — making false the canonical form. Agent A emitted the canonical boolean false; Agent B emitted the non-canonical string \"no\", which is not a valid enum member.",
+        "evidence_pointers": [
+          {
+            "note_id": "2025-01-19__pcp_visit",
+            "what_to_look_for": "No cough or dyspnea. No malignancy history.",
+            "offsets": [
+              455,
+              541
+            ]
+          },
+          {
+            "note_id": "cytology_supports_lung_primary criterion file",
+            "what_to_look_for": "answer_schema.enum: [true, false, no_info] — canonical type is boolean",
+            "offsets": null
+          }
+        ],
+        "agent_correctness": "both",
+        "classification_hint": "n_a",
+        "judge_confidence": "high"
+      },
+      "cost_usd": 0.11761155000000001,
+      "duration_ms": 28414,
+      "generated_at": "2026-05-09T20:12:13.951Z"
+    },
+    {
+      "patient_id": "patient_easy_neg_02",
+      "field_id": "icd_lung_cancer_present",
+      "kind": "type_drift",
+      "agent_a": {
+        "agent_id": "agent_1",
+        "answer": false,
+        "confidence": "high",
+        "rationale": "OMOP condition_occurrence table contains three active diagnoses: osteoarthritis of knee (M17.11), essential hypertension (I10), and traumatic effusion of knee (M25.461). No ICD-10-CM C34.* codes (lung cancer family) are present. No personal history codes (Z85.118) are documented.",
+        "evidence": [
+          {
+            "source": "omop",
+            "table": "condition_occurrence",
+            "row_id": "520001",
+            "concept_id": 80180,
+            "concept_name": "Osteoarthritis of knee"
+          },
+          {
+            "source": "omop",
+            "table": "condition_occurrence",
+            "row_id": "520002",
+            "concept_id": 320128,
+            "concept_name": "Essential hypertension"
+          },
+          {
+            "source": "omop",
+            "table": "condition_occurrence",
+            "row_id": "520003",
+            "concept_id": 444132,
+            "concept_name": "Traumatic effusion of knee"
+          }
+        ]
+      },
+      "agent_b": {
+        "agent_id": "agent_2",
+        "answer": "no",
+        "confidence": "high",
+        "rationale": "OMOP conditions table reviewed and no lung cancer ICD-10 codes present. Documented conditions are: Osteoarthritis of knee (M17.11, row_id 520001), Essential hypertension (I10, row_id 520002), Traumatic effusion of knee (M25.461, row_id 520003). No malignant neoplasm of lung (C34.x series) or secondary malignancy (C78.x series) codes recorded.",
+        "evidence": [
+          {
+            "source": "omop",
+            "table": "conditions",
+            "row_id": "520001",
+            "concept_name": "Osteoarthritis of knee"
+          },
+          {
+            "source": "omop",
+            "table": "conditions",
+            "row_id": "520002",
+            "concept_name": "Essential hypertension"
+          },
+          {
+            "source": "omop",
+            "table": "conditions",
+            "row_id": "520003",
+            "concept_name": "Traumatic effusion of knee"
+          }
+        ]
+      },
+      "analysis": {
+        "suggested_answer": false,
+        "reasoning": "This is a format/data-quality drift, not a clinical disagreement. Both agents correctly determined that no ICD-10-CM C34.* codes appear in the chart — all three notes document only right knee OA, hypertension, and traumatic knee effusion, with explicit statements such as 'No malignancy history.' The criterion's answer_schema defines an enum of boolean values [true, false]; Agent A emitted the canonical boolean false, while Agent B emitted the non-canonical string \"no\". The platform should coerce Agent B's answer to the boolean false.",
+        "evidence_pointers": [
+          {
+            "note_id": "icd_lung_cancer_present",
+            "what_to_look_for": "answer_schema.enum: [true, false] — boolean types required, not string 'yes'/'no'",
+            "offsets": null
+          },
+          {
+            "note_id": "2025-01-19__pcp_visit",
+            "what_to_look_for": "No malignancy history — confirms absence of lung cancer ICD codes",
+            "offsets": null
+          }
+        ],
+        "agent_correctness": "both",
+        "classification_hint": "n_a",
+        "judge_confidence": "high"
+      },
+      "cost_usd": 0.1035356,
+      "duration_ms": 29752,
+      "generated_at": "2026-05-09T20:12:46.202Z"
+    },
+    {
+      "patient_id": "patient_easy_neg_02",
+      "field_id": "imaging_lung_lesion",
+      "kind": "type_drift",
+      "agent_a": {
+        "agent_id": "agent_1",
+        "answer": false,
+        "confidence": "high",
+        "rationale": "The PCP visit note documents a normal lung exam with clear bilateral breath sounds. No chest imaging studies (CT, PET-CT, or X-ray) are documented that show any lung mass, nodule, or lesion suspicious for malignancy. The only imaging documented is knee X-ray on 2025-04-04, which is unrelated to lung cancer evaluation.",
+        "evidence": [
+          {
+            "source": "note",
+            "note_id": "2025-01-19__pcp_visit",
+            "span_offsets": [
+              907,
+              953
+            ],
+            "verbatim_quote": "Lungs: CTA bilaterally, no adventitious sounds"
+          }
+        ]
+      },
+      "agent_b": {
+        "agent_id": "agent_2",
+        "answer": "no",
+        "confidence": "high",
+        "rationale": "No chest imaging or lung lesion imaging identified in chart. Clinical lung exam on 2025-01-19 shows normal auscultation findings. Imaging documented consists exclusively of knee X-rays (3-view knee series on 2025-04-04). No CT chest, PET-CT, chest X-ray, or other pulmonary imaging performed. No nodules, consolidations, or masses mentioned.",
+        "evidence": [
+          {
+            "source": "note",
+            "note_id": "2025-01-19__pcp_visit.txt",
+            "span_offsets": [
+              907,
+              954
+            ],
+            "verbatim_quote": "Lungs: CTA bilaterally, no adventitious sounds.",
+            "doc_type": "pcp_visit",
+            "evidence_date": "2025-01-19"
+          },
+          {
+            "source": "note",
+            "note_id": "2025-04-04__er_visit.txt",
+            "span_offsets": [
+              946,
+              1109
+            ],
+            "verbatim_quote": "IMAGING: Right knee X-ray (AP, lateral, sunrise): Medial joint space narrowing, small osteophytes. No acute fracture. No loose body. Moderate soft tissue swelling.",
+            "doc_type": "er_visit",
+            "evidence_date": "2025-04-04"
+          }
+        ]
+      },
+      "analysis": {
+        "suggested_answer": false,
+        "reasoning": "This is a type_drift cell — both agents reached the same clinical conclusion (no lung lesion on imaging) but emitted different value types. The criterion's answer_schema.enum is [true, false, no_info] (boolean literals), so the canonical answer is boolean false. Agent A emitted the canonical boolean false; Agent B emitted the string \"no\", which deviates from the schema. All three notes confirm no chest imaging was performed: the chart documents only a normal lung auscultation (\"CTA bilaterally, no adventitious sounds\") and right knee X-rays, with zero CT chest, PET-CT, or chest X-ray present.",
+        "evidence_pointers": [
+          {
+            "note_id": "imaging_lung_lesion",
+            "what_to_look_for": "answer_schema.enum: [true, false, no_info] — canonical type is boolean, not string",
+            "offsets": null
+          },
+          {
+            "note_id": "2025-04-04__er_visit",
+            "what_to_look_for": "IMAGING section — only right knee X-ray, no pulmonary imaging",
+            "offsets": [
+              946,
+              1109
+            ]
+          }
+        ],
+        "agent_correctness": "both",
+        "classification_hint": "n_a",
+        "judge_confidence": "high"
+      },
+      "cost_usd": 0.10165355000000001,
+      "duration_ms": 29150,
+      "generated_at": "2026-05-09T20:12:16.450Z"
+    },
+    {
+      "patient_id": "patient_easy_neg_02",
+      "field_id": "lowest_hemoglobin_in_window",
+      "kind": "type_drift",
+      "agent_a": {
+        "agent_id": "agent_1",
+        "answer": null,
+        "confidence": "high",
+        "rationale": "OMOP measurements table contains only blood pressure readings (2025-01-19) and knee range of motion (2025-05-12). No hemoglobin or Hgb measurements are documented within the 24-month lookback window. Chart notes do not mention hemoglobin or anemia.",
+        "evidence": [
+          {
+            "source": "omop",
+            "table": "measurement",
+            "row_id": "520001",
+            "concept_name": "Blood pressure systolic"
+          },
+          {
+            "source": "omop",
+            "table": "measurement",
+            "row_id": "520003",
+            "concept_name": "Knee range of motion"
+          }
+        ]
+      },
+      "agent_b": {
+        "agent_id": "agent_2",
+        "answer": "no_info",
+        "confidence": "high",
+        "rationale": "No hemoglobin measurements found in the chart within the 24-month lookback window. OMOP measurements table contains only blood pressure readings (2025-01-19) and knee range of motion (2025-05-12). Chart note reviews from 2025-01-19, 2025-04-04, and 2025-05-12 do not document any laboratory values, CBC results, or hemoglobin levels. No hematologic workup performed during the three encounters documented.",
+        "evidence": [
+          {
+            "source": "omop",
+            "table": "measurements",
+            "row_id": "520001",
+            "concept_name": "Blood pressure systolic",
+            "value": 130,
+            "unit": "mmHg"
+          },
+          {
+            "source": "omop",
+            "table": "measurements",
+            "row_id": "520002",
+            "concept_name": "Blood pressure diastolic",
+            "value": 82,
+            "unit": "mmHg"
+          },
+          {
+            "source": "omop",
+            "table": "measurements",
+            "row_id": "520003",
+            "concept_name": "Knee range of motion",
+            "value": 125,
+            "unit": "degrees"
+          }
+        ]
+      },
+      "analysis": {
+        "suggested_answer": null,
+        "reasoning": "The criterion's answer_schema defines type as [number, 'null'], with no string enum values — 'no_info' is not a valid output for this field. Agent A emitted JSON null, which is the canonical form per the schema. Agent B emitted the string \"no_info\", which is a type drift: semantically equivalent intent but an invalid format for this criterion. All three patient notes (2025-01-19 PCP visit, 2025-04-04 ED visit, 2025-05-12 PCP follow-up) contain only vital signs and musculoskeletal findings; no hemoglobin, Hgb, CBC, or hematologic lab values appear anywhere in the chart. The correct answer is null with missingness_reason='not_documented', exactly as the criterion's extraction guidance specifies.",
+        "evidence_pointers": [
+          {
+            "note_id": "lowest_hemoglobin_in_window",
+            "what_to_look_for": "answer_schema type: [number, 'null'] — no string enum values defined",
+            "offsets": null
+          }
+        ],
+        "agent_correctness": "both",
+        "classification_hint": "n_a",
+        "judge_confidence": "high"
+      },
+      "cost_usd": 0.09868675,
+      "duration_ms": 27987,
+      "generated_at": "2026-05-09T20:13:13.990Z"
+    },
+    {
+      "patient_id": "patient_easy_neg_02",
+      "field_id": "oncologist_lung_cancer_diagnosis_in_note",
+      "kind": "type_drift",
+      "agent_a": {
+        "agent_id": "agent_1",
+        "answer": false,
+        "confidence": "high",
+        "rationale": "No oncologist or pulmonologist notes are present in the chart. All three notes are authored by primary care (Dr. C. Nguyen, MD) or emergency medicine (Dr. R. Patel, MD) providers. No treating oncology or pulmonology specialists have documented any lung cancer diagnosis.",
+        "evidence": [
+          {
+            "source": "note",
+            "note_id": "2025-01-19__pcp_visit",
+            "span_offsets": [
+              40,
+              82
+            ],
+            "verbatim_quote": "PROVIDER: Dr. C. Nguyen, MD — Primary Care"
+          }
+        ]
+      },
+      "agent_b": {
+        "agent_id": "agent_2",
+        "answer": "no",
+        "confidence": "high",
+        "rationale": "No oncology notes or treating oncologist documentation in patient's chart. Specialist referrals documented include only orthopedic referral for knee evaluation. All clinical documentation is from primary care and emergency medicine. No mention of lung cancer diagnosis, medical oncology, surgical oncology, or oncology consultation anywhere in the clinical notes spanning 2025-01-19 to 2025-05-12.",
+        "evidence": [
+          {
+            "source": "note",
+            "note_id": "2025-01-19__pcp_visit.txt",
+            "span_offsets": [
+              40,
+              82
+            ],
+            "verbatim_quote": "PROVIDER: Dr. C. Nguyen, MD — Primary Care",
+            "doc_type": "pcp_visit",
+            "evidence_date": "2025-01-19"
+          },
+          {
+            "source": "note",
+            "note_id": "2025-05-12__pcp_followup.txt",
+            "span_offsets": [
+              1034,
+              1112
+            ],
+            "verbatim_quote": "Orthopedic referral completed — orthopedist recommends conservative management",
+            "doc_type": "pcp_followup",
+            "evidence_date": "2025-05-12"
+          }
+        ]
+      },
+      "analysis": {
+        "suggested_answer": false,
+        "reasoning": "This is a type_drift cell: both agents reached the same correct clinical conclusion — no oncologist or pulmonologist note exists in this chart, and no lung cancer diagnosis is documented by any qualifying provider. Agent A emitted boolean `false`, which matches the criterion's answer_schema enum `[true, false, no_info]`. Agent B emitted string `\"no\"`, which is a non-canonical format for this schema. All three notes are authored by primary care (Dr. C. Nguyen, MD) and emergency medicine (Dr. R. Patel, MD); the chart concerns right knee OA and an ED visit for a hiking fall, with no oncology or pulmonology involvement whatsoever.",
+        "evidence_pointers": [
+          {
+            "note_id": "oncologist_lung_cancer_diagnosis_in_note",
+            "what_to_look_for": "answer_schema.enum — canonical values are [true, false, no_info] (booleans, not strings)",
+            "offsets": [
+              5,
+              10
+            ]
+          },
+          {
+            "note_id": "2025-01-19__pcp_visit",
+            "what_to_look_for": "PROVIDER line confirming primary care authorship, no oncology or pulmonology",
+            "offsets": [
+              40,
+              82
+            ]
+          }
+        ],
+        "agent_correctness": "both",
+        "classification_hint": "n_a",
+        "judge_confidence": "high"
+      },
+      "cost_usd": 0.0979429,
+      "duration_ms": 32052,
+      "generated_at": "2026-05-09T20:12:46.003Z"
+    },
+    {
+      "patient_id": "patient_easy_neg_02",
+      "field_id": "pathology_lung_primary",
+      "kind": "disagreement",
+      "agent_a": {
+        "agent_id": "agent_1",
+        "answer": "no_info",
+        "confidence": "high",
+        "rationale": "This criterion is applicable only when pathology_report_present == true. Since no qualifying pathology report was found in the chart, this field is not applicable.",
+        "evidence": [
+          {
+            "source": "note",
+            "note_id": "2025-01-19__pcp_visit",
+            "span_offsets": [
+              519,
+              540
+            ],
+            "verbatim_quote": "No malignancy history"
+          }
+        ]
+      },
+      "agent_b": {
+        "agent_id": "agent_2",
+        "answer": "not_applicable",
+        "confidence": "high",
+        "rationale": "This criterion is not applicable because pathology_report_present is 'no'. The gate condition (presence of a pathology report) is not satisfied, so this derived field does not require evaluation.",
+        "evidence": []
+      },
+      "analysis": {
+        "suggested_answer": "no_info",
+        "reasoning": "The criterion `pathology_lung_primary` has `is_applicable_when: pathology_report_present == 'yes'`, and all three notes in this chart (2025-01-19 PCP visit, 2025-04-04 ED visit, 2025-05-12 PCP follow-up) document only right knee OA, hypertension, and musculoskeletal complaints — no pathology report of any kind is present. Because no qualifying pathology report exists, the gate is not triggered. However, the criterion's `answer_schema.enum` contains `[\"nsclc\", \"sclc\", \"other_lung\", \"non_lung\", \"no_info\"]`; the value `\"not_applicable\"` that Agent B emitted is not a valid enum member. Agent A correctly selected `\"no_info\"`, the only schema-valid fallback, which is the canonical way to record that the gate condition is unmet and no histology is available.",
+        "evidence_pointers": [
+          {
+            "note_id": "2025-01-19__pcp_visit",
+            "what_to_look_for": "No malignancy history — confirms absence of any pathology workup",
+            "offsets": [
+              519,
+              540
+            ]
+          },
+          {
+            "note_id": "2025-04-04__er_visit",
+            "what_to_look_for": "No malignancy history — corroborates no oncologic workup across the window",
+            "offsets": null
+          }
+        ],
+        "agent_correctness": "agent_a",
+        "classification_hint": "agent_b_error",
+        "judge_confidence": "high"
+      },
+      "cost_usd": 0.23550459999999998,
+      "duration_ms": 26546,
+      "generated_at": "2026-05-09T20:08:25.033Z"
+    },
+    {
+      "patient_id": "patient_easy_neg_02",
+      "field_id": "pathology_report_present",
+      "kind": "type_drift",
+      "agent_a": {
+        "agent_id": "agent_1",
+        "answer": false,
+        "confidence": "high",
+        "rationale": "No pathology report documented in any of the three notes (PCP visit 2025-01-19, ED visit 2025-04-04, PCP followup 2025-05-12). The chart focuses entirely on knee pain and hypertension management. No biopsy or surgical specimen referenced.",
+        "evidence": [
+          {
+            "source": "note",
+            "note_id": "2025-01-19__pcp_visit",
+            "span_offsets": [
+              519,
+              540
+            ],
+            "verbatim_quote": "No malignancy history"
+          }
+        ]
+      },
+      "agent_b": {
+        "agent_id": "agent_2",
+        "answer": "no",
+        "confidence": "high",
+        "rationale": "Comprehensive search of patient chart found no pathology reports, biopsy results, specimen analysis, or histology/cytology specimens related to any organ system. Chart documents three clinical encounters (PCP visit 2025-01-19, ED visit 2025-04-04, PCP follow-up 2025-05-12) focused entirely on orthopedic issues (right knee pain and traumatic effusion), hypertension management, and preventive care. OMOP procedures data shows only knee X-rays and physical therapy, no pathology procedures.",
+        "evidence": [
+          {
+            "source": "note",
+            "note_id": "2025-01-19__pcp_visit.txt",
+            "span_offsets": [
+              83,
+              120
+            ],
+            "verbatim_quote": "VISIT: Office visit — right knee pain",
+            "doc_type": "pcp_visit",
+            "evidence_date": "2025-01-19"
+          }
+        ]
+      },
+      "analysis": {
+        "suggested_answer": false,
+        "reasoning": "This is a type_drift cell: both agents agree there is no pathology report in the chart — a finding fully confirmed by independent review of all three notes (2025-01-19 PCP visit, 2025-04-04 ED visit, 2025-05-12 PCP follow-up), none of which contain any biopsy, surgical specimen, or pathologist-authored document. The criterion's answer_schema.enum specifies boolean values [true, false, no_info], so the canonical negative answer is the boolean false. Agent A emitted the canonical boolean false; Agent B deviated by emitting the string \"no\", which is not a valid enum member. No clinical disagreement exists — this is purely a data-type formatting error on Agent B's part.",
+        "evidence_pointers": [
+          {
+            "note_id": "pathology_report_present",
+            "what_to_look_for": "answer_schema.enum: [true, false, no_info] — canonical negative is boolean false, not string \"no\"",
+            "offsets": null
+          }
+        ],
+        "agent_correctness": "both",
+        "classification_hint": "n_a",
+        "judge_confidence": "high"
+      },
+      "cost_usd": 0.1014835,
+      "duration_ms": 22033,
+      "generated_at": "2026-05-09T20:11:47.300Z"
+    },
+    {
+      "patient_id": "patient_easy_nsclc_01",
+      "field_id": "icd_lung_cancer_present",
+      "kind": "type_drift",
+      "agent_a": {
+        "agent_id": "agent_1",
+        "answer": true,
+        "confidence": "high",
+        "rationale": "OMOP conditions table shows active ICD-10-CM code C34.11 (Malignant neoplasm of upper lobe, right bronchus or lung) dated 2024-11-26, within the lookback window. This is a qualifying C34.* code and not a personal-history code.",
+        "evidence": [
+          {
+            "source": "omop",
+            "table": "CONDITION_OCCURRENCE",
+            "row_id": "110001",
+            "concept_id": 4115276,
+            "concept_name": "Malignant neoplasm of upper lobe, right bronchus or lung",
+            "value": "C34.11",
+            "evidence_date": "2024-11-26"
+          }
+        ]
+      },
+      "agent_b": {
+        "agent_id": "agent_2",
+        "answer": "yes",
+        "confidence": "high",
+        "rationale": "OMOP conditions table shows active ICD-10 code C34.11 (Malignant neoplasm of upper lobe, right bronchus or lung) dated 2024-11-26. Additionally, the oncology progress note documents ICD-10: C34.11.",
+        "evidence": [
+          {
+            "source": "omop",
+            "table": "conditions",
+            "row_id": "110001",
+            "concept_id": 4115276,
+            "concept_name": "Malignant neoplasm of upper lobe, right bronchus or lung",
+            "value": "active"
+          },
+          {
+            "source": "note",
+            "note_id": "2024-12-09__oncology_progress.txt",
+            "span_offsets": [
+              1764,
+              1778
+            ],
+            "verbatim_quote": "ICD-10: C34.11"
+          }
+        ]
+      },
+      "analysis": {
+        "suggested_answer": true,
+        "reasoning": "The criterion answer_schema.enum is [true, false] — boolean only; string 'yes' is not a valid enum value. Both agents correctly identified active ICD-10-CM code C34.11 on the 2024-12-09 oncology progress note encounter diagnosis ('ICD-10: C34.11'), which is a qualifying C34.* code within the 24-month lookback window and is not a personal-history Z85.118 code. The clinical answer is unambiguously true; this cell is a platform-level type drift where Agent B emitted the non-canonical string 'yes' instead of the boolean true required by the schema.",
+        "evidence_pointers": [
+          {
+            "note_id": "2024-12-09__oncology_progress",
+            "what_to_look_for": "ICD-10: C34.11 encounter diagnosis line",
+            "offsets": [
+              1764,
+              1778
+            ]
+          },
+          {
+            "note_id": "icd_lung_cancer_present",
+            "what_to_look_for": "answer_schema.enum: [true, false] — boolean only",
+            "offsets": null
+          }
+        ],
+        "agent_correctness": "both",
+        "classification_hint": "n_a",
+        "judge_confidence": "high"
+      },
+      "cost_usd": 0.08088324999999999,
+      "duration_ms": 25748,
+      "generated_at": "2026-05-09T20:10:25.143Z"
+    },
+    {
+      "patient_id": "patient_easy_nsclc_01",
+      "field_id": "imaging_lung_lesion",
+      "kind": "type_drift",
+      "agent_a": {
+        "agent_id": "agent_1",
+        "answer": true,
+        "confidence": "high",
+        "rationale": "CT chest from 2024-11-12 demonstrates a 2.9 × 2.4 cm spiculated mass in the right upper lobe with irregular stellate margins, pleural tethering, and clear impression stating it is \"highly suspicious for primary lung malignancy\" with recommendation for tissue sampling.",
+        "evidence": [
+          {
+            "source": "note",
+            "note_id": "2024-11-12__ct_chest",
+            "span_offsets": [
+              446,
+              530
+            ],
+            "verbatim_quote": "2.9 x 2.4 cm spiculated mass is identified in the right upper lobe posterior segment"
+          }
+        ]
+      },
+      "agent_b": {
+        "agent_id": "agent_2",
+        "answer": "yes",
+        "confidence": "high",
+        "rationale": "CT chest from 2024-11-12 identifies a 2.9 x 2.4 cm spiculated mass in the right upper lobe posterior segment, highly suspicious for primary lung malignancy. Mass demonstrates irregular stellate margins with pleural tethering.",
+        "evidence": [
+          {
+            "source": "note",
+            "note_id": "2024-11-12__ct_chest.txt",
+            "span_offsets": [
+              444,
+              530
+            ],
+            "verbatim_quote": "A 2.9 x 2.4 cm spiculated mass is identified in the right upper lobe posterior segment"
+          }
+        ]
+      },
+      "analysis": {
+        "suggested_answer": true,
+        "reasoning": "The criterion's answer_schema.enum is [true, false, no_info] — boolean values only. Both agents correctly identified the same unambiguous imaging finding: the 2024-11-12 CT chest describes 'A 2.9 x 2.4 cm spiculated mass is identified in the right upper lobe posterior segment' with impression 'highly suspicious for primary lung malignancy,' satisfying the criterion's threshold. This is not a clinical disagreement. Agent A emitted the canonical boolean true; Agent B emitted the string 'yes', which is not a valid enum member per the schema. The drift is a data-quality / serialization issue only.",
+        "evidence_pointers": [
+          {
+            "note_id": "2024-11-12__ct_chest",
+            "what_to_look_for": "spiculated RUL mass impression — confirms boolean true is correct clinical answer",
+            "offsets": [
+              444,
+              530
+            ]
+          },
+          {
+            "note_id": "imaging_lung_lesion.md (criterion file)",
+            "what_to_look_for": "answer_schema.enum: [true, false, no_info] — canonical form is boolean, not string",
+            "offsets": null
+          }
+        ],
+        "agent_correctness": "both",
+        "classification_hint": "n_a",
+        "judge_confidence": "high"
+      },
+      "cost_usd": 0.10602819999999999,
+      "duration_ms": 25519,
+      "generated_at": "2026-05-09T20:09:59.395Z"
+    },
+    {
+      "patient_id": "patient_easy_nsclc_01",
+      "field_id": "lowest_hemoglobin_in_window",
+      "kind": "type_drift",
+      "agent_a": {
+        "agent_id": "agent_1",
+        "answer": null,
+        "confidence": "high",
+        "rationale": "No specific hemoglobin measurement was documented in the chart within the lookback window. The oncology note dated 2024-12-09 references \"CBC WNL\" but does not provide numeric hemoglobin values. OMOP measurements table contains no hemoglobin entries.",
+        "evidence": []
+      },
+      "agent_b": {
+        "agent_id": "agent_2",
+        "answer": "no_info",
+        "confidence": "high",
+        "rationale": "While the oncology progress note (2024-12-09) documents CBC as WNL (within normal limits), no specific hemoglobin value is provided in the chart. The 24-month lookback window includes chart documentation, but specific hemoglobin measurements are not recorded. Per the skeptical interpretation approach for missing measurements, this is coded as no_info.",
+        "evidence": [
+          {
+            "source": "note",
+            "note_id": "2024-12-09__oncology_progress.txt",
+            "span_offsets": [
+              763,
+              799
+            ],
+            "verbatim_quote": "Labs: CBC WNL, CMP WNL, LDH 198 U/L."
+          }
+        ]
+      },
+      "analysis": {
+        "suggested_answer": null,
+        "reasoning": "This is a type_drift cell: both agents agree that no numeric hemoglobin value is documented in the chart. The criterion's answer_schema defines type as [number, 'null'] with no enum string options — the only valid non-numeric answer is JSON null, not the string 'no_info'. Agent A correctly emitted null. Agent B emitted the string \"no_info\", which is not a valid schema value for this field (string enums like 'no_info' apply to categorical criteria, not lab-value extraction fields). All four notes were reviewed: the oncology progress note (2024-12-09) states 'CBC WNL' without a numeric Hgb value, the PCP follow-up (2025-01-15) notes 'CBC pending at time of signing', and the pathology and CT reports contain no lab values. No OMOP hemoglobin measurements are present. The canonical answer per schema is null with missingness_reason='not_documented'.",
+        "evidence_pointers": [
+          {
+            "note_id": "2024-12-09__oncology_progress",
+            "what_to_look_for": "CBC WNL — no numeric hemoglobin value",
+            "offsets": [
+              763,
+              799
+            ]
+          },
+          {
+            "note_id": "2025-01-15__pcp_followup",
+            "what_to_look_for": "CBC pending at time of signing — no result recorded",
+            "offsets": null
+          }
+        ],
+        "agent_correctness": "both",
+        "classification_hint": "n_a",
+        "judge_confidence": "high"
+      },
+      "cost_usd": 0.10975809999999998,
+      "duration_ms": 27216,
+      "generated_at": "2026-05-09T20:10:35.328Z"
+    },
+    {
+      "patient_id": "patient_easy_nsclc_01",
+      "field_id": "oncologist_lung_cancer_diagnosis_in_note",
+      "kind": "type_drift",
+      "agent_a": {
+        "agent_id": "agent_1",
+        "answer": true,
+        "confidence": "high",
+        "rationale": "Oncology progress note dated 2024-12-09 authored by Dr. Renata S. Bhatt, MD (Medical Oncology) explicitly documents lung cancer diagnosis in the Assessment section: \"Stage IIIA non-small cell lung cancer, adenocarcinoma subtype, right upper lobe primary (cT2bN2M0). Diagnosis confirmed on core needle biopsy from 2024-11-26.\"",
+        "evidence": [
+          {
+            "source": "note",
+            "note_id": "2024-12-09__oncology_progress",
+            "span_offsets": [
+              1019,
+              1106
+            ],
+            "verbatim_quote": "Stage IIIA non-small cell lung cancer, adenocarcinoma subtype, right upper lobe primary"
+          }
+        ]
+      },
+      "agent_b": {
+        "agent_id": "agent_2",
+        "answer": "yes",
+        "confidence": "high",
+        "rationale": "Oncology progress note from 2024-12-09 by Dr. Renata S. Bhatt, MD (Medical Oncology) explicitly documents Stage IIIA non-small cell lung cancer diagnosis with adenocarcinoma subtype and right upper lobe primary confirmed on core needle biopsy.",
+        "evidence": [
+          {
+            "source": "note",
+            "note_id": "2024-12-09__oncology_progress.txt",
+            "span_offsets": [
+              1019,
+              1177
+            ],
+            "verbatim_quote": "Stage IIIA non-small cell lung cancer, adenocarcinoma subtype, right upper lobe primary (cT2bN2M0). Diagnosis confirmed on core needle biopsy from 2024-11-26."
+          }
+        ]
+      },
+      "analysis": {
+        "suggested_answer": true,
+        "reasoning": "This is a type_drift cell, not a clinical disagreement. Both agents correctly identified that Dr. Renata S. Bhatt, MD (Medical Oncology) explicitly documents 'Stage IIIA non-small cell lung cancer, adenocarcinoma subtype, right upper lobe primary (cT2bN2M0)' in the Assessment section of the 2024-12-09 oncology progress note, satisfying the criterion. The criterion's answer_schema.enum is [true, false, no_info] — boolean values — making Agent A's answer (boolean true) the canonical form and Agent B's answer (string \"yes\") a format deviation. No clinical or guideline ambiguity exists; this is purely a platform data-quality issue.",
+        "evidence_pointers": [
+          {
+            "note_id": "2024-12-09__oncology_progress",
+            "what_to_look_for": "Assessment section: Stage IIIA NSCLC diagnosis confirmed on biopsy",
+            "offsets": [
+              1019,
+              1106
+            ]
+          },
+          {
+            "note_id": "oncologist_lung_cancer_diagnosis_in_note.md",
+            "what_to_look_for": "answer_schema.enum: [true, false, no_info] — canonical type is boolean",
+            "offsets": null
+          }
+        ],
+        "agent_correctness": "both",
+        "classification_hint": "n_a",
+        "judge_confidence": "high"
+      },
+      "cost_usd": 0.0780971,
+      "duration_ms": 22603,
+      "generated_at": "2026-05-09T20:10:08.112Z"
+    },
+    {
+      "patient_id": "patient_easy_nsclc_01",
+      "field_id": "pathology_report_present",
+      "kind": "type_drift",
+      "agent_a": {
+        "agent_id": "agent_1",
+        "answer": true,
+        "confidence": "high",
+        "rationale": "A formal surgical pathology report from an accredited institution (Indiana University Health, Department of Pathology) dated 2024-11-26, authored by Dr. Olivia R. Marchetti, MD (Thoracic Pathology), is present. The report documents results of a CT-guided core needle biopsy of right upper lobe mass.",
+        "evidence": [
+          {
+            "source": "note",
+            "note_id": "2024-11-26__surgical_pathology",
+            "span_offsets": [
+              52,
+              77
+            ],
+            "verbatim_quote": "SURGICAL PATHOLOGY REPORT"
+          }
+        ]
+      },
+      "agent_b": {
+        "agent_id": "agent_2",
+        "answer": "yes",
+        "confidence": "high",
+        "rationale": "Surgical pathology report from 2024-11-26 is present in the chart documenting CT-guided core needle biopsy of right upper lobe mass with detailed histopathology and immunohistochemistry findings.",
+        "evidence": [
+          {
+            "source": "note",
+            "note_id": "2024-11-26__surgical_pathology.txt",
+            "span_offsets": [
+              1200,
+              1307
+            ],
+            "verbatim_quote": "DIAGNOSIS:\nRIGHT UPPER LOBE MASS, CT-GUIDED CORE NEEDLE BIOPSY:\n— ADENOCARCINOMA, moderately differentiated"
+          }
+        ]
+      },
+      "analysis": {
+        "suggested_answer": true,
+        "reasoning": "The criterion's answer_schema.enum is [true, false, no_info] — boolean values, not strings. Both agents agree clinically: a formal surgical pathology report dated 2024-11-26 from Indiana University Health is present in the chart, documenting a CT-guided core needle biopsy of the right upper lobe mass with a final adenocarcinoma diagnosis. This is a type_drift cell: Agent A emitted the canonical boolean true, while Agent B emitted the non-canonical string \"yes\". No clinical or guideline disagreement exists; the issue is purely a value-format deviation from the schema enum.",
+        "evidence_pointers": [
+          {
+            "note_id": "2024-11-26__surgical_pathology",
+            "what_to_look_for": "SURGICAL PATHOLOGY REPORT header and final adenocarcinoma diagnosis",
+            "offsets": [
+              52,
+              77
+            ]
+          },
+          {
+            "note_id": "pathology_report_present.md (criterion file)",
+            "what_to_look_for": "answer_schema.enum: [true, false, no_info] — boolean, not string",
+            "offsets": null
+          }
+        ],
+        "agent_correctness": "both",
+        "classification_hint": "n_a",
+        "judge_confidence": "high"
+      },
+      "cost_usd": 0.07444224999999999,
+      "duration_ms": 21217,
+      "generated_at": "2026-05-09T20:09:33.876Z"
+    },
+    {
+      "patient_id": "patient_easy_probable_02",
+      "field_id": "cytology_supports_lung_primary",
+      "kind": "type_drift",
+      "agent_a": {
+        "agent_id": "agent_1",
+        "answer": false,
+        "confidence": "high",
+        "rationale": "No cytology specimens (FNA, sputum, or pleural fluid) documented in the chart. Only imaging and clinical assessment are available; no tissue sampling of any kind was performed.",
+        "evidence": [
+          {
+            "source": "note",
+            "note_id": "2025-06-10__pulmonology_consult",
+            "span_offsets": [
+              1390,
+              1473
+            ],
+            "verbatim_quote": "Biopsy options — CT-guided core needle and bronchoscopy — were discussed in detail.",
+            "doc_type": "pulmonology_consult",
+            "evidence_date": "2025-06-10"
+          }
+        ]
+      },
+      "agent_b": {
+        "agent_id": "agent_2",
+        "answer": "no",
+        "confidence": "high",
+        "rationale": "No cytology results or cytology-based evidence identified in chart. Case relies on imaging and clinical assessment, not tissue sampling.",
+        "evidence": []
+      },
+      "analysis": {
+        "suggested_answer": false,
+        "reasoning": "This is a type_drift cell — both agents correctly identified that no cytology specimen (FNA, sputum, or pleural fluid) was obtained or resulted in this chart. The pulmonology note confirms the patient 'declined biopsy' and the oncology note states 'Tissue confirmation has not been obtained because the patient declined biopsy.' The criterion's answer_schema.enum is [true, false, no_info] (boolean values). Agent A emitted the canonical boolean false; Agent B emitted the string 'no', which does not match any enum value. No clinical re-adjudication is needed — this is solely a platform data-quality issue.",
+        "evidence_pointers": [
+          {
+            "note_id": "2025-06-10__pulmonology_consult",
+            "what_to_look_for": "patient declined biopsy — no tissue sampling performed",
+            "offsets": [
+              1390,
+              1473
+            ]
+          },
+          {
+            "note_id": "cytology_supports_lung_primary criterion file",
+            "what_to_look_for": "answer_schema.enum: [true, false, no_info] — boolean, not string",
+            "offsets": null
+          }
+        ],
+        "agent_correctness": "both",
+        "classification_hint": "n_a",
+        "judge_confidence": "high"
+      },
+      "cost_usd": 0.10632024999999998,
+      "duration_ms": 27756,
+      "generated_at": "2026-05-09T20:08:49.854Z"
+    },
+    {
+      "patient_id": "patient_easy_probable_02",
+      "field_id": "icd_lung_cancer_present",
+      "kind": "type_drift",
+      "agent_a": {
+        "agent_id": "agent_1",
+        "answer": false,
+        "confidence": "high",
+        "rationale": "No ICD-10-CM C34.* (lung cancer) code is present in the OMOP conditions table within the lookback window. The patient has COPD (J44.1), hypertension (I10), type 2 diabetes (E11.9), and remote prostate cancer history (Z85.46), but no active lung cancer diagnosis code. The oncology note explicitly states: \"No formal ICD diagnosis code has been entered at this time; however, the working oncologic diagnosis is primary lung cancer, left upper lobe.\"",
+        "evidence": [
+          {
+            "source": "note",
+            "note_id": "2025-06-30__oncology_progress",
+            "span_offsets": [
+              1020,
+              1161
+            ],
+            "verbatim_quote": "No formal ICD diagnosis code has been entered at this time; however, the working oncologic diagnosis is primary lung cancer, left upper lobe.",
+            "doc_type": "oncology_progress",
+            "author_role": "thoracic_oncologist",
+            "evidence_date": "2025-06-30"
+          }
+        ]
+      },
+      "agent_b": {
+        "agent_id": "agent_2",
+        "answer": "no",
+        "confidence": "high",
+        "rationale": "No ICD-10 lung cancer code (C34.*) present in OMOP conditions table. Oncologist explicitly documents that no formal ICD code has been entered despite clinical diagnosis of lung cancer.",
+        "evidence": [
+          {
+            "source": "note",
+            "note_id": "2025-06-30__oncology_progress",
+            "span_offsets": [
+              1020,
+              1078
+            ],
+            "verbatim_quote": "No formal ICD diagnosis code has been entered at this time"
+          }
+        ]
+      },
+      "analysis": {
+        "suggested_answer": false,
+        "reasoning": "This is a type-drift cell — both agents agree on the clinical finding. The oncology note explicitly states 'No formal ICD diagnosis code has been entered at this time,' confirming no C34.* code is present in the OMOP conditions table. The criterion's answer_schema.enum is [true, false] (booleans), so the canonical form is the boolean false. Agent A correctly emitted boolean false; Agent B deviated by emitting the string \"no\", which does not match the schema enum.",
+        "evidence_pointers": [
+          {
+            "note_id": "2025-06-30__oncology_progress",
+            "what_to_look_for": "explicit statement that no formal ICD code has been entered",
+            "offsets": [
+              1020,
+              1078
+            ]
+          },
+          {
+            "note_id": "icd_lung_cancer_present.md (criterion file)",
+            "what_to_look_for": "answer_schema.enum: [true, false] — boolean values only",
+            "offsets": null
+          }
+        ],
+        "agent_correctness": "both",
+        "classification_hint": "n_a",
+        "judge_confidence": "high"
+      },
+      "cost_usd": 0.08736959999999999,
+      "duration_ms": 21169,
+      "generated_at": "2026-05-09T20:09:11.436Z"
+    },
+    {
+      "patient_id": "patient_easy_probable_02",
+      "field_id": "imaging_lung_lesion",
+      "kind": "type_drift",
+      "agent_a": {
+        "agent_id": "agent_1",
+        "answer": true,
+        "confidence": "high",
+        "rationale": "CT chest shows a 3.4 cm spiculated left upper-lobe mass with irregular margins and ground-glass attenuation. The radiologist explicitly categorizes this as Lung-RADS 4X and states it is \"highly suspicious for primary lung malignancy\" in the context of a 40 pack-year smoking history. Additionally, left hilar lymphadenopathy is present, consistent with staging.",
+        "evidence": [
+          {
+            "source": "note",
+            "note_id": "2025-05-22__ct_chest",
+            "span_offsets": [
+              1308,
+              1465
+            ],
+            "verbatim_quote": "3.4 cm spiculated left upper-lobe mass, Lung-RADS 4X. In the context of a 40 pack-year smoking history this is highly suspicious for primary lung malignancy.",
+            "doc_type": "ct_chest",
+            "evidence_date": "2025-05-22"
+          },
+          {
+            "source": "note",
+            "note_id": "2025-05-22__ct_chest",
+            "span_offsets": [
+              463,
+              645
+            ],
+            "verbatim_quote": "Lungs: Left upper lobe, apicoposterior segment: 3.4 x 3.1 cm lobulated soft-tissue mass. Margins are irregular with spiculated projections. Mild surrounding ground-glass attenuation.",
+            "doc_type": "ct_chest",
+            "evidence_date": "2025-05-22"
+          },
+          {
+            "source": "note",
+            "note_id": "2025-05-22__ct_chest",
+            "span_offsets": [
+              698,
+              790
+            ],
+            "verbatim_quote": "Mediastinum/Hilar structures: Mild left hilar fullness; a 1.0 cm left hilar node is present.",
+            "doc_type": "ct_chest",
+            "evidence_date": "2025-05-22"
+          }
+        ]
+      },
+      "agent_b": {
+        "agent_id": "agent_2",
+        "answer": "yes",
+        "confidence": "high",
+        "rationale": "CT chest 05/22/2025 demonstrates a 3.4 cm spiculated left upper lobe mass with irregular margins, highly suspicious for primary lung malignancy per radiologist impression.",
+        "evidence": [
+          {
+            "source": "note",
+            "note_id": "2025-05-22__ct_chest",
+            "span_offsets": [
+              470,
+              602
+            ],
+            "verbatim_quote": "Left upper lobe, apicoposterior segment: 3.4 x 3.1 cm lobulated soft-tissue mass. Margins are irregular with spiculated projections."
+          }
+        ]
+      },
+      "analysis": {
+        "suggested_answer": true,
+        "reasoning": "The criterion's answer_schema.enum is [true, false, no_info] — boolean values, not strings. Both agents agree clinically: the 05/22/2025 CT chest describes a '3.4 cm spiculated left upper-lobe mass, Lung-RADS 4X… highly suspicious for primary lung malignancy,' which unambiguously satisfies imaging_lung_lesion. This is a type-drift cell, not a clinical disagreement. Agent A emitted the canonical boolean true; Agent B emitted the non-canonical string \"yes\". The correct canonical form is the boolean true per the schema enum.",
+        "evidence_pointers": [
+          {
+            "note_id": "2025-05-22__ct_chest",
+            "what_to_look_for": "IMPRESSION line 1: Lung-RADS 4X, highly suspicious for primary lung malignancy",
+            "offsets": [
+              1308,
+              1465
+            ]
+          },
+          {
+            "note_id": "imaging_lung_lesion.md (criterion file)",
+            "what_to_look_for": "answer_schema.enum: [true, false, no_info] — boolean, not string",
+            "offsets": null
+          }
+        ],
+        "agent_correctness": "both",
+        "classification_hint": "n_a",
+        "judge_confidence": "high"
+      },
+      "cost_usd": 0.07432775,
+      "duration_ms": 25234,
+      "generated_at": "2026-05-09T20:08:50.267Z"
+    },
+    {
+      "patient_id": "patient_easy_probable_02",
+      "field_id": "lowest_hemoglobin_in_window",
+      "kind": "type_drift",
+      "agent_a": {
+        "agent_id": "agent_1",
+        "answer": null,
+        "confidence": "high",
+        "rationale": "No hemoglobin measurements found in either the OMOP measurements table or the clinical notes within the 24-month lookback window. The OMOP measurements include body weight, oxygen saturation, and systolic blood pressure, but no hemoglobin (LOINC 718-7 or equivalent). Clinical notes do not document any hemoglobin or hematocrit values.",
+        "evidence": []
+      },
+      "agent_b": {
+        "agent_id": "agent_2",
+        "answer": "no_info",
+        "confidence": "high",
+        "rationale": "No hemoglobin or CBC laboratory results documented in chart. No hemoglobin values available in structured OMOP data or clinical notes.",
+        "evidence": []
+      },
+      "analysis": {
+        "suggested_answer": null,
+        "reasoning": "The criterion's answer_schema declares type as [number, 'null'], meaning the only valid non-numeric response is JSON null — not the string 'no_info'. Both agents correctly determined that no hemoglobin value exists in the chart: OMOP measurements contain only body weight, oxygen saturation, and systolic blood pressure (no LOINC 718-7 / Hgb concept), and all three clinical notes (CT chest, pulmonology consult, oncology progress) are silent on hemoglobin or hematocrit. Agent A emitted the canonical form (null); Agent B emitted 'no_info', which is not a valid schema value for this field. The criterion file itself states: 'If no hemoglobin is found, return null with missingness_reason=not_documented.' This is a format/data-quality drift, not a clinical disagreement.",
+        "evidence_pointers": [
+          {
+            "note_id": "criterion_file__lowest_hemoglobin_in_window",
+            "what_to_look_for": "answer_schema block — type: [number, 'null'] — no string enum values defined",
+            "offsets": null
+          }
+        ],
+        "agent_correctness": "both",
+        "classification_hint": "n_a",
+        "judge_confidence": "high"
+      },
+      "cost_usd": 0.10380609999999998,
+      "duration_ms": 34073,
+      "generated_at": "2026-05-09T20:09:45.509Z"
+    },
+    {
+      "patient_id": "patient_easy_probable_02",
+      "field_id": "oncologist_lung_cancer_diagnosis_in_note",
+      "kind": "type_drift",
+      "agent_a": {
+        "agent_id": "agent_1",
+        "answer": true,
+        "confidence": "high",
+        "rationale": "The treating thoracic oncologist (Dr. D. Holloway) explicitly documents the diagnosis of primary lung cancer in the clinical assessment section of the oncology progress note dated 06/30/2025. The note states: \"This patient has primary lung cancer, left upper lobe\" and \"The clinical picture is unambiguous\" with further clarification that despite absence of tissue confirmation, the patient is being managed as having primary lung malignancy on clinical grounds.",
+        "evidence": [
+          {
+            "source": "note",
+            "note_id": "2025-06-30__oncology_progress",
+            "span_offsets": [
+              519,
+              573
+            ],
+            "verbatim_quote": "This patient has primary lung cancer, left upper lobe.",
+            "doc_type": "oncology_progress",
+            "author_role": "thoracic_oncologist",
+            "evidence_date": "2025-06-30"
+          },
+          {
+            "source": "note",
+            "note_id": "2025-06-30__oncology_progress",
+            "span_offsets": [
+              574,
+              739
+            ],
+            "verbatim_quote": "The clinical picture is unambiguous: a 3.4 cm spiculated mass with hilar nodal involvement in a former heavy smoker with declining functional status and weight loss.",
+            "doc_type": "oncology_progress",
+            "author_role": "thoracic_oncologist",
+            "evidence_date": "2025-06-30"
+          }
+        ]
+      },
+      "agent_b": {
+        "agent_id": "agent_2",
+        "answer": "yes",
+        "confidence": "high",
+        "rationale": "Thoracic oncologist explicitly states diagnosis in new patient note dated 06/30/2025. Oncologist documents the clinical picture as unambiguous despite absence of tissue confirmation.",
+        "evidence": [
+          {
+            "source": "note",
+            "note_id": "2025-06-30__oncology_progress",
+            "span_offsets": [
+              519,
+              573
+            ],
+            "verbatim_quote": "This patient has primary lung cancer, left upper lobe."
+          }
+        ]
+      },
+      "analysis": {
+        "suggested_answer": true,
+        "reasoning": "This is a format/data-quality drift, not a clinical disagreement. Both agents correctly identified that thoracic oncologist Dr. D. Holloway explicitly documents lung cancer as the diagnosis in the 06/30/2025 oncology progress note ('This patient has primary lung cancer, left upper lobe'). The criterion's answer_schema defines enum values as boolean literals [true, false, no_info]. Agent A emitted the canonical boolean true; Agent B emitted the non-canonical string 'yes', which does not match any enum value in the schema. No clinical re-review is needed — the canonical answer is boolean true.",
+        "evidence_pointers": [
+          {
+            "note_id": "2025-06-30__oncology_progress",
+            "what_to_look_for": "oncologist explicit lung cancer diagnosis statement",
+            "offsets": [
+              519,
+              573
+            ]
+          },
+          {
+            "note_id": "oncologist_lung_cancer_diagnosis_in_note.md",
+            "what_to_look_for": "answer_schema.enum — boolean values [true, false, no_info]",
+            "offsets": null
+          }
+        ],
+        "agent_correctness": "both",
+        "classification_hint": "n_a",
+        "judge_confidence": "high"
+      },
+      "cost_usd": 0.09940990000000001,
+      "duration_ms": 22805,
+      "generated_at": "2026-05-09T20:09:12.659Z"
+    },
+    {
+      "patient_id": "patient_easy_probable_02",
+      "field_id": "pathology_report_present",
+      "kind": "type_drift",
+      "agent_a": {
+        "agent_id": "agent_1",
+        "answer": false,
+        "confidence": "high",
+        "rationale": "No surgical, biopsy, or cytology pathology report present in the lookback window. The patient declined biopsy due to advanced age, frailty, and impaired respiratory reserve (FEV1 48%, exertional desaturation). Pulmonology note explicitly states: \"After thorough counseling on procedural risks versus benefit, the patient declined biopsy.\"",
+        "evidence": [
+          {
+            "source": "note",
+            "note_id": "2025-06-10__pulmonology_consult",
+            "span_offsets": [
+              1179,
+              1225
+            ],
+            "verbatim_quote": "Imaging is compelling for primary lung cancer.",
+            "doc_type": "pulmonology_consult",
+            "evidence_date": "2025-06-10"
+          },
+          {
+            "source": "note",
+            "note_id": "2025-06-10__pulmonology_consult",
+            "span_offsets": [
+              1474,
+              1643
+            ],
+            "verbatim_quote": "After thorough counseling on procedural risks versus benefit, the patient declined biopsy, citing quality-of-life priorities and preference to avoid invasive procedures.",
+            "doc_type": "pulmonology_consult",
+            "evidence_date": "2025-06-10"
+          }
+        ]
+      },
+      "agent_b": {
+        "agent_id": "agent_2",
+        "answer": "no",
+        "confidence": "high",
+        "rationale": "No pathology report in chart. Patient declined biopsy. Oncology note explicitly states tissue confirmation was not obtained.",
+        "evidence": [
+          {
+            "source": "note",
+            "note_id": "2025-06-10__pulmonology_consult",
+            "span_offsets": [
+              1474,
+              1563
+            ],
+            "verbatim_quote": "After thorough counseling on procedural risks versus benefit, the patient declined biopsy"
+          }
+        ]
+      },
+      "analysis": {
+        "suggested_answer": false,
+        "reasoning": "This is a type_drift cell: both agents agree that no qualifying pathology report exists in the lookback window, which is confirmed by the chart — the pulmonology consult explicitly states 'the patient declined biopsy' and the plan is to 'refer to thoracic oncology for clinical management without pathologic tissue.' No surgical, biopsy, or cytology pathology document appears among any of the three notes in the corpus. The criterion's answer_schema.enum is [true, false, no_info] (boolean literals), so Agent A's answer of boolean false is the canonical form; Agent B's answer of string \"no\" is a format deviation. This is a platform data-quality issue, not a clinical or guideline disagreement.",
+        "evidence_pointers": [
+          {
+            "note_id": "2025-06-10__pulmonology_consult",
+            "what_to_look_for": "biopsy declined and no pathologic tissue obtained",
+            "offsets": [
+              1474,
+              1643
+            ]
+          },
+          {
+            "note_id": "pathology_report_present.md (criterion)",
+            "what_to_look_for": "answer_schema.enum — boolean [true, false, no_info], not string 'yes'/'no'",
+            "offsets": null
+          }
+        ],
+        "agent_correctness": "both",
+        "classification_hint": "n_a",
+        "judge_confidence": "high"
+      },
+      "cost_usd": 0.23245620000000006,
+      "duration_ms": 23604,
+      "generated_at": "2026-05-09T20:08:22.098Z"
+    }
+  ]
+}

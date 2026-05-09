@@ -1,0 +1,31 @@
+DATE: 2025-10-21
+PATIENT: Female, 58 years old
+PROVIDER: Dr. A. Bernstein, MD — Primary Care
+VISIT TYPE: Follow-up — Lab Review / Hypertension Check
+
+INTERVAL HISTORY:
+Ms. [N.] returns to review lab results from her July annual exam. She reports doing well overall. She started a low-sodium diet per our prior recommendations and has been consistent with her exercise routine. No new symptoms. No chest pain, dyspnea, or palpitations. Fatigue has fully resolved. She denies cough, weight loss, or fevers.
+
+RESULTS REVIEW:
+- CBC: Within normal limits.
+- BMP: Na 139, K 4.0, Cr 0.82, Glucose 95 — all normal.
+- Lipid panel: LDL 88 mg/dL (at goal), HDL 62, TG 112.
+- TSH: 2.1 mIU/L (normal).
+- Fasting glucose: 95 mg/dL (normal).
+- Mammography: Completed 2025-08-10; BI-RADS 1 — no abnormal findings.
+
+PHYSICAL EXAM:
+VS: BP 118/74 mmHg, HR 66 bpm, Weight 143 lbs.
+General: Well-appearing, no acute distress.
+Pulmonary: Clear to auscultation bilaterally.
+Cardiovascular: Regular rate and rhythm, no murmurs.
+
+ASSESSMENT AND PLAN:
+1. Hypertension — blood pressure at goal. Continue lisinopril 10 mg daily. Reinforce dietary sodium restriction.
+2. Hyperlipidemia — LDL at goal. Continue rosuvastatin.
+3. Glucose / metabolic — no evidence of pre-diabetes. Continue healthy lifestyle.
+4. Mammography negative — no further action needed. Repeat in 12 months.
+5. TSH normal — no thyroid pathology identified.
+6. Patient counseled on maintaining weight, exercise, and diet.
+
+All routine preventive screenings current. Next annual exam scheduled for July 2026.

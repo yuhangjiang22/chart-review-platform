@@ -1,0 +1,42 @@
+id: absent
+title: Absent Lung Cancer
+description: >-
+  Patient does not have confirmed or probable lung cancer; absence is clearly documented
+  or inferred from lack of clinical evidence.
+
+guidance: |
+  ## Absent Lung Cancer
+
+  A patient meets this criterion if there is **no evidence of confirmed or probable lung cancer**.
+  This includes:
+
+  ### Clear documentation of absence:
+  - Explicit statement: "No evidence of lung cancer"
+  - "Rule out lung cancer" with negative workup documented
+  - Biopsy showing benign pathology (e.g., hamartoma, lipoma)
+  - Imaging showing benign findings only (e.g., scarring, atelectasis, infectious consolidation)
+
+  ### Metastatic disease to lung (not primary lung cancer):
+  - Cancer originating in another organ (stomach, kidney, colon, etc.) with lung metastases
+  - Should be labeled "absent" for primary lung cancer purposes
+  - Note: Distinguish from primary lung malignancy
+
+  ### Historical lung cancer that resolved:
+  - Patient had lung cancer in the past but was treated and cured
+  - No current evidence of active disease
+  - Label current status as "absent"
+
+  ### Incidental findings without clinical workup:
+  - Small nodules found on imaging with no radiologist concern
+  - No documented follow-up or clinical concern
+  - No mention in clinical notes
+
+  ### Lung disease that is NOT cancer:
+  - COPD, emphysema, pneumonia, pulmonary fibrosis, etc.
+  - Benign lung lesions (cysts, nodules characterized as benign)
+
+  ### Key principle:
+  If the chart contains NO evidence of confirmed or probable lung cancer (as defined above),
+  the patient should be labeled "absent."
+
+output_value: absent

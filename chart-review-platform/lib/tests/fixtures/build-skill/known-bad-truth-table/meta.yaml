@@ -1,0 +1,11 @@
+task_type: phenotype_validation
+review_unit: patient
+manual_version: '2026-05-07'
+index_anchor: index_date
+time_windows:
+  - id: lookback_24mo
+    anchor: index_anchor
+    start_offset: -P24M
+    end_offset: P0D
+final_output: pathology_total
+overview_prose: minimal repro for derivation_truth_table_mismatch

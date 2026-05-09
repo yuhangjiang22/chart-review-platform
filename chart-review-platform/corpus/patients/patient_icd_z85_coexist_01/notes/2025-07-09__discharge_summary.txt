@@ -1,0 +1,19 @@
+EMERGENCY DEPARTMENT DISCHARGE SUMMARY
+Provider: V. Park, MD
+Discharge date: 2025-07-09 21:30
+
+DISCHARGE DIAGNOSES
+1. Musculoskeletal chest wall pain.
+2. Lung cancer (C34.10) — chronic, problem-list condition (treating
+   physician on file).
+3. Personal history of malignant neoplasm of bronchus and lung
+   (Z85.118).
+4. Tobacco use, former.
+
+NOTE
+Patient's chronic lung cancer (C34.10) was carried over to this
+admission's problem list automatically per institutional billing
+practice; no acute oncologic intervention performed during this visit.
+Patient counseled to follow up with oncology and PCP.
+
+V. Park, MD — electronically signed 2025-07-09 21:45

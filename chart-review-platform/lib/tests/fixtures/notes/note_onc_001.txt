@@ -1,0 +1,57 @@
+ONCOLOGY PROGRESS NOTE
+Provider: J. Chen, MD — Thoracic Medical Oncology
+Encounter date: 2025-10-03
+Encounter type: New patient consultation
+
+CHIEF COMPLAINT
+New diagnosis of lung cancer, here for treatment planning.
+
+HISTORY OF PRESENT ILLNESS
+Mr. Doe is a 72-year-old gentleman referred from pulmonology after a
+CT-guided core biopsy of a right upper lobe mass returned adenocarcinoma.
+He reports a six-month history of dry cough and a 12-pound unintentional
+weight loss. No hemoptysis. Mild dyspnea on exertion (one flight of stairs).
+No bone pain, no headaches, no focal neurologic symptoms.
+
+PAST MEDICAL HISTORY
+Hypertension, hyperlipidemia, COPD (GOLD stage II), former tobacco use
+(45 pack-years, quit 11 years ago).
+
+REVIEW OF SYSTEMS
+As above; otherwise non-contributory on a 12-system review.
+
+PHYSICAL EXAM
+Vitals stable. Lungs with mildly diminished breath sounds at the right apex,
+no rales or wheezes. No supraclavicular lymphadenopathy. Cardiac exam
+unremarkable. No hepatomegaly. Neuro grossly intact.
+
+IMAGING REVIEW
+CT chest 2025-09-08: 3.2 cm spiculated right upper lobe mass, right hilar
+adenopathy (largest node 1.4 cm), no contralateral disease, no pleural
+effusion.
+PET-CT 2025-09-22: FDG-avid right upper lobe mass (SUVmax 11.2),
+FDG-avid right hilar node (SUVmax 6.8). No distant metastatic disease.
+MRI brain 2025-09-25: no intracranial metastatic disease.
+
+PATHOLOGY REVIEW
+Outside core biopsy reviewed in our institutional tumor board on 2025-10-01.
+Confirmed adenocarcinoma of the lung. Molecular pending.
+
+ASSESSMENT
+1. Stage IIIA (cT2aN2M0) non-small-cell lung cancer, adenocarcinoma subtype
+   — primary diagnosis. Patient has lung cancer and is appropriate for
+   concurrent chemoradiation followed by consolidation immunotherapy
+   pending molecular results.
+2. COPD — stable, continue tiotropium.
+3. Hypertension — stable.
+
+PLAN
+- Multidisciplinary tumor board discussion completed; recommend definitive
+  concurrent chemoradiotherapy.
+- Carboplatin / paclitaxel weekly with concurrent thoracic radiotherapy
+  (60 Gy / 30 fx), starting on receipt of insurance authorization.
+- Hold consolidation durvalumab decision until EGFR / ALK results return.
+- Smoking cessation counseling reinforced (patient remains abstinent).
+- Follow-up in two weeks or sooner if symptoms.
+
+J. Chen, MD — electronically signed 2025-10-03 14:18

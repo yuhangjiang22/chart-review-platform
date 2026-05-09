@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chart-review-platform/contracts/note_type_filters.schema.json",
+  "title": "NoteTypeFilters",
+  "description": "Per-criterion note-type priority. One file per package at references/note_type_filters.md.",
+  "type": "object",
+  "required": ["filters"],
+  "properties": {
+    "description": { "type": "string" },
+    "version": { "type": "string" },
+    "filters": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "high":   { "type": "array", "items": { "type": "string" } },
+          "medium": { "type": "array", "items": { "type": "string" } },
+          "low":    { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "derived_from": {
+      "type": "object",
+      "required": ["cohort_size", "codified_at", "guideline_manual_version"],
+      "properties": {
+        "cohort_size": { "type": "integer", "minimum": 1 },
+        "cohort_oracle_done_count": { "type": "integer", "minimum": 1 },
+        "codified_at": { "type": "string" },
+        "guideline_manual_version": { "type": "string" }
+      }
+    }
+  }
+}

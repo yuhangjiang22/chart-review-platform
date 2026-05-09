@@ -1,0 +1,74 @@
+id: time_to_onset
+title: "Time to Onset"
+description: |
+  Assesses the interval between MS-DMT initiation (or cessation) and the appearance of liver injury.
+  Shorter intervals suggest stronger causal relationship. Scoring depends on whether this is the
+  patient's initial exposure to any DMT or a subsequent treatment with the same/different DMT.
+
+instructions: |
+  1. Determine the type of exposure:
+     - Initial Treatment: First time patient is exposed to the suspect MS-DMT
+     - Subsequent Treatment: Patient has prior exposure to the same drug (e.g., rechallenge after interruption)
+
+  2. Identify the time interval:
+     - Time from drug START to liver injury onset
+     - OR time from drug STOP to liver injury onset (if injury appeared after cessation)
+
+  3. For initial treatment (hepatocellular type):
+     - Score +2 if onset: 5-90 days from start (highly suggestive)
+     - Score +1 if onset: <5 or >90 days from start (compatible)
+     - Score +1 if onset: ≤15 days after stopping (compatible post-cessation)
+     - Mark as "unrelated" (excluded) if onset: >15 days after stopping
+
+  4. For initial treatment (cholestatic or mixed type):
+     - Score +2 if onset: 5-90 days from start (highly suggestive)
+     - Score +1 if onset: <5 or >90 days from start (compatible)
+     - Score +1 if onset: ≤30 days after stopping (compatible post-cessation)
+     - Mark as "unrelated" (excluded) if onset: >30 days after stopping
+
+  5. For subsequent treatment (hepatocellular type):
+     - Score +1 if onset: 1-15 days from start (compatible)
+     - Score +1 if onset: >15 days from start (suggestive recurrence)
+     - Score +1 if onset: ≤15 days after stopping (compatible post-cessation)
+
+  6. For subsequent treatment (cholestatic or mixed type):
+     - Score +1 if onset: 1-90 days from start (compatible)
+     - Score +1 if onset: >90 days from start (less specific)
+     - Score +1 if onset: ≤30 days after stopping (compatible post-cessation)
+
+  7. Edge case - Multiple DMT switches:
+     If patient switched from one MS-DMT to another shortly before liver injury, score the DMT
+     that was active when liver injury onset occurred per standard time-to-onset rules.
+
+  8. Edge case - Washout timing:
+     If injury begins during DMT washout period (≤15 days post-cessation for hepatocellular,
+     ≤30 days for cholestatic), consider it potentially related. If injury appears >15/30 days
+     post-cessation, mark as likely unrelated and score as -2.
+
+evidence_sources: |
+  - Date MS-DMT was initiated (from medication history, prescription date, clinical note documentation)
+  - Date MS-DMT was stopped/discontinued (from medication reconciliation, clinical note)
+  - Date of first abnormal liver enzyme result (ALT, AST, Alk P, or bilirubin elevation)
+  - Documentation of injury type (hepatocellular vs. cholestatic) based on R ratio = [ALT/ULN] ÷ [Alk P/ULN]
+    * R > 5.0 = hepatocellular
+    * R < 2.0 = cholestatic
+    * R = 2.0–5.0 = mixed
+
+assessment_options:
+  - label: "+2 (Highly suggestive)"
+    value: 2
+    description: "5-90 days from drug initiation (initial treatment, both types)"
+  - label: "+1 (Compatible - Time from start)"
+    value: 1
+    description: "<5 or >90 days from start (initial treatment), or 1-15 days from start (subsequent treatment)"
+  - label: "+1 (Compatible - Time from stop)"
+    value: 1
+    description: "≤15 days after stopping (hepatocellular) or ≤30 days (cholestatic)"
+  - label: "0 (Inconclusive)"
+    value: 0
+    description: "Timing unclear or missing critical dates"
+  - label: "-2 (Unrelated)"
+    value: -2
+    description: ">15 days post-cessation (hepatocellular) or >30 days (cholestatic), or injury began before drug started"
+
+output_format: "Numeric score: {value}"

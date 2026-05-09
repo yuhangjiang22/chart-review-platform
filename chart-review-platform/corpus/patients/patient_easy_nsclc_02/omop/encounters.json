@@ -1,0 +1,26 @@
+[
+  {
+    "row_id": 120050,
+    "concept_id": 9202,
+    "concept_name": "Outpatient Visit",
+    "type": "Outpatient",
+    "department": "Radiology",
+    "date": "2025-03-04"
+  },
+  {
+    "row_id": 120051,
+    "concept_id": 9202,
+    "concept_name": "Outpatient Visit",
+    "type": "Outpatient",
+    "department": "Pulmonology / Bronchoscopy Suite",
+    "date": "2025-03-24"
+  },
+  {
+    "row_id": 120052,
+    "concept_id": 9202,
+    "concept_name": "Outpatient Visit",
+    "type": "Outpatient",
+    "department": "Thoracic Oncology",
+    "date": "2025-04-22"
+  }
+]

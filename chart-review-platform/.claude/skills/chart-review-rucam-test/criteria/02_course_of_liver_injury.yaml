@@ -1,0 +1,64 @@
+id: course_of_liver_injury
+title: "Course of Liver Injury"
+description: |
+  Assesses how liver enzyme levels change after the suspect MS-DMT is stopped.
+  Rapid normalization suggests stronger causality. If the drug is continued, course is inconclusive (0).
+
+instructions: |
+  1. Determine whether the MS-DMT was stopped:
+     - If drug WAS STOPPED: Score based on enzyme recovery pattern (see steps 2-5 below)
+     - If drug is STILL BEING TAKEN: Score as 0 (inconclusive) regardless of lab changes
+
+  2. For hepatocellular type (elevated ALT):
+     - Score +3 (Highly suggestive): ALT decreased ≥50% within 8 days of stopping
+     - Score +2 (Suggestive): ALT decreased ≥50% within 30 days of stopping
+     - Score 0 (Inconclusive): ALT decreased ≥50% after 30 days, or no follow-up data available
+     - Score -2 (Against causality): ALT decreased <50% after 30 days, OR recurrent increase after initial improvement
+
+  3. For cholestatic type (elevated Alk P or bilirubin):
+     - Score +2 (Suggestive): Alk P or total bilirubin decreased ≥50% within 180 days of stopping
+     - Score +1 (Compatible): Alk P or bilirubin decreased <50% within 180 days
+     - Score 0 (Inconclusive): No change or no follow-up data
+     - Score -2 (Against causality): Persistence or increase in Alk P/bilirubin
+
+  4. For mixed type (R ratio 2.0-5.0):
+     - Calculate recovery using BOTH ALT and Alk P/bilirubin patterns
+     - Use the most favorable scoring (highest score) from either enzyme pattern
+
+  5. Calculate percentage change:
+     - % change = [(peak value - final value) / peak value] × 100
+     - Peak value = highest ALT, Alk P, or bilirubin during injury episode
+     - Final value = most recent lab value (or value at 8, 30, 180 days as applicable)
+
+  6. Edge case - Subclinical elevation:
+     Score normally even if elevation is mild/subclinical. Subclinical DILI counts.
+
+  7. Edge case - Incomplete follow-up labs:
+     If follow-up labs are missing or timeline is unclear, score as 0 (inconclusive)
+     rather than guessing or downgrading.
+
+evidence_sources: |
+  - Date MS-DMT was stopped (from medication reconciliation, clinical note, or discharge summary)
+  - Baseline liver enzyme values (ALT, AST, Alk P, total bilirubin) before or at start of DMT
+  - Peak liver enzyme values during injury episode
+  - Follow-up liver enzyme values at 8 days, 30 days, and 180 days post-cessation (as available)
+  - Timeline of normalization (when values returned to normal/upper limit of normal)
+
+assessment_options:
+  - label: "+3 (Highly suggestive)"
+    value: 3
+    description: "ALT decreased ≥50% within 8 days of stopping (hepatocellular type)"
+  - label: "+2 (Suggestive)"
+    value: 2
+    description: "ALT ≥50% within 30 days (hepatocellular) OR Alk P/bilirubin ≥50% within 180 days (cholestatic)"
+  - label: "+1 (Compatible)"
+    value: 1
+    description: "Alk P/bilirubin <50% within 180 days (cholestatic type)"
+  - label: "0 (Inconclusive)"
+    value: 0
+    description: "ALT/Alk P decreased ≥50% after 30 days, no follow-up data, or drug still being taken"
+  - label: "-2 (Against causality)"
+    value: -2
+    description: "ALT decreased <50% after 30 days, or recurrent increase in enzymes"
+
+output_format: "Numeric score: {value}"

@@ -1,0 +1,4 @@
+[
+  { "row_id": 7201, "concept_id": 3013762, "concept_name": "Body weight", "value": 78.2, "unit": "kg", "date": "2025-02-14" },
+  { "row_id": 7202, "concept_id": 3024171, "concept_name": "Hemoglobin", "value": 11.4, "unit": "g/dL", "ref_low": 13.5, "ref_high": 17.5, "abnormal": "low", "date": "2025-02-14" }
+]

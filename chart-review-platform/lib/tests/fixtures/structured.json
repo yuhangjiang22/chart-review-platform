@@ -1,0 +1,60 @@
+{
+  "patient_demo": {
+    "demographics": {
+      "patient_id": "patient_demo",
+      "birth_date": "1953-03-22",
+      "sex": "M",
+      "race": "White",
+      "ethnicity": "Not Hispanic or Latino",
+      "death_date": null
+    },
+    "conditions": [
+      { "row_id": 14080, "concept_id": 4119911, "concept_name": "Pneumonia", "icd10cm": "J18.9", "start_date": "2025-08-28", "end_date": "2025-09-04", "status": "resolved", "encounter_id": "enc_inp_2025_08_28" },
+      { "row_id": 14092, "concept_id": 320128, "concept_name": "Essential hypertension", "icd10cm": "I10", "start_date": "2018-04-12", "end_date": null, "status": "active", "encounter_id": "enc_pcp_2018_04_12" },
+      { "row_id": 14210, "concept_id": 255573, "concept_name": "Chronic obstructive pulmonary disease", "icd10cm": "J44.9", "start_date": "2022-11-04", "end_date": null, "status": "active", "encounter_id": "enc_pulm_2022_11_04" },
+      { "row_id": 14222, "concept_id": 201826, "concept_name": "Type 2 diabetes mellitus", "icd10cm": "E11.9", "start_date": "2019-06-15", "end_date": null, "status": "active", "encounter_id": "enc_pcp_2019_06_15" },
+      { "row_id": 14305, "concept_id": 4055225, "concept_name": "Tobacco use disorder, in remission", "icd10cm": "Z87.891", "start_date": "2014-01-01", "end_date": null, "status": "active", "encounter_id": null },
+      { "row_id": 14401, "concept_id": 4197666, "concept_name": "Pulmonary mass (finding)", "icd10cm": null, "start_date": "2025-09-08", "end_date": null, "status": "active", "encounter_id": "enc_ct_2025_09_08" },
+      { "row_id": 14402, "concept_id": 4180756, "concept_name": "Mediastinal lymphadenopathy", "icd10cm": "R59.0", "start_date": "2025-09-08", "end_date": null, "status": "active", "encounter_id": "enc_ct_2025_09_08" }
+    ],
+    "procedures": [
+      { "row_id": 22011, "concept_id": 4337193, "concept_name": "CT chest with contrast", "cpt": "71260", "procedure_date": "2025-09-08", "encounter_id": "enc_ct_2025_09_08", "provider_specialty": "Radiology" },
+      { "row_id": 22045, "concept_id": 4163872, "concept_name": "CT-guided percutaneous core needle biopsy of lung", "cpt": "32408", "procedure_date": "2025-09-12", "encounter_id": "enc_path_2025_09_15", "provider_specialty": "Interventional Radiology" },
+      { "row_id": 22102, "concept_id": 4126689, "concept_name": "PET-CT skull base to mid-thigh", "cpt": "78815", "procedure_date": "2025-09-22", "encounter_id": "enc_pet_2025_09_22", "provider_specialty": "Radiology" },
+      { "row_id": 22150, "concept_id": 4045394, "concept_name": "Influenza vaccination, inactivated", "cpt": "90686", "procedure_date": "2024-10-18", "encounter_id": "enc_pcp_2024_10_18", "provider_specialty": "Family Medicine" }
+    ],
+    "measurements": [
+      { "row_id": 88001, "concept_id": 3013682, "concept_name": "Hemoglobin", "loinc": "718-7", "value": 13.4, "unit": "g/dL", "date": "2025-09-12", "ref_low": 13.5, "ref_high": 17.5, "abnormal": "low" },
+      { "row_id": 88002, "concept_id": 3024561, "concept_name": "Albumin", "loinc": "1751-7", "value": 3.6, "unit": "g/dL", "date": "2025-09-12", "ref_low": 3.5, "ref_high": 5.0, "abnormal": null },
+      { "row_id": 88003, "concept_id": 3023314, "concept_name": "Creatinine", "loinc": "2160-0", "value": 0.92, "unit": "mg/dL", "date": "2025-09-12", "ref_low": 0.7, "ref_high": 1.3, "abnormal": null },
+      { "row_id": 88040, "concept_id": 3045716, "concept_name": "FEV1 / FVC ratio", "loinc": "19926-5", "value": 0.62, "unit": "ratio", "date": "2024-08-14", "ref_low": 0.7, "ref_high": null, "abnormal": "low" },
+      { "row_id": 88213, "concept_id": 4197666, "concept_name": "Pulmonary mass on imaging", "loinc": null, "value": "present", "unit": null, "date": "2025-09-08", "ref_low": null, "ref_high": null, "abnormal": null }
+    ],
+    "drugs": [
+      { "row_id": 33012, "concept_id": 1539403, "concept_name": "Lisinopril 10 MG oral tablet", "rxnorm": "314076", "start_date": "2018-04-12", "end_date": null, "status": "active" },
+      { "row_id": 33089, "concept_id": 1503297, "concept_name": "Metformin hydrochloride 500 MG oral tablet", "rxnorm": "861007", "start_date": "2019-06-15", "end_date": null, "status": "active" },
+      { "row_id": 33145, "concept_id": 1154343, "concept_name": "Tiotropium 18 MCG inhalation powder", "rxnorm": "583214", "start_date": "2022-11-04", "end_date": null, "status": "active" },
+      { "row_id": 33287, "concept_id": 1305058, "concept_name": "Ceftriaxone 1 G injection", "rxnorm": "309097", "start_date": "2025-08-28", "end_date": "2025-09-03", "status": "completed" }
+    ],
+    "observations": [
+      { "row_id": 55001, "concept_id": 4275495, "concept_name": "Tobacco smoking status — Former smoker", "loinc": "72166-2", "value": "former", "date": "2024-08-14", "detail": "45 pack-years; quit 2014" },
+      { "row_id": 55012, "concept_id": 4042634, "concept_name": "ECOG performance status", "loinc": "89247-1", "value": "1", "date": "2025-10-03", "detail": "ambulatory; restricted strenuous activity" },
+      { "row_id": 55020, "concept_id": 4019403, "concept_name": "Family history — lung cancer (mother)", "loinc": null, "value": "positive", "date": "2018-04-12", "detail": "mother, dx age 71" }
+    ],
+    "documents": [
+      { "row_id": 4400, "concept_id": null, "type": "Discharge summary", "date": "2025-08-31", "encounter_id": "enc_inp_2025_08_28", "note_id": "note_disch_001" },
+      { "row_id": 4410, "concept_id": null, "type": "Pulmonology consult note", "date": "2025-09-05", "encounter_id": "enc_pulm_2025_09_05", "note_id": "note_pulm_001" },
+      { "row_id": 4415, "concept_id": null, "type": "CT chest with contrast", "date": "2025-09-08", "encounter_id": "enc_ct_2025_09_08", "note_id": "note_ct_001" },
+      { "row_id": 4421, "concept_id": 11526, "type": "Surgical pathology report", "loinc": "11526-1", "date": "2025-09-15", "encounter_id": "enc_path_2025_09_15", "note_id": "note_path_001" },
+      { "row_id": 4430, "concept_id": null, "type": "Oncology progress note", "date": "2025-10-03", "encounter_id": "enc_onc_2025_10_03", "note_id": "note_onc_001" }
+    ],
+    "encounters": [
+      { "encounter_id": "enc_inp_2025_08_28", "date_start": "2025-08-28", "date_end": "2025-09-04", "type": "Inpatient", "department": "Hospital medicine", "primary_provider": "Dr. R. Chen" },
+      { "encounter_id": "enc_pulm_2025_09_05", "date_start": "2025-09-05", "date_end": "2025-09-05", "type": "Outpatient", "department": "Pulmonology", "primary_provider": "Dr. K. Singh" },
+      { "encounter_id": "enc_ct_2025_09_08", "date_start": "2025-09-08", "date_end": "2025-09-08", "type": "Imaging", "department": "Radiology", "primary_provider": "Dr. J. Park" },
+      { "encounter_id": "enc_path_2025_09_15", "date_start": "2025-09-12", "date_end": "2025-09-15", "type": "Procedure", "department": "Pathology", "primary_provider": "Dr. M. Alvarez" },
+      { "encounter_id": "enc_pet_2025_09_22", "date_start": "2025-09-22", "date_end": "2025-09-22", "type": "Imaging", "department": "Radiology", "primary_provider": "Dr. J. Park" },
+      { "encounter_id": "enc_onc_2025_10_03", "date_start": "2025-10-03", "date_end": "2025-10-03", "type": "Outpatient", "department": "Oncology", "primary_provider": "Dr. L. Okafor" }
+    ]
+  }
+}

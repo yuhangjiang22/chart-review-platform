@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chart-review-platform/contracts/evidence.schema.json",
+  "title": "EvidenceTriple",
+  "description": "One unit of evidence supporting a criterion answer. Either a span from a clinical note or a row from an OMOP/structured table.",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": ["source", "note_id", "span_offsets", "verbatim_quote", "evidence_date"],
+      "properties": {
+        "source": { "const": "note" },
+        "note_id": { "type": "string" },
+        "doc_type": { "type": "string" },
+        "span_offsets": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": { "type": "integer", "minimum": 0 }
+        },
+        "verbatim_quote": { "type": "string", "minLength": 1 },
+        "evidence_date": { "type": "string" },
+        "author_role": { "type": "string" }
+      }
+    },
+    {
+      "type": "object",
+      "required": ["source", "table", "row_id", "evidence_date"],
+      "properties": {
+        "source": { "const": "omop" },
+        "table": { "type": "string" },
+        "row_id": { "type": ["string", "integer"] },
+        "concept_id": { "type": "integer" },
+        "concept_name": { "type": "string" },
+        "value": {},
+        "unit": { "type": "string" },
+        "evidence_date": { "type": "string" }
+      }
+    },
+    {
+      "type": "object",
+      "required": ["source", "table", "row_id"],
+      "properties": {
+        "source": { "const": "structured" },
+        "table": { "type": "string" },
+        "row_id": { "type": ["string", "integer"] },
+        "concept_id": { "type": "integer" },
+        "concept_name": { "type": "string" },
+        "value": {},
+        "unit": { "type": "string" },
+        "evidence_date": { "type": "string" }
+      }
+    }
+  ]
+}

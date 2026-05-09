@@ -1,0 +1,52 @@
+[
+  { "expr": "a == 'yes'", "env": { "a": "yes" }, "expected": true },
+  { "expr": "a == 'yes' AND b == 1", "env": { "a": "yes", "b": 1 }, "expected": true },
+  { "expr": "a == 'yes' OR b == 2", "env": { "a": "no", "b": 2 }, "expected": true },
+  { "expr": "x in ['a','b','c']", "env": { "x": "b" }, "expected": true },
+  { "expr": "x in ['a','b']", "env": { "x": "z" }, "expected": false },
+  { "expr": "a == 'yes' ? 'ok' : 'no'", "env": { "a": "yes" }, "expected": "ok" },
+  { "expr": "a != 'no'", "env": { "a": "yes" }, "expected": true },
+  { "expr": "a == 'yes' AND b == 1", "env": { "a": "yes", "b": 2 }, "expected": false },
+  { "expr": "a == 'no' OR b == 3", "env": { "a": "no", "b": 3 }, "expected": true },
+  { "expr": "a == 'yes' ? 'ok' : 'no'", "env": { "a": "no" }, "expected": "no" },
+  { "expr": "a != 'no'", "env": { "a": "no" }, "expected": false },
+  { "expr": "score > 2", "env": { "score": 3 }, "expected": true },
+  { "expr": "score >= 2", "env": { "score": 2 }, "expected": true },
+  { "expr": "score < 5", "env": { "score": 4 }, "expected": true },
+  { "expr": "score <= 4", "env": { "score": 4 }, "expected": true },
+
+  { "expr": "a + b", "env": { "a": 3, "b": 4 }, "expected": 7 },
+  { "expr": "a - b", "env": { "a": 10, "b": 3 }, "expected": 7 },
+  { "expr": "a * b", "env": { "a": 6, "b": 7 }, "expected": 42 },
+  { "expr": "a / b", "env": { "a": 12, "b": 4 }, "expected": 3 },
+  { "expr": "a + b * c", "env": { "a": 1, "b": 2, "c": 3 }, "expected": 7 },
+  { "expr": "(a + b) * c", "env": { "a": 1, "b": 2, "c": 3 }, "expected": 9 },
+  { "expr": "a - b - c", "env": { "a": 10, "b": 3, "c": 2 }, "expected": 5 },
+  { "expr": "a * 2 + b", "env": { "a": 3, "b": 4 }, "expected": 10 },
+
+  { "expr": "a + b > 5", "env": { "a": 2, "b": 4 }, "expected": true },
+  { "expr": "a + b > 10", "env": { "a": 2, "b": 4 }, "expected": false },
+
+  { "expr": "a / b", "env": { "a": 5, "b": 0 }, "expected": null },
+  { "expr": "a + b", "env": { "a": null, "b": 5 }, "expected": null },
+  { "expr": "a + b", "env": { "a": 5, "b": null }, "expected": null },
+  { "expr": "a * b", "env": { "a": null, "b": 0 }, "expected": null },
+
+  { "expr": "count_true([a, b, c])", "env": { "a": true, "b": true, "c": true }, "expected": 3 },
+  { "expr": "count_true([a, b, c])", "env": { "a": true, "b": false, "c": true }, "expected": 2 },
+  { "expr": "count_true([a, b, c])", "env": { "a": null, "b": true, "c": false }, "expected": 1 },
+  { "expr": "count_true([a, b, c])", "env": { "a": null, "b": null, "c": null }, "expected": 0 },
+  { "expr": "count_true([])", "env": {}, "expected": 0 },
+  { "expr": "count_true([a == 'yes', b == 'yes', c == 'yes'])", "env": { "a": "yes", "b": "no", "c": "yes" }, "expected": 2 },
+
+  { "expr": "days_between(a, b)", "env": { "a": "2024-04-05", "b": "2024-03-12" }, "expected": 24 },
+  { "expr": "days_between(a, b)", "env": { "a": "2024-03-12", "b": "2024-04-05" }, "expected": -24 },
+  { "expr": "days_between(a, b)", "env": { "a": "2024-04-05", "b": "2024-04-05" }, "expected": 0 },
+  { "expr": "days_between(a, b)", "env": { "a": null, "b": "2024-04-05" }, "expected": null },
+  { "expr": "days_between(a, b)", "env": { "a": "2024-04-05", "b": null }, "expected": null },
+  { "expr": "days_between(a, b)", "env": { "a": "not a date", "b": "2024-04-05" }, "expected": null },
+  { "expr": "days_between(a, b) >= 5 AND days_between(a, b) <= 90 ? 2 : 1", "env": { "a": "2024-04-05", "b": "2024-03-12" }, "expected": 2 },
+
+  { "expr": "score == -5", "env": { "score": -5 }, "expected": true },
+  { "expr": "0 - score", "env": { "score": 7 }, "expected": -7 }
+]

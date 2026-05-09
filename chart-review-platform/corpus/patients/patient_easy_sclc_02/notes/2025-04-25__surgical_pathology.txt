@@ -1,0 +1,27 @@
+UCSF MEDICAL CENTER – SURGICAL PATHOLOGY
+Date: 2025-04-25
+Patient: [REDACTED], 72F  MRN: [REDACTED]
+Specimen: CT-guided core needle biopsy, right paratracheal mediastinal mass
+
+GROSS DESCRIPTION:
+Received in formalin: four core biopsy cylinders, tan-white, 0.8–1.2 cm in length. Extensive crush artifact noted on gross inspection. Entirely submitted in two blocks.
+
+MICROSCOPIC DESCRIPTION:
+Sections reveal a highly cellular neoplasm composed of small, poorly differentiated cells arranged in sheets and ribbons with focal rosette formation. Individual cells display scant cytoplasm, markedly hyperchromatic nuclei, and finely granular "salt-and-pepper" chromatin. Nuclear molding between adjacent cells is conspicuous. Nucleoli are absent or inconspicuous. Mitotic activity is brisk; mitotic index >25 per 10 HPF. Apoptotic bodies scattered throughout. Large zones of coagulative necrosis present. Crush artifact accounts for approximately 30% of submitted tissue, consistent with fragile small-cell morphology.
+
+Immunohistochemistry (block B1):
+- Synaptophysin: POSITIVE (strong, diffuse)
+- Chromogranin A: POSITIVE (moderate)
+- CD56: POSITIVE (strong, diffuse)
+- TTF-1: POSITIVE (nuclear, ~70% of cells)
+- Ki-67: ~90%
+- p40: NEGATIVE
+- p63: NEGATIVE
+- CK5/6: NEGATIVE
+
+DIAGNOSIS:
+Small-cell carcinoma, consistent with small-cell lung carcinoma (SCLC), metastatic to mediastinal lymph nodes. IHC profile is diagnostic. p40 and CK5/6 negativity excludes squamous cell carcinoma.
+
+Pathologist: Dr. S. Lin, MD, Surgical Pathology
+UCSF Department of Pathology
+Electronically signed: 2025-04-25 16:02
