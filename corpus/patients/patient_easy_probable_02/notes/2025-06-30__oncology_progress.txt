@@ -1,0 +1,24 @@
+MIDWESTERN REGIONAL MEDICAL CENTER — ONCOLOGY PROGRESS NOTE
+Date of Service: 06/30/2025
+Patient: [REDACTED] | Age: 78 | Sex: M | MRN: [REDACTED]
+Provider: Dr. D. Holloway, MD — Thoracic Oncology
+Visit Type: New patient — clinical management, index date encounter.
+
+REFERRAL SUMMARY:
+Referred by pulmonology following patient refusal of biopsy. CT 05/22/2025: 3.4 cm spiculated LUL mass, left hilar adenopathy, Lung-RADS 4X. Former 40 pack-year smoker, ECOG 2-3, FEV1 48%, unexplained weight loss.
+
+CLINICAL ASSESSMENT:
+This patient has primary lung cancer, left upper lobe. The clinical picture is unambiguous: a 3.4 cm spiculated mass with hilar nodal involvement in a former heavy smoker with declining functional status and weight loss. Tissue confirmation has not been obtained because the patient declined biopsy after thorough discussion with pulmonology.
+
+The absence of a pathology report does not alter the clinical diagnosis. The patient is being managed as having primary lung malignancy on clinical grounds. No formal ICD diagnosis code has been entered at this time; however, the working oncologic diagnosis is primary lung cancer, left upper lobe.
+
+PLAN:
+- SBRT presented; patient and daughter to consider.
+- Palliative care referral placed today (appointment 07/10/2025).
+- Low-dose dexamethasone 4 mg daily for appetite.
+- Repeat CT chest in 8 weeks.
+- Goals-of-care discussion initiated; advance directive recommended.
+- Return oncology 07/28/2025.
+
+Dr. D. Holloway, MD — Thoracic Oncology
+Electronically signed: 06/30/2025 15:55

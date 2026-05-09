@@ -1,0 +1,36 @@
+OUTPATIENT CLINIC NOTE
+Date: 2025-03-12
+Patient: Male, 69 years
+Provider: Dr. A. Morales, MD — Internal Medicine
+Visit Type: Annual Wellness Examination
+
+REASON FOR VISIT: Annual preventive health visit, medication review.
+
+HPI: Mr. J.H. is a 69-year-old male with hypertension, hyperlipidemia, type 2 diabetes, and BPH presenting for annual wellness exam. Reports feeling generally well. Denies chest pain, dyspnea, cough, hemoptysis, or weight loss. Mild end-of-day fatigue only.
+
+PAST MEDICAL HISTORY:
+- Hypertension (I10) — on lisinopril
+- Hyperlipidemia (E78.5) — on atorvastatin
+- Type 2 diabetes mellitus (E11.9) — on metformin
+- Benign prostatic hyperplasia (N40.0)
+- C34.10 — carried forward on problem list from prior hospitalization record
+
+SOCIAL HISTORY: Former smoker, 28 pack-years, quit 2012. Occasional alcohol.
+
+REVIEW OF SYSTEMS: No fever, night sweats, or weight change. No respiratory symptoms. No chest pain. Nocturia x2, stable.
+
+PHYSICAL EXAMINATION:
+Vitals: BP 128/78, HR 72, SpO2 98%, Wt 187 lbs, BMI 27.1
+General: Well-appearing, no acute distress.
+Pulmonary: Clear to auscultation bilaterally.
+Cardiovascular: Regular rate and rhythm, no murmurs.
+Abdomen: Soft, non-tender. Extremities: No edema.
+
+ASSESSMENT AND PLAN:
+1. Hypertension — controlled. Continue lisinopril 10 mg daily.
+2. Hyperlipidemia — LDL at goal. Continue atorvastatin 40 mg nightly.
+3. Diabetes — HbA1c 6.9%. Continue metformin 1000 mg BID. Recheck in 6 months.
+4. BPH — nocturia stable. Continue tamsulosin. PSA ordered.
+5. Preventive care — flu vaccine and pneumococcal booster given today.
+
+Return in 12 months or sooner as needed.

@@ -1,0 +1,33 @@
+EMERGENCY DEPARTMENT NOTE
+Date: 2024-10-22
+Patient: Female, 74 years
+Provider: Dr. R. Okafor, MD — Emergency Medicine
+Disposition: Admitted to Orthopedic Surgery
+
+CHIEF COMPLAINT: Right hip pain after mechanical fall.
+
+HPI: Mrs. E.W. is a 74-year-old female presenting via ambulance after slipping on a wet kitchen floor ~1.5 hours ago. She landed on her right side with immediate severe right hip/groin pain and inability to bear weight. Right leg appears shortened. No head injury, LOC, neck pain, or chest trauma. No fever or recent illness.
+
+PAST MEDICAL HISTORY (registration records):
+- Osteoporosis (M81.0), osteoarthritis right hip (M16.11)
+- Hypertension (I10), hypothyroidism (E03.9), GERD (K21.0)
+- C34.10 — imported from prior records during registration
+
+MEDICATIONS: Alendronate, levothyroxine, amlodipine, omeprazole, calcium+vitamin D.
+ALLERGIES: Penicillin (rash).
+
+PHYSICAL EXAMINATION:
+Vitals: BP 154/90, HR 96, SpO2 97%.
+Right hip: Shortening and external rotation of right lower extremity. Tenderness over greater trochanter and groin. No open wound. Distal sensation and pulses intact.
+Cardiovascular: Tachycardic, regular. Pulmonary: Clear bilaterally.
+
+RESULTS:
+Right hip X-ray: Right intertrochanteric femur fracture with varus angulation.
+Labs: Hgb 11.8, Cr 0.88, INR 1.0. Type and Screen sent.
+
+ASSESSMENT AND PLAN:
+1. Right intertrochanteric femur fracture (S72.141A) — Orthopedic Surgery consulted. Admit for surgical management. Pre-op evaluation initiated.
+2. Hypertension — resume home antihypertensives, monitor.
+3. Osteoporosis — continue current regimen; post-op bone-health protocol.
+
+Patient admitted to Orthopedic Surgery for operative management.

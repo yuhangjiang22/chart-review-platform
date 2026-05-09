@@ -1,0 +1,20 @@
+{
+  "patient_id": "patient_neg_hard_01",
+  "category": "negative",
+  "lung_cancer_status": "absent",
+  "leaf_answers": {
+    "pathology_report_present": "no",
+    "pathology_lung_primary": "not_applicable",
+    "cytology_supports_lung_primary": "no",
+    "imaging_lung_lesion": "no",
+    "oncologist_lung_cancer_diagnosis_in_note": "no",
+    "icd_lung_cancer_present": "no"
+  },
+  "applicability": {
+    "pathology_lung_primary": "not_applicable",
+    "cytology_supports_lung_primary": "applicable"
+  },
+  "expected_contradicting_evidence_fields": [],
+  "difficulty": "hard",
+  "difficulty_notes": "Hand-crafted. Tests negation and hedged-language handling. Pulm consult, CT, and ED note all contain phrases like 'rule out', 'no evidence of', 'low suspicion for'. Agent must NOT count any of these as positive signals."
+}

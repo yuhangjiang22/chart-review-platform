@@ -1,0 +1,33 @@
+DATE: 2025-07-15
+PATIENT: Female, 58 yo | PROVIDER: Dr. A. Bernstein, MD — Primary Care
+VISIT: Annual preventive health examination
+
+CC: Routine annual wellness exam.
+
+HPI: Ms. [N.] presents for her annual exam. Feels generally well; mild work-related fatigue recently improving. No fevers, chills, night sweats, or weight loss. No cough, dyspnea, chest pain, or palpitations.
+
+ROS: Negative for malignancy history, constitutional symptoms, respiratory, cardiovascular, GI, MSK, and neuro complaints.
+
+PMH: Hypertension (controlled), hyperlipidemia, seasonal allergic rhinitis.
+MEDS: Lisinopril 10 mg daily, rosuvastatin 10 mg daily, cetirizine 10 mg PRN, Vitamin D3 1000 IU daily.
+ALLERGIES: NKDA
+SOC HX: Never smoker. Connecticut. Financial analyst. Exercises 3x/week.
+FAM HX: HTN and T2DM (father); osteoporosis (mother).
+
+EXAM:
+VS: BP 122/76, HR 68, RR 14, T 98.4°F, SpO2 98%, BMI 24.2
+General: Alert, well-appearing, NAD.
+HEENT: Normal. Neck: No LAD, thyroid non-enlarged.
+CV: RRR, no murmurs. Lungs: CTA bilaterally.
+Abd: Soft, NT. Extremities: No edema. Skin: No lesions.
+
+A/P:
+1. Annual exam — age-appropriate screening labs ordered (lipids, TSH, CBC, BMP, glucose, mammography).
+2. HTN — well-controlled. Continue lisinopril 10 mg.
+3. Hyperlipidemia — LDL at goal on rosuvastatin. Repeat lipids 12 months.
+4. CRC screening — up to date (colonoscopy 2023, normal).
+5. Cervical screening — Pap/HPV co-test due 2026.
+6. Flu vaccine given today.
+7. Counseled: diet, exercise, sun protection.
+
+Return in 12 months or PRN.

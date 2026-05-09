@@ -1,0 +1,373 @@
+# Source-of-truth list of all 20 corpus patients.
+# Hand-crafted patients have hand_crafted: true and committed .txt notes.
+# API-generated patients have hand_crafted: false and a structured spec the
+# generation script consumes.
+
+# ---- 5 hand-crafted designed-to-fail patients ----
+
+- id: patient_neg_hard_01
+  category: negative
+  difficulty: hard
+  hand_crafted: true
+  headline: "71M, smoking history, hedged language across pulm/CT/ED notes; final absent."
+
+- id: patient_probable_fhx_01
+  category: probable
+  difficulty: hard
+  hand_crafted: true
+  headline: "64F, never-smoker with secondhand exposure; family history of lung cancer + Z85.118 decoys; oncologist active diagnosis; final probable."
+
+- id: patient_confirmed_reread_01
+  category: confirmed_nsclc
+  difficulty: hard
+  hand_crafted: true
+  headline: "73M, original path SCLC, re-read addendum NSCLC adenocarcinoma; final confirmed nsclc with contradicting_evidence."
+
+- id: patient_probable_cytology_01
+  category: probable
+  difficulty: hard
+  hand_crafted: true
+  headline: "81F, COPD precludes core biopsy; cytology FNA favors adenocarcinoma; tests is_applicable_when cytology gate; final probable."
+
+- id: patient_icd_z85_coexist_01
+  category: icd_only
+  difficulty: hard
+  hand_crafted: true
+  headline: "67M, C34.10 + Z85.118 coexist on chart; no path/imaging/oncologist note; final probable via ICD path."
+
+
+# ---- 15 API-generated easy patients ----
+
+# 4 confirmed-NSCLC
+- id: patient_easy_nsclc_01
+  category: confirmed_nsclc
+  difficulty: easy
+  hand_crafted: false
+  age: 68
+  sex: F
+  smoking: 30 pack-years, quit 2018
+  region: Midwest
+  presenting_complaint: hemoptysis
+  index_date: 2024-12-09
+  notes:
+    - { type: ct_chest, date: 2024-11-12 }
+    - { type: surgical_pathology, date: 2024-11-26 }
+    - { type: oncology_progress, date: 2024-12-09 }
+    - { type: pcp_followup, date: 2025-01-15 }
+  target_leaf_answers:
+    pathology_report_present: "yes"
+    pathology_lung_primary: "nsclc"
+    imaging_lung_lesion: "yes"
+    oncologist_lung_cancer_diagnosis_in_note: "yes"
+    icd_lung_cancer_present: "yes"
+
+- id: patient_easy_nsclc_02
+  category: confirmed_nsclc
+  difficulty: easy
+  hand_crafted: false
+  age: 75
+  sex: M
+  smoking: 60 pack-years, current
+  region: Pacific Northwest
+  presenting_complaint: chronic cough and weight loss
+  index_date: 2025-04-22
+  notes:
+    - { type: ct_chest, date: 2025-03-04 }
+    - { type: surgical_pathology, date: 2025-03-25 }
+    - { type: oncology_progress, date: 2025-04-22 }
+  target_leaf_answers:
+    pathology_report_present: "yes"
+    pathology_lung_primary: "nsclc"
+    imaging_lung_lesion: "yes"
+    oncologist_lung_cancer_diagnosis_in_note: "yes"
+    icd_lung_cancer_present: "yes"
+
+- id: patient_easy_nsclc_03
+  category: confirmed_nsclc
+  difficulty: easy
+  hand_crafted: false
+  age: 60
+  sex: F
+  smoking: 22 pack-years, quit 2020
+  region: Northeast
+  presenting_complaint: incidental nodule on routine chest x-ray
+  index_date: 2024-08-14
+  notes:
+    - { type: ct_chest, date: 2024-06-30 }
+    - { type: pulmonology_consult, date: 2024-07-08 }
+    - { type: surgical_pathology, date: 2024-07-21 }
+    - { type: oncology_progress, date: 2024-08-14 }
+  target_leaf_answers:
+    pathology_report_present: "yes"
+    pathology_lung_primary: "nsclc"
+    imaging_lung_lesion: "yes"
+    oncologist_lung_cancer_diagnosis_in_note: "yes"
+    icd_lung_cancer_present: "yes"
+
+- id: patient_easy_nsclc_04
+  category: confirmed_nsclc
+  difficulty: easy
+  hand_crafted: false
+  age: 82
+  sex: M
+  smoking: 45 pack-years, quit 2002
+  region: Southeast
+  presenting_complaint: shortness of breath, weight loss
+  index_date: 2025-02-11
+  notes:
+    - { type: ct_chest, date: 2025-01-08 }
+    - { type: surgical_pathology, date: 2025-01-22 }
+    - { type: oncology_progress, date: 2025-02-11 }
+    - { type: pcp_followup, date: 2025-03-04 }
+  target_leaf_answers:
+    pathology_report_present: "yes"
+    pathology_lung_primary: "nsclc"
+    imaging_lung_lesion: "yes"
+    oncologist_lung_cancer_diagnosis_in_note: "yes"
+    icd_lung_cancer_present: "yes"
+
+
+# 3 SCLC
+- id: patient_easy_sclc_01
+  category: sclc
+  difficulty: easy
+  hand_crafted: false
+  age: 67
+  sex: M
+  smoking: 55 pack-years, current
+  region: Midwest
+  presenting_complaint: cough, hemoptysis, weight loss
+  index_date: 2024-09-30
+  notes:
+    - { type: ct_chest, date: 2024-08-22 }
+    - { type: surgical_pathology, date: 2024-09-05 }
+    - { type: oncology_progress, date: 2024-09-30 }
+  target_leaf_answers:
+    pathology_report_present: "yes"
+    pathology_lung_primary: "sclc"
+    imaging_lung_lesion: "yes"
+    oncologist_lung_cancer_diagnosis_in_note: "yes"
+    icd_lung_cancer_present: "yes"
+
+- id: patient_easy_sclc_02
+  category: sclc
+  difficulty: easy
+  hand_crafted: false
+  age: 72
+  sex: F
+  smoking: 40 pack-years, quit 2014
+  region: West
+  presenting_complaint: SVC syndrome
+  index_date: 2025-05-20
+  notes:
+    - { type: ct_chest, date: 2025-04-09 }
+    - { type: surgical_pathology, date: 2025-04-25 }
+    - { type: oncology_progress, date: 2025-05-20 }
+  target_leaf_answers:
+    pathology_report_present: "yes"
+    pathology_lung_primary: "sclc"
+    imaging_lung_lesion: "yes"
+    oncologist_lung_cancer_diagnosis_in_note: "yes"
+    icd_lung_cancer_present: "yes"
+
+- id: patient_easy_sclc_03
+  category: sclc
+  difficulty: easy
+  hand_crafted: false
+  age: 65
+  sex: M
+  smoking: 50 pack-years, current
+  region: South
+  presenting_complaint: paraneoplastic SIADH
+  index_date: 2025-09-12
+  notes:
+    - { type: ct_chest, date: 2025-08-04 }
+    - { type: surgical_pathology, date: 2025-08-19 }
+    - { type: oncology_progress, date: 2025-09-12 }
+    - { type: pcp_followup, date: 2025-10-08 }
+  target_leaf_answers:
+    pathology_report_present: "yes"
+    pathology_lung_primary: "sclc"
+    imaging_lung_lesion: "yes"
+    oncologist_lung_cancer_diagnosis_in_note: "yes"
+    icd_lung_cancer_present: "yes"
+
+
+# 2 probable
+- id: patient_easy_probable_01
+  category: probable
+  difficulty: easy
+  hand_crafted: false
+  age: 70
+  sex: F
+  smoking: 25 pack-years, quit 2005
+  region: Northeast
+  presenting_complaint: incidental lung mass on CT abdomen for unrelated complaint
+  index_date: 2025-01-28
+  notes:
+    - { type: ct_chest, date: 2024-12-15 }
+    - { type: oncology_consult, date: 2025-01-12 }
+    - { type: oncology_progress, date: 2025-01-28 }
+  target_leaf_answers:
+    pathology_report_present: "no"
+    pathology_lung_primary: "not_applicable"
+    cytology_supports_lung_primary: "no"
+    imaging_lung_lesion: "yes"
+    oncologist_lung_cancer_diagnosis_in_note: "yes"
+    icd_lung_cancer_present: "yes"
+
+- id: patient_easy_probable_02
+  category: probable
+  difficulty: easy
+  hand_crafted: false
+  age: 78
+  sex: M
+  smoking: 40 pack-years, quit 1998
+  region: Midwest
+  presenting_complaint: cough, declining functional status
+  index_date: 2025-06-30
+  notes:
+    - { type: ct_chest, date: 2025-05-22 }
+    - { type: pulmonology_consult, date: 2025-06-10 }
+    - { type: oncology_progress, date: 2025-06-30 }
+  target_leaf_answers:
+    pathology_report_present: "no"
+    pathology_lung_primary: "not_applicable"
+    cytology_supports_lung_primary: "no"
+    imaging_lung_lesion: "yes"
+    oncologist_lung_cancer_diagnosis_in_note: "yes"
+    icd_lung_cancer_present: "no"
+
+
+# 2 ICD-only
+- id: patient_easy_icd_01
+  category: icd_only
+  difficulty: easy
+  hand_crafted: false
+  age: 69
+  sex: M
+  smoking: 28 pack-years, quit 2012
+  region: South
+  presenting_complaint: routine wellness visit
+  index_date: 2025-04-08
+  notes:
+    - { type: pcp_visit, date: 2025-03-12 }
+    - { type: er_visit, date: 2025-03-30 }
+    - { type: pcp_followup, date: 2025-04-08 }
+  target_leaf_answers:
+    pathology_report_present: "no"
+    pathology_lung_primary: "not_applicable"
+    cytology_supports_lung_primary: "no"
+    imaging_lung_lesion: "no"
+    oncologist_lung_cancer_diagnosis_in_note: "no"
+    icd_lung_cancer_present: "yes"
+
+- id: patient_easy_icd_02
+  category: icd_only
+  difficulty: easy
+  hand_crafted: false
+  age: 74
+  sex: F
+  smoking: 30 pack-years, quit 2008
+  region: West
+  presenting_complaint: orthopedic admission
+  index_date: 2024-11-04
+  notes:
+    - { type: er_visit, date: 2024-10-22 }
+    - { type: discharge_summary, date: 2024-10-26 }
+    - { type: pcp_followup, date: 2024-11-04 }
+  target_leaf_answers:
+    pathology_report_present: "no"
+    pathology_lung_primary: "not_applicable"
+    cytology_supports_lung_primary: "no"
+    imaging_lung_lesion: "no"
+    oncologist_lung_cancer_diagnosis_in_note: "no"
+    icd_lung_cancer_present: "yes"
+
+
+# 4 negative
+- id: patient_easy_neg_01
+  category: negative
+  difficulty: easy
+  hand_crafted: false
+  age: 58
+  sex: F
+  smoking: never
+  region: Northeast
+  presenting_complaint: routine annual exam
+  index_date: 2025-07-15
+  notes:
+    - { type: pcp_visit, date: 2025-07-15 }
+    - { type: pcp_followup, date: 2025-10-21 }
+  target_leaf_answers:
+    pathology_report_present: "no"
+    pathology_lung_primary: "not_applicable"
+    cytology_supports_lung_primary: "no"
+    imaging_lung_lesion: "no"
+    oncologist_lung_cancer_diagnosis_in_note: "no"
+    icd_lung_cancer_present: "no"
+
+- id: patient_easy_neg_02
+  category: negative
+  difficulty: easy
+  hand_crafted: false
+  age: 62
+  sex: M
+  smoking: 12 pack-years, quit 2000
+  region: Pacific Northwest
+  presenting_complaint: knee pain
+  index_date: 2025-01-19
+  notes:
+    - { type: pcp_visit, date: 2025-01-19 }
+    - { type: er_visit, date: 2025-04-04 }
+    - { type: pcp_followup, date: 2025-05-12 }
+  target_leaf_answers:
+    pathology_report_present: "no"
+    pathology_lung_primary: "not_applicable"
+    cytology_supports_lung_primary: "no"
+    imaging_lung_lesion: "no"
+    oncologist_lung_cancer_diagnosis_in_note: "no"
+    icd_lung_cancer_present: "no"
+
+- id: patient_easy_neg_03
+  category: negative
+  difficulty: easy
+  hand_crafted: false
+  age: 55
+  sex: F
+  smoking: never
+  region: Midwest
+  presenting_complaint: thyroid disease management
+  index_date: 2025-09-22
+  notes:
+    - { type: pcp_visit, date: 2025-09-22 }
+    - { type: endocrinology_consult, date: 2025-10-14 }
+  target_leaf_answers:
+    pathology_report_present: "no"
+    pathology_lung_primary: "not_applicable"
+    cytology_supports_lung_primary: "no"
+    imaging_lung_lesion: "no"
+    oncologist_lung_cancer_diagnosis_in_note: "no"
+    icd_lung_cancer_present: "no"
+
+- id: patient_easy_neg_04
+  category: negative
+  difficulty: easy
+  hand_crafted: false
+  age: 80
+  sex: M
+  smoking: 35 pack-years, quit 1990
+  region: South
+  presenting_complaint: chronic atrial fibrillation
+  index_date: 2025-08-06
+  notes:
+    - { type: pcp_visit, date: 2025-08-06 }
+    - { type: cardiology_consult, date: 2025-08-29 }
+    - { type: pcp_followup, date: 2025-10-12 }
+  target_leaf_answers:
+    pathology_report_present: "no"
+    pathology_lung_primary: "not_applicable"
+    cytology_supports_lung_primary: "no"
+    imaging_lung_lesion: "no"
+    oncologist_lung_cancer_diagnosis_in_note: "no"
+    icd_lung_cancer_present: "no"

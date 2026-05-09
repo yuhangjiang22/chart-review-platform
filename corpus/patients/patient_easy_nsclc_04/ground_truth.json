@@ -1,0 +1,17 @@
+{
+  "patient_id": "patient_easy_nsclc_04",
+  "category": "confirmed_nsclc",
+  "lung_cancer_status": "confirmed",
+  "leaf_answers": {
+    "pathology_report_present": "yes",
+    "pathology_lung_primary": "nsclc",
+    "cytology_supports_lung_primary": "not_applicable",
+    "imaging_lung_lesion": "yes",
+    "oncologist_lung_cancer_diagnosis_in_note": "yes",
+    "icd_lung_cancer_present": "yes"
+  },
+  "applicability": { "cytology_supports_lung_primary": "not_applicable" },
+  "expected_contradicting_evidence_fields": [],
+  "difficulty": "easy",
+  "difficulty_notes": "API-generated. Seed: shortness of breath, weight loss."
+}

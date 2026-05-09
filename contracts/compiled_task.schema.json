@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chart-review-platform/contracts/compiled_task.schema.json",
+  "title": "CompiledTask",
+  "type": "object",
+  "required": ["task_id", "review_unit", "manual_version", "fields", "source_document_sha"],
+  "properties": {
+    "task_id": { "type": "string" },
+    "task_type": { "type": "string" },
+    "review_unit": { "type": "string", "enum": ["patient", "encounter", "episode", "event"] },
+    "manual_version": { "type": "string" },
+    "source_document_sha": { "type": "string" },
+    "index_anchor": { "type": "string" },
+    "time_windows": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "anchor", "start_offset", "end_offset"],
+        "properties": {
+          "id": { "type": "string" },
+          "anchor": { "type": "string" },
+          "start_offset": { "type": "string" },
+          "end_offset": { "type": "string" }
+        }
+      }
+    },
+    "final_output": { "type": "string" },
+    "overview_prose": { "type": "string" },
+    "fields": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/Field" }
+    },
+    "stratify_by": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Patient-level keys (resolved against corpus/<pid>/structured.json) for stratified sampling. Empty = uniform random."
+    }
+  },
+  "$defs": {
+    "Field": {
+      "type": "object",
+      "required": ["id", "answer_schema"],
+      "properties": {
+        "id": { "type": "string" },
+        "prompt": { "type": "string" },
+        "answer_schema": { "type": "object" },
+        "cardinality": { "type": "string", "enum": ["one", "many"] },
+        "time_window": { "type": "string" },
+        "derivation": { "type": "string" },
+        "is_applicable_when": {
+          "type": "string",
+          "description": "Expression in the same dialect as `derivation`. When it evaluates to false against current values, the field auto-resolves to `not_applicable`; the agent skips it; the UI renders it as N/A. Required for HEDIS / NCCN / quality-measure-style gating."
+        },
+        "is_final_output": { "type": "boolean" },
+        "extraction_guidance": { "type": "string" },
+        "group": { "type": "string" },
+        "guidance_prose": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "requires_calibration": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, the per-criterion blinded review form is shown by default. Reviewer can toggle off per-session; contract preference reasserts on next case."
+        }
+      }
+    }
+  }
+}

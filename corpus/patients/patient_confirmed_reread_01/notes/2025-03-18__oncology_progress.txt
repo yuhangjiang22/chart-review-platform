@@ -1,0 +1,30 @@
+THORACIC ONCOLOGY PROGRESS NOTE
+Provider: M. Singh, MD — Hematology/Oncology
+Encounter date: 2025-03-18
+
+DIAGNOSIS
+Stage IIIA NSCLC, adenocarcinoma subtype, KRAS G12C, PD-L1 60%.
+
+INTERVAL HISTORY
+Patient returns following pathology re-read and molecular profiling.
+The original biopsy was initially called small-cell, but re-read with
+immunohistochemistry on 2025-03-07 revised the diagnosis to
+adenocarcinoma. Per institutional policy and the addendum text, the
+re-read is authoritative. Treatment planning proceeds on that basis.
+
+ASSESSMENT AND PLAN
+1. Stage IIIA NSCLC adenocarcinoma — confirmed. Treatment plan adjusted
+   from initial small-cell-protocol planning to NSCLC concurrent
+   chemoradiation. Note: prior plan documents from 2025-02-28 to 2025-03-06
+   referenced SCLC; those have been amended in the chart following the
+   re-read.
+2. PD-L1 60%, candidate for consolidation immunotherapy.
+3. KRAS G12C — at this point not actionable in stage III, but documented
+   for future relevance.
+
+PLAN
+- Begin concurrent chemoradiation per stage IIIA NSCLC protocol.
+- Repeat imaging in 6 weeks.
+- Follow up in clinic in 2 weeks.
+
+M. Singh, MD — electronically signed 2025-03-18

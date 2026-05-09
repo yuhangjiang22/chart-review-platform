@@ -1,0 +1,22 @@
+DATE: 2025-05-12
+PATIENT: Male, 62 years old
+PROVIDER: Dr. C. Nguyen, MD — Primary Care
+VISIT TYPE: Follow-up — Post-ED Knee Injury / Orthopedic Review
+
+INTERVAL HISTORY:
+Mr. [K.] returns approximately 5 weeks after his ED visit for traumatic right knee effusion. He reports meaningful improvement. He completed a course of physical therapy (8 sessions). Swelling is markedly reduced. He is now ambulating without crutches. He resumes short level walks but has not returned to trail hiking. Pain is 2/10 at rest and 4/10 with stairs, improved from 7/10 at ED visit. He denies constitutional symptoms, fevers, or weight loss. No respiratory complaints.
+
+PHYSICAL EXAM:
+VS: BP 124/78 mmHg, HR 70 bpm
+Right Knee: Trace residual effusion. Medial joint line tenderness mild. ROM 0-125°, improved from prior. Weight-bearing without assistance.
+
+ASSESSMENT AND PLAN:
+1. Right knee osteoarthritis with traumatic superimposed effusion, improving.
+   - Continue physical therapy as tolerated.
+   - Naproxen 500 mg BID PRN pain, with food.
+   - Orthopedic referral completed — orthopedist recommends conservative management, possible intra-articular cortisone injection if symptoms plateau.
+   - Discussed weight management and low-impact exercise (swimming, cycling).
+2. Hypertension — BP at goal on lisinopril 10 mg daily. Continue current regimen.
+3. Preventive care — due for colorectal screening (FIT test sent); flu vaccine deferred to fall.
+
+Follow-up in 3 months or sooner if knee worsens.

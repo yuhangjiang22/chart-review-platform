@@ -1,0 +1,28 @@
+[
+  {
+    "row_id": "230005",
+    "measurement_id": 230005,
+    "person_id": "sclc_03",
+    "measurement_concept_id": 3000034,
+    "measurement_concept_name": "Sodium [Moles/volume] in Serum or Plasma",
+    "measurement_date": "2025-07-28",
+    "value_as_number": 118,
+    "unit_concept_id": 8753,
+    "unit_source_value": "mEq/L",
+    "range_low": 136,
+    "range_high": 145
+  },
+  {
+    "row_id": "230006",
+    "measurement_id": 230006,
+    "person_id": "sclc_03",
+    "measurement_concept_id": 3000034,
+    "measurement_concept_name": "Sodium [Moles/volume] in Serum or Plasma",
+    "measurement_date": "2025-10-08",
+    "value_as_number": 136,
+    "unit_concept_id": 8753,
+    "unit_source_value": "mEq/L",
+    "range_low": 136,
+    "range_high": 145
+  }
+]

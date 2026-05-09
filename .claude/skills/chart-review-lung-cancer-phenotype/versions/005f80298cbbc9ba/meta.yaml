@@ -1,0 +1,35 @@
+task_type: phenotype_validation
+review_unit: patient
+manual_version: '2026-04-28'
+source_document_sha: sha256:9ed4d2d4218d6771fe8cbf9cb9a58b722643ab4eedb1dc9e21410ff066831dcc
+index_anchor: index_date
+time_windows:
+- id: lookback_24mo
+  anchor: index_anchor
+  start_offset: -24mo
+  end_offset: 0d
+final_output: lung_cancer_status
+overview_prose: 'This task determines whether a patient has lung cancer based on their
+  EHR record. The phenotype produces a three-tier label: `confirmed` (pathology-supported),
+  `probable` (imaging plus clinical diagnosis, or coding-only), or `absent` (no supporting
+  evidence in the lookback window).
+
+
+  **Source-document priority** (apply globally unless a field overrides):
+
+
+  1. Surgical pathology report (LOINC 11526-1)
+
+  2. Biopsy pathology report
+
+  3. Outside-institution pathology in the media tab
+
+  4. Treating-oncologist progress notes
+
+  5. Imaging reports (CT chest, PET-CT)
+
+  6. Problem list / encounter ICD codes
+
+
+  **Lookback window** is 24 months prior to the index date. The index date is the
+  start of the encounter that triggered the review.'

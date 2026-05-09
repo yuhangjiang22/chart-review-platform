@@ -1,0 +1,12 @@
+task_type: phenotype_validation
+review_unit: patient
+manual_version: '1.0.0'
+status: locked
+index_anchor: index_date
+time_windows:
+  - id: lookback_24mo
+    anchor: index_anchor
+    start_offset: -P24M
+    end_offset: P0D
+final_output: lung_status
+overview_prose: Codify-skill test fixture.

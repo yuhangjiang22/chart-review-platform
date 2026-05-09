@@ -1,0 +1,26 @@
+INDIANA UNIVERSITY HEALTH — RADIOLOGY REPORT
+Exam: CT Chest with Contrast
+Date: 12/15/2024
+Patient: [REDACTED] | DOB: [REDACTED] | MRN: [REDACTED]
+Ordering Provider: Dr. R. Patel, Gastroenterology
+Clinical indication: Follow-up of incidental right lower-lobe finding noted on CT abdomen/pelvis performed 11/28/2024 for diverticulitis workup.
+
+TECHNIQUE:
+Axial CT of the chest with intravenous contrast. 1.25 mm reconstructions. Reformatted in coronal and sagittal planes.
+
+FINDINGS:
+Lungs: Right lower lobe, posterior segment: 2.8 x 2.4 cm spiculated soft-tissue mass with pleural tethering. Margins are irregular with radiating strands into the adjacent parenchyma. No satellite nodules. Left lung clear. No pleural effusion.
+
+Mediastinum/Hilar structures: Right hilar lymphadenopathy — two nodes measuring 1.2 cm and 0.9 cm in short axis, which exceeds the threshold for radiologic concern. No contralateral adenopathy.
+
+Airways: Bronchi patent to segmental level bilaterally.
+
+Bones/Soft Tissues: Thoracic spine degenerative changes. No suspicious osseous lesion.
+
+IMPRESSION:
+1. 2.8 cm spiculated right lower-lobe mass with ipsilateral hilar lymphadenopathy. Morphology and nodal involvement are highly suspicious for primary malignancy. Lung-RADS 4X.
+2. Tissue sampling is strongly recommended. Bronchoscopy with navigational guidance or CT-guided transthoracic biopsy should be discussed at multidisciplinary tumor board.
+3. PET-CT staging recommended if biopsy confirms malignancy.
+
+Reporting radiologist: Dr. M. Chen, MD (Thoracic Radiology)
+Electronically signed: 12/15/2024 14:32

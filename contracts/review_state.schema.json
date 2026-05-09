@@ -1,0 +1,158 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chart-review-platform/contracts/review_state.schema.json",
+  "title": "ReviewState",
+  "description": "Live mutable per-patient×task state. Both the chat agent and the reviewer write to this file. The UI binds to it. Distinct from `review_record.schema.json` which is the immutable per-run record produced by the batch agent.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "patient_id",
+    "task_id",
+    "version",
+    "updated_at",
+    "updated_by",
+    "field_assessments"
+  ],
+  "properties": {
+    "schema_version": { "type": "string", "const": "1" },
+    "patient_id": { "type": "string" },
+    "task_id": { "type": "string" },
+    "task_version": { "type": "string" },
+    "task_document_sha": { "type": "string" },
+    "review_status": {
+      "type": "string",
+      "enum": ["draft", "in_progress", "agent_complete", "reviewer_validated", "locked"]
+    },
+    "version": { "type": "integer", "minimum": 1, "description": "Monotonic counter for optimistic concurrency." },
+    "updated_at": { "type": "string", "description": "ISO-8601 timestamp of the last write." },
+    "updated_by": { "type": "string", "enum": ["agent", "reviewer", "system"] },
+    "field_assessments": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/FieldAssessment" }
+    },
+    "summary": {
+      "type": "object",
+      "description": "Brief chart summary the agent or reviewer maintains. Updated via set_summary action; surfaced at the top of the Review Form pane.",
+      "properties": {
+        "brief_summary": { "type": "string" },
+        "key_conditions": { "type": "array", "items": { "type": "string" } },
+        "uncertainties": { "type": "array", "items": { "type": "string" } },
+        "evidence_files": { "type": "array", "items": { "type": "string" } },
+        "updated_at": { "type": "string" },
+        "updated_by": { "type": "string" }
+      }
+    },
+    "selected_evidence": {
+      "type": "array",
+      "description": "Notable evidence the agent or reviewer has flagged for the chart — supporting / contradicting / context. Distinct from per-field evidence (which lives on a CriterionAssessment); this is a free-floating list visible in the Review Form pane and clickable to jump-to-source in the note viewer. Updated via select_evidence action; faithfulness-pre-checked on every note quote.",
+      "items": {
+        "type": "object",
+        "required": ["id", "evidence", "added_at", "added_by"],
+        "properties": {
+          "id": { "type": "string" },
+          "evidence": { "$ref": "evidence.schema.json" },
+          "rationale": { "type": "string" },
+          "category": {
+            "type": "string",
+            "enum": ["supporting", "contradicting", "context"]
+          },
+          "field_id": {
+            "type": "string",
+            "description": "Optional — the protocol field this evidence speaks to."
+          },
+          "added_at": { "type": "string" },
+          "added_by": { "type": "string" }
+        }
+      }
+    },
+    "keyword_suggestions": {
+      "type": "object",
+      "description": "Per-topic keyword expansions the agent has surfaced for the reviewer to use as note-search terms. Updated via recommend_keywords action.",
+      "properties": {
+        "topic": { "type": "string" },
+        "direct_terms": { "type": "array", "items": { "type": "string" } },
+        "aliases": { "type": "array", "items": { "type": "string" } },
+        "abbreviations": { "type": "array", "items": { "type": "string" } },
+        "behavioral_clues": { "type": "array", "items": { "type": "string" } },
+        "treatment_terms": { "type": "array", "items": { "type": "string" } },
+        "negation_patterns": { "type": "array", "items": { "type": "string" } },
+        "updated_at": { "type": "string" },
+        "updated_by": { "type": "string" }
+      }
+    },
+    "cross_criterion_alerts": {
+      "type": "array",
+      "description": "Live, recomputed on every applyUiAction. Static alerts live on review_record.json.",
+      "items": {
+        "type": "object",
+        "required": ["id", "kind", "fields", "severity", "message"],
+        "properties": {
+          "id": { "type": "string" },
+          "kind": {
+            "type": "string",
+            "enum": ["applicability_violation", "derivation_violation", "answer_consistency"]
+          },
+          "fields": { "type": "array", "items": { "type": "string" } },
+          "severity": { "type": "string", "enum": ["error", "warning"] },
+          "message": { "type": "string" },
+          "computed_at": { "type": "string" }
+        }
+      }
+    },
+    "locked_at": { "type": "string", "description": "ISO-8601 timestamp of the lock transition." },
+    "locked_by": { "type": "string", "description": "reviewer_id who performed the lock." },
+    "lock_task_sha": { "type": "string", "description": "sha256(compiled_task_json).slice(0,16) at lock time. Pinned forever." },
+    "assigned_to": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Reviewer IDs assigned to this record. Empty = unassigned (any reviewer can write). Multiple = multi-reviewer (e.g., calibration). Only assigned reviewers can write field assessments when this is non-empty."
+    }
+  },
+  "$defs": {
+    "FieldAssessment": {
+      "type": "object",
+      "required": ["field_id", "status", "source", "updated_at"],
+      "properties": {
+        "field_id": { "type": "string" },
+        "answer": {},
+        "confidence": { "type": "string", "enum": ["low", "medium", "high"] },
+        "evidence": {
+          "type": "array",
+          "items": { "$ref": "evidence.schema.json" }
+        },
+        "rationale": { "type": "string" },
+        "source": { "type": "string", "enum": ["agent", "reviewer"] },
+        "status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "agent_proposed",
+            "approved",
+            "overridden",
+            "not_applicable"
+          ]
+        },
+        "updated_at": { "type": "string" },
+        "updated_by": { "type": "string", "description": "agent session id, reviewer id, or 'system'" },
+        "edit_reason": {
+          "type": "string",
+          "enum": ["missed_evidence", "misinterpreted", "wrong_rule", "criterion_ambiguous", "other"],
+          "description": "Set by the reviewer when editing away from a prior agent answer. Consumed by Role C clustering."
+        },
+        "edit_note": { "type": "string" },
+        "original_agent_snapshot": {
+          "type": "object",
+          "description": "Captured by the server the first time the reviewer overrides a prior agent answer. Sticky thereafter.",
+          "properties": {
+            "answer": {},
+            "evidence": { "type": "array", "items": { "$ref": "evidence.schema.json" } },
+            "rationale": { "type": "string" },
+            "confidence": { "type": "string", "enum": ["low", "medium", "high"] },
+            "captured_at": { "type": "string" },
+            "captured_from_version": { "type": "integer" }
+          }
+        }
+      }
+    }
+  }
+}

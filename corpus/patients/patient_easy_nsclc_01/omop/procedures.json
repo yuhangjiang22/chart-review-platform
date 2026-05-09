@@ -1,0 +1,23 @@
+[
+  {
+    "row_id": 110010,
+    "concept_id": 4013905,
+    "cpt": "71260",
+    "concept_name": "CT thorax with contrast",
+    "procedure_date": "2024-11-12"
+  },
+  {
+    "row_id": 110011,
+    "concept_id": 4052536,
+    "cpt": "32405",
+    "concept_name": "CT-guided core needle biopsy of lung",
+    "procedure_date": "2024-11-25"
+  },
+  {
+    "row_id": 110012,
+    "concept_id": 4171651,
+    "cpt": "78816",
+    "concept_name": "PET/CT whole body",
+    "procedure_date": "2024-12-03"
+  }
+]

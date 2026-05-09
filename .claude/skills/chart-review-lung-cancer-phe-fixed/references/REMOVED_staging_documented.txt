@@ -1,0 +1,2 @@
+lung_cancer_staging_documented criterion has been removed per reviewer request.
+The staging information is not needed for the lung cancer phenotype.

@@ -1,0 +1,17 @@
+[
+  {
+    "row_id": "210001",
+    "condition_occurrence_id": 210001,
+    "person_id": "sclc_01",
+    "condition_concept_id": 4115276,
+    "condition_concept_name": "Small cell carcinoma of lung",
+    "condition_start_date": "2024-09-05",
+    "condition_end_date": null,
+    "condition_type_concept_id": 32817,
+    "condition_type": "EHR",
+    "icd_code": "C34.10",
+    "icd_description": "Malignant neoplasm of upper lobe, bronchus or lung, unspecified side",
+    "condition_source_value": "C34.10",
+    "stop_reason": null
+  }
+]

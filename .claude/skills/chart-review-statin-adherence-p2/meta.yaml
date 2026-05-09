@@ -1,0 +1,24 @@
+task_type: phenotype_validation
+review_unit: patient
+manual_version: '2026-05-07-draft'
+index_anchor: most_recent_encounter
+time_windows:
+  - id: lookback_180d
+    anchor: index_anchor
+    start_offset: -P180D
+    end_offset: P0D
+    label: 180 days prior to most recent encounter (CMS adherence-measure window)
+final_output: adherence_label
+overview_prose: |
+  Statin adherence phenotype for patients with hypercholesterolemia. v0
+  measures Proportion of Days Covered (PDC) over the prior 180 days and
+  classifies each patient as adherent (PDC ≥ 0.80), partial (0.50–0.79),
+  non_adherent (< 0.50), or not_applicable (no statin prescription).
+
+  Population: adults with a documented hypercholesterolemia diagnosis (any
+  ICD E78.x code) in the chart at any point.
+  Index date: the most recent encounter date.
+
+  PDC is the standard CMS adherence measure: total days the medication was
+  available to the patient in a 180-day window divided by 180. A patient
+  with no statin prescription is `not_applicable` rather than non-adherent.

@@ -1,0 +1,29 @@
+[
+  {
+    "row_id": "410031",
+    "patient_id": "patient_easy_icd_01",
+    "encounter_date": "2025-03-12",
+    "encounter_type": "outpatient",
+    "department": "Internal Medicine / Primary Care",
+    "visit_reason": "Annual wellness examination",
+    "discharge_date": "2025-03-12"
+  },
+  {
+    "row_id": "410032",
+    "patient_id": "patient_easy_icd_01",
+    "encounter_date": "2025-03-30",
+    "encounter_type": "emergency",
+    "department": "Emergency Department",
+    "visit_reason": "Left ankle injury after fall",
+    "discharge_date": "2025-03-30"
+  },
+  {
+    "row_id": "410033",
+    "patient_id": "patient_easy_icd_01",
+    "encounter_date": "2025-04-08",
+    "encounter_type": "outpatient",
+    "department": "Internal Medicine / Primary Care",
+    "visit_reason": "Follow-up after ankle sprain",
+    "discharge_date": "2025-04-08"
+  }
+]

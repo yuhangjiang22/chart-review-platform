@@ -1,0 +1,32 @@
+MIDWESTERN REGIONAL MEDICAL CENTER — RADIOLOGY REPORT
+Exam: CT Chest without and with Contrast
+Date: 05/22/2025
+Patient: [REDACTED] | DOB: [REDACTED] | MRN: [REDACTED]
+Ordering Provider: Dr. L. Morris, Internal Medicine / PCP
+Clinical indication: Progressive cough x 3 months, declining functional status. Rule out pulmonary mass.
+
+TECHNIQUE:
+Helical CT chest without and with intravenous contrast. 1.5 mm thin slices. Multiplanar reformats generated.
+
+FINDINGS:
+Lungs: Left upper lobe, apicoposterior segment: 3.4 x 3.1 cm lobulated soft-tissue mass. Margins are irregular with spiculated projections. Mild surrounding ground-glass attenuation. No satellite nodules identified. Right lung clear.
+
+Mediastinum/Hilar structures: Mild left hilar fullness; a 1.0 cm left hilar node is present. Superior mediastinal nodes are not enlarged. No contralateral involvement.
+
+Pleura: No pleural effusion. No pneumothorax.
+
+Airways: Patent to subsegmental level bilaterally.
+
+Cardiovascular: Mild aortic calcification consistent with age. Moderate cardiomegaly.
+
+Bones: Multilevel degenerative changes of the thoracic spine. No suspicious lytic or sclerotic lesion.
+
+Other: Moderate bilateral dependent atelectasis. Mild emphysematous changes diffusely, most pronounced in the upper lobes bilaterally.
+
+IMPRESSION:
+1. 3.4 cm spiculated left upper-lobe mass, Lung-RADS 4X. In the context of a 40 pack-year smoking history this is highly suspicious for primary lung malignancy.
+2. Left hilar lymphadenopathy warrants further staging.
+3. Recommend tissue sampling. Clinical and multidisciplinary team discussion advised regarding procedural planning given patient's functional status and emphysematous changes.
+
+Reporting radiologist: Dr. B. Nakamura, MD (Chest Radiology)
+Electronically signed: 05/22/2025 09:47

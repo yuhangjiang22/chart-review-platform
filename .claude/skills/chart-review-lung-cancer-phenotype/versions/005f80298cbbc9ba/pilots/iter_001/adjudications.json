@@ -1,0 +1,22 @@
+[
+  {
+    "patient_id": "patient_easy_neg_01",
+    "field_id": "pathology_lung_primary",
+    "pair": {
+      "agent_a": "agent_1",
+      "agent_b": "agent_2"
+    },
+    "classification": "agent_a_error",
+    "timestamp": "2026-05-04T17:31:09.222Z"
+  },
+  {
+    "patient_id": "patient_easy_nsclc_01",
+    "field_id": "lowest_hemoglobin_in_window",
+    "pair": {
+      "agent_a": "agent_1",
+      "agent_b": "agent_2"
+    },
+    "classification": "agent_a_error",
+    "timestamp": "2026-05-04T17:32:19.515Z"
+  }
+]

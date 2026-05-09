@@ -1,0 +1,27 @@
+task_type: phenotype_validation
+review_unit: patient
+manual_version: '2026-05-07-draft'
+index_anchor: surgery_date
+time_windows:
+  - id: post_op_12wk
+    anchor: index_anchor
+    start_offset: P0D
+    end_offset: P84D
+    label: Surgery date through 12 weeks post-op (NCCN-recommended adjuvant chemo window)
+final_output: adjuvant_chemo_concordance
+overview_prose: |
+  Score concordance with the NCCN Non-Small Cell Lung Cancer guideline
+  recommendation for adjuvant chemotherapy in patients with surgically
+  resected stage IB–IIIA disease (NCCN NSCL-1 algorithm, 2025 update). A
+  guideline-concordant care pathway is: eligible patient → platinum-doublet
+  chemotherapy initiated within 12 weeks of surgery.
+
+  v0 captures the eligibility gate and the timing concordance leaf, derives
+  a binary concordance label, and treats reason-for-discordance (refused /
+  contraindicated / true_gap) as deferred to v1 to keep the v0 atomic and
+  small.
+
+  Population: adults with pathologically confirmed NSCLC stage IB–IIIA who
+  underwent curative-intent resection (lobectomy, segmentectomy, or
+  pneumonectomy).
+  Index date: the date of the index resection.

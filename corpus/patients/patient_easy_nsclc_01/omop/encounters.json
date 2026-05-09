@@ -1,0 +1,34 @@
+[
+  {
+    "row_id": 110050,
+    "concept_id": 9202,
+    "concept_name": "Outpatient Visit",
+    "type": "Outpatient",
+    "department": "Radiology",
+    "date": "2024-11-12"
+  },
+  {
+    "row_id": 110051,
+    "concept_id": 9202,
+    "concept_name": "Outpatient Visit",
+    "type": "Outpatient",
+    "department": "Pathology / Interventional Radiology",
+    "date": "2024-11-25"
+  },
+  {
+    "row_id": 110052,
+    "concept_id": 9202,
+    "concept_name": "Outpatient Visit",
+    "type": "Outpatient",
+    "department": "Thoracic Oncology",
+    "date": "2024-12-09"
+  },
+  {
+    "row_id": 110053,
+    "concept_id": 9202,
+    "concept_name": "Outpatient Visit",
+    "type": "Outpatient",
+    "department": "Primary Care",
+    "date": "2025-01-15"
+  }
+]

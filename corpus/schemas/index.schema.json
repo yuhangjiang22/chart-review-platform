@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chart-review-platform/corpus/schemas/index.schema.json",
+  "title": "CorpusIndex",
+  "type": "object",
+  "required": ["generated_at", "patients"],
+  "properties": {
+    "generated_at": { "type": "string" },
+    "model_id": { "type": "string" },
+    "prompt_version": { "type": "string" },
+    "git_sha_at_generation": { "type": "string" },
+    "patients": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["patient_id", "category", "difficulty"],
+        "properties": {
+          "patient_id": { "type": "string", "pattern": "^patient_[a-z0-9_]+$" },
+          "category":   { "type": "string", "enum": ["confirmed_nsclc", "sclc", "probable", "icd_only", "negative"] },
+          "difficulty": { "type": "string", "enum": ["easy", "hard"] },
+          "headline": { "type": "string" }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,22 @@
+[
+  {
+    "row_id": "530001",
+    "visit_occurrence_id": 530001,
+    "person_id": "patient_easy_neg_03",
+    "visit_start_date": "2025-09-22",
+    "visit_end_date": "2025-09-22",
+    "visit_concept_name": "Outpatient Visit",
+    "provider_specialty": "Primary Care",
+    "note_type": "pcp_visit"
+  },
+  {
+    "row_id": "530002",
+    "visit_occurrence_id": 530002,
+    "person_id": "patient_easy_neg_03",
+    "visit_start_date": "2025-10-14",
+    "visit_end_date": "2025-10-14",
+    "visit_concept_name": "Outpatient Visit",
+    "provider_specialty": "Endocrinology",
+    "note_type": "endocrinology_consult"
+  }
+]

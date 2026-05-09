@@ -1,0 +1,32 @@
+[
+  {
+    "row_id": "510001",
+    "condition_occurrence_id": 510001,
+    "person_id": "patient_easy_neg_01",
+    "condition_concept_id": 320128,
+    "condition_concept_name": "Essential hypertension",
+    "icd10_code": "I10",
+    "condition_start_date": "2025-07-15",
+    "condition_type_concept_name": "EHR problem list"
+  },
+  {
+    "row_id": "510002",
+    "condition_occurrence_id": 510002,
+    "person_id": "patient_easy_neg_01",
+    "condition_concept_id": 432867,
+    "condition_concept_name": "Hyperlipidemia",
+    "icd10_code": "E78.5",
+    "condition_start_date": "2025-07-15",
+    "condition_type_concept_name": "EHR problem list"
+  },
+  {
+    "row_id": "510003",
+    "condition_occurrence_id": 510003,
+    "person_id": "patient_easy_neg_01",
+    "condition_concept_id": 4283893,
+    "condition_concept_name": "Seasonal allergic rhinitis",
+    "icd10_code": "J30.1",
+    "condition_start_date": "2025-07-15",
+    "condition_type_concept_name": "EHR problem list"
+  }
+]

@@ -1,0 +1,29 @@
+[
+  {
+    "row_id": "520001",
+    "measurement_id": 520001,
+    "person_id": "patient_easy_neg_02",
+    "measurement_concept_name": "Blood pressure systolic",
+    "measurement_date": "2025-01-19",
+    "value_as_number": 130,
+    "unit_concept_name": "mmHg"
+  },
+  {
+    "row_id": "520002",
+    "measurement_id": 520002,
+    "person_id": "patient_easy_neg_02",
+    "measurement_concept_name": "Blood pressure diastolic",
+    "measurement_date": "2025-01-19",
+    "value_as_number": 82,
+    "unit_concept_name": "mmHg"
+  },
+  {
+    "row_id": "520003",
+    "measurement_id": 520003,
+    "person_id": "patient_easy_neg_02",
+    "measurement_concept_name": "Knee range of motion (degrees, right)",
+    "measurement_date": "2025-05-12",
+    "value_as_number": 125,
+    "unit_concept_name": "degrees"
+  }
+]

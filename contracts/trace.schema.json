@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chart-review-platform/contracts/trace.schema.json",
+  "title": "Trace shapes (per-criterion summary + per-record audit trail)",
+  "$defs": {
+    "TraceSummary": {
+      "type": "object",
+      "required": ["skills_invoked", "tools_used"],
+      "properties": {
+        "skills_invoked": { "type": "array", "items": { "type": "string" } },
+        "tools_used": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["tool", "n_calls"],
+            "properties": {
+              "tool": { "type": "string" },
+              "n_calls": { "type": "integer", "minimum": 0 }
+            }
+          }
+        }
+      }
+    },
+    "AuditEntry": {
+      "type": "object",
+      "required": ["timestamp", "step_type"],
+      "properties": {
+        "timestamp": { "type": "string" },
+        "step_type": {
+          "type": "string",
+          "enum": ["plan", "tool_call", "tool_result", "skill_invocation", "skill_result", "answer", "self_check", "override"]
+        },
+        "payload": {},
+        "model_version": { "type": "string" },
+        "prompt_version": { "type": "string" },
+        "skill_version": { "type": "string" },
+        "tool_version": { "type": "string" }
+      }
+    }
+  }
+}

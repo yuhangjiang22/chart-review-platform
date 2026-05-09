@@ -1,0 +1,4 @@
+[
+  { "row_id": 6301, "concept_id": 4096774, "concept_name": "Computed tomography of thorax with contrast", "cpt": "71260", "procedure_date": "2025-05-08", "provider_specialty": "Radiology" },
+  { "row_id": 6302, "concept_id": 4035768, "concept_name": "EBUS with transbronchial FNA", "cpt": "31652", "procedure_date": "2025-05-22", "provider_specialty": "Pulmonology" }
+]

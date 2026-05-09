@@ -1,0 +1,24 @@
+task_id: lung-cancer-labels
+task_type: phenotype_validation
+review_unit: patient
+manual_version: "1.0"
+index_anchor: diagnosis_date
+time_windows:
+  - id: present
+    anchor: index
+    start_offset: "0d"
+    end_offset: "0d"
+
+output_shape: outcome-first
+
+final_output: lung_cancer_status
+
+overview_prose: |
+  This chart review guideline helps reviewers accurately identify confirmed lung cancer cases
+  from clinical documentation. For each patient chart mentioning lung cancer, the reviewer
+  assesses whether the patient has confirmed, probable, or absent lung cancer based on
+  pathology, imaging, and clinical context evidence.
+
+  The output is a three-category assessment: **confirmed** (tissue diagnosis present),
+  **probable** (imaging suspicious with active workup/treatment), or **absent** (no evidence
+  of confirmed or probable lung cancer).

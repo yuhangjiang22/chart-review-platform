@@ -1,0 +1,16 @@
+[
+  {
+    "row_id": 110040,
+    "concept_id": 4275495,
+    "concept_name": "Smoking status",
+    "value": "30 pack-years, quit 2018",
+    "date": "2024-12-09"
+  },
+  {
+    "row_id": 110041,
+    "concept_id": 4059471,
+    "concept_name": "ECOG performance status",
+    "value": "1",
+    "date": "2024-12-09"
+  }
+]

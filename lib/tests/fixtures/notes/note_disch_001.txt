@@ -1,0 +1,43 @@
+DISCHARGE SUMMARY
+Memorial Regional Medical Center — Hospital Medicine
+Admission: 2025-08-28
+Discharge: 2025-08-31
+Attending: P. Okafor, MD
+
+ADMISSION DIAGNOSIS
+Community-acquired pneumonia, right upper lobe, with hypoxia.
+
+DISCHARGE DIAGNOSES
+1. Community-acquired pneumonia, right upper lobe, resolving.
+2. Incidental right upper lobe density on chest x-ray, requires outpatient
+   CT chest for further characterization. Differential includes post-
+   infectious change versus underlying mass; recommend dedicated imaging
+   given smoking history.
+3. Hypertension, controlled.
+4. COPD without exacerbation during this admission.
+5. Former tobacco use (45 pack-years, quit 2014).
+
+HOSPITAL COURSE
+Mr. Doe is a 72-year-old gentleman who presented with three days of cough,
+fever to 38.7 C, and exertional dyspnea. Initial chest x-ray showed a right
+upper lobe opacity with surrounding consolidation. He was admitted, started
+on ceftriaxone and azithromycin, and improved over 48 hours. Repeat chest
+x-ray prior to discharge showed partial resolution of consolidation but
+persistence of a more focal density in the apical segment, prompting
+recommendation for outpatient CT.
+
+He was afebrile for 24 hours prior to discharge with oxygen saturations of
+95% on room ambulation. Pulmonology follow-up arranged.
+
+DISCHARGE MEDICATIONS
+- Amoxicillin-clavulanate 875/125 mg PO BID x 5 days to complete course.
+- Tiotropium 18 mcg inhaled daily (continue home med).
+- Lisinopril 20 mg PO daily (continue home med).
+- Atorvastatin 40 mg PO QHS (continue home med).
+
+FOLLOW-UP
+- Pulmonology: 2025-09-05 with Dr. Patel.
+- CT chest with contrast scheduled outpatient.
+- Primary care: within two weeks.
+
+P. Okafor, MD — electronically signed 2025-08-31 11:04

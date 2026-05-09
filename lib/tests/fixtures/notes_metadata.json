@@ -1,0 +1,32 @@
+{
+  "note_path_001": {
+    "doc_type": "Surgical pathology report",
+    "date": "2025-09-15",
+    "author_role": "pathologist",
+    "encounter_id": "enc_path_2025_09_15"
+  },
+  "note_onc_001": {
+    "doc_type": "Oncology progress note",
+    "date": "2025-10-03",
+    "author_role": "oncologist",
+    "encounter_id": "enc_onc_2025_10_03"
+  },
+  "note_ct_001": {
+    "doc_type": "CT chest with contrast",
+    "date": "2025-09-08",
+    "author_role": "radiologist",
+    "encounter_id": "enc_ct_2025_09_08"
+  },
+  "note_disch_001": {
+    "doc_type": "Discharge summary",
+    "date": "2025-08-31",
+    "author_role": "hospitalist",
+    "encounter_id": "enc_inp_2025_08_28"
+  },
+  "note_pulm_001": {
+    "doc_type": "Pulmonology consult note",
+    "date": "2025-09-05",
+    "author_role": "pulmonologist",
+    "encounter_id": "enc_pulm_2025_09_05"
+  }
+}

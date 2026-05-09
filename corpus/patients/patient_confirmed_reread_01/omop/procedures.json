@@ -1,0 +1,4 @@
+[
+  { "row_id": 6201, "concept_id": 4096774, "concept_name": "Computed tomography of thorax with contrast", "cpt": "71260", "procedure_date": "2025-02-14", "provider_specialty": "Radiology" },
+  { "row_id": 6202, "concept_id": 4321756, "concept_name": "CT-guided lung biopsy", "cpt": "32408", "procedure_date": "2025-02-25", "provider_specialty": "Interventional Radiology" }
+]

@@ -1,0 +1,26 @@
+[
+  {
+    "row_id": "220003",
+    "procedure_occurrence_id": 220003,
+    "person_id": "sclc_02",
+    "procedure_concept_id": 4163872,
+    "procedure_concept_name": "CT of chest with contrast",
+    "procedure_date": "2025-04-09",
+    "procedure_type_concept_id": 32817,
+    "cpt_code": "71260",
+    "cpt_description": "Computed tomography, thorax; with contrast material(s)",
+    "provider": "Dr. R. Kapoor"
+  },
+  {
+    "row_id": "220004",
+    "procedure_occurrence_id": 220004,
+    "person_id": "sclc_02",
+    "procedure_concept_id": 4166231,
+    "procedure_concept_name": "CT-guided core needle biopsy of mediastinum",
+    "procedure_date": "2025-04-25",
+    "procedure_type_concept_id": 32817,
+    "cpt_code": "32408",
+    "cpt_description": "Core needle biopsy, lung or mediastinum, percutaneous, including imaging guidance",
+    "provider": "Dr. S. Lin"
+  }
+]

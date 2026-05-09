@@ -1,0 +1,210 @@
+{
+  "task_id": "lung_cancer_phenotype",
+  "task_type": "phenotype_validation",
+  "review_unit": "patient",
+  "manual_version": "2026-04-28",
+  "source_document_sha": "sha256:9ed4d2d4218d6771fe8cbf9cb9a58b722643ab4eedb1dc9e21410ff066831dcc",
+  "fields": [
+    {
+      "id": "pathology_report_present",
+      "prompt": "Is a qualifying pathology report present in the lookback window?",
+      "answer_schema": {
+        "enum": [
+          true,
+          false,
+          "no_info"
+        ]
+      },
+      "cardinality": "one",
+      "time_window": "lookback_24mo",
+      "group": "pathology",
+      "extraction_guidance": "Search note documents tagged pathology_report, surgical_pathology, or LOINC 11526-1.",
+      "guidance_prose": {
+        "definition": "A pathology report authored by a credentialed pathologist. Surgical and biopsy specimens both qualify. Cytology-only diagnoses do not qualify here — record `no` and let `pathology_lung_primary` capture cytology separately if needed.",
+        "examples": "- \"Final diagnosis: Adenocarcinoma of the lung, T2N1M0\" → `yes`\n- \"Suspicious for malignancy, recommend re-biopsy\" → `no_info`\n- No pathology document found in the 24-month window → `no`"
+      }
+    },
+    {
+      "id": "pathology_lung_primary",
+      "prompt": "What primary site / histology does the pathology report indicate?",
+      "answer_schema": {
+        "enum": [
+          "nsclc",
+          "sclc",
+          "other_lung",
+          "non_lung",
+          "no_info"
+        ]
+      },
+      "cardinality": "one",
+      "time_window": "lookback_24mo",
+      "group": "pathology",
+      "is_applicable_when": "pathology_report_present == 'yes'",
+      "extraction_guidance": "Apply WHO mapping below.",
+      "guidance_prose": {
+        "definition_/_who_mapping": "NSCLC subtypes (adenocarcinoma, squamous cell carcinoma, large-cell carcinoma) collapse to `nsclc`. Carcinoid tumors map to `other_lung`. Mesothelioma maps to `non_lung`. Metastatic disease without lung primary → `non_lung`.",
+        "conflict_resolution": "If multiple pathology reports conflict, prefer the most recent unless a documented re-read exists. If a re-read is documented, the re-read wins regardless of date.",
+        "examples": "- \"Adenocarcinoma of the lung\" → `nsclc`\n- \"Small cell carcinoma, lung\" → `sclc`\n- \"Carcinoid tumor of the lung\" → `other_lung`\n- \"Metastatic colorectal carcinoma\" → `non_lung`"
+      }
+    },
+    {
+      "id": "cytology_supports_lung_primary",
+      "prompt": "Does cytology (no surgical/biopsy specimen available) support a lung primary?",
+      "answer_schema": {
+        "enum": [
+          true,
+          false,
+          "no_info"
+        ]
+      },
+      "cardinality": "one",
+      "time_window": "lookback_24mo",
+      "group": "pathology",
+      "is_applicable_when": "pathology_report_present == 'no'",
+      "extraction_guidance": "Only evaluated when no qualifying pathology report exists. Look for cytology reports (FNA, sputum, pleural fluid) tagged as suspicious or positive for lung primary.",
+      "guidance_prose": {
+        "definition": "Fallback when surgical or biopsy pathology is unavailable. A cytology specimen\n(fine-needle aspiration, sputum cytology, or pleural fluid cytology) interpreted\nby a credentialed pathologist as suspicious for or diagnostic of a lung primary\nmalignancy. Cytology-only diagnoses do not satisfy `pathology_lung_primary` —\nthey are recorded here so downstream derivation can still capture them as a\nweaker tier of pathology evidence."
+      }
+    },
+    {
+      "id": "imaging_lung_lesion",
+      "prompt": "Does imaging show a lung mass, nodule, or lesion suspicious for malignancy?",
+      "answer_schema": {
+        "enum": [
+          true,
+          false,
+          "no_info"
+        ]
+      },
+      "cardinality": "one",
+      "time_window": "lookback_24mo",
+      "group": "imaging",
+      "guidance_prose": {
+        "definition": "Imaging (CT chest, PET-CT, chest X-ray) shows a lung mass, nodule, or lesion suspicious for malignancy. Stable benign-appearing nodules do not qualify.",
+        "examples": "- \"3.2 cm spiculated mass in the right upper lobe, highly suspicious for malignancy\" → `yes`\n- \"Stable 4 mm nodule, likely granuloma\" → `no`\n- \"No prior imaging available for comparison\" → `no_info`"
+      }
+    },
+    {
+      "id": "oncologist_lung_cancer_diagnosis_in_note",
+      "prompt": "Does a treating oncologist or pulmonologist document lung cancer as the diagnosis?",
+      "answer_schema": {
+        "enum": [
+          true,
+          false,
+          "no_info"
+        ]
+      },
+      "cardinality": "one",
+      "time_window": "lookback_24mo",
+      "group": "clinical_diagnosis",
+      "extraction_guidance": "Author role must be oncologist or pulmonologist. Family history mentions do not count.",
+      "guidance_prose": {
+        "definition": "A treating oncologist or pulmonologist documents lung cancer as the patient's diagnosis (active or historical). Family history mentions, \"rule out\" language, and provider-questioned diagnoses do **not** qualify.",
+        "examples": "- Oncology progress note: \"Patient with stage IIIA NSCLC, currently on cisplatin/etoposide\" → `yes`\n- \"Father with history of lung cancer\" → `no`\n- \"Considering lung cancer in differential, awaiting biopsy\" → `no_info`"
+      }
+    },
+    {
+      "id": "lowest_hemoglobin_in_window",
+      "prompt": "Lowest documented hemoglobin in the lookback window (g/dL). Null if no hemoglobin measurement is found.",
+      "answer_schema": {
+        "type": [
+          "number",
+          "null"
+        ]
+      },
+      "cardinality": "one",
+      "time_window": "lookback_24mo",
+      "group": "labs",
+      "extraction_guidance": "Search OMOP measurements (LOINC 718-7 / concept name 'Hemoglobin' or 'Hgb') and note text (Hgb, Hb, hemoglobin) within the lookback window. Report the single lowest value. If multiple units appear, normalize to g/dL (a g/L value divided by 10). If no hemoglobin is found, return null with missingness_reason='not_documented'.",
+      "guidance_prose": {
+        "definition": "A lab-value extraction field. Hemoglobin is reported in grams per deciliter (g/dL). Values reported in g/L are divided by 10. Cancer-related anemia of chronic disease commonly produces values below 12 g/dL in untreated lung-cancer patients; this field feeds the derived `pre_treatment_anemia_present` flag.",
+        "examples": "- OMOP measurement row \"Hemoglobin 11.4 g/dL on 2025-02-14\" → `11.4`\n- Discharge summary line \"Pre-op Hgb 11.6, transfusion not required\" → `11.6`\n- No hemoglobin documented anywhere in the window → `null` with `missingness_reason: not_documented`"
+      }
+    },
+    {
+      "id": "pre_treatment_anemia_present",
+      "prompt": "Is anemia (Hgb < 12 g/dL) documented in the lookback window?",
+      "answer_schema": {
+        "type": [
+          "boolean",
+          "null"
+        ]
+      },
+      "derivation": "lowest_hemoglobin_in_window != null AND lowest_hemoglobin_in_window < 12.0",
+      "group": "derived",
+      "guidance_prose": {
+        "definition": "True iff a hemoglobin measurement under 12 g/dL exists in the lookback window. Used as a context signal for downstream cohort filtering — does not affect `lung_cancer_status`."
+      }
+    },
+    {
+      "id": "icd_lung_cancer_present",
+      "prompt": "Is an ICD-10 C34.* code on the problem list or any encounter diagnosis?",
+      "answer_schema": {
+        "enum": [
+          true,
+          false
+        ]
+      },
+      "cardinality": "one",
+      "time_window": "lookback_24mo",
+      "group": "codes",
+      "extraction_guidance": "Query CONDITION_OCCURRENCE for ICD-10-CM C34.* codes. Personal-history codes (Z85.118) do not qualify here.",
+      "guidance_prose": {
+        "definition": "An ICD-10-CM code in the C34.* family appears on the patient's problem list or any encounter diagnosis within the lookback window.",
+        "examples": "- C34.10 on a 2025-09-12 encounter → `yes`\n- Only Z85.118 (\"personal history of malignant neoplasm of bronchus and lung\") → `no`\n- No relevant codes → `no`"
+      }
+    },
+    {
+      "id": "pathology_confirms_lung_cancer",
+      "prompt": "Does pathology confirm lung cancer?",
+      "answer_schema": {
+        "type": "boolean"
+      },
+      "derivation": "pathology_report_present == 'yes' AND pathology_lung_primary in ['nsclc','sclc','other_lung']",
+      "group": "derived",
+      "guidance_prose": {
+        "definition": "True iff a pathology report exists AND it identifies a lung primary malignancy. Derived field — no evidence required; provenance is the input field values."
+      }
+    },
+    {
+      "id": "clinical_diagnosis_lung_cancer",
+      "prompt": "Imaging plus oncologist clinical diagnosis present?",
+      "answer_schema": {
+        "type": "boolean"
+      },
+      "derivation": "imaging_lung_lesion == 'yes' AND oncologist_lung_cancer_diagnosis_in_note == 'yes'",
+      "group": "derived",
+      "guidance_prose": {
+        "definition": "True iff imaging shows a suspicious lung lesion AND a treating oncologist or pulmonologist documents lung cancer."
+      }
+    },
+    {
+      "id": "lung_cancer_status",
+      "prompt": "Final phenotype label.",
+      "answer_schema": {
+        "enum": [
+          "confirmed",
+          "probable",
+          "absent"
+        ]
+      },
+      "derivation": "pathology_confirms_lung_cancer == true ? 'confirmed' : (clinical_diagnosis_lung_cancer == true OR icd_lung_cancer_present == 'yes') ? 'probable' : 'absent'",
+      "is_final_output": true,
+      "group": "final",
+      "guidance_prose": {
+        "tier_rationale": "- `confirmed` requires pathology evidence — the highest-tier evidence available in routine EHR.\n- `probable` allows two paths: clinical-diagnosis-with-imaging-support, or an ICD code (the weakest signal but included to match how chart reviewers operate when full pathology is missing).\n- `absent` is asserted only when all leaf fields have been evaluated and none support lung cancer."
+      }
+    }
+  ],
+  "index_anchor": "index_date",
+  "time_windows": [
+    {
+      "id": "lookback_24mo",
+      "anchor": "index_anchor",
+      "start_offset": "-24mo",
+      "end_offset": "0d"
+    }
+  ],
+  "final_output": "lung_cancer_status",
+  "overview_prose": "This task determines whether a patient has lung cancer based on their EHR record. The phenotype produces a three-tier label: `confirmed` (pathology-supported), `probable` (imaging plus clinical diagnosis, or coding-only), or `absent` (no supporting evidence in the lookback window).\n\n**Source-document priority** (apply globally unless a field overrides):\n\n1. Surgical pathology report (LOINC 11526-1)\n2. Biopsy pathology report\n3. Outside-institution pathology in the media tab\n4. Treating-oncologist progress notes\n5. Imaging reports (CT chest, PET-CT)\n6. Problem list / encounter ICD codes\n\n**Lookback window** is 24 months prior to the index date. The index date is the start of the encounter that triggered the review."
+}

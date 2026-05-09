@@ -1,0 +1,24 @@
+MIDWESTERN REGIONAL MEDICAL CENTER — PULMONOLOGY CONSULTATION NOTE
+Date of Service: 06/10/2025
+Patient: [REDACTED] | Age: 78 | Sex: M | MRN: [REDACTED]
+Consulting Physician: Dr. S. Okonkwo, MD — Pulmonary Medicine
+Referring Physician: Dr. L. Morris, Internal Medicine
+Reason for Consultation: 3.4 cm left upper-lobe mass, biopsy planning.
+
+HISTORY OF PRESENT ILLNESS:
+Mr. [REDACTED] is a 78-year-old male with a 40 pack-year smoking history (quit 1998) presenting with 3-month progressive cough and declining functional status. CT chest 05/22/2025 shows a 3.4 cm spiculated LUL mass with left hilar lymphadenopathy, Lung-RADS 4X. Reports ~8 lb weight loss over 2 months and markedly decreased exercise tolerance (half-block limited by dyspnea).
+
+PMH: COPD (GOLD Stage II), hypertension, type 2 diabetes, remote prostate cancer in remission.
+Medications: Tiotropium, albuterol PRN, metformin, amlodipine.
+Social: Lives alone; daughter assists. Former smoker 40 pack-years, quit 1998.
+
+EXAM: SpO2 90% at rest, desaturates to 85% with ambulation. Diminished air entry left upper zone, diffuse expiratory wheeze.
+PFTs (2024): FEV1 48% predicted, FEV1/FVC 0.61.
+
+ASSESSMENT AND PLAN:
+Imaging is compelling for primary lung cancer. However, tissue biopsy carries high risk given severely impaired respiratory reserve (FEV1 48%, exertional desaturation), advanced age, and multiple comorbidities. Biopsy options — CT-guided core needle and bronchoscopy — were discussed in detail. After thorough counseling on procedural risks versus benefit, the patient declined biopsy, citing quality-of-life priorities and preference to avoid invasive procedures.
+
+Plan: Refer to thoracic oncology for clinical management without pathologic tissue. Biopsy refusal documented. Continue COPD supportive care. Palliative care referral recommended.
+
+Dr. S. Okonkwo, MD — Pulmonary Medicine
+Electronically signed: 06/10/2025 13:22

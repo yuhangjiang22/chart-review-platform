@@ -1,0 +1,29 @@
+[
+  {
+    "row_id": "510001",
+    "drug_exposure_id": 510001,
+    "person_id": "patient_easy_neg_01",
+    "drug_concept_name": "Lisinopril 10 MG Oral Tablet",
+    "drug_start_date": "2025-07-15",
+    "rxnorm_code": "314077",
+    "route_concept_name": "Oral"
+  },
+  {
+    "row_id": "510002",
+    "drug_exposure_id": 510002,
+    "person_id": "patient_easy_neg_01",
+    "drug_concept_name": "Rosuvastatin 10 MG Oral Tablet",
+    "drug_start_date": "2025-07-15",
+    "rxnorm_code": "861634",
+    "route_concept_name": "Oral"
+  },
+  {
+    "row_id": "510003",
+    "drug_exposure_id": 510003,
+    "person_id": "patient_easy_neg_01",
+    "drug_concept_name": "Cetirizine 10 MG Oral Tablet",
+    "drug_start_date": "2025-07-15",
+    "rxnorm_code": "1014676",
+    "route_concept_name": "Oral"
+  }
+]

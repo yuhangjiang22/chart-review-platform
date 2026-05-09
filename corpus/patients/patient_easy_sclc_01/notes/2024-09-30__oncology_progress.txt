@@ -1,0 +1,29 @@
+INDIANA UNIVERSITY HEALTH – THORACIC ONCOLOGY
+ONCOLOGY PROGRESS NOTE
+Date: 2024-09-30
+Patient: [REDACTED], 67M  MRN: [REDACTED]
+Attending: Dr. P. Whitmore, MD – Thoracic Oncology
+
+DIAGNOSIS: Small-cell lung carcinoma (SCLC), limited stage (LS-SCLC)
+ICD-10: C34.10
+
+HISTORY OF PRESENT ILLNESS:
+Mr. [REDACTED] is a 67-year-old male with 55 pack-year smoking history (current smoker) who presented with a 6-week history of persistent cough, hemoptysis, and 12-lb unintentional weight loss. CT chest (2024-08-22) demonstrated a 4.1 cm right central hilar mass with bulky bilateral mediastinal lymphadenopathy. EBUS-TBNA (2024-09-05) confirmed small-cell carcinoma with neuroendocrine IHC profile. PET/CT performed 2024-09-18 showed FDG-avid right hilar primary (SUVmax 14.2) with mediastinal nodal involvement confined to the chest; no distant metastases identified. MRI brain negative for intracranial metastases.
+
+STAGING: Limited-stage SCLC (VALSG criteria: disease confined to one hemithorax and mediastinum, encompassable within a tolerable radiation field).
+
+PERFORMANCE STATUS: ECOG 1
+
+PLAN:
+1. Initiate concurrent chemoradiotherapy (cCRT):
+   - Chemotherapy: Cisplatin 75 mg/m2 day 1 + Etoposide 100 mg/m2 days 1-3, every 21 days x 4 cycles
+   - Radiotherapy: Begin with cycle 1; 45 Gy in 30 fractions (twice daily) to primary and involved nodes
+2. Prophylactic cranial irradiation (PCI) to be discussed after completion of cCRT if CR/PR achieved
+3. Smoking cessation counseling initiated; NRT prescription provided
+4. Repeat CT chest/abdomen post-cycle 2 to assess response
+5. Surveillance labs: CBC, CMP prior to each cycle
+
+Patient and family counseled regarding diagnosis, treatment intent (potentially curative), and expected side effects. Patient verbalized understanding and wishes to proceed.
+
+Electronically signed: Dr. P. Whitmore, MD, Thoracic Oncology
+2024-09-30 13:15

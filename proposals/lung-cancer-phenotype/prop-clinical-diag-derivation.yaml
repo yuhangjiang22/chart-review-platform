@@ -1,0 +1,38 @@
+id: prop-clinical-diag-derivation-20260507
+guideline_id: lung-cancer-phenotype
+created_at: 2026-05-07T19:35:36Z
+created_by: chart-review-improve skill
+target_field: clinical_diagnosis_lung_cancer
+change_kind: derivation_revise
+motivating_patients:
+  - patient_easy_probable_02
+evidence:
+  - patient: patient_easy_probable_02
+    agent_answer: false
+    reviewer_answer: false
+    edit_reason: wrong_rule
+    reviewer_evidence: >
+      Patient has imaging_lung_lesion=true (3.4cm spiculated left upper lobe mass, Lung-RADS 4X)
+      AND oncologist_lung_cancer_diagnosis_in_note=true ("This patient has primary lung cancer, left upper lobe").
+      The derivation should evaluate to true, but currently returns false due to type mismatch.
+proposal:
+  derivation:
+    criterion_id: clinical_diagnosis_lung_cancer
+    old_expression: "imaging_lung_lesion == 'yes' AND oncologist_lung_cancer_diagnosis_in_note == 'yes'"
+    new_expression: "imaging_lung_lesion == true AND oncologist_lung_cancer_diagnosis_in_note == true"
+    reason: >
+      The answer_schema for imaging_lung_lesion and oncologist_lung_cancer_diagnosis_in_note
+      store answers as boolean values (true/false/no_info), not strings. The current derivation
+      compares against string literals 'yes' which will never match, causing the expression
+      to always evaluate to false when both leaf criteria are true. Changing the comparison
+      to use boolean literals fixes this type mismatch.
+rationale: >
+  The derivation expression for clinical_diagnosis_lung_cancer contains a type mismatch bug.
+  Both upstream fields use boolean answer schemas (answer_schema with enum [true, false, no_info]),
+  but the derivation checks for string equality ('yes'). This causes the derived field to always
+  evaluate to false even when both upstream criteria are true. Correcting the comparison to
+  use boolean literals (== true) instead of string literals (== 'yes') will fix the logic
+  to work as intended: true imaging findings + true oncologist diagnosis = true clinical diagnosis.
+provenance:
+  source: override_pattern
+  status: draft

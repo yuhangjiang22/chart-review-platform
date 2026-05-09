@@ -1,0 +1,38 @@
+[
+  {
+    "row_id": "420041",
+    "patient_id": "patient_easy_icd_02",
+    "drug_source_value": "197641",
+    "drug_source_concept_name": "Alendronate 70 MG Oral Tablet",
+    "drug_exposure_start_date": "2016-10-01",
+    "drug_exposure_end_date": null,
+    "sig": "70 mg weekly (held post-op)"
+  },
+  {
+    "row_id": "420042",
+    "patient_id": "patient_easy_icd_02",
+    "drug_source_value": "892700",
+    "drug_source_concept_name": "Levothyroxine Sodium 75 MCG Oral Tablet",
+    "drug_exposure_start_date": "2010-07-15",
+    "drug_exposure_end_date": null,
+    "sig": "75 mcg daily"
+  },
+  {
+    "row_id": "420043",
+    "patient_id": "patient_easy_icd_02",
+    "drug_source_value": "197378",
+    "drug_source_concept_name": "Amlodipine 5 MG Oral Tablet",
+    "drug_exposure_start_date": "2013-11-20",
+    "drug_exposure_end_date": null,
+    "sig": "5 mg daily"
+  },
+  {
+    "row_id": "420044",
+    "patient_id": "patient_easy_icd_02",
+    "drug_source_value": "541893",
+    "drug_source_concept_name": "Enoxaparin sodium 40 MG/0.4 ML Injectable Solution",
+    "drug_exposure_start_date": "2024-10-23",
+    "drug_exposure_end_date": "2024-11-19",
+    "sig": "40 mg SQ daily x 28 days (DVT prophylaxis post-op)"
+  }
+]

@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chart-review-platform/corpus/schemas/ground_truth.schema.json",
+  "title": "PatientGroundTruth",
+  "type": "object",
+  "required": ["patient_id", "category", "lung_cancer_status", "leaf_answers", "applicability", "expected_contradicting_evidence_fields", "difficulty"],
+  "properties": {
+    "patient_id": { "type": "string", "pattern": "^patient_[a-z0-9_]+$" },
+    "category":   { "type": "string", "enum": ["confirmed_nsclc", "sclc", "probable", "icd_only", "negative"] },
+    "lung_cancer_status": { "type": "string", "enum": ["confirmed", "probable", "absent"] },
+    "leaf_answers": {
+      "type": "object",
+      "required": [
+        "pathology_report_present",
+        "pathology_lung_primary",
+        "cytology_supports_lung_primary",
+        "imaging_lung_lesion",
+        "oncologist_lung_cancer_diagnosis_in_note",
+        "icd_lung_cancer_present"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "pathology_report_present":              { "type": "string", "enum": ["yes", "no", "no_info", "not_applicable"] },
+        "pathology_lung_primary":                { "type": "string", "enum": ["nsclc", "sclc", "other_lung", "non_lung", "no_info", "not_applicable"] },
+        "cytology_supports_lung_primary":        { "type": "string", "enum": ["yes", "no", "no_info", "not_applicable"] },
+        "imaging_lung_lesion":                   { "type": "string", "enum": ["yes", "no", "no_info", "not_applicable"] },
+        "oncologist_lung_cancer_diagnosis_in_note": { "type": "string", "enum": ["yes", "no", "no_info", "not_applicable"] },
+        "icd_lung_cancer_present":               { "type": "string", "enum": ["yes", "no", "not_applicable"] }
+      }
+    },
+    "applicability": {
+      "type": "object",
+      "additionalProperties": { "type": "string", "enum": ["applicable", "not_applicable", "unknown"] }
+    },
+    "expected_contradicting_evidence_fields": { "type": "array", "items": { "type": "string" } },
+    "difficulty": { "type": "string", "enum": ["easy", "hard"] },
+    "difficulty_notes": { "type": "string" }
+  },
+  "if": {
+    "properties": { "difficulty": { "const": "hard" } },
+    "required": ["difficulty"]
+  },
+  "then": { "required": ["difficulty_notes"] }
+}

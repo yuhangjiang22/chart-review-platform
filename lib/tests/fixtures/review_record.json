@@ -1,0 +1,466 @@
+{
+  "record_id": "rec_demo_001",
+  "task_document_sha": "sha256:7c19a4b2e8d6f1c0a3b5e7d9c2f4a6b8e0d2f4a6b8c0e2d4f6a8b0c2e4d6f8a0",
+  "review_unit_id": "patient_demo",
+  "patient_id": "patient_demo",
+  "task_metadata_snapshot": {
+    "task_id": "lung_cancer_phenotype",
+    "manual_version": "2026-04-28",
+    "index_date": "2025-10-15"
+  },
+  "started_at": "2026-04-28T09:14:22Z",
+  "criterion_assessments": [
+    {
+      "field_id": "pathology_report_present",
+      "answer": "yes",
+      "confidence": "high",
+      "applied_rule": "Surgical pathology report (LOINC 11526-1) — source-document priority rank 1.",
+      "evidence": [
+        {
+          "source": "note",
+          "note_id": "note_path_001",
+          "doc_type": "Surgical pathology report",
+          "span_offsets": [170, 197],
+          "verbatim_quote": "Pathologist: M. Alvarez, MD",
+          "evidence_date": "2025-09-15",
+          "author_role": "pathologist"
+        },
+        {
+          "source": "note",
+          "note_id": "note_path_001",
+          "doc_type": "Surgical pathology report",
+          "span_offsets": [1671, 1725],
+          "verbatim_quote": "ADENOCARCINOMA OF THE LUNG, moderately differentiated.",
+          "evidence_date": "2025-09-15",
+          "author_role": "pathologist"
+        },
+        {
+          "source": "omop",
+          "table": "document",
+          "row_id": 4421,
+          "concept_id": 11526,
+          "concept_name": "Surgical pathology report (LOINC 11526-1)",
+          "value": "finalized",
+          "evidence_date": "2025-09-15"
+        }
+      ],
+      "alternatives_considered": [
+        { "value": "no_info", "reason_rejected": "A finalized surgical pathology document exists in the lookback window with a credentialed pathologist signature." },
+        { "value": "no", "reason_rejected": "Pathology document of qualifying type located; not absent." }
+      ],
+      "coverage": {
+        "notes_in_scope": 47,
+        "notes_searched": 47,
+        "notes_read_in_full": 1,
+        "queries_run": ["pathology", "biopsy", "specimen", "adenocarcinoma", "histology"],
+        "structured_queries_run": ["LOINC 11526-1", "LOINC 60568-3", "document.type_concept_id IN (pathology types)"],
+        "excluded": []
+      },
+      "schema_validation": { "status": "pass" },
+      "faithfulness_check": { "status": "pass" },
+      "trace_summary": {
+        "skills_invoked": ["document.locate", "document.classify", "pathology.qualify"],
+        "tools_used": [
+          { "tool": "search_notes", "n_calls": 5 },
+          { "tool": "fetch_note_full", "n_calls": 1 },
+          { "tool": "omop_query", "n_calls": 2 }
+        ]
+      },
+      "reasoning_summary": "I searched the document table for LOINC 11526-1 and adjacent pathology types in the 24-month lookback window. One surgical pathology report dated 2025-09-15 was located. I retrieved its full text, confirmed a credentialed pathologist signature, and confirmed the specimen was a CT-guided core biopsy (qualifying surgical/biopsy specimen, not cytology-only). Therefore yes."
+    },
+    {
+      "field_id": "pathology_lung_primary",
+      "answer": "nsclc",
+      "confidence": "high",
+      "applied_rule": "WHO NSCLC subtype mapping: adenocarcinoma → nsclc.",
+      "evidence": [
+        {
+          "source": "note",
+          "note_id": "note_path_001",
+          "doc_type": "Surgical pathology report",
+          "span_offsets": [1671, 1725],
+          "verbatim_quote": "ADENOCARCINOMA OF THE LUNG, moderately differentiated.",
+          "evidence_date": "2025-09-15",
+          "author_role": "pathologist"
+        },
+        {
+          "source": "note",
+          "note_id": "note_path_001",
+          "doc_type": "Surgical pathology report",
+          "span_offsets": [1784, 1832],
+          "verbatim_quote": "Synoptic summary: NSCLC, adenocarcinoma subtype.",
+          "evidence_date": "2025-09-15",
+          "author_role": "pathologist"
+        },
+        {
+          "source": "note",
+          "note_id": "note_path_001",
+          "doc_type": "Surgical pathology report",
+          "span_offsets": [1314, 1347],
+          "verbatim_quote": "TTF-1: positive (diffuse, strong)",
+          "evidence_date": "2025-09-15",
+          "author_role": "pathologist"
+        }
+      ],
+      "alternatives_considered": [
+        { "value": "sclc", "reason_rejected": "Glandular acinar/lepidic morphology with TTF-1+/Napsin A+ is incompatible with small-cell histology." },
+        { "value": "non_lung", "reason_rejected": "CK7+/CK20- with TTF-1+ excludes colorectal or other extrathoracic primary." },
+        { "value": "other_lung", "reason_rejected": "Carcinoid morphology not described; no neuroendocrine markers." }
+      ],
+      "coverage": {
+        "notes_in_scope": 47,
+        "notes_searched": 47,
+        "notes_read_in_full": 1,
+        "queries_run": ["adenocarcinoma", "squamous", "small cell", "carcinoid", "TTF-1", "p40", "synoptic"],
+        "structured_queries_run": ["condition_occurrence WHERE concept_id IN (lung primary set)"],
+        "excluded": []
+      },
+      "schema_validation": { "status": "pass" },
+      "faithfulness_check": { "status": "pass" },
+      "trace_summary": {
+        "skills_invoked": ["pathology.qualify", "histology.map_who"],
+        "tools_used": [
+          { "tool": "search_notes", "n_calls": 7 },
+          { "tool": "fetch_note_full", "n_calls": 1 }
+        ]
+      }
+    },
+    {
+      "field_id": "imaging_lung_lesion",
+      "answer": "yes",
+      "confidence": "medium",
+      "applied_rule": "Imaging — definition: lung mass, nodule, or lesion suspicious for malignancy on CT, PET-CT, or chest X-ray.",
+      "evidence": [
+        {
+          "source": "note",
+          "note_id": "note_ct_001",
+          "doc_type": "CT chest with contrast",
+          "span_offsets": [493, 570],
+          "verbatim_quote": "3.2 x 2.8 cm spiculated mass in the posterior segment of the right upper lobe",
+          "evidence_date": "2025-09-08",
+          "author_role": "radiologist"
+        },
+        {
+          "source": "note",
+          "note_id": "note_ct_001",
+          "doc_type": "CT chest with contrast",
+          "span_offsets": [1462, 1559],
+          "verbatim_quote": "3.2 cm spiculated right upper lobe mass, highly suspicious for primary    bronchogenic carcinoma.",
+          "evidence_date": "2025-09-08",
+          "author_role": "radiologist"
+        },
+        {
+          "source": "note",
+          "note_id": "note_disch_001",
+          "doc_type": "Discharge summary",
+          "span_offsets": [40, 80],
+          "verbatim_quote": "right upper lobe mass on chest x-ray, biopsy-confirmed",
+          "evidence_date": "2025-08-31",
+          "author_role": "hospitalist"
+        },
+        {
+          "source": "omop",
+          "table": "measurement",
+          "row_id": 88213,
+          "concept_id": 4197666,
+          "concept_name": "Pulmonary mass (finding)",
+          "value": "present",
+          "evidence_date": "2025-09-08"
+        }
+      ],
+      "alternatives_considered": [
+        { "value": "no", "reason_rejected": "Multiple imaging studies describe a 3.2 cm spiculated RUL mass; cannot be 'no'." },
+        { "value": "no_info", "reason_rejected": "Two imaging reports in window with explicit findings; the chart is not silent." }
+      ],
+      "coverage": {
+        "notes_in_scope": 47,
+        "notes_searched": 47,
+        "notes_read_in_full": 2,
+        "queries_run": ["nodule", "mass", "lesion", "spiculated", "PET", "CT chest", "FDG-avid"],
+        "structured_queries_run": ["radiology_report WHERE modality IN ('CT','PET-CT','XR')"],
+        "excluded": [
+          { "note_id": "note_ortho_2024_03", "reason": "Out of scope — orthopedic clinic note, no imaging content." }
+        ]
+      },
+      "schema_validation": { "status": "pass" },
+      "faithfulness_check": {
+        "status": "partial",
+        "details": [
+          "Evidence row 3 (note_disch_001 offsets 40–80): cited quote 'right upper lobe mass on chest x-ray, biopsy-confirmed' does not match the note text at the cited offset. The discharge summary describes a 'right upper lobe density on chest x-ray' and explicitly defers tissue diagnosis to outpatient workup. The agent has paraphrased and added 'biopsy-confirmed' which is not in the source.",
+          "Other evidence rows pass; answer 'yes' is independently supported by the CT chest report."
+        ]
+      },
+      "trace_summary": {
+        "skills_invoked": ["imaging.locate", "imaging.qualify"],
+        "tools_used": [
+          { "tool": "search_notes", "n_calls": 9 },
+          { "tool": "fetch_note_full", "n_calls": 2 },
+          { "tool": "omop_query", "n_calls": 1 }
+        ]
+      },
+      "reasoning_summary": "I located two imaging reports in the lookback window. The CT chest from 2025-09-08 describes a 3.2 cm spiculated RUL mass with adenopathy, classified as suspicious for malignancy. I attempted to corroborate from the discharge summary; the cited span was paraphrased rather than verbatim, which the faithfulness check flagged. The CT report alone is sufficient evidence. Confidence medium because the partial faithfulness failure indicates I over-reached on the discharge summary citation."
+    },
+    {
+      "field_id": "oncologist_lung_cancer_diagnosis_in_note",
+      "answer": "yes",
+      "confidence": "high",
+      "applied_rule": "Treating oncologist progress note — source-document priority rank 4. Excludes 'rule out' and family-history language.",
+      "evidence": [
+        {
+          "source": "note",
+          "note_id": "note_onc_001",
+          "doc_type": "Oncology progress note",
+          "span_offsets": [1551, 1623],
+          "verbatim_quote": "Stage IIIA (cT2aN2M0) non-small-cell lung cancer, adenocarcinoma subtype",
+          "evidence_date": "2025-10-03",
+          "author_role": "oncologist"
+        },
+        {
+          "source": "note",
+          "note_id": "note_onc_001",
+          "doc_type": "Oncology progress note",
+          "span_offsets": [1648, 1671],
+          "verbatim_quote": "Patient has lung cancer",
+          "evidence_date": "2025-10-03",
+          "author_role": "oncologist"
+        },
+        {
+          "source": "note",
+          "note_id": "note_onc_001",
+          "doc_type": "Oncology progress note",
+          "span_offsets": [158, 216],
+          "verbatim_quote": "New diagnosis of lung cancer, here for treatment planning.",
+          "evidence_date": "2025-10-03",
+          "author_role": "oncologist"
+        }
+      ],
+      "alternatives_considered": [
+        { "value": "no", "reason_rejected": "Oncologist explicitly documents lung cancer as the primary diagnosis." },
+        { "value": "no_info", "reason_rejected": "Note contains an unambiguous diagnosis statement." }
+      ],
+      "contradicting_evidence": [
+        {
+          "evidence": {
+            "source": "note",
+            "note_id": "note_pulm_001",
+            "doc_type": "Pulmonology consultation",
+            "span_offsets": [992, 1108],
+            "verbatim_quote": "no diagnosis of lung cancer has been established at\nthis visit and we explicitly defer that determination to tissue.",
+            "evidence_date": "2025-09-05",
+            "author_role": "pulmonologist"
+          },
+          "reason_not_decisive": "The pulmonology consultation predates the surgical pathology report (2025-09-15) and the oncology progress note (2025-10-03). The note explicitly defers diagnosis to tissue, which the later pathology then provided. Per source-document priority, a treating-oncologist diagnosis backed by tissue supersedes an earlier hedged specialist note."
+        }
+      ],
+      "coverage": {
+        "notes_in_scope": 47,
+        "notes_searched": 47,
+        "notes_read_in_full": 2,
+        "queries_run": ["oncology", "thoracic", "lung cancer", "adenocarcinoma", "diagnosis", "rule out"],
+        "structured_queries_run": ["provider WHERE specialty IN ('Hematology/Oncology','Pulmonology')"],
+        "excluded": []
+      },
+      "schema_validation": { "status": "pass" },
+      "faithfulness_check": { "status": "pass" },
+      "trace_summary": {
+        "skills_invoked": ["clinical_diagnosis.locate", "diagnosis.disambiguate"],
+        "tools_used": [
+          { "tool": "search_notes", "n_calls": 6 },
+          { "tool": "fetch_note_full", "n_calls": 2 }
+        ]
+      }
+    },
+    {
+      "field_id": "lowest_hemoglobin_in_window",
+      "answer": 13.4,
+      "confidence": "high",
+      "applied_rule": "Lowest documented hemoglobin in g/dL within the 24-month lookback window.",
+      "evidence": [
+        {
+          "source": "omop",
+          "table": "measurement",
+          "row_id": 88001,
+          "concept_id": 3013682,
+          "concept_name": "Hemoglobin",
+          "value": 13.4,
+          "unit": "g/dL",
+          "evidence_date": "2025-09-12"
+        }
+      ],
+      "alternatives_considered": [
+        { "value": null, "reason_rejected": "Hemoglobin measurement located in OMOP within the lookback window; not absent." }
+      ],
+      "coverage": {
+        "note": "structured_only",
+        "notes_in_scope": 47,
+        "notes_searched": 5,
+        "notes_read_in_full": 0,
+        "queries_run": ["hemoglobin", "Hgb", "\\bHb\\b"],
+        "structured_queries_run": [
+          "measurement WHERE loinc IN ('718-7') AND date BETWEEN lookback",
+          "measurement WHERE concept_name ILIKE '%hemoglobin%'"
+        ],
+        "excluded": []
+      },
+      "schema_validation": { "status": "pass" },
+      "faithfulness_check": { "status": "pass" },
+      "trace_summary": {
+        "skills_invoked": ["extract_lab_value"],
+        "tools_used": [
+          { "tool": "omop_query", "n_calls": 2 },
+          { "tool": "search_notes", "n_calls": 3 }
+        ]
+      },
+      "reasoning_summary": "Queried OMOP measurements for hemoglobin (LOINC 718-7) in the 24-month lookback. One result: 13.4 g/dL on 2025-09-12 (pre-biopsy panel). Note grep for 'Hgb'/'hemoglobin' across the 5 in-scope clinical notes surfaced no additional values. Reported the single lowest (and only) value."
+    },
+    {
+      "field_id": "icd_lung_cancer_present",
+      "answer": "no",
+      "confidence": "low",
+      "missingness_reason": "not_documented",
+      "applied_rule": "ICD-10-CM C34.* family. Personal-history Z85.118 does not qualify.",
+      "evidence": [
+        {
+          "source": "omop",
+          "table": "condition_occurrence",
+          "row_id": 14091,
+          "concept_id": 4119911,
+          "concept_name": "Pneumonia (J18.9)",
+          "value": "active",
+          "evidence_date": "2025-08-28"
+        },
+        {
+          "source": "omop",
+          "table": "condition_occurrence",
+          "row_id": 14092,
+          "concept_id": 320128,
+          "concept_name": "Essential hypertension (I10)",
+          "value": "active",
+          "evidence_date": "2025-08-28"
+        },
+        {
+          "source": "omop",
+          "table": "condition_occurrence",
+          "row_id": 14210,
+          "concept_id": 255573,
+          "concept_name": "Chronic obstructive pulmonary disease (J44.9)",
+          "value": "active",
+          "evidence_date": "2025-09-05"
+        }
+      ],
+      "alternatives_considered": [
+        { "value": "yes", "reason_rejected": "No condition_occurrence row in the lookback window mapped to the C34.* family. Closest hits are pneumonia (J18.9), hypertension (I10), and COPD (J44.9)." }
+      ],
+      "coverage": {
+        "note": "structured_only",
+        "notes_in_scope": 47,
+        "notes_searched": 0,
+        "notes_read_in_full": 0,
+        "queries_run": [],
+        "structured_queries_run": [
+          "condition_occurrence WHERE icd10cm LIKE 'C34.%'",
+          "condition_occurrence WHERE concept_id IN (lung_cancer_concept_set)",
+          "problem_list WHERE active = true"
+        ],
+        "excluded": []
+      },
+      "schema_validation": { "status": "pass" },
+      "faithfulness_check": { "status": "pass" },
+      "trace_summary": {
+        "skills_invoked": ["codes.lookup"],
+        "tools_used": [
+          { "tool": "omop_query", "n_calls": 3 }
+        ]
+      },
+      "reasoning_summary": "I queried condition_occurrence and the active problem list for C34.* and the lung-cancer concept set. Neither returned any rows in the 24-month lookback. Confidence is low because tissue diagnosis was very recent (2025-09-15) and ICD coding for new oncology diagnoses commonly lags by several encounters; absence here is plausibly an artifact of coding latency rather than true absence of disease. A reviewer who weights coding latency may want to override."
+    }
+  ],
+  "derived_assessments": [
+    {
+      "field_id": "pathology_confirms_lung_cancer",
+      "value": true,
+      "derivation_inputs": [
+        { "field_id": "pathology_report_present", "value": "yes" },
+        { "field_id": "pathology_lung_primary", "value": "nsclc" }
+      ]
+    },
+    {
+      "field_id": "clinical_diagnosis_lung_cancer",
+      "value": true,
+      "derivation_inputs": [
+        { "field_id": "imaging_lung_lesion", "value": "yes" },
+        { "field_id": "oncologist_lung_cancer_diagnosis_in_note", "value": "yes" }
+      ]
+    },
+    {
+      "field_id": "pre_treatment_anemia_present",
+      "value": false,
+      "derivation_inputs": [
+        { "field_id": "lowest_hemoglobin_in_window", "value": 13.4 }
+      ]
+    }
+  ],
+  "cross_criterion_alerts": [
+    {
+      "fields": ["pathology_report_present", "pathology_lung_primary", "icd_lung_cancer_present"],
+      "description": "Pathology confirms NSCLC but no C34.* ICD code is present on the chart. This is consistent with coding latency for a diagnosis dated 2025-09-15, but warrants a manual problem-list check before sign-off.",
+      "severity": "warning"
+    },
+    {
+      "fields": ["imaging_lung_lesion"],
+      "description": "Faithfulness check returned `partial` for imaging_lung_lesion. One cited evidence row (discharge summary) contains paraphrased text not present at the cited offset. Verify before approving.",
+      "severity": "error"
+    }
+  ],
+  "final_output": {
+    "field_id": "lung_cancer_status",
+    "value": "confirmed",
+    "derivation_chain": [
+      "pathology_confirms_lung_cancer == true → lung_cancer_status = 'confirmed'"
+    ]
+  },
+  "audit_trail": [
+    { "timestamp": "2026-04-28T09:14:22Z", "step_type": "plan", "payload": { "plan": "Resolve pathology_report_present, then pathology_lung_primary, then imaging, then oncologist note, then ICD; finally derive lung_cancer_status." }, "model_version": "claude-3.7-sonnet", "prompt_version": "phenotype_v12" },
+    { "timestamp": "2026-04-28T09:14:24Z", "step_type": "skill_invocation", "payload": { "skill": "document.locate", "field_id": "pathology_report_present" }, "skill_version": "1.4.0" },
+    { "timestamp": "2026-04-28T09:14:24Z", "step_type": "tool_call", "payload": { "tool": "omop_query", "args": { "table": "document", "filter": "type IN pathology" } }, "tool_version": "omop-q-2.1" },
+    { "timestamp": "2026-04-28T09:14:25Z", "step_type": "tool_result", "payload": { "n_rows": 1, "row_ids": [4421] } },
+    { "timestamp": "2026-04-28T09:14:25Z", "step_type": "tool_call", "payload": { "tool": "fetch_note_full", "args": { "note_id": "note_path_001" } }, "tool_version": "notes-1.3" },
+    { "timestamp": "2026-04-28T09:14:26Z", "step_type": "tool_result", "payload": { "note_id": "note_path_001", "chars": 1891 } },
+    { "timestamp": "2026-04-28T09:14:27Z", "step_type": "skill_result", "payload": { "skill": "document.locate", "result": "found_one_qualifying" } },
+    { "timestamp": "2026-04-28T09:14:27Z", "step_type": "answer", "payload": { "field_id": "pathology_report_present", "value": "yes", "confidence": "high" } },
+    { "timestamp": "2026-04-28T09:14:28Z", "step_type": "self_check", "payload": { "field_id": "pathology_report_present", "schema": "pass", "faithfulness": "pass" } },
+
+    { "timestamp": "2026-04-28T09:14:30Z", "step_type": "skill_invocation", "payload": { "skill": "histology.map_who", "field_id": "pathology_lung_primary" }, "skill_version": "1.2.1" },
+    { "timestamp": "2026-04-28T09:14:31Z", "step_type": "tool_call", "payload": { "tool": "search_notes", "args": { "note_id": "note_path_001", "query": "synoptic" } } },
+    { "timestamp": "2026-04-28T09:14:31Z", "step_type": "tool_result", "payload": { "matches": 1 } },
+    { "timestamp": "2026-04-28T09:14:32Z", "step_type": "answer", "payload": { "field_id": "pathology_lung_primary", "value": "nsclc", "confidence": "high" } },
+    { "timestamp": "2026-04-28T09:14:33Z", "step_type": "self_check", "payload": { "field_id": "pathology_lung_primary", "schema": "pass", "faithfulness": "pass" } },
+
+    { "timestamp": "2026-04-28T09:14:35Z", "step_type": "skill_invocation", "payload": { "skill": "imaging.qualify", "field_id": "imaging_lung_lesion" }, "skill_version": "1.1.0" },
+    { "timestamp": "2026-04-28T09:14:36Z", "step_type": "tool_call", "payload": { "tool": "search_notes", "args": { "query": "spiculated" } } },
+    { "timestamp": "2026-04-28T09:14:36Z", "step_type": "tool_result", "payload": { "matches": 2 } },
+    { "timestamp": "2026-04-28T09:14:37Z", "step_type": "tool_call", "payload": { "tool": "fetch_note_full", "args": { "note_id": "note_ct_001" } } },
+    { "timestamp": "2026-04-28T09:14:38Z", "step_type": "tool_result", "payload": { "note_id": "note_ct_001", "chars": 1835 } },
+    { "timestamp": "2026-04-28T09:14:39Z", "step_type": "answer", "payload": { "field_id": "imaging_lung_lesion", "value": "yes", "confidence": "medium" } },
+    { "timestamp": "2026-04-28T09:14:40Z", "step_type": "self_check", "payload": { "field_id": "imaging_lung_lesion", "schema": "pass", "faithfulness": "partial", "details": ["Discharge summary citation paraphrased; cited offset does not match note text."] } },
+
+    { "timestamp": "2026-04-28T09:14:42Z", "step_type": "skill_invocation", "payload": { "skill": "clinical_diagnosis.locate", "field_id": "oncologist_lung_cancer_diagnosis_in_note" }, "skill_version": "1.0.5" },
+    { "timestamp": "2026-04-28T09:14:43Z", "step_type": "tool_call", "payload": { "tool": "fetch_note_full", "args": { "note_id": "note_onc_001" } } },
+    { "timestamp": "2026-04-28T09:14:44Z", "step_type": "tool_result", "payload": { "note_id": "note_onc_001", "chars": 2358 } },
+    { "timestamp": "2026-04-28T09:14:45Z", "step_type": "tool_call", "payload": { "tool": "fetch_note_full", "args": { "note_id": "note_pulm_001" } } },
+    { "timestamp": "2026-04-28T09:14:46Z", "step_type": "tool_result", "payload": { "note_id": "note_pulm_001", "chars": 1270 } },
+    { "timestamp": "2026-04-28T09:14:47Z", "step_type": "answer", "payload": { "field_id": "oncologist_lung_cancer_diagnosis_in_note", "value": "yes", "confidence": "high" } },
+    { "timestamp": "2026-04-28T09:14:48Z", "step_type": "self_check", "payload": { "field_id": "oncologist_lung_cancer_diagnosis_in_note", "schema": "pass", "faithfulness": "pass" } },
+
+    { "timestamp": "2026-04-28T09:14:50Z", "step_type": "skill_invocation", "payload": { "skill": "codes.lookup", "field_id": "icd_lung_cancer_present" }, "skill_version": "0.9.4" },
+    { "timestamp": "2026-04-28T09:14:51Z", "step_type": "tool_call", "payload": { "tool": "omop_query", "args": { "filter": "icd10cm LIKE 'C34.%'" } } },
+    { "timestamp": "2026-04-28T09:14:51Z", "step_type": "tool_result", "payload": { "n_rows": 0 } },
+    { "timestamp": "2026-04-28T09:14:52Z", "step_type": "answer", "payload": { "field_id": "icd_lung_cancer_present", "value": "no", "confidence": "low" } },
+    { "timestamp": "2026-04-28T09:14:53Z", "step_type": "self_check", "payload": { "field_id": "icd_lung_cancer_present", "schema": "pass", "faithfulness": "pass" } },
+
+    { "timestamp": "2026-04-28T09:14:55Z", "step_type": "answer", "payload": { "derived": "pathology_confirms_lung_cancer", "value": true } },
+    { "timestamp": "2026-04-28T09:14:55Z", "step_type": "answer", "payload": { "derived": "clinical_diagnosis_lung_cancer", "value": true } },
+    { "timestamp": "2026-04-28T09:14:55Z", "step_type": "answer", "payload": { "derived": "lung_cancer_status", "value": "confirmed" } }
+  ],
+  "reviewer_overrides": []
+}

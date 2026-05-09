@@ -1,0 +1,30 @@
+INDIANA RADIOLOGY ASSOCIATES
+CT CHEST WITH CONTRAST
+Date: 2024-11-12
+Patient: Margaret L. Hoover  DOB: 1956-03-14  MRN: 881042
+Ordering Physician: Dr. Patricia Kwan, MD (Internal Medicine)
+Indication: Hemoptysis x 3 weeks; 30 pack-year smoking history.
+
+TECHNIQUE:
+Helical CT of the chest obtained with intravenous contrast (100 mL Omnipaque 350) following standard dose-reduction protocol. Multiplanar reformations reviewed.
+
+FINDINGS:
+Lungs: A 2.9 x 2.4 cm spiculated mass is identified in the right upper lobe posterior segment. The mass demonstrates irregular, stellate margins with pleural tethering. Mild post-obstructive atelectasis is present in the adjacent subsegmental bronchus. No satellite nodules identified.
+
+Lymph nodes: A 1.4 cm right paratracheal lymph node (station 4R) and a 1.1 cm right hilar lymph node are noted, both with short-axis enlargement and rounded morphology suspicious for nodal involvement. No contralateral mediastinal adenopathy.
+
+Airways: Patent central airways. No endobronchial lesion identified on CT.
+
+Pleura/chest wall: No pleural effusion. No pneumothorax.
+
+Cardiovascular: Coronary artery calcification, moderate. Heart size normal.
+
+Abdomen (imaged): Liver, spleen, adrenals unremarkable on limited views.
+
+IMPRESSION:
+1. 2.9 x 2.4 cm spiculated right upper lobe mass — highly suspicious for primary lung malignancy. Tissue sampling strongly recommended.
+2. Right paratracheal and hilar lymphadenopathy, suspicious for regional nodal involvement.
+3. Recommend PET/CT and pulmonary/thoracic surgery consultation for staging and biopsy planning.
+
+Electronically signed: Dr. Samuel T. Prentice, MD (Diagnostic Radiology)
+Date/Time: 2024-11-12  16:42

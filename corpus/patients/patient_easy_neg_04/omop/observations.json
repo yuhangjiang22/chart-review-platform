@@ -1,0 +1,12 @@
+[
+  {
+    "row_id": "540001",
+    "observation_id": 540001,
+    "person_id": "patient_easy_neg_04",
+    "observation_concept_name": "Tobacco smoking status",
+    "observation_date": "2025-08-06",
+    "value_as_string": "Former smoker",
+    "snomed_code": "8517006",
+    "note": "35 pack-years, quit 1990"
+  }
+]

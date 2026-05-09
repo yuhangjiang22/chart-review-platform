@@ -1,0 +1,16 @@
+{
+  "task_id": "lung-cancer-phe-fixed",
+  "phase": "drafting",
+  "sample_mode": false,
+  "conversation_cursor": 0,
+  "last_activity_at": "2026-05-07T16:17:14.026Z",
+  "phase_markers": {
+    "intake": "locked",
+    "output_shape": "locked",
+    "population": "locked",
+    "criteria": "locked",
+    "evidence": "locked",
+    "edge_cases": "locked",
+    "codes": "locked"
+  }
+}

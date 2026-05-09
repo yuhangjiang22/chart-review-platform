@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chart-review-platform/contracts/task-meta.schema.json",
+  "title": "TaskMeta",
+  "description": "On-disk meta.yaml emitted by chart-review-build, consumed by the loader.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "task_type",
+    "review_unit",
+    "manual_version",
+    "index_anchor",
+    "time_windows",
+    "final_output",
+    "overview_prose"
+  ],
+  "properties": {
+    "task_type": {
+      "type": "string",
+      "enum": ["phenotype_validation", "cohort_classification", "outcome_adjudication"]
+    },
+    "review_unit": {
+      "type": "string",
+      "enum": ["patient", "encounter", "episode", "event"]
+    },
+    "manual_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "index_anchor": {
+      "type": "string",
+      "minLength": 1
+    },
+    "time_windows": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "anchor", "start_offset", "end_offset"],
+        "properties": {
+          "id": { "type": "string" },
+          "anchor": { "type": "string" },
+          "start_offset": { "type": "string" },
+          "end_offset": { "type": "string" },
+          "label": { "type": "string" }
+        }
+      }
+    },
+    "final_output": {
+      "type": "string",
+      "description": "field_id of the criterion that holds the final answer.",
+      "minLength": 1
+    },
+    "overview_prose": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_id": { "type": "string" },
+    "denominator": { "type": "string" },
+    "index_event": { "type": "string" },
+    "output_shape": {
+      "type": "string",
+      "enum": ["outcome-first", "evidence-first", "timeline", "hybrid", "narrative"]
+    },
+    "overview_prose_check": {
+      "type": "string",
+      "enum": ["skip"],
+      "description": "Optional. Set to 'skip' to suppress the overview_prose trajectory-residue heuristic for this task (e.g. when reversion language is intentional documentation)."
+    }
+  }
+}

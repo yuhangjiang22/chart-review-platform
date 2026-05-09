@@ -1,0 +1,29 @@
+task_type: outcome_adjudication
+review_unit: patient
+manual_version: '2026-05-07-draft'
+index_anchor: drug_start_date
+time_windows:
+  - id: peri_drug
+    anchor: index_anchor
+    start_offset: -P30D
+    end_offset: P180D
+    label: 30 days before drug start through 180 days after (covers onset and resolution windows)
+final_output: rucam_causality_category
+overview_prose: |
+  Score the causality of a suspected drug-induced liver injury (DILI) event
+  using a v0 subset of the Roussel Uclaf Causality Assessment Method (RUCAM,
+  Danan & Teschke 2016 update). v0 covers hepatocellular pattern only and
+  five of the seven canonical RUCAM components: time to onset, course of
+  ALT after stopping the drug, alternative causes workup, prior known
+  hepatotoxicity of the drug, and the R-ratio pattern (used to confirm
+  hepatocellular). Risk factors, concomitant drugs, and rechallenge are
+  deferred to v1.
+
+  Population: patients with suspected DILI — that is, ALT or ALP elevation
+  with documented exposure to a candidate drug, where the chart reflects an
+  active workup or causality discussion.
+  Index date: the drug-start date for the suspect drug.
+
+  Output: one of {excluded, unlikely, possible, probable, highly_probable}
+  per RUCAM total-score thresholds. Total range with this v0 subset is
+  approximately −10 to +9 (full RUCAM caps at +14).

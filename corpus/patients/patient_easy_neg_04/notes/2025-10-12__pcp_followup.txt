@@ -1,0 +1,30 @@
+DATE: 2025-10-12
+PATIENT: Male, 80 years old
+PROVIDER: Dr. J. Tran, MD — Primary Care
+VISIT TYPE: Follow-up — Atrial Fibrillation / HFpEF Post-Cardiology
+
+INTERVAL HISTORY:
+Mr. [W.] returns following his cardiology consultation on 2025-08-29. He was started on furosemide 20 mg daily and has noted significant improvement in ankle swelling and exertional dyspnea. He is now ambulating 3-4 blocks without significant dyspnea. He is monitoring his weight daily at home. He denies any new symptoms. No chest pain, no palpitations beyond baseline AF. No fevers or weight loss. No cough or respiratory symptoms.
+
+PHYSICAL EXAM:
+VS: BP 126/74 mmHg, HR 80 bpm (irregular), SpO2 97% RA, Weight 178 lbs (down 6 lbs from August)
+Cardiovascular: Irregularly irregular. No S3. No murmur.
+Pulmonary: Clear to auscultation bilaterally, no crackles.
+Extremities: No peripheral edema.
+
+LABS (drawn 2025-10-01):
+- BNP: 145 pg/mL (improved from 310)
+- CMP: Cr 1.5 (stable), K 4.0, Na 139
+- CBC: Normal
+
+ASSESSMENT AND PLAN:
+1. Atrial fibrillation with HFpEF — symptomatically improved.
+   - Continue furosemide 20 mg daily. Reinforce daily weights.
+   - Continue metoprolol succinate 50 mg daily, apixaban 5 mg BID.
+   - Follow up with cardiology in 6 weeks per their plan.
+2. Hypertension — well-controlled. Continue lisinopril 5 mg daily.
+3. Hyperlipidemia — continue atorvastatin. Lipid panel due in 3 months.
+4. CKD 3a — creatinine stable. Avoid nephrotoxins.
+5. Preventive — pneumococcal vaccine up to date. Shingrix series completed. Influenza vaccine administered today.
+
+Next PCP visit in 3 months.

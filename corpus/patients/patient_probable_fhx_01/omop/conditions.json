@@ -1,0 +1,7 @@
+[
+  { "row_id": 5101, "concept_id": 320128, "concept_name": "Essential hypertension", "icd10cm": "I10", "status": "active", "date": "2015-06-01" },
+  { "row_id": 5102, "concept_id": 4193869, "concept_name": "Personal history of malignant neoplasm of bronchus and lung", "icd10cm": "Z85.118", "status": "active", "date": "2017-03-15" },
+  { "row_id": 5103, "concept_id": 4234254, "concept_name": "Personal history of malignant neoplasm of large intestine", "icd10cm": "Z85.038", "status": "active", "date": "2019-09-12" },
+  { "row_id": 5104, "concept_id": 4119911, "concept_name": "Cough, chronic", "icd10cm": "R05.3", "status": "active", "date": "2024-11-08" },
+  { "row_id": 5105, "concept_id": 4242415, "concept_name": "Unintentional weight loss", "icd10cm": "R63.4", "status": "active", "date": "2024-11-08" }
+]

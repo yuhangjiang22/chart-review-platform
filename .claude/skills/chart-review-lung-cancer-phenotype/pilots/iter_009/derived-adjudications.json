@@ -1,0 +1,446 @@
+[
+  {
+    "patient_id": "patient_easy_probable_02",
+    "field_id": "pathology_confirms_lung_cancer",
+    "iter_id": "iter_009",
+    "agent_1": {
+      "answer_match_human": true,
+      "evidence_overlap_jaccard": 1,
+      "notes_read_jaccard": 1,
+      "human_evidence_seen_by_agent": true,
+      "classification": "correct",
+      "rationale_short": "Agent 1 matches the human answer and rationale exactly, with identical derived logic."
+    },
+    "agent_2": {
+      "answer_match_human": true,
+      "evidence_overlap_jaccard": 1,
+      "notes_read_jaccard": 1,
+      "human_evidence_seen_by_agent": true,
+      "classification": "correct",
+      "rationale_short": "Agent 2 matches the human answer and rationale exactly, with identical derived logic."
+    },
+    "pair": {
+      "classification": "both_correct"
+    },
+    "gap_signal": {
+      "candidate": false,
+      "reason": "Both agents and the human agree; the criterion and derivation logic are unambiguous.",
+      "suggested_revision": null
+    },
+    "trajectory_features": {
+      "notes_unique_to_agent_1": [],
+      "notes_unique_to_agent_2": [],
+      "notes_only_human_cited": []
+    },
+    "reviewer_comment": null,
+    "classifier": {
+      "model": "claude-sonnet-4-6",
+      "ts": "2026-05-07T19:34:01.704Z",
+      "cost_usd": 0.007883999999999999
+    }
+  },
+  {
+    "patient_id": "patient_easy_probable_02",
+    "field_id": "oncologist_lung_cancer_diagnosis_in_note",
+    "iter_id": "iter_009",
+    "agent_1": {
+      "answer_match_human": true,
+      "evidence_overlap_jaccard": 0.5,
+      "notes_read_jaccard": 1,
+      "human_evidence_seen_by_agent": true,
+      "classification": "correct",
+      "rationale_short": "Agent 1 correctly identified the diagnosis with the same primary evidence span as the human, plus one additional supporting span."
+    },
+    "agent_2": {
+      "answer_match_human": true,
+      "evidence_overlap_jaccard": 1,
+      "notes_read_jaccard": 1,
+      "human_evidence_seen_by_agent": true,
+      "classification": "correct",
+      "rationale_short": "Agent 2 exactly matched the human's answer, evidence span, and rationale."
+    },
+    "pair": {
+      "classification": "both_correct"
+    },
+    "gap_signal": {
+      "candidate": false,
+      "reason": "Both agents and the human agree; no ambiguity or rubric gap detected.",
+      "suggested_revision": null
+    },
+    "trajectory_features": {
+      "notes_unique_to_agent_1": [],
+      "notes_unique_to_agent_2": [],
+      "notes_only_human_cited": []
+    },
+    "reviewer_comment": null,
+    "classifier": {
+      "model": "claude-sonnet-4-6",
+      "ts": "2026-05-07T19:34:02.369Z",
+      "cost_usd": 0.011289
+    }
+  },
+  {
+    "patient_id": "patient_easy_probable_02",
+    "field_id": "cytology_supports_lung_primary",
+    "iter_id": "iter_009",
+    "agent_1": {
+      "answer_match_human": true,
+      "evidence_overlap_jaccard": 1,
+      "notes_read_jaccard": 1,
+      "human_evidence_seen_by_agent": true,
+      "classification": "correct",
+      "rationale_short": "Agent 1 matches the human answer and cites exactly the same evidence note and span."
+    },
+    "agent_2": {
+      "answer_match_human": true,
+      "evidence_overlap_jaccard": 0,
+      "notes_read_jaccard": 0,
+      "human_evidence_seen_by_agent": false,
+      "classification": "right_answer_wrong_evidence",
+      "rationale_short": "Agent 2 reaches the correct answer (false/no) but provides no evidence citation, missing the pulmonology consult note the human referenced."
+    },
+    "pair": {
+      "classification": "both_correct"
+    },
+    "gap_signal": {
+      "candidate": false,
+      "reason": "Both agents agree with the human answer; no ambiguity in the criterion or rubric.",
+      "suggested_revision": null
+    },
+    "trajectory_features": {
+      "notes_unique_to_agent_1": [
+        "2025-06-10__pulmonology_consult"
+      ],
+      "notes_unique_to_agent_2": [],
+      "notes_only_human_cited": []
+    },
+    "reviewer_comment": null,
+    "classifier": {
+      "model": "claude-sonnet-4-6",
+      "ts": "2026-05-07T19:34:02.391Z",
+      "cost_usd": 0.01035
+    }
+  },
+  {
+    "patient_id": "patient_easy_probable_02",
+    "field_id": "lung_cancer_status",
+    "iter_id": "iter_009",
+    "agent_1": {
+      "answer_match_human": true,
+      "evidence_overlap_jaccard": 1,
+      "notes_read_jaccard": 0,
+      "human_evidence_seen_by_agent": false,
+      "classification": "correct",
+      "rationale_short": "Agent 1 matches the human answer of 'absent' with identical rationale."
+    },
+    "agent_2": {
+      "answer_match_human": false,
+      "evidence_overlap_jaccard": 0,
+      "notes_read_jaccard": 0,
+      "human_evidence_seen_by_agent": false,
+      "classification": "wrong_answer_clear_rule",
+      "rationale_short": "Agent 2 returned 'probable' instead of 'absent', contradicting the derived logic applied by the human."
+    },
+    "pair": {
+      "classification": "one_wrong"
+    },
+    "gap_signal": {
+      "candidate": false,
+      "reason": "The derivation rule is explicit and unambiguous; Agent 2's error is a straightforward misapplication, not a guideline gap.",
+      "suggested_revision": null
+    },
+    "trajectory_features": {
+      "notes_unique_to_agent_1": [],
+      "notes_unique_to_agent_2": [],
+      "notes_only_human_cited": []
+    },
+    "reviewer_comment": null,
+    "classifier": {
+      "model": "claude-sonnet-4-6",
+      "ts": "2026-05-07T19:34:02.408Z",
+      "cost_usd": 0.008373
+    }
+  },
+  {
+    "patient_id": "patient_easy_probable_02",
+    "field_id": "icd_lung_cancer_present",
+    "iter_id": "iter_009",
+    "agent_1": {
+      "answer_match_human": true,
+      "evidence_overlap_jaccard": 1,
+      "notes_read_jaccard": 1,
+      "human_evidence_seen_by_agent": true,
+      "classification": "correct",
+      "rationale_short": "Agent 1's answer, evidence note, span offsets, and verbatim quote are identical to the human truth."
+    },
+    "agent_2": {
+      "answer_match_human": true,
+      "evidence_overlap_jaccard": 0.5,
+      "notes_read_jaccard": 1,
+      "human_evidence_seen_by_agent": true,
+      "classification": "right_answer_wrong_evidence",
+      "rationale_short": "Agent 2 correctly answered false/no from the same note but cited a truncated span (1020-1078) rather than the full human-cited span (1020-1161), omitting the working diagnosis clause."
+    },
+    "pair": {
+      "classification": "both_correct"
+    },
+    "gap_signal": {
+      "candidate": false,
+      "reason": "Both agents reached the correct answer; no ambiguity in the criterion text was exposed.",
+      "suggested_revision": null
+    },
+    "trajectory_features": {
+      "notes_unique_to_agent_1": [],
+      "notes_unique_to_agent_2": [],
+      "notes_only_human_cited": []
+    },
+    "reviewer_comment": null,
+    "classifier": {
+      "model": "claude-sonnet-4-6",
+      "ts": "2026-05-07T19:34:02.657Z",
+      "cost_usd": 0.011682000000000001
+    }
+  },
+  {
+    "patient_id": "patient_easy_probable_02",
+    "field_id": "clinical_diagnosis_lung_cancer",
+    "iter_id": "iter_009",
+    "agent_1": {
+      "answer_match_human": true,
+      "evidence_overlap_jaccard": 1,
+      "notes_read_jaccard": 0,
+      "human_evidence_seen_by_agent": false,
+      "classification": "correct",
+      "rationale_short": "Agent 1 matches the human answer (false) with identical derived rationale."
+    },
+    "agent_2": {
+      "answer_match_human": false,
+      "evidence_overlap_jaccard": 1,
+      "notes_read_jaccard": 0,
+      "human_evidence_seen_by_agent": false,
+      "classification": "wrong_answer_clear_rule",
+      "rationale_short": "Agent 2 returned true despite the derived logic yielding the same component flags, contradicting the human-approved false answer."
+    },
+    "pair": {
+      "classification": "one_wrong"
+    },
+    "gap_signal": {
+      "candidate": true,
+      "reason": "Both agents use identical rationale text (imaging_lung_lesion==yes AND oncologist_lung_cancer_diagnosis_in_note==yes) yet produce opposite boolean answers, suggesting the criterion or derivation logic does not clearly specify how these sub-flags map to the final boolean, making it easy for agents to invert the result.",
+      "suggested_revision": "## Suggested Revision\n\nAdd an explicit mapping note to the criterion:\n\n> **clinical_diagnosis_lung_cancer** is `true` if and only if BOTH `imaging_lung_lesion == 'yes'` AND `oncologist_lung_cancer_diagnosis_in_note == 'yes'`. If the derived field evaluates to `false` (e.g., either sub-flag is not 'yes'), the final answer must be `false`. Implementations must propagate the derived boolean without inversion."
+    },
+    "trajectory_features": {
+      "notes_unique_to_agent_1": [],
+      "notes_unique_to_agent_2": [],
+      "notes_only_human_cited": []
+    },
+    "reviewer_comment": null,
+    "classifier": {
+      "model": "claude-sonnet-4-6",
+      "ts": "2026-05-07T19:34:05.685Z",
+      "cost_usd": 0.010629000000000001
+    }
+  },
+  {
+    "patient_id": "patient_easy_probable_02",
+    "field_id": "imaging_lung_lesion",
+    "iter_id": "iter_009",
+    "agent_1": {
+      "answer_match_human": true,
+      "evidence_overlap_jaccard": 1,
+      "notes_read_jaccard": 1,
+      "human_evidence_seen_by_agent": true,
+      "classification": "correct",
+      "rationale_short": "Agent 1's answer, evidence spans, and rationale exactly match the human reviewer's approved assessment."
+    },
+    "agent_2": {
+      "answer_match_human": true,
+      "evidence_overlap_jaccard": 0.25,
+      "notes_read_jaccard": 1,
+      "human_evidence_seen_by_agent": true,
+      "classification": "right_answer_wrong_evidence",
+      "rationale_short": "Agent 2 correctly answers true but cites only one partial evidence span from the CT chest note, missing the Lung-RADS 4X impression and hilar node findings cited by the human reviewer."
+    },
+    "pair": {
+      "classification": "one_wrong"
+    },
+    "gap_signal": {
+      "candidate": false,
+      "reason": "Both agents reach the correct answer; the discrepancy is in evidence completeness, not a guideline ambiguity.",
+      "suggested_revision": null
+    },
+    "trajectory_features": {
+      "notes_unique_to_agent_1": [],
+      "notes_unique_to_agent_2": [],
+      "notes_only_human_cited": []
+    },
+    "reviewer_comment": null,
+    "classifier": {
+      "model": "claude-sonnet-4-6",
+      "ts": "2026-05-07T19:34:06.387Z",
+      "cost_usd": 0.013842
+    }
+  },
+  {
+    "patient_id": "patient_easy_probable_02",
+    "field_id": "lowest_hemoglobin_in_window",
+    "iter_id": "iter_009",
+    "agent_1": {
+      "answer_match_human": false,
+      "evidence_overlap_jaccard": 1,
+      "notes_read_jaccard": 1,
+      "human_evidence_seen_by_agent": true,
+      "classification": "wrong_answer_gap_arguable",
+      "rationale_short": "Agent 1 answered null instead of no_info, which differs from the human's no_info answer, though both convey the same absence-of-data meaning — the distinction is a schema/semantic gap."
+    },
+    "agent_2": {
+      "answer_match_human": true,
+      "evidence_overlap_jaccard": 1,
+      "notes_read_jaccard": 1,
+      "human_evidence_seen_by_agent": true,
+      "classification": "correct",
+      "rationale_short": "Agent 2's answer (no_info), evidence, and rationale exactly match the human reviewer's assessment."
+    },
+    "pair": {
+      "classification": "one_wrong"
+    },
+    "gap_signal": {
+      "candidate": true,
+      "reason": "The criterion does not distinguish between a null numeric answer and a categorical no_info answer; Agent 1 used null (a numeric absence) while Agent 2 and the human used no_info (an explicit categorical value), suggesting the guideline should clarify which value to use when no measurement exists.",
+      "suggested_revision": "## Suggested revision\nAdd to the criterion text:\n> When no hemoglobin measurement is found in the lookback window, record the answer as `no_info` (not a numeric `null`). Use `null` only if the field is intentionally left blank due to a data extraction error."
+    },
+    "trajectory_features": {
+      "notes_unique_to_agent_1": [],
+      "notes_unique_to_agent_2": [],
+      "notes_only_human_cited": []
+    },
+    "reviewer_comment": null,
+    "classifier": {
+      "model": "claude-sonnet-4-6",
+      "ts": "2026-05-07T19:34:06.431Z",
+      "cost_usd": 0.011346
+    }
+  },
+  {
+    "patient_id": "patient_easy_probable_02",
+    "field_id": "pre_treatment_anemia_present",
+    "iter_id": "iter_009",
+    "agent_1": {
+      "answer_match_human": true,
+      "evidence_overlap_jaccard": 1,
+      "notes_read_jaccard": 1,
+      "human_evidence_seen_by_agent": true,
+      "classification": "correct",
+      "rationale_short": "Agent 1's answer and rationale exactly match the human truth (auto-derived false)."
+    },
+    "agent_2": {
+      "answer_match_human": true,
+      "evidence_overlap_jaccard": 1,
+      "notes_read_jaccard": 1,
+      "human_evidence_seen_by_agent": true,
+      "classification": "correct",
+      "rationale_short": "Agent 2's answer and rationale exactly match the human truth (auto-derived false)."
+    },
+    "pair": {
+      "classification": "both_correct"
+    },
+    "gap_signal": {
+      "candidate": false,
+      "reason": "Both agents and the human agree; no ambiguity or gap in the guideline detected.",
+      "suggested_revision": null
+    },
+    "trajectory_features": {
+      "notes_unique_to_agent_1": [],
+      "notes_unique_to_agent_2": [],
+      "notes_only_human_cited": []
+    },
+    "reviewer_comment": null,
+    "classifier": {
+      "model": "claude-sonnet-4-6",
+      "ts": "2026-05-07T19:34:10.004Z",
+      "cost_usd": 0.008025000000000001
+    }
+  },
+  {
+    "patient_id": "patient_easy_probable_02",
+    "field_id": "pathology_lung_primary",
+    "iter_id": "iter_009",
+    "agent_1": {
+      "answer_match_human": true,
+      "evidence_overlap_jaccard": 1,
+      "notes_read_jaccard": 1,
+      "human_evidence_seen_by_agent": true,
+      "classification": "correct",
+      "rationale_short": "Agent 1 matches the human answer and cites exactly the same evidence with matching span offsets and verbatim quote."
+    },
+    "agent_2": {
+      "answer_match_human": true,
+      "evidence_overlap_jaccard": 0,
+      "notes_read_jaccard": 0,
+      "human_evidence_seen_by_agent": false,
+      "classification": "right_answer_wrong_evidence",
+      "rationale_short": "Agent 2 reached the correct 'not_applicable' answer but provided no evidence, whereas the human cited a specific span from the pulmonology consult note."
+    },
+    "pair": {
+      "classification": "one_wrong"
+    },
+    "gap_signal": {
+      "candidate": false,
+      "reason": "Both agents produced the correct answer; the only difference is Agent 2 omitted evidence. No guideline ambiguity detected.",
+      "suggested_revision": null
+    },
+    "trajectory_features": {
+      "notes_unique_to_agent_1": [
+        "2025-06-10__pulmonology_consult"
+      ],
+      "notes_unique_to_agent_2": [],
+      "notes_only_human_cited": []
+    },
+    "reviewer_comment": null,
+    "classifier": {
+      "model": "claude-sonnet-4-6",
+      "ts": "2026-05-07T19:34:11.279Z",
+      "cost_usd": 0.010644
+    }
+  },
+  {
+    "patient_id": "patient_easy_probable_02",
+    "field_id": "pathology_report_present",
+    "iter_id": "iter_009",
+    "agent_1": {
+      "answer_match_human": true,
+      "evidence_overlap_jaccard": 1,
+      "notes_read_jaccard": 1,
+      "human_evidence_seen_by_agent": true,
+      "classification": "correct",
+      "rationale_short": "Agent 1 matches the human answer exactly with identical evidence quotes and rationale from the same note."
+    },
+    "agent_2": {
+      "answer_match_human": true,
+      "evidence_overlap_jaccard": 0.33,
+      "notes_read_jaccard": 1,
+      "human_evidence_seen_by_agent": true,
+      "classification": "right_answer_wrong_evidence",
+      "rationale_short": "Agent 2 correctly answered false but cited only one of the two human evidence spans and used a slightly different offset range."
+    },
+    "pair": {
+      "classification": "both_correct"
+    },
+    "gap_signal": {
+      "candidate": false,
+      "reason": "Both agents agree with the human on a clear factual finding; no ambiguity in the guideline.",
+      "suggested_revision": null
+    },
+    "trajectory_features": {
+      "notes_unique_to_agent_1": [],
+      "notes_unique_to_agent_2": [],
+      "notes_only_human_cited": []
+    },
+    "reviewer_comment": null,
+    "classifier": {
+      "model": "claude-sonnet-4-6",
+      "ts": "2026-05-07T19:34:13.181Z",
+      "cost_usd": 0.011805
+    }
+  }
+]

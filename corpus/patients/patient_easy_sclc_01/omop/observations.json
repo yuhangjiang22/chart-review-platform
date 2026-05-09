@@ -1,0 +1,14 @@
+[
+  {
+    "row_id": "210008",
+    "observation_id": 210008,
+    "person_id": "sclc_01",
+    "observation_concept_id": 4275495,
+    "observation_concept_name": "Tobacco smoking status",
+    "observation_date": "2024-09-30",
+    "value_as_string": "Current every day smoker",
+    "observation_source_value": "current_smoker",
+    "observation_type_concept_id": 32817,
+    "qualifier_source_value": "55 pack-years"
+  }
+]

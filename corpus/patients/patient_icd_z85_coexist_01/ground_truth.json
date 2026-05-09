@@ -1,0 +1,20 @@
+{
+  "patient_id": "patient_icd_z85_coexist_01",
+  "category": "icd_only",
+  "lung_cancer_status": "probable",
+  "leaf_answers": {
+    "pathology_report_present": "no",
+    "pathology_lung_primary": "not_applicable",
+    "cytology_supports_lung_primary": "no",
+    "imaging_lung_lesion": "no",
+    "oncologist_lung_cancer_diagnosis_in_note": "no",
+    "icd_lung_cancer_present": "yes"
+  },
+  "applicability": {
+    "pathology_lung_primary": "not_applicable",
+    "cytology_supports_lung_primary": "applicable"
+  },
+  "expected_contradicting_evidence_fields": [],
+  "difficulty": "hard",
+  "difficulty_notes": "Hand-crafted. C34.10 code on recent ER discharge problem list (added by an internist for billing during a non-oncology admission). Legacy Z85.118 personal-history code from prior chart from a different visit. No surgical pathology, no suspicious imaging in the lookback window, no oncologist note in the lookback window. Final = probable solely via the icd_lung_cancer_present='yes' path. Tests that the agent counts C34.10 even when Z85.118 also appears."
+}

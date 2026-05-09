@@ -1,0 +1,1193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Dual-agent adjudication — primary mockup</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT,WONK@9..144,300..900,0..100,0..1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+  rel="stylesheet"
+/>
+<style>
+  /* ── Tokens (mirror the v2 Studio palette) ────────────────── */
+  :root {
+    --paper: hsl(40 24% 97%);
+    --card: hsl(0 0% 100%);
+    --ink: hsl(20 10% 12%);
+    --foreground: hsl(20 10% 18%);
+    --muted-foreground: hsl(20 8% 44%);
+    --border: hsl(28 14% 86%);
+    --border-strong: hsl(28 14% 70%);
+
+    --oxblood: hsl(354 50% 32%);   /* destructive / hard-disagreement / alerts */
+    --sage:    hsl(140 22% 38%);   /* validated / agreement / submit-success */
+    --ochre:   hsl(34 60% 44%);    /* in-progress / soft-disagreement / QA badge */
+    --slate:   hsl(220 16% 38%);   /* neutral agent chip ink */
+
+    --agent1-band: hsl(214 38% 32%); /* deep slate-blue, anonymous */
+    --agent2-band: hsl(176 28% 30%); /* desaturated teal, anonymous */
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--paper);
+    color: var(--foreground);
+    font-family: "Inter", system-ui, sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  code, .mono { font-family: "JetBrains Mono", ui-monospace, monospace; }
+  .display {
+    font-family: "Fraunces", Georgia, serif;
+    font-feature-settings: "tnum" 1;
+    font-variation-settings: "opsz" 60, "SOFT" 60, "WONK" 0;
+    letter-spacing: -0.01em;
+  }
+
+  /* ── Layout shell ─────────────────────────────────────────── */
+  .shell {
+    display: grid;
+    grid-template-columns: 264px 1fr 360px;
+    grid-template-rows: 56px 1fr;
+    height: 100vh;
+    min-height: 720px;
+  }
+  header.topbar {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    padding: 0 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--paper);
+  }
+  .topbar .crumb {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    color: var(--muted-foreground);
+  }
+  .topbar h1 {
+    margin: 0;
+    font-family: "Fraunces", serif;
+    font-variation-settings: "opsz" 36, "SOFT" 60;
+    font-size: 22px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+  }
+  .topbar .meta {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 11.5px;
+    color: var(--muted-foreground);
+  }
+  .topbar .spacer { flex: 1; }
+  .topbar .reviewer {
+    font-size: 11.5px;
+    color: var(--muted-foreground);
+  }
+
+  /* ── Left: patient list ───────────────────────────────────── */
+  aside.patients {
+    border-right: 1px solid var(--border);
+    background: var(--paper);
+    overflow-y: auto;
+  }
+  .pane-header {
+    padding: 14px 16px 8px;
+    border-bottom: 1px solid var(--border);
+    background: var(--paper);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+  .pane-header .label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--muted-foreground);
+  }
+  .pane-header .progress {
+    margin-top: 6px;
+    font-size: 11.5px;
+    color: var(--foreground);
+    font-variant-numeric: tabular-nums;
+  }
+  .pane-header .progress strong {
+    font-family: "Fraunces", serif;
+    font-variation-settings: "opsz" 24;
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--ink);
+  }
+  ul.patient-list { list-style: none; margin: 0; padding: 0; }
+  .patient {
+    display: grid;
+    grid-template-columns: 14px 1fr auto;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 16px;
+    border-bottom: 1px solid hsl(28 14% 92%);
+    cursor: pointer;
+    font-size: 12px;
+    text-decoration: none;
+    color: var(--foreground);
+  }
+  .patient:hover { background: hsl(28 14% 95%); }
+  .patient.active {
+    background: var(--card);
+    border-left: 2px solid var(--oxblood);
+    padding-left: 14px;
+  }
+  .patient .pid { font-family: "JetBrains Mono", monospace; font-size: 12px; }
+  .patient .status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--border-strong);
+  }
+  .patient.done .status-dot { background: var(--sage); }
+  .patient.in-progress .status-dot { background: var(--ochre); }
+  .patient.flagged .status-dot { background: var(--oxblood); }
+  .patient .counter {
+    font-size: 10.5px;
+    color: var(--muted-foreground);
+    font-variant-numeric: tabular-nums;
+    font-family: "JetBrains Mono", monospace;
+  }
+  .patient .qa-tag {
+    display: inline-block;
+    margin-left: 4px;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--ochre);
+    border: 1px solid var(--ochre);
+    padding: 0 4px;
+    border-radius: 2px;
+  }
+
+  /* ── Center: criterion stream ─────────────────────────────── */
+  main.stream {
+    overflow-y: auto;
+    background: var(--paper);
+    position: relative;
+  }
+  .summary-banner {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--paper);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 28px 14px;
+  }
+  .summary-banner .row {
+    display: flex; align-items: baseline; gap: 18px;
+  }
+  .summary-banner .caption {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    color: var(--muted-foreground);
+  }
+  .summary-banner .stat {
+    display: inline-flex; align-items: baseline; gap: 8px;
+  }
+  .summary-banner .stat .v {
+    font-family: "Fraunces", serif;
+    font-variation-settings: "opsz" 60, "SOFT" 50;
+    font-weight: 500;
+    font-size: 32px;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+  .summary-banner .stat .v.disagreed { color: var(--oxblood); }
+  .summary-banner .stat .v.agreed { color: var(--sage); }
+  .summary-banner .stat .l {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--muted-foreground);
+  }
+  .summary-banner .right {
+    margin-left: auto;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .toggle-btn {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--foreground);
+    background: var(--card);
+    border: 1px solid var(--border);
+    padding: 6px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .toggle-btn:hover { border-color: var(--border-strong); }
+  .toggle-btn.primary {
+    background: var(--ink);
+    color: var(--paper);
+    border-color: var(--ink);
+  }
+  .qa-pill {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--ochre);
+    border: 1px solid var(--ochre);
+    background: hsl(34 60% 96%);
+    padding: 3px 8px;
+    border-radius: 3px;
+  }
+
+  /* progress strip under banner */
+  .progress-strip {
+    display: flex; gap: 2px;
+    padding: 0 28px 12px;
+    background: var(--paper);
+    border-bottom: 1px solid var(--border);
+  }
+  .progress-strip .seg {
+    flex: 1;
+    height: 4px;
+    background: hsl(28 14% 90%);
+    border-radius: 1px;
+  }
+  .progress-strip .seg.agreed { background: var(--sage); opacity: 0.6; }
+  .progress-strip .seg.disagreed { background: var(--oxblood); opacity: 0.8; }
+  .progress-strip .seg.resolved { background: var(--sage); }
+  .progress-strip .seg.current {
+    box-shadow: 0 0 0 1px var(--ink);
+  }
+
+  /* criterion sections */
+  .criteria { padding: 8px 28px 80px; }
+  .section-divider {
+    display: flex; align-items: center; gap: 12px;
+    margin: 24px 0 12px;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    color: var(--muted-foreground);
+  }
+  .section-divider::after {
+    content: ""; flex: 1; height: 1px; background: var(--border);
+  }
+
+  .criterion {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    margin-bottom: 12px;
+    overflow: hidden;
+  }
+  .criterion.disagreed { border-left: 3px solid var(--oxblood); }
+  .criterion.disagreed.soft { border-left-color: var(--ochre); }
+  .criterion.agreed { border-left: 3px solid var(--sage); }
+  .criterion.agreed.collapsed .crit-body,
+  .criterion.agreed.collapsed .adjudication { display: none; }
+
+  /* Criterion header row (always visible) */
+  .crit-header {
+    display: grid;
+    grid-template-columns: 18px minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    cursor: pointer;
+    font-size: 12.5px;
+  }
+  .crit-header:hover { background: hsl(40 20% 98%); }
+  .crit-header .chev {
+    font-size: 10px;
+    color: var(--muted-foreground);
+    width: 12px;
+  }
+  .crit-header .id {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 12px;
+    color: var(--ink);
+  }
+  .crit-header .prompt {
+    color: var(--foreground);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .crit-header .answers-mini {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11px;
+  }
+  .crit-header .answers-mini .vs {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--muted-foreground);
+  }
+  .crit-header .badge {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    padding: 2px 7px;
+    border-radius: 2px;
+    border: 1px solid currentColor;
+  }
+  .badge.agreed { color: var(--sage); }
+  .badge.hard { color: var(--oxblood); background: hsl(354 50% 96%); }
+  .badge.soft { color: var(--ochre); background: hsl(34 60% 96%); }
+  .badge.qa   { color: var(--ochre); }
+  .badge.resolved { color: var(--sage); background: hsl(140 22% 96%); }
+
+  /* answer chips inline */
+  .chip {
+    display: inline-block;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 11px;
+    padding: 1px 7px;
+    border-radius: 2px;
+    border: 1px solid currentColor;
+    line-height: 1.5;
+  }
+  .chip.yes     { color: var(--sage);   background: hsl(140 22% 96%); }
+  .chip.no      { color: var(--oxblood);background: hsl(354 50% 96%); }
+  .chip.no_info { color: var(--slate);  background: hsl(220 16% 96%); }
+  .chip.unknown { color: var(--muted-foreground); background: hsl(28 14% 95%); }
+
+  /* Criterion body — two columns */
+  .crit-body {
+    border-top: 1px solid var(--border);
+    background: var(--paper);
+  }
+  .agent-grid {
+    display: grid;
+    grid-template-columns: 1fr 1px 1fr;
+  }
+  .agent-col {
+    padding: 14px 16px 16px;
+    background: var(--card);
+  }
+  .agent-grid .divider {
+    background: var(--border);
+  }
+  .agent-col.discord { background: hsl(354 50% 99%); }
+  .agent-col .agent-band {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 10px;
+  }
+  .agent-col .agent-name {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    color: var(--paper);
+    background: var(--agent1-band);
+    padding: 3px 9px;
+    border-radius: 2px;
+  }
+  .agent-col.a2 .agent-name { background: var(--agent2-band); }
+  .agent-col .conf {
+    font-size: 10.5px;
+    color: var(--muted-foreground);
+    font-variant-numeric: tabular-nums;
+    font-family: "JetBrains Mono", monospace;
+  }
+  .agent-col .answer-row {
+    display: flex; align-items: baseline; gap: 8px;
+    margin-bottom: 10px;
+  }
+  .agent-col .answer-row .lbl {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--muted-foreground);
+  }
+  .agent-col .rationale {
+    font-size: 12px;
+    color: var(--foreground);
+    line-height: 1.55;
+    margin-bottom: 12px;
+    font-style: italic;
+  }
+  .evidence-block {
+    border-top: 1px dashed var(--border);
+    padding-top: 10px;
+  }
+  .evidence-block .lbl {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--muted-foreground);
+    margin-bottom: 6px;
+  }
+  ul.evidence {
+    list-style: none; margin: 0; padding: 0;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  ul.evidence li {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 8px;
+    font-size: 11.5px;
+  }
+  ul.evidence .note-id {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10.5px;
+    color: var(--muted-foreground);
+    background: hsl(28 14% 95%);
+    padding: 1px 5px;
+    border-radius: 2px;
+    height: fit-content;
+    white-space: nowrap;
+    cursor: pointer;
+    border: 1px solid transparent;
+  }
+  ul.evidence .note-id:hover {
+    border-color: var(--border-strong);
+    color: var(--foreground);
+  }
+  ul.evidence .quote {
+    color: var(--foreground);
+    line-height: 1.5;
+    border-left: 2px solid var(--border);
+    padding-left: 8px;
+  }
+  ul.evidence .quote em {
+    background: hsl(34 60% 92%);
+    font-style: normal;
+    padding: 0 2px;
+  }
+
+  /* Adjudication form */
+  .adjudication {
+    border-top: 1px solid var(--border);
+    background: hsl(40 20% 98%);
+    padding: 16px 20px 18px;
+  }
+  .adjudication .title {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 10px;
+  }
+  .adjudication .title .lbl {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    color: var(--muted-foreground);
+  }
+  .adjudication .title .hint {
+    font-size: 11px;
+    color: var(--muted-foreground);
+  }
+  .radio-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 12px;
+    margin-bottom: 12px;
+  }
+  .radio-opt {
+    display: grid;
+    grid-template-columns: 14px 1fr;
+    gap: 10px;
+    align-items: start;
+    padding: 10px 12px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 12.5px;
+  }
+  .radio-opt:hover { border-color: var(--border-strong); }
+  .radio-opt.selected {
+    border-color: var(--ink);
+    box-shadow: inset 0 0 0 1px var(--ink);
+  }
+  .radio-opt .marker {
+    width: 12px; height: 12px;
+    border: 1px solid var(--border-strong);
+    border-radius: 50%;
+    margin-top: 3px;
+  }
+  .radio-opt.selected .marker {
+    background: var(--ink);
+    border-color: var(--ink);
+    box-shadow: inset 0 0 0 2px var(--card);
+  }
+  .radio-opt .opt-title {
+    font-weight: 500;
+    color: var(--ink);
+  }
+  .radio-opt .opt-sub {
+    font-size: 11px;
+    color: var(--muted-foreground);
+    margin-top: 1px;
+  }
+  .radio-opt.gap.selected { border-color: var(--oxblood); box-shadow: inset 0 0 0 1px var(--oxblood); }
+  .radio-opt.gap.selected .marker { background: var(--oxblood); border-color: var(--oxblood); }
+
+  .revision-block {
+    margin-top: 4px;
+  }
+  .revision-block .lbl {
+    display: flex; align-items: baseline; gap: 8px;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--muted-foreground);
+    margin-bottom: 6px;
+  }
+  .revision-block .lbl .req {
+    color: var(--oxblood);
+    text-transform: none;
+    letter-spacing: 0;
+    font-size: 11px;
+    font-style: italic;
+  }
+  textarea.revision {
+    width: 100%;
+    min-height: 76px;
+    resize: vertical;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    background: var(--card);
+    padding: 10px 12px;
+    font-family: inherit;
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: var(--foreground);
+  }
+  textarea.revision:focus {
+    outline: 2px solid var(--ink);
+    outline-offset: -1px;
+    border-color: var(--ink);
+  }
+
+  .form-actions {
+    display: flex; align-items: center; gap: 12px;
+    margin-top: 12px;
+  }
+  .form-actions .submit {
+    background: var(--ink);
+    color: var(--paper);
+    border: none;
+    padding: 8px 16px;
+    border-radius: 3px;
+    font-size: 12px;
+    font-family: inherit;
+    cursor: pointer;
+    letter-spacing: 0.04em;
+  }
+  .form-actions .submit:hover { background: hsl(20 10% 8%); }
+  .form-actions .submit.committed {
+    background: var(--sage);
+    cursor: default;
+  }
+  .form-actions .submit:disabled {
+    background: var(--border-strong);
+    cursor: not-allowed;
+  }
+  .form-actions .secondary {
+    font-size: 11.5px;
+    color: var(--muted-foreground);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-color: var(--border);
+    text-underline-offset: 3px;
+    font-family: inherit;
+  }
+  .form-actions .secondary:hover { color: var(--foreground); }
+  .form-actions .kbd {
+    margin-left: auto;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10.5px;
+    color: var(--muted-foreground);
+  }
+  .form-actions .kbd kbd {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-bottom-width: 2px;
+    padding: 1px 5px;
+    border-radius: 2px;
+    font-size: 10px;
+    margin: 0 2px;
+  }
+
+  /* Compact agreed row (collapsed default) */
+  .crit-header.agreed-collapsed {
+    background: hsl(140 12% 98%);
+  }
+
+  /* QA force-expanded — different background tint */
+  .criterion.qa-sample {
+    border-left: 3px solid var(--ochre);
+  }
+  .criterion.qa-sample .crit-header {
+    background: hsl(34 60% 98%);
+  }
+
+  /* ── Right: Inspector / patient summary ───────────────────── */
+  aside.inspector {
+    border-left: 1px solid var(--border);
+    background: var(--paper);
+    overflow-y: auto;
+  }
+  .inspector .panel {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .inspector .panel .lbl {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    color: var(--muted-foreground);
+    margin-bottom: 8px;
+  }
+  .inspector h3.display {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 500;
+    color: var(--ink);
+    line-height: 1.05;
+  }
+  .inspector .meta-row {
+    display: flex; justify-content: space-between;
+    font-size: 12px;
+    padding: 4px 0;
+    border-bottom: 1px solid hsl(28 14% 92%);
+  }
+  .inspector .meta-row:last-child { border: none; }
+  .inspector .meta-row .k { color: var(--muted-foreground); }
+  .inspector .meta-row .v { font-family: "JetBrains Mono", monospace; font-size: 11.5px; }
+
+  .checklist { list-style: none; margin: 0; padding: 0; }
+  .checklist li {
+    display: grid;
+    grid-template-columns: 14px 1fr auto;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 0;
+    font-size: 12px;
+    color: var(--foreground);
+    border-bottom: 1px solid hsl(28 14% 94%);
+  }
+  .checklist li:last-child { border: none; }
+  .checklist .marker {
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    background: var(--border-strong);
+  }
+  .checklist li.done .marker { background: var(--sage); }
+  .checklist li.pending .marker { background: var(--oxblood); }
+  .checklist li.qa .marker { background: var(--ochre); }
+  .checklist li .id { font-family: "JetBrains Mono", monospace; font-size: 11.5px; }
+  .checklist li .micro {
+    font-size: 10px;
+    color: var(--muted-foreground);
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+  }
+
+  .footer-bar {
+    grid-column: 1 / -1;
+    height: 32px;
+    border-top: 1px solid var(--border);
+    background: var(--card);
+    display: flex; align-items: center; gap: 16px;
+    padding: 0 16px;
+    font-size: 10.5px;
+    color: var(--muted-foreground);
+    font-family: "JetBrains Mono", monospace;
+  }
+
+  /* small helpers */
+  .row-flex { display: flex; align-items: center; gap: 10px; }
+  .muted { color: var(--muted-foreground); }
+  .tnum { font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- ── Top bar ───────────────────────────────────────────── -->
+  <header class="topbar">
+    <div>
+      <div class="crumb">Reviewer · adjudication surface</div>
+      <h1>Dual-agent review</h1>
+    </div>
+    <div class="meta">
+      task <code>lung-cancer-phenotype</code>
+      &nbsp;·&nbsp; sha <code>a8c4f1d2</code>
+      &nbsp;·&nbsp; iter <code>iter_002</code>
+    </div>
+    <div class="spacer"></div>
+    <div class="reviewer">reviewer · <code class="mono">hexing@iu.edu</code></div>
+  </header>
+
+  <!-- ── Patient list (left) ──────────────────────────────── -->
+  <aside class="patients">
+    <div class="pane-header">
+      <div class="label">Cohort · DEV (n=20)</div>
+      <div class="progress"><strong>7</strong> of 20 reviewed · 3 pending</div>
+    </div>
+    <ul class="patient-list">
+      <li class="patient done"><span class="status-dot"></span><span class="pid">pt_0001</span><span class="counter">3 / 12</span></li>
+      <li class="patient done"><span class="status-dot"></span><span class="pid">pt_0002</span><span class="counter">2 / 12</span></li>
+      <li class="patient done"><span class="status-dot"></span><span class="pid">pt_0003</span><span class="counter">5 / 12</span></li>
+      <li class="patient done"><span class="status-dot"></span><span class="pid">pt_0004</span><span class="counter">1 / 12</span></li>
+      <li class="patient active in-progress">
+        <span class="status-dot"></span>
+        <span class="pid">pt_0005<span class="qa-tag">qa</span></span>
+        <span class="counter">— / 12</span>
+      </li>
+      <li class="patient"><span class="status-dot"></span><span class="pid">pt_0006</span><span class="counter">— / —</span></li>
+      <li class="patient"><span class="status-dot"></span><span class="pid">pt_0007</span><span class="counter">— / —</span></li>
+      <li class="patient"><span class="status-dot"></span><span class="pid">pt_0008</span><span class="counter">— / —</span></li>
+      <li class="patient flagged"><span class="status-dot"></span><span class="pid">pt_0009</span><span class="counter">flag</span></li>
+      <li class="patient"><span class="status-dot"></span><span class="pid">pt_0010<span class="qa-tag">qa</span></span><span class="counter">— / —</span></li>
+      <li class="patient"><span class="status-dot"></span><span class="pid">pt_0011</span><span class="counter">— / —</span></li>
+      <li class="patient"><span class="status-dot"></span><span class="pid">pt_0012</span><span class="counter">— / —</span></li>
+      <li class="patient"><span class="status-dot"></span><span class="pid">pt_0013</span><span class="counter">— / —</span></li>
+      <li class="patient"><span class="status-dot"></span><span class="pid">pt_0014</span><span class="counter">— / —</span></li>
+      <li class="patient"><span class="status-dot"></span><span class="pid">pt_0015<span class="qa-tag">qa</span></span><span class="counter">— / —</span></li>
+    </ul>
+  </aside>
+
+  <!-- ── Center: stream ───────────────────────────────────── -->
+  <main class="stream">
+
+    <!-- Sticky banner -->
+    <div class="summary-banner">
+      <div class="row">
+        <div class="caption">Patient pt_0005 · disagreement summary</div>
+      </div>
+      <div class="row" style="margin-top: 10px;">
+        <div class="stat">
+          <span class="v agreed display">8</span>
+          <span class="l">agreed</span>
+        </div>
+        <div class="stat">
+          <span class="v disagreed display">4</span>
+          <span class="l">disagreed</span>
+        </div>
+        <div class="stat">
+          <span class="v display" style="color: var(--ochre)">1</span>
+          <span class="l">QA-sample</span>
+        </div>
+        <div class="right">
+          <span class="qa-pill">QA review · 1 agreement force-expanded</span>
+          <button class="toggle-btn">Collapse all agreed</button>
+          <button class="toggle-btn primary">Expand all</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Progress segments -->
+    <div class="progress-strip" title="One segment per criterion in order">
+      <div class="seg agreed"></div>
+      <div class="seg agreed"></div>
+      <div class="seg agreed"></div>
+      <div class="seg disagreed resolved"></div>
+      <div class="seg agreed"></div>
+      <div class="seg disagreed current"></div>
+      <div class="seg disagreed"></div>
+      <div class="seg agreed"></div>
+      <div class="seg agreed"></div>
+      <div class="seg disagreed"></div>
+      <div class="seg agreed"></div>
+      <div class="seg agreed"></div>
+    </div>
+
+    <div class="criteria">
+
+      <!-- ─────────── Section: Disagreements ─────────── -->
+      <div class="section-divider">Disagreements · 4 (1 resolved)</div>
+
+      <!-- A resolved disagreement (collapsed by default but here shown collapsed) -->
+      <article class="criterion disagreed agreed">
+        <header class="crit-header">
+          <span class="chev">▸</span>
+          <code class="id">has_metastasis</code>
+          <div class="answers-mini">
+            <span class="chip yes">yes</span>
+            <span class="vs">vs</span>
+            <span class="chip no">no</span>
+            <span class="badge resolved">resolved · agent 2 error</span>
+          </div>
+          <span class="prompt muted" style="grid-column: 3; text-align: right; font-size: 11px;">resolved 14:22</span>
+        </header>
+      </article>
+
+      <!-- The currently-focused disagreement (expanded) -->
+      <article class="criterion disagreed">
+        <header class="crit-header">
+          <span class="chev">▾</span>
+          <code class="id">stage_at_diagnosis</code>
+          <span class="prompt">What stage was the cancer at initial diagnosis?</span>
+          <div class="answers-mini">
+            <span class="chip no_info">III</span>
+            <span class="vs">vs</span>
+            <span class="chip yes">IV</span>
+            <span class="badge hard">hard · disagreement</span>
+          </div>
+        </header>
+
+        <div class="crit-body">
+          <div class="agent-grid">
+            <!-- Agent 1 column -->
+            <div class="agent-col a1 discord">
+              <div class="agent-band">
+                <span class="agent-name">Agent 1</span>
+                <span class="conf">conf 0.78</span>
+              </div>
+              <div class="answer-row">
+                <span class="lbl">answer</span>
+                <span class="chip no_info">III</span>
+              </div>
+              <div class="rationale">
+                Path report describes T3 N2 M0; no extrathoracic disease on staging
+                CT. Stage IIIB by AJCC 8th ed.
+              </div>
+              <div class="evidence-block">
+                <div class="lbl">Evidence · 2 citations</div>
+                <ul class="evidence">
+                  <li>
+                    <span class="note-id">path_2023-04-12</span>
+                    <span class="quote">"Adenocarcinoma; <em>pT3 pN2 M0</em>, AJCC 8th edition stage IIIB."</span>
+                  </li>
+                  <li>
+                    <span class="note-id">ct-chest_2023-04-09</span>
+                    <span class="quote">"No evidence of distant metastatic disease in chest, abdomen, or pelvis."</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <!-- Agent 2 column -->
+            <div class="agent-col a2 discord">
+              <div class="agent-band">
+                <span class="agent-name">Agent 2</span>
+                <span class="conf">conf 0.62</span>
+              </div>
+              <div class="answer-row">
+                <span class="lbl">answer</span>
+                <span class="chip yes">IV</span>
+              </div>
+              <div class="rationale">
+                Brain MRI 6 months later showed metastatic disease; treating as
+                stage IV at diagnosis given short interval.
+              </div>
+              <div class="evidence-block">
+                <div class="lbl">Evidence · 1 citation</div>
+                <ul class="evidence">
+                  <li>
+                    <span class="note-id">mri-brain_2023-10-21</span>
+                    <span class="quote">"Two enhancing lesions consistent with <em>metastatic disease</em>; new since prior."</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <!-- Adjudication form -->
+          <div class="adjudication">
+            <div class="title">
+              <span class="lbl">Adjudication</span>
+              <span class="hint">Pick one. If guideline gap, the revision is required.</span>
+            </div>
+
+            <div class="radio-grid">
+              <label class="radio-opt gap selected">
+                <span class="marker"></span>
+                <span>
+                  <div class="opt-title">Guideline gap</div>
+                  <div class="opt-sub">Both readings are defensible — the rubric is silent or ambiguous.</div>
+                </span>
+              </label>
+              <label class="radio-opt">
+                <span class="marker"></span>
+                <span>
+                  <div class="opt-title">Agent 1 error</div>
+                  <div class="opt-sub">Agent 1 misread the chart or misapplied the rubric.</div>
+                </span>
+              </label>
+              <label class="radio-opt">
+                <span class="marker"></span>
+                <span>
+                  <div class="opt-title">Agent 2 error</div>
+                  <div class="opt-sub">Agent 2 misread the chart or misapplied the rubric.</div>
+                </span>
+              </label>
+              <label class="radio-opt">
+                <span class="marker"></span>
+                <span>
+                  <div class="opt-title">True clinical ambiguity</div>
+                  <div class="opt-sub">The chart genuinely doesn't support a single answer.</div>
+                </span>
+              </label>
+            </div>
+
+            <div class="revision-block">
+              <div class="lbl">
+                Suggested guideline revision
+                <span class="req">required for guideline gap</span>
+              </div>
+              <textarea class="revision" placeholder="Propose specific edit to the criterion's prompt, guidance prose, or examples…">Clarify staging timeframe: stage_at_diagnosis should be the AJCC stage at the *initial* diagnostic workup, not retrospectively re-staged based on subsequent metastases. Add example: "If brain mets appear &gt;3 months after initial staging, leave stage_at_diagnosis as originally assigned and flag progression in `progressed_after_dx`."</textarea>
+            </div>
+
+            <div class="form-actions">
+              <button class="submit">Submit adjudication</button>
+              <button class="secondary">Skip — needs more chart review</button>
+              <span class="kbd"><kbd>1</kbd>–<kbd>4</kbd> select · <kbd>⌘</kbd><kbd>↵</kbd> submit</span>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <!-- A soft disagreement (collapsed) -->
+      <article class="criterion disagreed soft">
+        <header class="crit-header">
+          <span class="chev">▸</span>
+          <code class="id">smoking_status</code>
+          <span class="prompt">Smoking status at diagnosis.</span>
+          <div class="answers-mini">
+            <span class="chip yes">former</span>
+            <span class="vs">vs</span>
+            <span class="chip no_info">unknown</span>
+            <span class="badge soft">soft · yes vs no_info</span>
+          </div>
+        </header>
+      </article>
+
+      <!-- Another disagreement (collapsed) -->
+      <article class="criterion disagreed">
+        <header class="crit-header">
+          <span class="chev">▸</span>
+          <code class="id">received_chemotherapy</code>
+          <span class="prompt">Did the patient receive systemic chemotherapy?</span>
+          <div class="answers-mini">
+            <span class="chip yes">yes</span>
+            <span class="vs">vs</span>
+            <span class="chip no">no</span>
+            <span class="badge hard">hard · disagreement</span>
+          </div>
+        </header>
+      </article>
+
+      <!-- ─────────── Section: Agreements (collapsed by default) ─────────── -->
+      <div class="section-divider">Agreements · 8 (1 force-expanded for QA)</div>
+
+      <!-- QA-sample agreement (force-expanded) -->
+      <article class="criterion agreed qa-sample">
+        <header class="crit-header">
+          <span class="chev">▾</span>
+          <code class="id">primary_site</code>
+          <span class="prompt">Primary tumor site.</span>
+          <div class="answers-mini">
+            <span class="chip yes">lung</span>
+            <span class="badge qa">QA sample · verify</span>
+          </div>
+        </header>
+        <div class="crit-body">
+          <div class="agent-grid">
+            <div class="agent-col a1">
+              <div class="agent-band">
+                <span class="agent-name">Agent 1</span>
+                <span class="conf">conf 0.94</span>
+              </div>
+              <div class="answer-row">
+                <span class="lbl">answer</span>
+                <span class="chip yes">lung</span>
+              </div>
+              <div class="rationale">Pathology and imaging consistent with primary lung malignancy.</div>
+              <div class="evidence-block">
+                <div class="lbl">Evidence · 1 citation</div>
+                <ul class="evidence">
+                  <li>
+                    <span class="note-id">path_2023-04-12</span>
+                    <span class="quote">"Primary <em>pulmonary adenocarcinoma</em>, RUL."</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+            <div class="divider"></div>
+            <div class="agent-col a2">
+              <div class="agent-band">
+                <span class="agent-name">Agent 2</span>
+                <span class="conf">conf 0.91</span>
+              </div>
+              <div class="answer-row">
+                <span class="lbl">answer</span>
+                <span class="chip yes">lung</span>
+              </div>
+              <div class="rationale">Imaging and biopsy concordant for RUL primary lung cancer.</div>
+              <div class="evidence-block">
+                <div class="lbl">Evidence · 1 citation</div>
+                <ul class="evidence">
+                  <li>
+                    <span class="note-id">ct-chest_2023-04-09</span>
+                    <span class="quote">"3.4 cm spiculated mass <em>right upper lobe</em>, suspicious for primary lung carcinoma."</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          <div class="adjudication" style="background: hsl(34 60% 98%);">
+            <div class="title">
+              <span class="lbl">QA confirmation</span>
+              <span class="hint">Both agents agreed; spot-check before signing off.</span>
+            </div>
+            <div class="form-actions" style="margin-top: 0;">
+              <button class="submit committed">Confirm agreement</button>
+              <button class="secondary">Disagree — flag for review</button>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <!-- Collapsed agreement rows -->
+      <article class="criterion agreed collapsed">
+        <header class="crit-header agreed-collapsed">
+          <span class="chev">▸</span>
+          <code class="id">histology</code>
+          <span class="prompt">Histologic subtype.</span>
+          <div class="answers-mini">
+            <span class="chip yes">adenocarcinoma</span>
+            <span class="badge agreed">agreed</span>
+          </div>
+        </header>
+      </article>
+      <article class="criterion agreed collapsed">
+        <header class="crit-header agreed-collapsed">
+          <span class="chev">▸</span>
+          <code class="id">egfr_mutation</code>
+          <span class="prompt">EGFR mutation status.</span>
+          <div class="answers-mini">
+            <span class="chip yes">positive</span>
+            <span class="badge agreed">agreed</span>
+          </div>
+        </header>
+      </article>
+      <article class="criterion agreed collapsed">
+        <header class="crit-header agreed-collapsed">
+          <span class="chev">▸</span>
+          <code class="id">alk_rearrangement</code>
+          <span class="prompt">ALK rearrangement status.</span>
+          <div class="answers-mini">
+            <span class="chip no">negative</span>
+            <span class="badge agreed">agreed</span>
+          </div>
+        </header>
+      </article>
+      <article class="criterion agreed collapsed">
+        <header class="crit-header agreed-collapsed">
+          <span class="chev">▸</span>
+          <code class="id">received_radiation</code>
+          <span class="prompt">Did the patient receive radiation therapy?</span>
+          <div class="answers-mini">
+            <span class="chip yes">yes</span>
+            <span class="badge agreed">agreed</span>
+          </div>
+        </header>
+      </article>
+      <article class="criterion agreed collapsed">
+        <header class="crit-header agreed-collapsed">
+          <span class="chev">▸</span>
+          <code class="id">received_surgery</code>
+          <span class="prompt">Did the patient undergo surgical resection?</span>
+          <div class="answers-mini">
+            <span class="chip no">no</span>
+            <span class="badge agreed">agreed</span>
+          </div>
+        </header>
+      </article>
+      <article class="criterion agreed collapsed">
+        <header class="crit-header agreed-collapsed">
+          <span class="chev">▸</span>
+          <code class="id">ecog_at_dx</code>
+          <span class="prompt">ECOG performance status at diagnosis.</span>
+          <div class="answers-mini">
+            <span class="chip no_info">1</span>
+            <span class="badge agreed">agreed</span>
+          </div>
+        </header>
+      </article>
+      <article class="criterion agreed collapsed">
+        <header class="crit-header agreed-collapsed">
+          <span class="chev">▸</span>
+          <code class="id">vital_status</code>
+          <span class="prompt">Vital status at last contact.</span>
+          <div class="answers-mini">
+            <span class="chip yes">alive</span>
+            <span class="badge agreed">agreed</span>
+          </div>
+        </header>
+      </article>
+
+    </div>
+  </main>
+
+  <!-- ── Right: inspector ─────────────────────────────────── -->
+  <aside class="inspector">
+    <div class="panel">
+      <div class="lbl">Patient</div>
+      <h3 class="display">pt_0005</h3>
+      <div style="margin-top: 12px;">
+        <div class="meta-row"><span class="k">Notes</span><span class="v">14</span></div>
+        <div class="meta-row"><span class="k">Date range</span><span class="v">2023-04 → 2024-02</span></div>
+        <div class="meta-row"><span class="k">Provenance</span><span class="v">cohort_dev_n20</span></div>
+        <div class="meta-row"><span class="k">QA-sample</span><span class="v" style="color: var(--ochre)">yes (n%5==0)</span></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="lbl">Adjudication progress</div>
+      <ul class="checklist">
+        <li class="done"><span class="marker"></span><span class="id">primary_site</span><span class="micro">QA · ok</span></li>
+        <li class="done"><span class="marker"></span><span class="id">histology</span><span class="micro">agreed</span></li>
+        <li class="done"><span class="marker"></span><span class="id">has_metastasis</span><span class="micro">a2 error</span></li>
+        <li class="pending" style="background: hsl(354 50% 98%);"><span class="marker"></span><span class="id">stage_at_diagnosis</span><span class="micro">in progress</span></li>
+        <li class="pending"><span class="marker"></span><span class="id">smoking_status</span><span class="micro">soft · open</span></li>
+        <li class="pending"><span class="marker"></span><span class="id">received_chemotherapy</span><span class="micro">hard · open</span></li>
+        <li class="done"><span class="marker"></span><span class="id">egfr_mutation</span><span class="micro">agreed</span></li>
+        <li class="done"><span class="marker"></span><span class="id">alk_rearrangement</span><span class="micro">agreed</span></li>
+        <li class="done"><span class="marker"></span><span class="id">received_radiation</span><span class="micro">agreed</span></li>
+        <li class="done"><span class="marker"></span><span class="id">received_surgery</span><span class="micro">agreed</span></li>
+        <li class="done"><span class="marker"></span><span class="id">ecog_at_dx</span><span class="micro">agreed</span></li>
+        <li class="done"><span class="marker"></span><span class="id">vital_status</span><span class="micro">agreed</span></li>
+      </ul>
+    </div>
+
+    <div class="panel">
+      <div class="lbl">Adjudication tally · this patient</div>
+      <div class="meta-row"><span class="k">guideline gap</span><span class="v tnum">0</span></div>
+      <div class="meta-row"><span class="k">agent 1 error</span><span class="v tnum">0</span></div>
+      <div class="meta-row"><span class="k">agent 2 error</span><span class="v tnum">1</span></div>
+      <div class="meta-row"><span class="k">true ambiguity</span><span class="v tnum">0</span></div>
+    </div>
+
+    <div class="panel">
+      <div class="lbl">Cohort tally · iter_002</div>
+      <div class="meta-row"><span class="k">patients done</span><span class="v tnum">7 / 20</span></div>
+      <div class="meta-row"><span class="k">guideline gaps</span><span class="v tnum" style="color: var(--oxblood)">5</span></div>
+      <div class="meta-row"><span class="k">agent 1 errors</span><span class="v tnum">3</span></div>
+      <div class="meta-row"><span class="k">agent 2 errors</span><span class="v tnum">8</span></div>
+      <div class="meta-row"><span class="k">true ambiguity</span><span class="v tnum">2</span></div>
+    </div>
+  </aside>
+
+  <!-- ── Footer status ────────────────────────────────────── -->
+  <footer class="footer-bar">
+    <span>connected</span>
+    <span>· iter_002 · sha a8c4f1d2</span>
+    <span style="margin-left:auto">j/k criterion · enter expand · 1–4 adjudicate · ⌘↵ submit · e expand-all</span>
+  </footer>
+
+</div>
+</body>
+</html>

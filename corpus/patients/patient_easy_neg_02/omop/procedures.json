@@ -1,0 +1,20 @@
+[
+  {
+    "row_id": "520001",
+    "procedure_occurrence_id": 520001,
+    "person_id": "patient_easy_neg_02",
+    "procedure_concept_name": "X-ray knee 3 views",
+    "procedure_date": "2025-04-04",
+    "cpt_code": "73564",
+    "note": "AP, lateral, sunrise views — no fracture, medial joint space narrowing"
+  },
+  {
+    "row_id": "520002",
+    "procedure_occurrence_id": 520002,
+    "person_id": "patient_easy_neg_02",
+    "procedure_concept_name": "Physical therapy evaluation and treatment, knee",
+    "procedure_date": "2025-04-15",
+    "cpt_code": "97162",
+    "note": "Quadriceps strengthening protocol"
+  }
+]

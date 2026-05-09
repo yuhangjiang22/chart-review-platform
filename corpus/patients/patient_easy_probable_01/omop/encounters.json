@@ -1,0 +1,32 @@
+[
+  {
+    "row_id": "310051",
+    "visit_occurrence_id": "310051",
+    "visit_concept_name": "Outpatient Visit",
+    "visit_source_value": "OP",
+    "visit_start_date": "2024-12-15",
+    "visit_end_date": "2024-12-15",
+    "provider": "Dr. M. Chen, Thoracic Radiology",
+    "note_type": "ct_chest"
+  },
+  {
+    "row_id": "310052",
+    "visit_occurrence_id": "310052",
+    "visit_concept_name": "Outpatient Visit",
+    "visit_source_value": "OP",
+    "visit_start_date": "2025-01-12",
+    "visit_end_date": "2025-01-12",
+    "provider": "Dr. A. Torres, Thoracic Oncology",
+    "note_type": "oncology_consult"
+  },
+  {
+    "row_id": "310053",
+    "visit_occurrence_id": "310053",
+    "visit_concept_name": "Outpatient Visit",
+    "visit_source_value": "OP",
+    "visit_start_date": "2025-01-28",
+    "visit_end_date": "2025-01-28",
+    "provider": "Dr. A. Torres, Thoracic Oncology",
+    "note_type": "oncology_progress"
+  }
+]

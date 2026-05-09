@@ -1,0 +1,29 @@
+# rucam-test — chart-review guideline (draft)
+task_id: rucam-test
+task_type: phenotype_validation
+review_unit: patient
+manual_version: 0.1.0-draft
+index_anchor: index_date
+output_shape: narrative
+overview_prose: |
+  This chart review guideline implements the RUCAM (Roussel Uclaf Causality Assessment Method)
+  for structured assessment of drug-induced liver injury (DILI) in multiple sclerosis (MS) patients
+  on disease-modifying therapies (DMTs). The guideline evaluates seven standardized criteria—time to onset,
+  course of liver injury, risk factors (standard and MS-specific), concomitant hepatotoxic drugs,
+  exclusion of alternative causes, prior knowledge of the DMT's hepatotoxic potential, and response
+  to readministration (rechallenge)—to yield a final numeric RUCAM causality score.
+
+  The population consists of MS patients on any DMT who developed abnormal liver enzymes. The output
+  is a single numeric score representing the likelihood that the observed liver injury is causally
+  related to the suspect MS-DMT, where higher scores indicate stronger causality.
+
+denominator: "MS patients on any DMT who developed abnormal liver enzymes (ALT, AST, Alk P, or bilirubin elevation)"
+index_event: "Abnormal liver enzyme elevation (first documented)"
+time_windows:
+  - id: injury_to_assessment
+    anchor: index_date
+    start_offset: "-P30D"
+    end_offset: "P180D"
+    label: "30 days before to 180 days after abnormal liver enzyme detection"
+
+final_output: rucam_final_score

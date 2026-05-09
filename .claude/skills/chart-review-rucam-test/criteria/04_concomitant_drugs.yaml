@@ -1,0 +1,72 @@
+id: concomitant_drugs
+title: "Concomitant Drugs"
+description: |
+  Assesses whether other hepatotoxic medications were started around the time of liver injury.
+  If a concomitant drug may share responsibility for the injury, this reduces confidence that
+  the MS-DMT alone caused the injury.
+
+instructions: |
+  1. Extract the patient's medication list at time of liver injury onset:
+     - Note all medications (prescription, OTC, supplements, herbal) active during the relevant period
+     - Document start and stop dates for each drug
+
+  2. Identify timing of concomitant drug initiation:
+     - Compare each concomitant drug's start date to the liver injury onset date
+     - Assess whether timing is compatible with injury causality
+
+  3. Classify each concomitant drug using RUCAM scoring:
+
+     Score 0 (No contribution):
+     - No concomitant drugs identified, OR
+     - Concomitant drug has incompatible time to onset (e.g., started >2 weeks before or after injury onset), OR
+     - No documented hepatotoxic potential for the concomitant drug
+
+     Score -1 (Suggestive contribution):
+     - Concomitant drug was started around the time of injury (timing compatible), AND
+     - The drug has known hepatotoxic potential (e.g., acetaminophen, NSAIDs, statins, antibiotics), BUT
+     - No strong evidence (e.g., positive rechallenge or clear temporal link)
+
+     Score -2 (Known hepatotoxic with suggestive timing):
+     - Concomitant drug is known to cause DILI (e.g., isoniazid, phenytoin, amoxicillin-clavulanate), AND
+     - Timing of initiation is highly compatible with injury onset (e.g., started 1-2 weeks before injury)
+
+     Score -3 (Clear evidence of concomitant drug's role):
+     - Concomitant drug has clear evidence for its role in causing this injury (positive rechallenge, prior DILI
+       documented with this specific drug, or clear temporal and clinical signature matching known toxicity pattern)
+
+  4. Document specific concomitant drugs identified:
+     - Drug name, indication, start date, stop date
+     - Hepatotoxic potential (known, possible, unlikely)
+     - Timing relative to liver injury onset
+     - Any prior history of this drug causing DILI in this patient
+
+  5. Edge case - Multiple hepatotoxic agents:
+     If multiple concomitant hepatotoxic drugs were started around the time of injury,
+     score the most contributory one. If unclear which contributed most, use -1 or -2
+     based on the strongest evidence.
+
+evidence_sources: |
+  - Medication reconciliation list (admission, outpatient visit, discharge)
+  - Prescription history with start/stop dates
+  - Over-the-counter medication use (from patient interview or chart documentation)
+  - Herbal and supplement use (from medication list or alternative medicine section)
+  - Known hepatotoxic drug database (FDA labels, pharmacology references)
+  - Prior adverse event documentation for patient with the concomitant drug
+
+assessment_options:
+  - label: "0 (No contribution or incompatible timing)"
+    value: 0
+    description: "No concomitant hepatotoxic drugs, or timing is incompatible with injury"
+  - label: "-1 (Suggestive contribution)"
+    value: -1
+    description: "Concomitant drug with suggestive timing but limited known hepatotoxicity"
+  - label: "-2 (Known hepatotoxic with suggestive timing)"
+    value: -2
+    description: "Known hepatotoxic drug with timing compatible with injury onset"
+  - label: "-3 (Clear evidence of role)"
+    value: -3
+    description: "Strong evidence (positive rechallenge, prior DILI, or typical signature) for concomitant drug"
+
+output_format: |
+  Concomitant Drug Score: {value}
+  Drugs Identified: [list of concomitant drugs with timing and hepatotoxic potential]

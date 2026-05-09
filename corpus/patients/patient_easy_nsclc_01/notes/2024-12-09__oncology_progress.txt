@@ -1,0 +1,30 @@
+INDIANA UNIVERSITY HEALTH — THORACIC ONCOLOGY
+PROGRESS NOTE
+Date: 2024-12-09
+Patient: Margaret L. Hoover  DOB: 1956-03-14  MRN: 881042
+Attending: Dr. Renata S. Bhatt, MD (Medical Oncology)
+
+SUBJECTIVE:
+Ms. Hoover is a 68-year-old woman with a 30 pack-year history (quit 2018) presenting for initial oncology consultation following recent CT and biopsy findings. She reports hemoptysis now largely resolved, mild exertional dyspnea, and a 6-pound unintentional weight loss over the past 2 months. Performance status ECOG 1. She lives with her husband in Indianapolis and is a retired schoolteacher.
+
+OBJECTIVE:
+Vitals: BP 128/76, HR 72, SpO2 96% on room air, Weight 61.2 kg
+Exam: Mild dullness to percussion right apex. No supraclavicular adenopathy. No clubbing.
+Labs: CBC WNL, CMP WNL, LDH 198 U/L. PET/CT (2024-12-03): hypermetabolic RUL mass (SUVmax 9.8) and right paratracheal node (SUVmax 4.1). No distant metastases.
+Pathology reviewed: adenocarcinoma, TTF-1+/Napsin A+. EGFR mutation panel pending.
+
+ASSESSMENT:
+Stage IIIA non-small cell lung cancer, adenocarcinoma subtype, right upper lobe primary (cT2bN2M0). Diagnosis confirmed on core needle biopsy from 2024-11-26. PD-L1 TPS result pending.
+
+PLAN:
+1. Await EGFR/ALK/ROS1/KRAS mutation profiling before finalizing systemic therapy choice.
+2. Multidisciplinary tumor board review scheduled 2024-12-16.
+3. Referral to radiation oncology for possible concurrent chemoradiation planning.
+4. Enrollment in IU Health lung cancer clinical trial discussed; patient interested.
+5. Supportive: antiemetics prescribed prophylactically; pulmonary rehab referral placed.
+6. Follow-up in 3 weeks or sooner if symptoms worsen. Patient instructed to call with fever, worsening hemoptysis, or new neurologic symptoms.
+
+ICD-10: C34.11 (Malignant neoplasm of upper lobe, right bronchus or lung)
+
+Electronically signed: Dr. Renata S. Bhatt, MD
+Date/Time: 2024-12-09  11:20

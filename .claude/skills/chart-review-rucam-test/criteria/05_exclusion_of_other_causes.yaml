@@ -1,0 +1,106 @@
+id: exclusion_of_other_causes
+title: "Exclusion of Other Causes of Liver Injury"
+description: |
+  Assesses how thoroughly alternative diagnoses have been ruled out. Strong causality requires
+  excluding other common causes of liver injury. Scoring depends on how many potential causes
+  have been excluded.
+
+instructions: |
+  1. Identify and assess GROUP I causes (6 major causes):
+     These are the most common and important causes to exclude:
+
+     a) Acute viral hepatitis due to:
+        - HAV (test: IgM anti-HAV antibody)
+        - HBV (test: HBsAg and/or IgM anti-HBc)
+        - HCV (test: anti-HCV antibody and/or HCV RNA with appropriate clinical history)
+        EXCLUDED if: Serology performed and negative, or patient has immunity/prior infection only
+
+     b) Biliary obstruction:
+        - Evidence: Imaging (ultrasound, CT, MRCP) showing ductal dilation, gallstones, malignancy
+        EXCLUDED if: Imaging performed and shows no obstruction
+
+     c) Alcoholism:
+        - Evidence: History of excessive alcohol intake AND AST/ALT ratio ≥2
+        EXCLUDED if: No documented history of heavy drinking and normal AST/ALT ratio
+
+     d) Recent hypotension, shock, or ischemia:
+        - Evidence: Documented episode within 2 weeks of liver injury onset
+        EXCLUDED if: No shock/ischemia episode in relevant timeframe
+
+     e) Autoimmune hepatitis:
+        - Evidence: Positive autoimmune serology (ANA, anti-smooth muscle antibody, anti-LKM) + biopsy
+        EXCLUDED if: Negative serology or alternative diagnosis more likely
+
+     f) Other autoimmune liver diseases:
+        - Primary biliary cirrhosis (PBC), primary sclerosing cholangitis (PSC)
+        EXCLUDED if: Appropriate testing (AMA for PBC, cholangiography/ERCP for PSC) negative or not clinically indicated
+
+  2. Identify and assess GROUP II causes (2 categories):
+
+     a) Complications of underlying disease(s):
+        - Sepsis, chronic hepatitis B or C, autoimmune hepatitis, cirrhosis, malignancy
+        EXCLUDED if: No clinical or serologic evidence of these conditions
+
+     b) Acute CMV, EBV, or HSV:
+        - Evidence: PCR, serology (IgM), or clinical signs of acute infection
+        EXCLUDED if: Serology/PCR negative or no signs of acute infection
+
+  3. Determine exclusion score:
+
+     Score +2 (Most supportive of drug causality):
+     - ALL causes in GROUP I and GROUP II have been ruled out
+     - Strong evidence for exclusion (negative serology, negative imaging, no relevant history)
+
+     Score +1 (Supportive):
+     - All 6 causes in GROUP I have been ruled out, but GROUP II assessment incomplete
+     - OR at least 5-6 of GROUP I causes ruled out with some GROUP II assessment
+
+     Score 0 (Inconclusive):
+     - Only 4-5 of GROUP I causes have been ruled out
+     - OR multiple potential alternative diagnoses remain possible
+
+     Score -2 (Against drug causality):
+     - Less than 4 of GROUP I causes have been ruled out
+     - OR strong evidence of an alternative diagnosis (e.g., confirmed viral hepatitis, biliary obstruction)
+
+  4. Document specific exclusions:
+     For each cause, note:
+     - Excluded (YES/NO)
+     - Evidence supporting exclusion (e.g., test results, clinical findings)
+     - Alternative diagnosis if applicable
+
+  5. Edge case - Concurrent infections:
+     If patient has confirmed viral hepatitis AND concurrent MS-DMT exposure:
+     - The viral infection becomes the primary cause (score -2 or lower)
+     - MS-DMT causality is secondary and should be downgraded
+     - Still complete the RUCAM for documentation, but interpret as reduced likelihood
+
+evidence_sources: |
+  - Viral serology results (HAV IgM, HBsAg, anti-HBc, anti-HCV, HCV RNA)
+  - Imaging reports (ultrasound, CT, MRCP) for biliary obstruction assessment
+  - Alcohol use history (social history, addiction notes, AST/ALT ratio)
+  - Shock/ischemia documentation (ICU notes, vital signs, lactatemia)
+  - Autoimmune serology (ANA, anti-smooth muscle antibody, anti-LKM, anti-mitochondrial antibody for PBC)
+  - Liver biopsy pathology (if available)
+  - CMV/EBV/HSV serology or PCR results
+  - Problem list and past medical history (chronic hepatitis, cirrhosis, malignancy)
+
+assessment_options:
+  - label: "+2 (All causes excluded)"
+    value: 2
+    description: "All GROUP I and GROUP II causes ruled out"
+  - label: "+1 (GROUP I excluded)"
+    value: 1
+    description: "All or most GROUP I causes ruled out, some GROUP II assessment"
+  - label: "0 (Partial exclusion)"
+    value: 0
+    description: "4-5 of GROUP I causes ruled out, or multiple alternatives remain"
+  - label: "-2 (Incomplete exclusion or alternative diagnosis)"
+    value: -2
+    description: "<4 of GROUP I causes ruled out, or strong evidence of alternative cause"
+
+output_format: |
+  Exclusion Score: {value}
+  GROUP I Causes - Excluded: [list]
+  GROUP I Causes - Not Excluded: [list]
+  GROUP II Assessment: [summary]

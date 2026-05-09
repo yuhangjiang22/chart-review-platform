@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chart-review-platform/corpus/schemas/meta.schema.json",
+  "title": "PatientMeta",
+  "type": "object",
+  "required": ["patient_id", "category", "demographics", "index_date", "doc_types", "generated_by"],
+  "properties": {
+    "patient_id": { "type": "string", "pattern": "^patient_[a-z0-9_]+$" },
+    "category": { "type": "string", "enum": ["confirmed_nsclc", "sclc", "probable", "icd_only", "negative"] },
+    "demographics": {
+      "type": "object",
+      "required": ["age", "sex"],
+      "properties": {
+        "age": { "type": "integer", "minimum": 0, "maximum": 120 },
+        "sex": { "type": "string", "enum": ["M", "F"] },
+        "region": { "type": "string" }
+      }
+    },
+    "smoking": { "type": "string" },
+    "index_date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+    "doc_types": { "type": "array", "items": { "type": "string" } },
+    "generated_by": { "type": "string", "enum": ["hand", "claude_api"] },
+    "generation_run_id": { "type": "string" }
+  }
+}

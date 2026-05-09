@@ -1,0 +1,29 @@
+UCSF MEDICAL CENTER – RADIOLOGY
+CT CHEST WITH CONTRAST
+Date: 2025-04-09
+Patient: [REDACTED], 72F  MRN: [REDACTED]
+Ordering provider: Dr. L. Torres, Emergency Medicine
+
+CLINICAL INDICATION: Facial swelling, bilateral arm edema, dyspnea; clinical concern for superior vena cava syndrome.
+
+TECHNIQUE:
+Multidetector CT chest with IV contrast; arterial and portal venous phase acquisitions. Coronal and sagittal reformats. CT venogram protocol applied.
+
+FINDINGS:
+MEDIASTINUM: A dominant anterior/superior mediastinal mass measuring 6.8 x 5.4 x 4.9 cm is present, centered at the right upper mediastinum and extending to encase the superior vena cava. Near-complete obliteration of the SVC lumen is identified; prominent collateral venous channels are present along the chest wall bilaterally (azygos and internal mammary routes).
+
+LUNG PARENCHYMA: Right hilar mass component measuring approximately 3.5 cm extends from the mediastinal conglomerate toward the right upper lobe bronchus. Mild right-sided pleural effusion (small, estimated 150 mL).
+
+LYMPH NODES: Contiguous right paratracheal, prevascular, and subcarinal adenopathy. No discrete axillary or supraclavicular masses (though clinical palpation recommended).
+
+CARDIOVASCULAR: Pericardial effusion, small, measuring approximately 4 mm circumferential. No cardiac chamber compromise.
+
+BONES: No destructive osseous lesions.
+
+IMPRESSION:
+1. Large superior mediastinal mass with near-complete SVC occlusion causing SVC syndrome. Findings most consistent with a primary mediastinal or central lung malignancy; small-cell lung carcinoma is a leading diagnostic consideration given rapidity of presentation.
+2. Small right pleural and pericardial effusions; clinical significance to be determined.
+3. Urgent tissue biopsy recommended for histologic diagnosis. Oncology and interventional radiology consultation advised.
+
+Electronically signed: Dr. R. Kapoor, MD, Body Imaging
+2025-04-09 22:17

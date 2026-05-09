@@ -1,0 +1,18 @@
+[
+  {
+    "row_id": 110001,
+    "concept_id": 4115276,
+    "icd10cm": "C34.11",
+    "concept_name": "Malignant neoplasm of upper lobe, right bronchus or lung",
+    "status": "active",
+    "date": "2024-11-26"
+  },
+  {
+    "row_id": 110002,
+    "concept_id": 320128,
+    "icd10cm": "I10",
+    "concept_name": "Essential hypertension",
+    "status": "active",
+    "date": "2024-12-09"
+  }
+]

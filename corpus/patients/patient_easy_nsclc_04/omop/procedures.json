@@ -1,0 +1,23 @@
+[
+  {
+    "row_id": 140010,
+    "concept_id": 4013905,
+    "cpt": "71260",
+    "concept_name": "CT thorax with contrast",
+    "procedure_date": "2025-01-08"
+  },
+  {
+    "row_id": 140011,
+    "concept_id": 4058263,
+    "cpt": "32480",
+    "concept_name": "Left lower lobectomy, open thoracotomy with lymph node dissection",
+    "procedure_date": "2025-01-20"
+  },
+  {
+    "row_id": 140012,
+    "concept_id": 4171651,
+    "cpt": "78816",
+    "concept_name": "PET/CT whole body",
+    "procedure_date": "2025-02-03"
+  }
+]

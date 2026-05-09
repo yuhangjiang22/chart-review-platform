@@ -1,0 +1,33 @@
+task_type: phenotype_validation
+review_unit: patient
+manual_version: '2026-05-07-draft'
+index_anchor: index_date
+time_windows:
+  - id: lookback_lifetime
+    anchor: index_anchor
+    start_offset: -P10Y
+    end_offset: P0D
+    label: 10-year history (chronic/historic conditions)
+  - id: lookback_6mo
+    anchor: index_anchor
+    start_offset: -P6M
+    end_offset: P0D
+    label: 6-month window (INR lability requires recent measurements)
+final_output: bleeding_risk_tier
+overview_prose: |
+  Score adults on chronic anticoagulation (typically for AFib) on the HAS-BLED
+  bleeding-risk score (Pisters et al. 2010). Sum of 9 components — many
+  weighted 1 point each, one weighted 0–1 by sub-criterion — yields a total
+  0–9; the total maps to a risk tier (low / intermediate / high) used to
+  flag patients for closer monitoring.
+
+  Population: adults with AFib on or being considered for chronic
+  anticoagulation.
+  Index date: the most recent encounter where anticoagulation is reviewed
+  or initiated.
+
+  Per HAS-BLED: H — uncontrolled HTN (current SBP > 160); A — abnormal
+  renal/liver function (1pt each); S — prior stroke; B — prior major
+  bleeding or predisposition; L — labile INR (TTR < 60%); E — elderly
+  (≥65); D — drugs (antiplatelet/NSAID concomitant) or alcohol (≥8
+  drinks/wk).

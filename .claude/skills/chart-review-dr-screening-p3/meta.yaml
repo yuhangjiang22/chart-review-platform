@@ -1,0 +1,29 @@
+task_type: phenotype_validation
+review_unit: patient
+manual_version: '2026-05-07-draft'
+index_anchor: index_date
+time_windows:
+  - id: lookback_12mo
+    anchor: index_anchor
+    start_offset: -P12M
+    end_offset: P0D
+    label: 12-month lookback (ADA annual DR screening interval)
+final_output: dr_screening_concordance
+overview_prose: |
+  Diabetic retinopathy screening concordance per ADA Standards of Care:
+  patients with diabetes mellitus should receive a dilated retinal exam
+  by an eye care professional (ophthalmologist or optometrist) at least
+  annually.
+
+  Population: adults with active diabetes mellitus (T1 or T2) at the
+  index date.
+  Index date: most recent encounter at the primary care or endocrinology
+  clinic.
+
+  Output: concordant (eligible AND received qualifying exam in window) /
+  discordant (eligible but missed the exam) / not_applicable (not a
+  diabetic, the rec doesn't apply).
+
+  Edge cases: patients with bilateral no-light-perception blindness are
+  documented in the relevant criterion's edge cases as `not_applicable`
+  rather than `discordant`.

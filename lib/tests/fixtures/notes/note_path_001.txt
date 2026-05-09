@@ -1,0 +1,50 @@
+SURGICAL PATHOLOGY REPORT
+Memorial Regional Medical Center — Department of Pathology
+Accession: SP-2025-014782
+Specimen received: 2025-09-12
+Report finalized: 2025-09-15
+Pathologist: M. Alvarez, MD (Board-certified, Anatomic Pathology)
+
+CLINICAL HISTORY
+72-year-old former smoker (45 pack-years, quit 2014) with a 3.2 cm right upper
+lobe spiculated mass identified on staging CT. Referred for CT-guided core
+biopsy by pulmonology service. No prior thoracic malignancy. No known
+extrathoracic primary.
+
+SPECIMEN
+A. Right upper lobe, CT-guided core biopsy — three cores, aggregate 1.4 cm,
+   tan-white, firm.
+
+GROSS DESCRIPTION
+The specimen is received in formalin labeled with the patient's name and
+"right upper lobe core biopsy." Three linear cores measuring 1.0, 1.2, and
+1.4 cm in greatest dimension are submitted entirely in cassette A1.
+
+MICROSCOPIC DESCRIPTION
+Sections show fragments of lung parenchyma extensively replaced by an
+infiltrating glandular neoplasm. Tumor cells are arranged in acinar and
+lepidic patterns with focal papillary architecture. Nuclei are enlarged,
+vesicular, and show prominent nucleoli. Mitotic activity is brisk
+(approximately 12 per 10 high-power fields). No necrosis is identified in
+this limited sample. Background lung shows mild emphysematous change.
+
+IMMUNOHISTOCHEMISTRY
+TTF-1: positive (diffuse, strong)
+Napsin A: positive
+p40: negative
+CK7: positive
+CK20: negative
+The immunoprofile supports a primary lung adenocarcinoma and excludes
+squamous and metastatic colorectal origin.
+
+MOLECULAR (sent out, results pending at sign-out)
+EGFR, ALK, ROS1, BRAF, KRAS, PD-L1 — pending.
+
+FINAL DIAGNOSIS
+Right upper lobe, core biopsy:
+   ADENOCARCINOMA OF THE LUNG, moderately differentiated.
+   See microscopic description and immunohistochemistry.
+
+Synoptic summary: NSCLC, adenocarcinoma subtype.
+
+Electronically signed: M. Alvarez, MD — 2025-09-15 16:42

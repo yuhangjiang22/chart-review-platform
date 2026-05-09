@@ -1,0 +1,28 @@
+BOSTON MEDICAL IMAGING — THORACIC CT SERVICE
+CT CHEST WITHOUT CONTRAST (FOLLOW-UP NODULE PROTOCOL)
+Date: 2024-06-30
+Patient: Susan E. Callahan  DOB: 1963-11-07  MRN: 662317
+Ordering Physician: Dr. Andrew T. Marsh, MD (Internal Medicine / Primary Care)
+Indication: Incidental 8 mm nodule detected on portable CXR 2024-06-12 obtained for pre-employment screening. No respiratory symptoms. 22 pack-year history, quit 2020.
+
+TECHNIQUE:
+Low-dose helical CT of the chest without contrast per Lung-RADS protocol. 1.0 mm axial reconstructions reviewed.
+
+FINDINGS:
+Lungs: A 1.6 x 1.4 cm part-solid ground-glass nodule is identified in the left upper lobe anterior segment. The nodule has a 6 mm solid component centrally. Margins are slightly irregular with ground-glass halo. No satellite nodules. No other suspicious pulmonary nodules. No consolidation.
+
+Lymph nodes: No mediastinal or hilar adenopathy identified (all nodes <1 cm short axis).
+
+Pleura / chest wall: No pleural effusion or pneumothorax.
+
+Airways: No airway abnormality.
+
+Cardiovascular: No pericardial effusion. Heart normal in size.
+
+IMPRESSION:
+1. 1.6 cm part-solid left upper lobe nodule (solid component 6 mm) — Lung-RADS 4B. Suspicious for malignancy; tissue sampling recommended.
+2. No mediastinal adenopathy identified at this time.
+3. Recommend multidisciplinary review and expedited pulmonology referral for biopsy planning.
+
+Electronically signed: Dr. Yolanda B. Fischer, MD (Thoracic Radiology)
+Date/Time: 2024-06-30  11:55

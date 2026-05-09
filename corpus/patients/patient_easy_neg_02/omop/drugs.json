@@ -1,0 +1,29 @@
+[
+  {
+    "row_id": "520001",
+    "drug_exposure_id": 520001,
+    "person_id": "patient_easy_neg_02",
+    "drug_concept_name": "Lisinopril 10 MG Oral Tablet",
+    "drug_start_date": "2025-01-19",
+    "rxnorm_code": "314077",
+    "route_concept_name": "Oral"
+  },
+  {
+    "row_id": "520002",
+    "drug_exposure_id": 520002,
+    "person_id": "patient_easy_neg_02",
+    "drug_concept_name": "Naproxen 500 MG Oral Tablet",
+    "drug_start_date": "2025-01-19",
+    "rxnorm_code": "849313",
+    "route_concept_name": "Oral"
+  },
+  {
+    "row_id": "520003",
+    "drug_exposure_id": 520003,
+    "person_id": "patient_easy_neg_02",
+    "drug_concept_name": "Omeprazole 20 MG Oral Capsule",
+    "drug_start_date": "2025-01-19",
+    "rxnorm_code": "541233",
+    "route_concept_name": "Oral"
+  }
+]

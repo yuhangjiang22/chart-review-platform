@@ -1,0 +1,32 @@
+[
+  {
+    "row_id": "520001",
+    "condition_occurrence_id": 520001,
+    "person_id": "patient_easy_neg_02",
+    "condition_concept_id": 80180,
+    "condition_concept_name": "Osteoarthritis of knee",
+    "icd10_code": "M17.11",
+    "condition_start_date": "2025-01-19",
+    "condition_type_concept_name": "EHR problem list"
+  },
+  {
+    "row_id": "520002",
+    "condition_occurrence_id": 520002,
+    "person_id": "patient_easy_neg_02",
+    "condition_concept_id": 320128,
+    "condition_concept_name": "Essential hypertension",
+    "icd10_code": "I10",
+    "condition_start_date": "2025-01-19",
+    "condition_type_concept_name": "EHR problem list"
+  },
+  {
+    "row_id": "520003",
+    "condition_occurrence_id": 520003,
+    "person_id": "patient_easy_neg_02",
+    "condition_concept_id": 444132,
+    "condition_concept_name": "Traumatic effusion of knee",
+    "icd10_code": "M25.461",
+    "condition_start_date": "2025-04-04",
+    "condition_type_concept_name": "EHR encounter diagnosis"
+  }
+]

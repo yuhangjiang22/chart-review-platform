@@ -1,0 +1,18 @@
+[
+  {
+    "row_id": 120020,
+    "concept_id": 3020891,
+    "concept_name": "Oxygen saturation in Arterial blood",
+    "value": 92,
+    "unit": "%",
+    "date": "2025-04-22"
+  },
+  {
+    "row_id": 120021,
+    "concept_id": 3004249,
+    "concept_name": "Systolic blood pressure",
+    "value": 146,
+    "unit": "mmHg",
+    "date": "2025-04-22"
+  }
+]

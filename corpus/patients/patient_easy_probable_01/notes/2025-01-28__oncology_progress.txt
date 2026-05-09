@@ -1,0 +1,27 @@
+INDIANA UNIVERSITY HEALTH — ONCOLOGY PROGRESS NOTE
+Date of Service: 01/28/2025
+Patient: [REDACTED] | Age: 70 | Sex: F | MRN: [REDACTED]
+Provider: Dr. A. Torres, MD — Thoracic Oncology
+Visit Type: Follow-up, index date encounter.
+
+INTERVAL HISTORY:
+Patient returns after two non-diagnostic biopsy attempts (01/24/2025 and 02/06/2025 both with inadequate tissue). She declines endobronchial ultrasound-guided biopsy at this time, citing fatigue and preference to observe. No new pulmonary symptoms. Stable weight. Performance status ECOG 1.
+
+ACTIVE PROBLEM LIST:
+1. Lung cancer — primary lung malignancy, right lower lobe. No tissue confirmation yet; however, the clinical and radiologic profile is unambiguous. The patient is being managed as having lung cancer based on clinical grounds. Staging: cT1c N1 Mx (clinical).
+2. Hypertension — controlled on lisinopril.
+3. GERD — stable.
+
+ONCOLOGIST ASSESSMENT:
+This patient has lung cancer. The 2.8 cm spiculated right lower-lobe mass with ipsilateral hilar adenopathy in a former 25 pack-year smoker constitutes a clinical diagnosis of primary lung cancer even in the absence of pathologic confirmation. A diagnosis code of C34.10 (malignant neoplasm of right lower lobe bronchus and lung) has been entered to facilitate appropriate referrals and insurance authorization.
+
+PLAN:
+- Repeat CT chest in 6 weeks to assess stability or progression.
+- PET-CT scan ordered for clinical staging.
+- Multidisciplinary thoracic tumor board presentation scheduled.
+- Will re-approach tissue biopsy discussion at next visit.
+- Patient educated on signs/symptoms requiring earlier contact (hemoptysis, new chest pain, neurologic changes).
+
+Follow-up: 6 weeks or sooner PRN.
+Dr. A. Torres, MD — Thoracic Oncology
+Electronically signed: 01/28/2025 16:10
