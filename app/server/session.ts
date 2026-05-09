@@ -3,6 +3,7 @@ import type { WSClient } from "./types.js";
 import { AgentSession } from "./ai-client.js";
 import { chatStore } from "./chat-store.js";
 import { patientDir } from "./patients.js";
+import { modelFor } from "./model-config.js";
 import type { CompiledTask } from "./tasks.js";
 import type { ReviewState } from "./domain/review/index.js";
 import { appendAuditEntry } from "./audit-trail.js";
@@ -61,7 +62,7 @@ export class Session {
         patient_id: this.patientId,
         task_id: this.task.task_id,
         task_document_sha: this.task.source_document_sha,
-        model: process.env.CHART_REVIEW_MODEL ?? "(default)",
+        model: modelFor("default") ?? "(unset)",
         cwd: patientDir(patientId),
       });
     }

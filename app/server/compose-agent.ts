@@ -66,16 +66,11 @@ export interface ComposeAgentOptions {
   permissionMode?: string;
 }
 
-const DEFAULT_MODEL =
-  process.env.CHART_REVIEW_MODEL ?? "deepseek/deepseek-v4-flash";
-
-// #46 — when set, this model is used for any patient flagged `phi: true` in
-// meta.json. Operators should point this to a HIPAA-eligible deployment
-// (e.g. AWS Bedrock Anthropic, Azure-hosted, etc.) and ensure the runtime's
-// ANTHROPIC_BASE_URL / OAuth credentials are configured to match. If unset,
-// PHI patients fall back to the default model — that's the safe-by-default
-// behavior; operators MUST explicitly opt in to a separate route.
-const PHI_MODEL = process.env.CHART_REVIEW_PHI_MODEL;
+// Model selection is centralized in model-config.ts. Every default and
+// env-var fallback for which model serves which feature lives there; this
+// module just calls modelFor() at the seams below. See model-config.ts
+// for resolution order and how to add new feature slots.
+import { modelFor } from "./model-config.js";
 
 function buildSystemPrompt(input: ComposeAgentInput): string {
   const lines: string[] = [];
@@ -108,22 +103,27 @@ export function composeAgentOptions(input: ComposeAgentInput): ComposeAgentOptio
   }
   // #46 — explicit caller-provided model wins; otherwise pick PHI vs.
   // default. Logged once per call so operators can audit which patients
-  // route via the HIPAA-eligible deployment.
+  // route via the HIPAA-eligible deployment. Resolution lives in
+  // model-config.ts; we just ask `modelFor()` for each slot.
   let model = input.model;
   if (!model) {
-    if (input.phi && PHI_MODEL) {
-      model = PHI_MODEL;
-      console.log(
-        `[compose-agent] phi=true → routing ${input.patientId ?? "(no pid)"} to PHI model: ${PHI_MODEL}`,
-      );
-    } else if (input.phi && !PHI_MODEL) {
-      console.warn(
-        `[compose-agent] phi=true but CHART_REVIEW_PHI_MODEL is not set; ` +
-        `falling back to default. This is unsafe for real PHI — set the env var or refuse.`,
-      );
-      model = DEFAULT_MODEL;
+    if (input.phi) {
+      const phiModel = modelFor("phi");
+      if (phiModel) {
+        model = phiModel;
+        console.log(
+          `[compose-agent] phi=true → routing ${input.patientId ?? "(no pid)"} to PHI model: ${phiModel}`,
+        );
+      } else {
+        console.warn(
+          `[compose-agent] phi=true but no PHI model configured ` +
+            `(CHART_REVIEW_PHI_MODEL unset and no fallback). Falling back to ` +
+            `default. This is unsafe for real PHI — set the env var or refuse.`,
+        );
+        model = modelFor("default");
+      }
     } else {
-      model = DEFAULT_MODEL;
+      model = modelFor("default");
     }
   }
   return {

@@ -16,6 +16,7 @@
 import fs from "fs";
 import path from "path";
 import { query } from "@anthropic-ai/claude-agent-sdk";
+import { modelFor } from "./model-config.js";
 import { computeQAStats } from "./qa-panel.js";
 import { loadCompiledTask } from "./tasks.js";
 import { PLATFORM_ROOT } from "./patients.js";
@@ -198,7 +199,7 @@ export async function draftMethodsSection(
     run_id: runId,
     generated_at: generatedAt,
     guideline_sha: guidelineSha,
-    model: process.env.CHART_REVIEW_MODEL ?? "(default)",
+    model: modelFor("default") ?? "(unset)",
     duration_ms: Date.now() - startedAt,
     cost_usd: cost,
     qa_snapshot: qa,
