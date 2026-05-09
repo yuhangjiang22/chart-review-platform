@@ -33,4 +33,8 @@ cohorts/
 # Runtime artifacts (eval / scripts output)
 chart-review-platform/app/scripts/eval-parity-results.json
 .claude/worktrees/
-workspace/
+# Anchored: only the repo-root scratchpad workspace directory, NOT the
+# React Workspace component folder (app/client/src/ui/Workspace/). On
+# case-insensitive filesystems the unanchored pattern collides with
+# the React folder and silently excludes ~30 component files.
+/workspace/

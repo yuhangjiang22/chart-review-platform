@@ -12,6 +12,7 @@ import type { WSClient, IncomingWSMessage } from "./types.js";
 import { chatStore } from "./chat-store.js";
 import { Session } from "./session.js";
 import { PLATFORM_ROOT, listPatients, listNotes, readNote, readStructured } from "./patients.js";
+import { modelFor, describeAllModels } from "./model-config.js";
 import { listCompiledTasks, loadCompiledTask } from "./tasks.js";
 import {
   applyUiAction,
@@ -270,7 +271,7 @@ app.use(codifyRouter());
 // Runtime info — model + key task ids — for the UI header.
 app.get("/api/runtime", (_req, res) => {
   res.json({
-    model: process.env.CHART_REVIEW_MODEL ?? "(default)",
+    model: modelFor("default") ?? "(unset)",
     base_url: process.env.ANTHROPIC_BASE_URL ?? "(default — direct anthropic)",
     default_task_id: DEFAULT_TASK_ID,
     auth_mode: authMode(),
@@ -659,7 +660,14 @@ app.get("/api/agent-roles", (_req, res) => {
 });
 
 app.get("/api/agent-roles/default-model", (_req, res) => {
-  res.json({ default_model: process.env.CHART_REVIEW_MODEL ?? null });
+  res.json({ default_model: modelFor("default") ?? null });
+});
+
+// Diagnostics — surface every feature's resolved model + source
+// (env var vs hardcoded fallback) so operators can audit routing
+// without grepping logs. Mirrors describeAllModels() in model-config.ts.
+app.get("/api/diagnostics/models", (_req, res) => {
+  res.json({ models: describeAllModels() });
 });
 
 // pilot iterations routes (start, list, stats, eligibility,
