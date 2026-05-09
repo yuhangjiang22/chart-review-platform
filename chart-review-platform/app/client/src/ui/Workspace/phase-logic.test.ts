@@ -1,0 +1,143 @@
+import { describe, it, expect } from "vitest";
+import { derivePhase } from "./phase-logic";
+import type { IterState, CellCounts } from "./phase-logic";
+
+const noCells: CellCounts = { validated: 0, total: 10, stale: 0, patient_count: 0 };
+const allFresh: CellCounts = { validated: 10, total: 10, stale: 0, patient_count: 10 };
+const partialNoStale: CellCounts = { validated: 5, total: 10, stale: 0, patient_count: 10 };
+const partialWithStale: CellCounts = { validated: 10, total: 10, stale: 2, patient_count: 10 };
+
+describe("derivePhase — rule 1: locked + deployed", () => {
+  it("returns DEPLOY when maturity locked and deployedCohortExists true", () => {
+    const result = derivePhase("locked", null, noCells, true);
+    expect(result.phase).toBe("DEPLOY");
+  });
+});
+
+describe("derivePhase — rule 2: locked, no deploy", () => {
+  it("returns LOCK when maturity locked and no deployed cohort", () => {
+    const result = derivePhase("locked", null, noCells, false);
+    expect(result.phase).toBe("LOCK");
+    expect(result.status_label).toBe("ready to deploy");
+  });
+});
+
+describe("derivePhase — rule 3: complete + all fresh → DECIDE (clean)", () => {
+  it("returns DECIDE with 'validation complete' when iter complete and all cells fresh", () => {
+    const result = derivePhase("draft", { state: "complete" } as IterState, allFresh, false);
+    expect(result.phase).toBe("DECIDE");
+    expect(result.status_label).toBe("validation complete");
+  });
+});
+
+describe("derivePhase — rule 4: complete + stale cells → DECIDE (stale)", () => {
+  it("returns DECIDE with 'complete, stale cells' when iter complete but cells stale", () => {
+    const result = derivePhase("draft", { state: "complete" } as IterState, partialWithStale, false);
+    expect(result.phase).toBe("DECIDE");
+    expect(result.status_label).toBe("complete, stale cells");
+  });
+});
+
+describe("derivePhase — rule 5: ready_to_validate with some validated → VALIDATE mid-flight", () => {
+  it("returns VALIDATE when ready_to_validate and some cells validated", () => {
+    const result = derivePhase("draft", { state: "ready_to_validate" } as IterState, partialNoStale, false);
+    expect(result.phase).toBe("VALIDATE");
+    expect(result.status_label).toBe("validating");
+    expect(result.completeness).toEqual({ done: 5, total: 10 });
+  });
+});
+
+describe("derivePhase — rule 5b: running + any validated → VALIDATE mid-flight", () => {
+  it("returns VALIDATE when running and some cells validated", () => {
+    const result = derivePhase("draft", { state: "running" } as IterState, partialNoStale, false);
+    expect(result.phase).toBe("VALIDATE");
+    expect(result.status_label).toBe("validating");
+  });
+});
+
+describe("derivePhase — rule 6: running + no validated → TRY", () => {
+  it("returns TRY when agent running and no cells validated", () => {
+    const result = derivePhase("draft", { state: "running" } as IterState, noCells, false);
+    expect(result.phase).toBe("TRY");
+    expect(result.status_label).toBe("running");
+  });
+});
+
+describe("derivePhase — rule 7: ready_to_validate + no validated → VALIDATE waiting", () => {
+  it("returns VALIDATE when ready_to_validate but no cell validated yet", () => {
+    const result = derivePhase("draft", { state: "ready_to_validate" } as IterState, noCells, false);
+    expect(result.phase).toBe("VALIDATE");
+    expect(result.status_label).toBe("awaiting validation");
+  });
+});
+
+describe("derivePhase — rule 8: no iter → AUTHOR", () => {
+  it("returns AUTHOR when no iter", () => {
+    const result = derivePhase("draft", null, noCells, false);
+    expect(result.phase).toBe("AUTHOR");
+  });
+
+  it("returns AUTHOR when iter is abandoned", () => {
+    const result = derivePhase("draft", { state: "abandoned" } as IterState, noCells, false);
+    expect(result.phase).toBe("AUTHOR");
+  });
+});
+
+import { deriveNextCTA } from "./phase-logic";
+import type { CTADescriptor } from "./phase-logic";
+
+describe("deriveNextCTA — AUTHOR phase", () => {
+  it("returns 'Edit guideline' when idle (no cells)", () => {
+    const cta = deriveNextCTA("AUTHOR", "authoring", { validated: 0, total: 0, stale: 0, patient_count: 0 });
+    expect(cta.label).toBe("Edit guideline");
+    expect(cta.action).toBe("open-draft");
+  });
+});
+
+describe("deriveNextCTA — TRY phase", () => {
+  it("returns 'Run agent' CTA referencing patient count", () => {
+    const cta = deriveNextCTA("TRY", "running", { validated: 0, total: 88, stale: 0, patient_count: 8 });
+    expect(cta.label).toMatch(/Run agent on 8 patients/);
+    expect(cta.action).toBe("run-agent");
+  });
+});
+
+describe("deriveNextCTA — VALIDATE phase, partial", () => {
+  it("returns 'Validate next patient' while cells remain", () => {
+    const cta = deriveNextCTA("VALIDATE", "validating", { validated: 3, total: 10, stale: 0, patient_count: 10 });
+    expect(cta.label).toBe("Validate next patient");
+    expect(cta.action).toBe("open-validate");
+  });
+});
+
+describe("deriveNextCTA — VALIDATE phase, complete", () => {
+  it("returns 'Continue to DECIDE' when all validated", () => {
+    const cta = deriveNextCTA("VALIDATE", "validating", { validated: 10, total: 10, stale: 0, patient_count: 10 });
+    expect(cta.label).toBe("All validated — continue to DECIDE");
+    expect(cta.action).toBe("advance-decide");
+  });
+});
+
+describe("deriveNextCTA — DECIDE phase", () => {
+  it("returns Revise CTA when status is validation complete", () => {
+    const cta = deriveNextCTA("DECIDE", "validation complete", { validated: 10, total: 10, stale: 0, patient_count: 10 });
+    expect(cta.label).toBe("Revise");
+    expect(cta.action).toBe("revise");
+  });
+});
+
+describe("deriveNextCTA — LOCK phase", () => {
+  it("returns 'Run calibration' CTA", () => {
+    const cta = deriveNextCTA("LOCK", "ready to deploy", { validated: 10, total: 10, stale: 0, patient_count: 10 });
+    expect(cta.label).toBe("Run calibration");
+    expect(cta.action).toBe("run-calibration");
+  });
+});
+
+describe("deriveNextCTA — DEPLOY phase", () => {
+  it("returns 'Run on cohort' CTA", () => {
+    const cta = deriveNextCTA("DEPLOY", "deployed", { validated: 0, total: 0, stale: 0, patient_count: 0 });
+    expect(cta.label).toBe("Run on cohort");
+    expect(cta.action).toBe("run-cohort");
+  });
+});
