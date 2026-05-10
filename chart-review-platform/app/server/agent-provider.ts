@@ -81,10 +81,14 @@ export async function getAgentProvider(): Promise<AgentProvider> {
       cached = new ClaudeAgentProvider();
       return cached;
     }
-    // case "codex": { ... } — wire up when the impl lands
+    case "codex": {
+      const { CodexAgentProvider } = await import("./agent-provider-codex.js");
+      cached = new CodexAgentProvider();
+      return cached;
+    }
     default:
       throw new Error(
-        `Unknown AGENT_PROVIDER=${choice}. Supported: "claude" (or unset).`,
+        `Unknown AGENT_PROVIDER=${choice}. Supported: "claude" (default), "codex".`,
       );
   }
 }
