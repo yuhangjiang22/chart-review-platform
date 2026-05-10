@@ -242,15 +242,9 @@ export function readAuditLines(runId: string, patientId: string): string[] {
 }
 
 // ── write helpers ────────────────────────────────────────────────────────────
-
-/** Atomic write — temp file + rename. */
-export function atomicWriteJson(filepath: string, value: unknown): void {
-  const dir = path.dirname(filepath);
-  fs.mkdirSync(dir, { recursive: true });
-  const tmp = `${filepath}.${process.pid}.${Date.now()}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(value, null, 2));
-  fs.renameSync(tmp, filepath);
-}
+// atomicWriteJson is imported above from ../../storage.js. Re-exported
+// here so callers that import via the batch-run barrel keep working.
+export { atomicWriteJson };
 
 export function deleteRun(runId: string): boolean {
   const dir = runDir(runId);
@@ -284,6 +278,7 @@ export function generateRunId(now = new Date()): string {
 import { withReviewsRoot } from "../../domain/review/index.js";
 import { runAgent } from "../../agent-provider.js";
 import { modelFor } from "../../model-config.js";
+import { atomicWriteJson } from "../../storage.js";
 import { makeReviewMcpServer } from "../../mcp-tools.js";
 import { buildAuditHooks } from "../../audit-trail.js";
 import { loadCompiledTask } from "../../tasks.js";
