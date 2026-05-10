@@ -671,11 +671,17 @@ async function runOneAgent(
     // MCP_TRANSPORT env var. The default is in-process for backward
     // compat; set MCP_TRANSPORT=subprocess to spawn the standalone
     // stdio server for non-Anthropic providers (Codex etc.).
+    //
+    // Pass scratchRoot to the subprocess via env var: the in-process
+    // path uses AsyncLocalStorage (`withReviewsRoot`) to redirect
+    // writes here, but that context doesn't cross process boundaries.
+    // The subprocess server reads CHART_REVIEW_REVIEWS_ROOT env var.
     const mcpServers: Record<string, unknown> = buildMcpServersConfig(
       patientId,
       task,
       sessionId,
       { onStateUpdate: () => {} },
+      { reviewsRoot: scratchRoot },
     );
     const sdkHooks: Record<string, Array<{ hooks: any[] }>> = {
       PreToolUse: [{ hooks: [auditHooks.pre] }],

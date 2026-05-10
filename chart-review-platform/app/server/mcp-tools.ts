@@ -244,6 +244,21 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const STDIO_SERVER_PATH = path.join(__dirname, "mcp-stdio-server.ts");
 
+/** Optional overrides the call site needs to flow into the subprocess
+ *  env vars. The most important one is `reviewsRoot` — the parent
+ *  process uses `withReviewsRoot()` AsyncLocalStorage to redirect
+ *  writes to a scratch directory during a single agent run, but
+ *  AsyncLocalStorage doesn't cross process boundaries. The subprocess
+ *  has to be told about the redirect explicitly via the
+ *  CHART_REVIEW_REVIEWS_ROOT env var. */
+export interface BuildMcpServersOptions {
+  /** Per-run override for the reviews root. The subprocess will
+   *  receive this as CHART_REVIEW_REVIEWS_ROOT, which review-state.ts
+   *  honors (taking precedence over the default
+   *  `<PLATFORM_ROOT>/reviews/`). */
+  reviewsRoot?: string;
+}
+
 /**
  * Build the `mcpServers` config the Anthropic SDK consumes for an
  * agent run. Picks transport based on the `MCP_TRANSPORT` env var:
@@ -271,19 +286,29 @@ export function buildMcpServersConfig(
   task: CompiledTask,
   sessionId: string,
   hooks: ReviewToolHooks,
+  opts: BuildMcpServersOptions = {},
 ): Record<string, unknown> {
   if (process.env.MCP_TRANSPORT === "subprocess") {
+    const env: Record<string, string> = {
+      ...(process.env as Record<string, string>),
+      CHART_REVIEW_MCP_PATIENT_ID: patientId,
+      CHART_REVIEW_MCP_TASK_ID: task.task_id,
+      CHART_REVIEW_MCP_SESSION_ID: sessionId,
+    };
+    // The reviewsRoot override is what makes the per-run scratch
+    // directory work across the process boundary. Without it, the
+    // subprocess writes to <PLATFORM_ROOT>/reviews/ and runs.ts's
+    // post-run check (looking at scratchRoot) sees nothing, failing
+    // with "did not write review_state.json".
+    if (opts.reviewsRoot) {
+      env.CHART_REVIEW_REVIEWS_ROOT = opts.reviewsRoot;
+    }
     return {
       chart_review_state: {
         type: "stdio" as const,
         command: "npx",
         args: ["tsx", STDIO_SERVER_PATH],
-        env: {
-          ...(process.env as Record<string, string>),
-          CHART_REVIEW_MCP_PATIENT_ID: patientId,
-          CHART_REVIEW_MCP_TASK_ID: task.task_id,
-          CHART_REVIEW_MCP_SESSION_ID: sessionId,
-        },
+        env,
       },
     };
   }
