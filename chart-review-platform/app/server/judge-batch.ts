@@ -20,6 +20,7 @@ import { pilotIterDir } from "./domain/iter/pilots.js";
 import { runDir, getRunStatus } from "./infra/batch-run/index.js";
 import { loadAgentDrafts, type FieldAssessment } from "./disagreements.js";
 import { loadCriteria } from "./domain/rubric/index.js";
+import { atomicWriteJson } from "./storage.js";
 import {
   judgeCell,
   type JudgeAnalysis,
@@ -58,13 +59,6 @@ export interface JudgeAnalysesFile {
 
 function judgeAnalysesPath(taskId: string, iterId: string): string {
   return path.join(pilotIterDir(taskId, iterId), "judge_analyses.json");
-}
-
-function atomicWriteJson(filepath: string, value: unknown): void {
-  fs.mkdirSync(path.dirname(filepath), { recursive: true });
-  const tmp = `${filepath}.${process.pid}.${Date.now()}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(value, null, 2));
-  fs.renameSync(tmp, filepath);
 }
 
 function snapshotFromFA(agentId: string, fa: FieldAssessment): JudgeAgentSnapshot {

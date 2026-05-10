@@ -18,6 +18,7 @@ import { loadCompiledTask } from "./tasks.js";
 import { REVIEWS_ROOT } from "./domain/review/index.js";
 import { readAuditEntries } from "./audit-trail.js";
 import { generatePdf } from "./methodologist-pdf.js";
+import { readJsonOrNull } from "./storage.js";
 
 /** Re-read each call so tests can override CHART_REVIEW_REVIEWS_ROOT. */
 function reviewsRoot(): string {
@@ -148,17 +149,13 @@ function collectSampleRecordIds(
   for (const pid of fs.readdirSync(root)) {
     if (pid.startsWith("_")) continue;
     const rsPath = path.join(root, pid, taskId, "review_state.json");
-    if (!fs.existsSync(rsPath)) continue;
-    try {
-      const rs = JSON.parse(fs.readFileSync(rsPath, "utf8")) as {
-        locked_at?: string;
-        updated_at?: string;
-        review_status?: string;
-      };
-      candidates.push({ pid, ...rs });
-    } catch {
-      continue;
-    }
+    const rs = readJsonOrNull<{
+      locked_at?: string;
+      updated_at?: string;
+      review_status?: string;
+    }>(rsPath);
+    if (!rs) continue;
+    candidates.push({ pid, ...rs });
   }
 
   const locked = candidates

@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import { readAuditEntries } from "./audit-trail.js";
 import { replayReviewerAnswers, computeKappaProper } from "./kappa.js";
+import { readJsonOrNull } from "./storage.js";
 
 export interface CriterionStats {
   total: number;
@@ -66,20 +67,14 @@ export async function computeQAStats(
   };
   if (!fs.existsSync(reviewsRoot)) return stats;
 
-  // Walk reviews/<*>/<taskId>/review_state.json — skip _* directories
+  // Walk reviews/<*>/<taskId>/review_state.json — skip _* directories.
+  // readJsonOrNull handles missing-file + malformed-JSON cases uniformly.
   const allRecords: Array<{ pid: string; state: MinimalState }> = [];
   for (const pid of fs.readdirSync(reviewsRoot)) {
     if (pid.startsWith("_")) continue;
     const rsPath = path.join(reviewsRoot, pid, taskId, "review_state.json");
-    if (!fs.existsSync(rsPath)) continue;
-    try {
-      const state = JSON.parse(
-        fs.readFileSync(rsPath, "utf8"),
-      ) as MinimalState;
-      allRecords.push({ pid, state });
-    } catch {
-      // skip malformed files
-    }
+    const state = readJsonOrNull<MinimalState>(rsPath);
+    if (state) allRecords.push({ pid, state });
   }
 
   stats.total_records = allRecords.length;
