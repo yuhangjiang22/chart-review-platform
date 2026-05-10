@@ -1,36 +1,34 @@
 # Skills Index
 
-Skills in this folder are discovered flat by the Claude Agent SDK — they all sit
-at this level on purpose. Subdirectories are not recursively scanned, so
-**moving any skill into a subfolder will break SDK discovery.** This index
+Skills in this folder are discovered flat by both the Anthropic Claude Agent
+SDK (via the `.claude/skills` symlink to here) and OpenAI Codex (which looks
+for `.agents/skills/` natively). Subdirectories are not recursively scanned,
+so **moving any skill into a subfolder will break SDK discovery.** This index
 groups them by role so you can find what you need without reorganizing files.
 
-There are 23 skills in three groups:
-- **9 lifecycle skills** — used by every task, applied across all rubrics
+There are 22 skills in two groups:
+- **10 lifecycle skills** — used by every task, applied across all rubrics
 - **12 phenotype rubrics** — one per study, each carrying its own criteria
-- **2 placeholders** — scaffolding, candidates for cleanup
 
 ---
 
-## Lifecycle skills (9)
+## Lifecycle skills (10)
 
 The platform's procedural skills, applied across all rubrics. Activated by
 description match in the user prompt.
 
-| Skill | Phase | Role | SKILL.md | Total .md |
-|---|---|---|---:|---:|
-| `chart-review`           | runtime   | Universal reviewer — reads notes, cites evidence, commits via MCP   | 144 | 973 |
-| `chart-review-author`    | DRAFT     | Batch rubric drafting from a published guideline / SOP / paper      | 190 | 277 |
-| `chart-review-build`     | DRAFT     | Interactive 7-phase rubric authoring interview                      | 254 | 1000 |
-| `chart-review-calibrate` | CALIBRATE | Computes per-criterion Cohen's κ from blind dual-reviewer samples   | 134 | 195 |
-| `chart-review-improve`   | CALIBRATE | Clusters disagreements + override patterns into rubric edit proposals| 220 | 557 |
-| `chart-review-copilot`   | VALIDATE  | Read-only copilot for the human reviewer during validation          | 175 | 175 |
-| `chart-review-codify`    | POST-LOCK | Mines validated cohort for keyword / code / note-type anchors       | 88  | 134 |
-| `chart-review-cohort`    | DEPLOY    | Cohort drift detection + override pattern analysis                  | 169 | 169 |
-| `chart-review-methods`   | PUBLISH   | Drafts past-tense Methods section from locked rubric + κ stats      | 150 | 376 |
-
-`SKILL.md` = the entry-point file's line count. `Total .md` = sum of all markdown
-lines in the skill folder (entry point + references).
+| Skill | Phase | Role |
+|---|---|---|
+| `chart-review`           | runtime   | Universal reviewer — reads notes, cites evidence, commits via MCP |
+| `chart-review-author`    | DRAFT     | Batch rubric drafting from a published guideline / SOP / paper |
+| `chart-review-build`     | DRAFT     | Interactive 7-phase rubric authoring interview |
+| `chart-review-calibrate` | CALIBRATE | Computes per-criterion Cohen's κ from blind dual-reviewer samples |
+| `chart-review-improve`   | CALIBRATE | Clusters disagreements + override patterns into rubric edit proposals |
+| `chart-review-judge`     | JUDGE     | LLM-as-judge pre-screening of disagreements + low-confidence + type-drift cells before reviewer adjudication |
+| `chart-review-copilot`   | VALIDATE  | Read-only copilot for the human reviewer during validation |
+| `chart-review-codify`    | POST-LOCK | Mines validated cohort for keyword / code / note-type anchors |
+| `chart-review-cohort`    | DEPLOY    | Cohort drift detection + override pattern analysis |
+| `chart-review-methods`   | PUBLISH   | Drafts past-tense Methods section from locked rubric + κ stats |
 
 ---
 
@@ -64,19 +62,6 @@ development; the parent rubric is `lung-cancer-phenotype`.
 ~10× the markdown of any other phenotype, full source-document SHA pinned,
 9 completed pilot iters under `pilots/`, and the only one with end-to-end
 synthetic corpus + ground truth wired up.
-
----
-
-## Placeholders (2)
-
-| Skill | Status | Notes |
-|---|---|---|
-| `chart-review-task1` | (no meta.yaml) | 1 criterion, no `final_output` defined — appears to be scaffolding |
-| `chart-review-test`  | (no meta.yaml) | Empty (no criteria, ~6 lines total) |
-
-Neither has a `meta.yaml`, which means they're not registered as tasks by the
-backend (`/api/tasks` only returns skills with valid metadata). Safe to delete
-without affecting the SDK or the Studio.
 
 ---
 
