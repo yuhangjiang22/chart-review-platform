@@ -288,7 +288,14 @@ export function buildMcpServersConfig(
   hooks: ReviewToolHooks,
   opts: BuildMcpServersOptions = {},
 ): Record<string, unknown> {
-  if (process.env.MCP_TRANSPORT === "subprocess") {
+  // Codex (and any future non-Anthropic provider) can't host an
+  // in-process Anthropic-SDK server, so subprocess transport is the
+  // only viable shape. Auto-promote when AGENT_PROVIDER demands it,
+  // even if the operator didn't set MCP_TRANSPORT explicitly.
+  const provider = (process.env.AGENT_PROVIDER ?? "claude").toLowerCase();
+  const wantsSubprocess =
+    process.env.MCP_TRANSPORT === "subprocess" || provider === "codex";
+  if (wantsSubprocess) {
     const env: Record<string, string> = {
       ...(process.env as Record<string, string>),
       CHART_REVIEW_MCP_PATIENT_ID: patientId,

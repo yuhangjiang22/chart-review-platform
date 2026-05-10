@@ -25,12 +25,35 @@ export type ModelFeature =
 /** Hardcoded fallback when no env var is set. Edit here to change the
  *  shipped default for a given feature. Operators usually override these
  *  via env vars; the fallback exists so a fresh checkout works without
- *  configuration. */
-const DEFAULTS: Record<ModelFeature, string | undefined> = {
+ *  configuration.
+ *
+ *  Provider-aware defaults: when AGENT_PROVIDER=codex, the Anthropic
+ *  model IDs don't apply. ChatGPT-account auth (Codex's default) only
+ *  permits a small set of models, and `gpt-5-codex` is rejected (per
+ *  spike). Setting model to undefined for the codex provider lets
+ *  Codex pick its own default. Operators can still override via the
+ *  feature env vars or by passing `model` per-call in code. */
+const ANTHROPIC_DEFAULTS: Record<ModelFeature, string | undefined> = {
   default: "anthropic/claude-haiku-4.5",
   judge: "anthropic/claude-sonnet-4.6",
   phi: undefined, // No safe shipped default — operators MUST set CHART_REVIEW_PHI_MODEL
 };
+
+const CODEX_DEFAULTS: Record<ModelFeature, string | undefined> = {
+  default: undefined, // let codex pick — ChatGPT auth restricts choices
+  judge: undefined,
+  phi: undefined,
+};
+
+function activeProvider(): "claude" | "codex" {
+  return (process.env.AGENT_PROVIDER ?? "claude").toLowerCase() === "codex"
+    ? "codex"
+    : "claude";
+}
+
+function defaultsForProvider(): Record<ModelFeature, string | undefined> {
+  return activeProvider() === "codex" ? CODEX_DEFAULTS : ANTHROPIC_DEFAULTS;
+}
 
 /** Map a feature to the env var operators use to override its model. */
 function envVarFor(feature: ModelFeature): string {
@@ -49,7 +72,7 @@ export function modelFor(feature: ModelFeature, caller?: string): string | undef
   if (caller) return caller;
   const envVal = process.env[envVarFor(feature)];
   if (envVal) return envVal;
-  return DEFAULTS[feature];
+  return defaultsForProvider()[feature];
 }
 
 /** Diagnostic helper: returns the active model resolution for every
@@ -64,11 +87,12 @@ export interface ModelResolution {
 
 export function describeAllModels(): ModelResolution[] {
   const features: ModelFeature[] = ["default", "judge", "phi"];
+  const fallbacks = defaultsForProvider();
   return features.map((f) => {
     const envVar = envVarFor(f);
     const envVal = process.env[envVar];
     if (envVal) return { feature: f, model: envVal, source: "env", envVar };
-    const fallback = DEFAULTS[f];
+    const fallback = fallbacks[f];
     if (fallback) return { feature: f, model: fallback, source: "fallback", envVar };
     return { feature: f, model: undefined, source: "unset", envVar };
   });
