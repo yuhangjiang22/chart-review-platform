@@ -11,6 +11,8 @@
  * mcp-handlers.ts so both adapters benefit.
  */
 
+import path from "path";
+import { fileURLToPath } from "url";
 import { tool, createSdkMcpServer } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
 
@@ -234,4 +236,58 @@ export function makeReviewMcpServer(
     version: "0.6.0",
     tools,
   });
+}
+
+// ── transport selector ──────────────────────────────────────────────────
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const STDIO_SERVER_PATH = path.join(__dirname, "mcp-stdio-server.ts");
+
+/**
+ * Build the `mcpServers` config the Anthropic SDK consumes for an
+ * agent run. Picks transport based on the `MCP_TRANSPORT` env var:
+ *
+ *   - `MCP_TRANSPORT=subprocess` → spawn the standalone stdio server
+ *     at app/server/mcp-stdio-server.ts. Required for non-Anthropic
+ *     providers (Codex, Ollama, etc.) and useful for testing.
+ *
+ *   - any other value (default) → in-process registration via
+ *     `makeReviewMcpServer()` — current behavior.
+ *
+ * The session context (patientId, task, sessionId) is captured the
+ * same way in both transports — closures for in-process, env vars
+ * for subprocess.
+ *
+ * Note: subprocess transport ignores `hooks.onStateUpdate`. The
+ * subprocess can't broadcast WebSocket events back to the parent;
+ * instead, the main server picks up state changes by reading the
+ * filesystem on its next polling cycle. For batch agent runs (where
+ * Studio polls `/api/runs/...` every few seconds anyway) this is
+ * functionally equivalent.
+ */
+export function buildMcpServersConfig(
+  patientId: string,
+  task: CompiledTask,
+  sessionId: string,
+  hooks: ReviewToolHooks,
+): Record<string, unknown> {
+  if (process.env.MCP_TRANSPORT === "subprocess") {
+    return {
+      chart_review_state: {
+        type: "stdio" as const,
+        command: "npx",
+        args: ["tsx", STDIO_SERVER_PATH],
+        env: {
+          ...(process.env as Record<string, string>),
+          CHART_REVIEW_MCP_PATIENT_ID: patientId,
+          CHART_REVIEW_MCP_TASK_ID: task.task_id,
+          CHART_REVIEW_MCP_SESSION_ID: sessionId,
+        },
+      },
+    };
+  }
+  return {
+    chart_review_state: makeReviewMcpServer(patientId, task, sessionId, hooks),
+  };
 }

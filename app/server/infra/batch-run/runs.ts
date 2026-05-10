@@ -279,7 +279,7 @@ import { withReviewsRoot } from "../../domain/review/index.js";
 import { runAgent } from "../../agent-provider.js";
 import { modelFor } from "../../model-config.js";
 import { atomicWriteJson } from "../../storage.js";
-import { makeReviewMcpServer } from "../../mcp-tools.js";
+import { buildMcpServersConfig } from "../../mcp-tools.js";
 import { buildAuditHooks } from "../../audit-trail.js";
 import { loadCompiledTask } from "../../tasks.js";
 import { computeTaskSha } from "../../lock.js";
@@ -667,11 +667,16 @@ async function runOneAgent(
   const auditHooks = buildAuditHooks({ patientId, taskId, sessionId });
 
   await withReviewsRoot(scratchRoot, async () => {
-    const mcpServers: Record<string, unknown> = {
-      chart_review_state: makeReviewMcpServer(patientId, task, sessionId, {
-        onStateUpdate: () => {},
-      }),
-    };
+    // Transport (in-process vs subprocess) is selected by the
+    // MCP_TRANSPORT env var. The default is in-process for backward
+    // compat; set MCP_TRANSPORT=subprocess to spawn the standalone
+    // stdio server for non-Anthropic providers (Codex etc.).
+    const mcpServers: Record<string, unknown> = buildMcpServersConfig(
+      patientId,
+      task,
+      sessionId,
+      { onStateUpdate: () => {} },
+    );
     const sdkHooks: Record<string, Array<{ hooks: any[] }>> = {
       PreToolUse: [{ hooks: [auditHooks.pre] }],
       PostToolUse: [{ hooks: [auditHooks.post] }],
