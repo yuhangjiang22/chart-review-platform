@@ -27,8 +27,14 @@ chart-review-platform/
 ├── docs/            Spec docs (superpowers/specs/) + spike notes
 └── corpus/          20 synthetic patients
 
-.agents/skills/      [PLANNED] Vendor-neutral skills location (Codex compat)
-.claude/skills/      24 skill packages — currently the live skills root
+chart-review-platform/.agents/skills/   Real skills directory (24 packages).
+                                        Vendor-neutral location — Codex looks
+                                        here by default; Anthropic SDK finds
+                                        them via the symlink below.
+chart-review-platform/.claude/skills    Symlink → ../.agents/skills, kept so
+                                        the Anthropic Agent SDK's auto-walk
+                                        for `.claude/skills/` still works
+                                        without configuration.
 ```
 
 ## Architecture in one screen
@@ -129,10 +135,12 @@ See `.claude/skills/README.md` for the full skill index.
    output. Edits to one must be ported to the other; the parity
    test is the canary.
 
-3. **`.claude/skills/<task>/` is a symlink** (planned, not yet) when
-   running under both Claude and Codex. Today it's a real directory.
-   If you're refactoring skill discovery, `.agents/skills/` is the
-   long-term shared location.
+3. **`chart-review-platform/.claude/skills` is a symlink to
+   `../.agents/skills`.** Real skill content lives at
+   `chart-review-platform/.agents/skills/`. The symlink exists so the
+   Anthropic Agent SDK's "walk up to find `.claude/`" still works
+   transparently. If you're modifying skills, edit through either
+   path — they resolve to the same files.
 
 4. **`composeAgentOptions()` returns Anthropic-SDK-shaped options.**
    The `AgentProvider` abstraction normalizes the *call* but
