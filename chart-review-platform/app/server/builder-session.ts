@@ -64,6 +64,12 @@ function autoForkFromLockedIfMissing(taskId: string, draftPath: string): void {
   forkLockedToDraft({ src_task_id: taskId, new_task_id: taskId });
 }
 
+// BuilderSession (like AgentSession in ai-client.ts) is intentionally
+// NOT migrated to AgentProvider yet — its iterator emits raw Anthropic
+// SDK message shapes directly into WebSocket subscribers via the
+// builder UI protocol. Migration would require updating the chat
+// protocol downstream. Other agent invocations all use runAgent();
+// follow up if we wire a Codex provider.
 export class BuilderSession {
   public readonly taskId: string;
   public readonly draftPath: string;

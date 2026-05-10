@@ -18,9 +18,8 @@
 import fs from "fs";
 import path from "path";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
-import { query } from "@anthropic-ai/claude-agent-sdk";
+import { runAgent } from "./agent-provider.js";
 import { PLATFORM_ROOT } from "./patients.js";
-import { composeAgentOptions } from "./compose-agent.js";
 import { loadSkillBundle, guidelineDir, guidelinesRoot } from "./domain/rubric/index.js";
 import { yamlCriterionToSkillMarkdown } from "./domain/rubric/yaml-to-markdown.js";
 import { getMaturity } from "./maturity.js";
@@ -135,50 +134,45 @@ export async function draftTask(
   let errorMessage: string | undefined;
 
   try {
-    for await (const msg of query({
+    for await (const event of runAgent({
       prompt: userPrompt,
-      options: composeAgentOptions({
-        // Scope the Write tool to the draft directory by making it the cwd.
-        // The SDK still walks up to find .claude/skills/ at the platform root.
-        cwd: draftPath,
-        taskId: opts.task_id,
-        // No guidelinePath — this skill is creating the guideline, not consuming one.
-        extraTools: ["Write"],
-        maxTurns: 30,
-        permissionMode: "acceptEdits",
-        extraSystemPrompt:
-          "Activate the `chart-review-author` skill via the Skill tool. Write all " +
-          "files into your current working directory using relative paths. Do not " +
-          "write outside the cwd.",
-      }) as any,
+      // Scope the Write tool to the draft directory by making it the cwd.
+      // The SDK still walks up to find .claude/skills/ at the platform root.
+      cwd: draftPath,
+      taskId: opts.task_id,
+      // No guidelinePath — this skill is creating the guideline, not consuming one.
+      extraTools: ["Write"],
+      maxTurns: 30,
+      permissionMode: "acceptEdits",
+      extraSystemPrompt:
+        "Activate the `chart-review-author` skill via the Skill tool. Write all " +
+        "files into your current working directory using relative paths. Do not " +
+        "write outside the cwd.",
     })) {
-      const m = msg as any;
-      // Translate SDK stream events into AuthoringEvents for the
-      // optional onEvent callback. The chat agent SDK emits assistant
-      // text, tool_use, and tool_result objects with a stable shape.
-      if (m?.type === "assistant" && m?.message?.content) {
-        const content = m.message.content;
-        if (typeof content === "string") {
-          emit({ kind: "assistant_text", payload: content });
-        } else if (Array.isArray(content)) {
-          for (const block of content) {
-            if (block?.type === "text" && block.text) {
-              emit({ kind: "assistant_text", payload: block.text });
-            } else if (block?.type === "tool_use") {
-              emit({ kind: "tool_use", payload: { name: block.name, input: block.input } });
-            }
-          }
-        }
-      } else if (m?.type === "user" && Array.isArray(m?.message?.content)) {
-        for (const block of m.message.content) {
-          if (block?.type === "tool_result") {
-            emit({ kind: "tool_result", payload: { tool_use_id: block.tool_use_id, is_error: !!block.is_error } });
-          }
-        }
-      } else if (m?.type === "result") {
-        success = m.subtype === "success";
-        cost = m.total_cost_usd;
-        emit({ kind: "result", payload: { subtype: m.subtype, total_cost_usd: m.total_cost_usd } });
+      // Translate normalized AgentEvents into AuthoringEvents for the
+      // optional onEvent callback.
+      if (event.type === "text") {
+        emit({ kind: "assistant_text", payload: event.text });
+      } else if (event.type === "tool_use") {
+        emit({
+          kind: "tool_use",
+          payload: { name: event.tool_name, input: event.tool_input },
+        });
+      } else if (event.type === "tool_result") {
+        emit({
+          kind: "tool_result",
+          payload: { tool_use_id: event.tool_use_id, is_error: false },
+        });
+      } else if (event.type === "result") {
+        success = event.subtype === "success";
+        cost = event.cost_usd;
+        emit({
+          kind: "result",
+          payload: { subtype: event.subtype, total_cost_usd: event.cost_usd },
+        });
+      } else if (event.type === "error") {
+        errorMessage = event.error;
+        emit({ kind: "error", payload: event.error });
       }
     }
   } catch (e) {

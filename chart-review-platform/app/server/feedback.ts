@@ -17,9 +17,8 @@
 
 import fs from "fs";
 import path from "path";
-import { query } from "@anthropic-ai/claude-agent-sdk";
+import { runAgent } from "./agent-provider.js";
 import { PLATFORM_ROOT } from "./patients.js";
-import { composeAgentOptions } from "./compose-agent.js";
 import { loadCompiledTask } from "./tasks.js";
 import { guidelineDir } from "./domain/rubric/index.js";
 
@@ -126,26 +125,26 @@ export async function analyzeCohort(
   let errorMessage: string | undefined;
 
   try {
-    for await (const msg of query({
+    for await (const event of runAgent({
       prompt: userPrompt,
-      options: composeAgentOptions({
-        cwd: PLATFORM_ROOT,
-        taskId: opts.task_id,
-        guidelinePath,
-        extraTools: ["Write"],
-        maxTurns: 50,
-        permissionMode: "acceptEdits",
-        extraSystemPrompt:
-          "Activate the `chart-review-cohort` skill via the Skill tool. Follow its " +
-          "procedure to walk every review_state.json for this guideline, detect " +
-          "drift, cluster overrides, and emit feedback.json + feedback.md to " +
-          "the output paths in the user message. Do NOT propose edits — that's " +
-          "the `chart-review-improve` skill's job.",
-      }) as any,
+      cwd: PLATFORM_ROOT,
+      taskId: opts.task_id,
+      guidelinePath,
+      extraTools: ["Write"],
+      maxTurns: 50,
+      permissionMode: "acceptEdits",
+      extraSystemPrompt:
+        "Activate the `chart-review-cohort` skill via the Skill tool. Follow its " +
+        "procedure to walk every review_state.json for this guideline, detect " +
+        "drift, cluster overrides, and emit feedback.json + feedback.md to " +
+        "the output paths in the user message. Do NOT propose edits — that's " +
+        "the `chart-review-improve` skill's job.",
     })) {
-      if ((msg as any)?.type === "result") {
-        success = (msg as any).subtype === "success";
-        cost = (msg as any).total_cost_usd;
+      if (event.type === "result") {
+        success = event.subtype === "success";
+        cost = event.cost_usd;
+      } else if (event.type === "error") {
+        errorMessage = event.error;
       }
     }
   } catch (e) {

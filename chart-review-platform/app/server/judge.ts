@@ -12,8 +12,7 @@
 // Output schema is documented in .claude/skills/chart-review-judge/SKILL.md.
 
 import path from "path";
-import { query } from "@anthropic-ai/claude-agent-sdk";
-import { composeAgentOptions } from "./compose-agent.js";
+import { runAgent } from "./agent-provider.js";
 import { modelFor } from "./model-config.js";
 import { patientDir, PLATFORM_ROOT, isPhiPatient } from "./patients.js";
 import { phenotypeSkillDir } from "./domain/rubric/index.js";
@@ -219,28 +218,25 @@ export async function judgeCell(input: JudgeInput): Promise<JudgeOutput> {
   let cost: number | undefined;
 
   try {
-    for await (const msg of query({
+    for await (const event of runAgent({
       prompt: buildUserPrompt(input),
-      options: composeAgentOptions({
-        cwd,
-        patientId: input.patientId,
-        taskId: input.taskId,
-        guidelinePath,
-        phi: isPhiPatient(input.patientId),
-        maxTurns: 24,
-        model: JUDGE_MODEL,
-        extraSystemPrompt:
-          "You are the chart-review-judge skill. Produce ONE strict-JSON " +
-          "record wrapped in <JUDGE_ANALYSIS> sentinels. Do not commit, " +
-          "do not edit, do not narrate.",
-      }) as any,
+      cwd,
+      patientId: input.patientId,
+      taskId: input.taskId,
+      guidelinePath,
+      phi: isPhiPatient(input.patientId),
+      maxTurns: 24,
+      model: JUDGE_MODEL,
+      extraSystemPrompt:
+        "You are the chart-review-judge skill. Produce ONE strict-JSON " +
+        "record wrapped in <JUDGE_ANALYSIS> sentinels. Do not commit, " +
+        "do not edit, do not narrate.",
     })) {
-      const m = msg as any;
-      if (m?.type === "result") {
-        const r = m.result as string | undefined;
-        if (r) resultText = r;
-        const c = m.total_cost_usd as number | undefined;
-        if (typeof c === "number") cost = c;
+      if (event.type === "result") {
+        if (event.result) resultText = event.result;
+        if (typeof event.cost_usd === "number") cost = event.cost_usd;
+      } else if (event.type === "error") {
+        throw new Error(event.error);
       }
     }
   } catch (e) {

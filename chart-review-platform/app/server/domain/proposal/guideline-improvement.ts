@@ -14,9 +14,8 @@
 
 import fs from "fs";
 import path from "path";
-import { query } from "@anthropic-ai/claude-agent-sdk";
+import { runAgent } from "../../agent-provider.js";
 import { PLATFORM_ROOT } from "../../patients.js";
-import { composeAgentOptions } from "../../compose-agent.js";
 import { loadSkillBundle, guidelineDir } from "../rubric/index.js";
 
 function proposalsRoot(): string {
@@ -218,26 +217,26 @@ export async function improveGuideline(
   let errorMessage: string | undefined;
 
   try {
-    for await (const msg of query({
+    for await (const event of runAgent({
       prompt: userPrompt,
-      options: composeAgentOptions({
-        cwd: PLATFORM_ROOT,
-        taskId: opts.guideline_id,
-        guidelinePath,
-        extraTools: ["Write"],
-        maxTurns: 50,
-        permissionMode: "acceptEdits",
-        extraSystemPrompt:
-          "Activate the `chart-review-improve` skill via the Skill tool. Follow " +
-          "its procedure to cluster reviewer overrides into concrete proposed edits. " +
-          "Each proposal goes to a separate YAML file at the proposals output " +
-          "directory provided in the user message; never modify files under " +
-          "`guidelines/`.",
-      }) as any,
+      cwd: PLATFORM_ROOT,
+      taskId: opts.guideline_id,
+      guidelinePath,
+      extraTools: ["Write"],
+      maxTurns: 50,
+      permissionMode: "acceptEdits",
+      extraSystemPrompt:
+        "Activate the `chart-review-improve` skill via the Skill tool. Follow " +
+        "its procedure to cluster reviewer overrides into concrete proposed edits. " +
+        "Each proposal goes to a separate YAML file at the proposals output " +
+        "directory provided in the user message; never modify files under " +
+        "`guidelines/`.",
     })) {
-      if ((msg as any)?.type === "result") {
-        success = (msg as any).subtype === "success";
-        cost = (msg as any).total_cost_usd;
+      if (event.type === "result") {
+        success = event.subtype === "success";
+        cost = event.cost_usd;
+      } else if (event.type === "error") {
+        errorMessage = event.error;
       }
     }
   } catch (e) {

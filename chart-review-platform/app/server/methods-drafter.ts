@@ -15,12 +15,11 @@
 
 import fs from "fs";
 import path from "path";
-import { query } from "@anthropic-ai/claude-agent-sdk";
+import { runAgent } from "./agent-provider.js";
 import { modelFor } from "./model-config.js";
 import { computeQAStats } from "./qa-panel.js";
 import { loadCompiledTask } from "./tasks.js";
 import { PLATFORM_ROOT } from "./patients.js";
-import { composeAgentOptions } from "./compose-agent.js";
 import { computeTaskSha } from "./lock.js";
 import { guidelineDir } from "./domain/rubric/index.js";
 
@@ -163,25 +162,23 @@ export async function draftMethodsSection(
   let cost: number | undefined;
 
   try {
-    for await (const msg of query({
+    for await (const event of runAgent({
       prompt: userPrompt,
-      options: composeAgentOptions({
-        cwd: PLATFORM_ROOT,
-        taskId,
-        guidelinePath,
-        maxTurns: 1,
-        extraSystemPrompt:
-          `Activate the \`chart-review-methods\` skill via the Skill tool. ` +
-          `Follow its procedure to produce a ${sectionInfo.word_target} ${section} ` +
-          `section in markdown. ${input.prior_draft ? "This is a revision; integrate the reviewer feedback above." : ""} ` +
-          `Output the markdown text only — no preamble, no commentary.`,
-      }) as any,
+      cwd: PLATFORM_ROOT,
+      taskId,
+      guidelinePath,
+      maxTurns: 1,
+      extraSystemPrompt:
+        `Activate the \`chart-review-methods\` skill via the Skill tool. ` +
+        `Follow its procedure to produce a ${sectionInfo.word_target} ${section} ` +
+        `section in markdown. ${input.prior_draft ? "This is a revision; integrate the reviewer feedback above." : ""} ` +
+        `Output the markdown text only — no preamble, no commentary.`,
     })) {
-      if ((msg as any)?.type === "result") {
-        const result = (msg as any).result as string | undefined;
-        if (result) resultText = result;
-        const c = (msg as any).total_cost_usd as number | undefined;
-        if (typeof c === "number") cost = c;
+      if (event.type === "result") {
+        if (event.result) resultText = event.result;
+        if (typeof event.cost_usd === "number") cost = event.cost_usd;
+      } else if (event.type === "error") {
+        throw new Error(event.error);
       }
     }
   } catch (e) {
