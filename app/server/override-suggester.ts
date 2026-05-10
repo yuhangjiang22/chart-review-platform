@@ -11,8 +11,7 @@
 // module is for a structured one-shot suggestion the form can render inline.
 
 import path from "path";
-import { query } from "@anthropic-ai/claude-agent-sdk";
-import { composeAgentOptions } from "./compose-agent.js";
+import { runAgent } from "./agent-provider.js";
 import { patientDir, PLATFORM_ROOT, isPhiPatient } from "./patients.js";
 import { guidelineDir } from "./domain/rubric/index.js";
 
@@ -114,48 +113,38 @@ export async function* suggestOverrideReasonStream(
   let cost: number | undefined;
 
   try {
-    for await (const msg of query({
+    for await (const event of runAgent({
       prompt: userPrompt,
-      options: composeAgentOptions({
-        cwd,
-        patientId: input.patientId,
-        taskId: input.taskId,
-        guidelinePath,
-        phi: isPhiPatient(input.patientId), // #46
-        maxTurns: 24,
-        extraSystemPrompt:
-          "You are the chart-review-copilot operating in Mode 4 (Document). Output a " +
-          "single override-reason paragraph as plain text. No preamble, no " +
-          "markdown formatting, no surrounding quotes.",
-      }) as any,
+      cwd,
+      patientId: input.patientId,
+      taskId: input.taskId,
+      guidelinePath,
+      phi: isPhiPatient(input.patientId), // #46
+      maxTurns: 24,
+      extraSystemPrompt:
+        "You are the chart-review-copilot operating in Mode 4 (Document). Output a " +
+        "single override-reason paragraph as plain text. No preamble, no " +
+        "markdown formatting, no surrounding quotes.",
     })) {
-      const m = msg as any;
-      if (m?.type === "assistant") {
-        const content = m.message?.content;
-        if (Array.isArray(content)) {
-          for (const block of content) {
-            if (block?.type === "tool_use") {
-              yield {
-                type: "tool_use",
-                toolName: String(block.name ?? ""),
-                toolInput: block.input,
-              };
-            } else if (block?.type === "text") {
-              const text = String(block.text ?? "");
-              if (text.trim().length > 0) {
-                yield { type: "narration", text };
-              }
-            }
-          }
+      if (event.type === "tool_use") {
+        yield {
+          type: "tool_use",
+          toolName: event.tool_name,
+          toolInput: event.tool_input,
+        };
+      } else if (event.type === "text") {
+        if (event.text.trim().length > 0) {
+          yield { type: "narration", text: event.text };
         }
-      } else if (m?.type === "result") {
-        const result = m.result as string | undefined;
-        if (result) resultText = result;
-        const c = m.total_cost_usd as number | undefined;
-        if (typeof c === "number") cost = c;
+      } else if (event.type === "result") {
+        if (event.result) resultText = event.result;
+        if (typeof event.cost_usd === "number") cost = event.cost_usd;
         console.log(
-          `[override-suggester] ${input.patientId}/${input.fieldId}: subtype=${m.subtype} cost=${cost} resultLen=${result?.length ?? 0}`,
+          `[override-suggester] ${input.patientId}/${input.fieldId}: subtype=${event.subtype} cost=${cost} resultLen=${event.result?.length ?? 0}`,
         );
+      } else if (event.type === "error") {
+        yield { type: "error", error: event.error };
+        return;
       }
     }
   } catch (e) {

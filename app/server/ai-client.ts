@@ -65,6 +65,14 @@ export function buildCopilotExtraSystemPrompt(args: {
   return lines.filter(Boolean).join("\n");
 }
 
+// AgentSession is intentionally NOT migrated to AgentProvider yet —
+// `getOutputStream()` exposes raw Anthropic-SDK message shapes to its
+// WebSocket consumers (session.ts → chat-store → client UI). Migrating
+// would require updating the entire chat protocol downstream. The
+// other agent invocation sites (judge, runs, methods, etc.) all use
+// runAgent() from agent-provider.ts; only the session-style code path
+// remains directly coupled to the SDK. Track this as a follow-up if
+// we add a Codex provider.
 export class AgentSession {
   private queue = new MessageQueue();
   private outputIterator: AsyncIterator<unknown> | null = null;

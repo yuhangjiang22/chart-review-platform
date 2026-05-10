@@ -281,9 +281,8 @@ export function generateRunId(now = new Date()): string {
 // final review_state.json to `runs/<run_id>/per_patient/<pid>/agent_draft
 // .json`. Errors per patient are isolated; the run keeps going.
 
-import { query } from "@anthropic-ai/claude-agent-sdk";
 import { withReviewsRoot } from "../../domain/review/index.js";
-import { composeAgentOptions } from "../../compose-agent.js";
+import { runAgent } from "../../agent-provider.js";
 import { modelFor } from "../../model-config.js";
 import { makeReviewMcpServer } from "../../mcp-tools.js";
 import { buildAuditHooks } from "../../audit-trail.js";
@@ -682,28 +681,25 @@ async function runOneAgent(
       PreToolUse: [{ hooks: [auditHooks.pre] }],
       PostToolUse: [{ hooks: [auditHooks.post] }],
     };
-    for await (const msg of query({
+    for await (const event of runAgent({
       prompt: userPrompt,
-      options: composeAgentOptions({
-        cwd: patientDir(patientId),
-        patientId,
-        taskId,
-        guidelinePath: guidelineDir(taskId),
-        mcpServers,
-        hooks: sdkHooks,
-        maxTurns: manifest.max_turns_per_patient,
-        permissionMode: "acceptEdits",
-        model: spec.model,
-        extraSystemPrompt:
-          "You are running unattended in batch mode. There is no human in the " +
-          "loop for this patient — produce your draft and stop. Do not ask " +
-          "clarifying questions; pick the most defensible answer with the " +
-          "evidence available.",
-      }) as any,
+      cwd: patientDir(patientId),
+      patientId,
+      taskId,
+      guidelinePath: guidelineDir(taskId),
+      mcpServers,
+      hooks: sdkHooks,
+      maxTurns: manifest.max_turns_per_patient,
+      permissionMode: "acceptEdits",
+      model: spec.model,
+      extraSystemPrompt:
+        "You are running unattended in batch mode. There is no human in the " +
+        "loop for this patient — produce your draft and stop. Do not ask " +
+        "clarifying questions; pick the most defensible answer with the " +
+        "evidence available.",
     })) {
-      if ((msg as any)?.type === "result") {
-        const c = (msg as any).total_cost_usd as number | undefined;
-        if (typeof c === "number") cost = c;
+      if (event.type === "result" && typeof event.cost_usd === "number") {
+        cost = event.cost_usd;
       }
     }
   });
