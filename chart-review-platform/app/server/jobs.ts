@@ -18,7 +18,7 @@
 import fs from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
-import { writeJsonAtomic } from "./lib/fs-atomic.js";
+import { atomicWriteJson } from "./storage.js";
 import { PLATFORM_ROOT } from "./patients.js";
 
 export type JobKind = "authoring" | "cohort_feedback" | "methods_drafting";
@@ -68,10 +68,6 @@ function manifestPath(jobId: string): string { return path.join(jobDir(jobId), "
 function statusPath(jobId: string): string { return path.join(jobDir(jobId), "status.json"); }
 function transcriptPath(jobId: string): string { return path.join(jobDir(jobId), "transcript.jsonl"); }
 
-function atomicWriteJson(filepath: string, value: unknown): void {
-  fs.mkdirSync(path.dirname(filepath), { recursive: true });
-  writeJsonAtomic(filepath, value);
-}
 
 export interface CreateJobInput {
   kind: JobKind;

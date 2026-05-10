@@ -33,6 +33,7 @@ import { startBatchRun, getRunStatus, getRunManifest, runDir, agentDraftPath, ty
 import { improveGuideline, type ImproveGuidelineResult } from "../proposal/index.js";
 import type { AgentSpec } from "../../agent-specs.js";
 import { compareDrafts, loadAgentDrafts, type AgentDraft, type Disagreement, type DisagreementSummary, type FieldAssessment } from "../../disagreements.js";
+import { atomicWriteJson } from "../../storage.js";
 import { listAdjudications, splitByClassification, writeAgentErrors, type Adjudication } from "../../adjudications.js";
 import {
   criterionSchemaHashFromFile,
@@ -282,13 +283,6 @@ function nextIterId(taskId: string): { iter_id: string; iter_num: number } {
   }
   const iterId = `iter_${String(next).padStart(3, "0")}`;
   return { iter_id: iterId, iter_num: next };
-}
-
-function atomicWriteJson(filepath: string, value: unknown): void {
-  fs.mkdirSync(path.dirname(filepath), { recursive: true });
-  const tmp = `${filepath}.${process.pid}.${Date.now()}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(value, null, 2));
-  fs.renameSync(tmp, filepath);
 }
 
 // ── criterion hash snapshot helpers ─────────────────────────────────────────
