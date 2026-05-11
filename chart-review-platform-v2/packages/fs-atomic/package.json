@@ -1,0 +1,15 @@
+{
+  "name": "@chart-review/fs-atomic",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Atomic JSON write helper (writeJsonAtomic). Zero dependencies.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  }
+}

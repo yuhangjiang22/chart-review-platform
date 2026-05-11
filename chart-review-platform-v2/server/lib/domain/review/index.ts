@@ -56,4 +56,4 @@ export {
 
 export {
   getReviewsRootOverride,
-} from "./reviews-context.js";
+} from "@chart-review/reviews-context";

@@ -26,7 +26,7 @@ import { randomUUID } from "crypto";
 import fs from "fs";
 import path from "path";
 import { PLATFORM_ROOT } from "../../patients.js";
-import { getReviewsRootOverride, withReviewsRoot as _withReviewsRoot } from "./reviews-context.js";
+import { getReviewsRootOverride, withReviewsRoot as _withReviewsRoot } from "@chart-review/reviews-context";
 import type { Evidence } from "../../faithfulness.js";
 import { verifyEvidence } from "../../faithfulness.js";
 import type { CompiledTask } from "../../tasks.js";
