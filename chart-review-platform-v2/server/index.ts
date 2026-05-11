@@ -56,6 +56,7 @@ import { proposalRoutes } from "./proposal-routes.js";
 import { issueRoutes } from "./issue-routes.js";
 import { lockTestRoutes } from "./lock-test-routes.js";
 import { cohortRoutes } from "./cohort-routes.js";
+import { coreRoutes, type RawBody } from "./core-routes.js";
 
 const PORT = Number(process.env.PORT ?? 3002);
 const REVIEWS_ROOT = process.env.CHART_REVIEW_REVIEWS_ROOT
@@ -186,6 +187,7 @@ const paramRouter = makeRouter([
   ...issueRoutes,
   ...lockTestRoutes,
   ...cohortRoutes,
+  ...coreRoutes,
 ]);
 
 // ── http plumbing ───────────────────────────────────────────────────
@@ -244,13 +246,24 @@ const server = http.createServer(async (req, res) => {
   if (!handler) {
     const matched = paramRouter.match(req.method ?? "GET", url);
     if (matched) {
-      res.setHeader("Content-Type", "application/json");
       try {
         const body = await readBody(req);
         const out = await matched.handler(body, req, matched.params, matched.query);
-        res.statusCode = 200;
-        res.end(JSON.stringify(out));
+        // RawBody escape hatch: handlers returning { __raw: true, contentType, body }
+        // skip JSON.stringify and use the requested content-type. Used by
+        // text/plain note bodies; everything else stays JSON.
+        const raw = out as Partial<RawBody>;
+        if (raw && raw.__raw === true && typeof raw.body === "string") {
+          res.setHeader("Content-Type", raw.contentType ?? "text/plain; charset=utf-8");
+          res.statusCode = 200;
+          res.end(raw.body);
+        } else {
+          res.setHeader("Content-Type", "application/json");
+          res.statusCode = 200;
+          res.end(JSON.stringify(out));
+        }
       } catch (err) {
+        res.setHeader("Content-Type", "application/json");
         const e = err as HttpError;
         res.statusCode = e.status ?? 500;
         res.end(JSON.stringify({ error: e.message, ...(e.payload ? { payload: e.payload } : {}) }));
@@ -263,7 +276,7 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  // 3. Static UI: served from <CLIENT_DIR> (v1's client, symlinked).
+  // 3. Static UI: served from <CLIENT_DIR> (vendored from v1 in M5).
   if (req.method === "GET" && !url.startsWith("/api/")) {
     const reqPath = url === "/" ? "/index.html" : url;
     const filePath = path.join(CLIENT_DIR, reqPath);
