@@ -4,6 +4,11 @@
   "private": true,
   "type": "module",
   "description": "6-module pluggable pipeline shared by chart-review and lit-extract workflows.",
+  "workspaces": [
+    "packages/*",
+    "packages/skills/*",
+    "packages/skills/phenotypes/*"
+  ],
   "scripts": {
     "dev": "concurrently \"npm:dev:server\" \"npm:dev:client\"",
     "dev:server": "tsx watch server/index.ts",
