@@ -50,6 +50,8 @@ import type {
 import {
   login, logout, readTokenFromRequest, requireMethodologist, whoami,
 } from "./auth.js";
+import { makeRouter } from "./router.js";
+import { pilotReadRoutes, pilotWriteRoutes, versionsRoutes } from "./pilot-routes.js";
 
 const PORT = Number(process.env.PORT ?? 3002);
 const REVIEWS_ROOT = process.env.CHART_REVIEW_REVIEWS_ROOT
@@ -170,6 +172,14 @@ const routes: Record<string, Handler> = {
   "GET /api/v2/healthz": async () => ({ ok: true, modules: 6, reviewsRoot: REVIEWS_ROOT, corpusRoot: CORPUS_ROOT }),
 };
 
+// Parameterized routes (have :taskId / :iterId path params) — checked
+// after the exact-match `routes` table, before the v1 proxy fallback.
+const paramRouter = makeRouter([
+  ...pilotReadRoutes,
+  ...pilotWriteRoutes,
+  ...versionsRoutes,
+]);
+
 // ── http plumbing ───────────────────────────────────────────────────
 
 interface HttpError extends Error { status: number; payload?: unknown; }
@@ -216,15 +226,33 @@ function proxyToV1(req: http.IncomingMessage, res: http.ServerResponse): void {
 
 const server = http.createServer(async (req, res) => {
   const url = req.url ?? "/";
-  const key = `${req.method} ${url}`;
+  const key = `${req.method} ${url.split("?")[0]}`;
   const handler = routes[key];
 
-  // 1. v2 native routes win (handler != null below).
-  // 2. Anything else under /api/ or /ws/ → proxy to v1 (until ported).
-  //    Ported subsystems get matched as v2 routes above this point.
-  if (!handler && (url.startsWith("/api/") || url.startsWith("/ws"))) {
-    proxyToV1(req, res);
-    return;
+  // 1a. v2 native exact-match routes win.
+  // 1b. v2 parameterized routes (pilots, versions, …) — match on
+  //     path, decode params, call with (body, req, params, query).
+  // 2.  Anything else under /api/ or /ws/ → proxy to v1 (until ported).
+  if (!handler) {
+    const matched = paramRouter.match(req.method ?? "GET", url);
+    if (matched) {
+      res.setHeader("Content-Type", "application/json");
+      try {
+        const body = await readBody(req);
+        const out = await matched.handler(body, req, matched.params, matched.query);
+        res.statusCode = 200;
+        res.end(JSON.stringify(out));
+      } catch (err) {
+        const e = err as HttpError;
+        res.statusCode = e.status ?? 500;
+        res.end(JSON.stringify({ error: e.message, ...(e.payload ? { payload: e.payload } : {}) }));
+      }
+      return;
+    }
+    if (url.startsWith("/api/") || url.startsWith("/ws")) {
+      proxyToV1(req, res);
+      return;
+    }
   }
 
   // 3. Static UI: served from <CLIENT_DIR> (v1's client, symlinked).
