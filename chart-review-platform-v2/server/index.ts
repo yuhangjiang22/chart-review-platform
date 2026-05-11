@@ -58,6 +58,7 @@ import { lockTestRoutes } from "./lock-test-routes.js";
 import { cohortRoutes } from "./cohort-routes.js";
 import { coreRoutes, type RawBody } from "./core-routes.js";
 import { miscRoutes } from "./misc-routes.js";
+import { jobsRoutes } from "./jobs-routes.js";
 
 const PORT = Number(process.env.PORT ?? 3002);
 const REVIEWS_ROOT = process.env.CHART_REVIEW_REVIEWS_ROOT
@@ -190,6 +191,7 @@ const paramRouter = makeRouter([
   ...cohortRoutes,
   ...coreRoutes,
   ...miscRoutes,
+  ...jobsRoutes,
 ]);
 
 // ── http plumbing ───────────────────────────────────────────────────
