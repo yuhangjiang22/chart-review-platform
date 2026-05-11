@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "allowImportingTsExtensions": false,
+    "noEmit": true,
+    "isolatedModules": true
+  },
+  // v2 cross-imports v1's source via plain relative paths
+  // ("../chart-review-platform/app/server/*"); transitive deps resolve
+  // through the node_modules symlink to v1's install.
+  "include": [
+    "shared/**/*.ts", "modules/**/*.ts", "workflows/**/*.ts", "examples/**/*.ts",
+    "../chart-review-platform/app/server/disagreements.ts",
+    "../chart-review-platform/app/server/contract-eval.ts",
+    "../chart-review-platform/app/server/agent-provider.ts",
+    "../chart-review-platform/app/server/tasks.ts",
+    "../chart-review-platform/app/server/audit-trail.ts",
+    "../chart-review-platform/app/server/judge.ts"
+  ]
+}

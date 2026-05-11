@@ -1,0 +1,21 @@
+// Module 4: Extraction.
+//
+// Runs one extractor over the form against the corpus. The workflow
+// drivers call this N times in parallel with different extractor_id
+// (and typically different LLM models) — that's how the dual-extractor
+// "agent_default vs agent_skeptical" / "extractor_a vs extractor_b"
+// pattern works.
+//
+// Both adapters share the same faithfulness wrapper: every cited
+// span MUST byte-match the EvidenceUnit it points into, else the
+// FieldAssessment is rejected. That's the chart-review MCP gate
+// generalized.
+
+export type { ExtractModule, ExtractorOutput, FieldAssessment, EvidenceRef } from "../../shared/types.js";
+
+export { makeStubExtract } from "./stub.js";
+export { verifyEvidenceFaithfulness } from "./faithfulness.js";
+
+// Real adapter that wraps v1's runAgent (Claude/Codex swappable, MCP-backed).
+// Use this in production; keep makeStubExtract for the offline smoke test.
+export { makeV1AgentExtract } from "./v1-agent-extract.js";
