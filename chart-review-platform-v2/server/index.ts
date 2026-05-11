@@ -52,6 +52,7 @@ import {
 } from "./auth.js";
 import { makeRouter } from "./router.js";
 import { pilotReadRoutes, pilotWriteRoutes, versionsRoutes } from "./pilot-routes.js";
+import { proposalRoutes } from "./proposal-routes.js";
 
 const PORT = Number(process.env.PORT ?? 3002);
 const REVIEWS_ROOT = process.env.CHART_REVIEW_REVIEWS_ROOT
@@ -178,6 +179,7 @@ const paramRouter = makeRouter([
   ...pilotReadRoutes,
   ...pilotWriteRoutes,
   ...versionsRoutes,
+  ...proposalRoutes,
 ]);
 
 // ── http plumbing ───────────────────────────────────────────────────
