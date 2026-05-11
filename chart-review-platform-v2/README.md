@@ -88,7 +88,26 @@ chart-review-platform-v2/
 cd chart-review-platform-v2
 npm install
 npm run typecheck            # confirm contracts compile
-npm run smoke                # exercise all 6 modules, both workflows
+npm run smoke                # offline: stub extractor, both workflows
+npm run smoke:real           # real Claude/Codex via v1's runAgent + chart-review-judge
+npm run server               # boot HTTP server (PORT=3002) exposing 6 modules as REST
+```
+
+### Server endpoints
+
+The HTTP server is the integration point for non-TypeScript clients
+(Python notebooks, the existing v1 Studio, etc.). One endpoint per
+module + a `run` shortcut + healthz:
+
+```
+POST /api/v2/clarify    { prompt, domain }                                  → TaskSpec
+POST /api/v2/form       { task_spec }                                       → FormSpec
+POST /api/v2/discover   { task_spec, subject }                              → EvidenceUnit[]
+POST /api/v2/extract    { form, subject, corpus, extractor_id, mode, provider } → ExtractorOutput
+POST /api/v2/reconcile  { outputs, run_judge, judge_provider }              → ReconciledDraft
+POST /api/v2/correct    { task_id, subject_id, field_id, decision }         → FinalizedAssessment
+POST /api/v2/run        { prompt, subject, domain, mode, run_judge }        → FinalizedAssessment
+GET  /api/v2/healthz
 ```
 
 The smoke test:

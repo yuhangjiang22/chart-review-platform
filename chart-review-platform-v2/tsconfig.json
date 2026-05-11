@@ -17,7 +17,8 @@
   // ("../chart-review-platform/app/server/*"); transitive deps resolve
   // through the node_modules symlink to v1's install.
   "include": [
-    "shared/**/*.ts", "modules/**/*.ts", "workflows/**/*.ts", "examples/**/*.ts",
+    "shared/**/*.ts", "modules/**/*.ts", "workflows/**/*.ts",
+    "examples/**/*.ts", "server/**/*.ts",
     "../chart-review-platform/app/server/disagreements.ts",
     "../chart-review-platform/app/server/contract-eval.ts",
     "../chart-review-platform/app/server/agent-provider.ts",
