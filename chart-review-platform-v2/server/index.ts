@@ -20,11 +20,19 @@
 // the matching HTTP status code.
 
 import http from "node:http";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const CLIENT_DIR = path.resolve(__dirname, "..", "client");
+
+// Until each v1 API route is ported into v2, proxy unmatched /api/*
+// and /ws/* to the v1 server at $V1_TARGET (default localhost:3001).
+// This lets v2's port serve the full v1 Studio without re-implementing
+// dozens of routes up-front. Replace one passthrough at a time.
+const V1_TARGET = process.env.V1_TARGET ?? "http://localhost:3001";
 import { makeChartReviewClarify, makeLitExtractClarify } from "../modules/1-clarify/index.js";
 import { makeChartReviewFormGen, makeLitExtractFormGen } from "../modules/2-form-gen/index.js";
 import { makeChartReviewDiscover, makeLitExtractDiscover } from "../modules/3-discover/index.js";
@@ -39,6 +47,9 @@ import type {
   TaskSpec, FormSpec, SubjectRef, EvidenceUnit, ExtractorOutput,
   HumanDecision, Domain, ProviderName,
 } from "../shared/types.js";
+import {
+  login, logout, readTokenFromRequest, requireMethodologist, whoami,
+} from "./auth.js";
 
 const PORT = Number(process.env.PORT ?? 3002);
 const REVIEWS_ROOT = process.env.CHART_REVIEW_REVIEWS_ROOT
@@ -63,8 +74,21 @@ function discoverFor(domain: Domain) {
 
 // ── route table ─────────────────────────────────────────────────────
 
-type Handler = (body: unknown) => Promise<unknown>;
+type Handler = (body: unknown, req: http.IncomingMessage) => Promise<unknown>;
 const routes: Record<string, Handler> = {
+  // ── auth ────────────────────────────────────────────────────────
+  "POST /api/auth/login": async (body) => {
+    const reviewer_id = (body as { reviewer_id?: string })?.reviewer_id ?? "";
+    return login(reviewer_id);
+  },
+  "POST /api/auth/logout": async (_body, req) => {
+    const token = readTokenFromRequest(req) ?? "";
+    logout(token);
+    return { ok: true };
+  },
+  "GET /api/auth/whoami": async (_body, req) => whoami(req),
+
+  // ── v2 modules (some methodologist-gated, like v1) ──────────────
   "POST /api/v2/clarify": async (body) => {
     const { prompt, domain } = body as { prompt: string; domain: Domain };
     return clarifyFor(domain).clarify(prompt);
@@ -112,15 +136,11 @@ const routes: Record<string, Handler> = {
     return makeReconciler(judge).reconcile(outputs, { runJudge: run_judge });
   },
 
-  "POST /api/v2/correct": async (body) => {
+  "POST /api/v2/correct": requireMethodologist(async (body) => {
     const { task_id, subject_id, field_id, decision, seed } = body as {
       task_id: string; subject_id: string; field_id?: string;
       decision?: HumanDecision; seed?: unknown;
     };
-    // Pull domain from task_id prefix is brittle; in practice the
-    // caller would carry domain explicitly. For the MVP we route both
-    // domains through chart-review's correct-log since they share the
-    // same audit format.
     const correctLog = makeCorrectLog({ reviewsRoot: REVIEWS_ROOT });
     if (seed) {
       return correctLog.seed(seed as Parameters<typeof correctLog.seed>[0]);
@@ -129,9 +149,9 @@ const routes: Record<string, Handler> = {
       throw httpError(400, "either { seed } or { field_id + decision } required");
     }
     return correctLog.recordDecision(task_id, subject_id, field_id, decision);
-  },
+  }),
 
-  "POST /api/v2/run": async (body) => {
+  "POST /api/v2/run": requireMethodologist(async (body) => {
     const { prompt, subject, run_judge, domain } = body as {
       prompt: string; subject: SubjectRef; run_judge?: boolean; domain: Domain;
     };
@@ -145,7 +165,7 @@ const routes: Record<string, Handler> = {
       runJudge: run_judge,
     });
     return p.runOne(prompt, subject);
-  },
+  }),
 
   "GET /api/v2/healthz": async () => ({ ok: true, modules: 6, reviewsRoot: REVIEWS_ROOT, corpusRoot: CORPUS_ROOT }),
 };
@@ -170,9 +190,78 @@ async function readBody(req: http.IncomingMessage): Promise<unknown> {
   catch { throw httpError(400, "invalid JSON body"); }
 }
 
+function proxyToV1(req: http.IncomingMessage, res: http.ServerResponse): void {
+  const target = new URL(V1_TARGET);
+  const upstream = http.request(
+    {
+      protocol: target.protocol,
+      hostname: target.hostname,
+      port: target.port,
+      method: req.method,
+      path: req.url,
+      headers: { ...req.headers, host: target.host },
+    },
+    (upstreamRes) => {
+      res.writeHead(upstreamRes.statusCode ?? 502, upstreamRes.headers);
+      upstreamRes.pipe(res);
+    },
+  );
+  upstream.on("error", (err) => {
+    res.statusCode = 502;
+    res.setHeader("Content-Type", "application/json");
+    res.end(JSON.stringify({ error: `v1 proxy failed: ${err.message}`, target: V1_TARGET }));
+  });
+  req.pipe(upstream);
+}
+
 const server = http.createServer(async (req, res) => {
-  const key = `${req.method} ${req.url}`;
+  const url = req.url ?? "/";
+  const key = `${req.method} ${url}`;
   const handler = routes[key];
+
+  // 1. v2 native routes win (handler != null below).
+  // 2. Anything else under /api/ or /ws/ → proxy to v1 (until ported).
+  //    Ported subsystems get matched as v2 routes above this point.
+  if (!handler && (url.startsWith("/api/") || url.startsWith("/ws"))) {
+    proxyToV1(req, res);
+    return;
+  }
+
+  // 3. Static UI: served from <CLIENT_DIR> (v1's client, symlinked).
+  if (req.method === "GET" && !url.startsWith("/api/")) {
+    const reqPath = url === "/" ? "/index.html" : url;
+    const filePath = path.join(CLIENT_DIR, reqPath);
+    if (!filePath.startsWith(CLIENT_DIR)) {
+      res.statusCode = 403;
+      res.end("forbidden");
+      return;
+    }
+    if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+      const ext = path.extname(filePath);
+      const ct: Record<string, string> = {
+        ".html": "text/html; charset=utf-8",
+        ".js": "application/javascript",
+        ".mjs": "application/javascript",
+        ".css": "text/css",
+        ".json": "application/json",
+        ".svg": "image/svg+xml",
+      };
+      res.setHeader("Content-Type", ct[ext] ?? "application/octet-stream");
+      res.statusCode = 200;
+      fs.createReadStream(filePath).pipe(res);
+      return;
+    }
+    // SPA fallback: unknown asset → serve index.html so client-side
+    // routing can handle it.
+    const fallback = path.join(CLIENT_DIR, "index.html");
+    if (fs.existsSync(fallback)) {
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.statusCode = 200;
+      fs.createReadStream(fallback).pipe(res);
+      return;
+    }
+  }
+
   res.setHeader("Content-Type", "application/json");
   if (!handler) {
     res.statusCode = 404;
@@ -181,7 +270,7 @@ const server = http.createServer(async (req, res) => {
   }
   try {
     const body = await readBody(req);
-    const out = await handler(body);
+    const out = await handler(body, req);
     res.statusCode = 200;
     res.end(JSON.stringify(out));
   } catch (err) {
@@ -189,6 +278,36 @@ const server = http.createServer(async (req, res) => {
     res.statusCode = e.status ?? 500;
     res.end(JSON.stringify({ error: e.message, ...(e.payload ? { payload: e.payload } : {}) }));
   }
+});
+
+// WebSocket upgrades (/ws/*) — forward the raw TCP socket to v1.
+// v1's server still owns the WebSocket endpoints until each is ported.
+server.on("upgrade", (req, clientSocket, head) => {
+  if (!req.url?.startsWith("/ws")) {
+    clientSocket.destroy();
+    return;
+  }
+  const target = new URL(V1_TARGET);
+  const upstream = http.request({
+    hostname: target.hostname,
+    port: target.port,
+    path: req.url,
+    method: "GET",
+    headers: req.headers,
+  });
+  upstream.end();
+  upstream.on("upgrade", (_upstreamRes, upstreamSocket, upstreamHead) => {
+    clientSocket.write(
+      "HTTP/1.1 101 Switching Protocols\r\n" +
+      "Upgrade: websocket\r\n" +
+      "Connection: Upgrade\r\n" +
+      "\r\n",
+    );
+    upstreamSocket.write(upstreamHead);
+    clientSocket.pipe(upstreamSocket).pipe(clientSocket);
+  });
+  upstream.on("error", () => clientSocket.destroy());
+  if (head.length > 0) upstream.write(head);
 });
 
 server.listen(PORT, () => {

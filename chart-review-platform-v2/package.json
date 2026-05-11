@@ -5,8 +5,12 @@
   "type": "module",
   "description": "MVP scaffold: 6-module pluggable pipeline shared by chart-review and lit-extract workflows.",
   "scripts": {
+    "dev": "concurrently \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:server": "tsx watch server/index.ts",
+    "dev:client": "vite --config config/vite.config.ts",
     "smoke": "tsx examples/smoke.ts",
     "server": "tsx server/index.ts",
+    "build:client": "vite build --config config/vite.config.ts",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
