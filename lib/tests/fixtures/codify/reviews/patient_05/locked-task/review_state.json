@@ -1,0 +1,30 @@
+{
+  "schema_version": "1",
+  "patient_id": "patient_05",
+  "task_id": "locked-task",
+  "version": 1,
+  "updated_at": "2026-04-29T10:00:00Z",
+  "updated_by": "agent",
+  "review_status": "agent_complete",
+  "field_assessments": [
+    {
+      "field_id": "lung_pathology",
+      "answer": "yes",
+      "source": "agent",
+      "status": "agent_proposed",
+      "updated_at": "2026-04-29T10:00:00Z",
+      "evidence": [
+        {
+          "source": "note",
+          "note_id": "patient_05__discharge_2024-08-20",
+          "doc_type": "discharge_summary",
+          "span_offsets": [0, 30],
+          "verbatim_quote": "AGENT_GUESS_TOKEN should not appear in artifacts.",
+          "evidence_date": "2024-08-20"
+        }
+      ]
+    }
+  ],
+  "selected_evidence": [],
+  "oracle_done": false
+}

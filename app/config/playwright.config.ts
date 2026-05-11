@@ -1,7 +1,10 @@
 import { defineConfig, devices } from "@playwright/test";
+import path from "node:path";
+
+const APP_ROOT = path.resolve(__dirname, "..");
 
 export default defineConfig({
-  testDir: "./e2e",
+  testDir: path.join(APP_ROOT, "e2e"),
   // E2E flow includes a real agent run; one minute can easily not be enough.
   timeout: 5 * 60 * 1000,
   expect: { timeout: 30 * 1000 },
@@ -30,6 +33,7 @@ export default defineConfig({
   // for an isolated `npx playwright test` invocation.
   webServer: {
     command: "./node_modules/.bin/concurrently \"npm:dev:server\" \"npm:dev:client\"",
+    cwd: APP_ROOT,
     url: "http://localhost:5173",
     timeout: 60 * 1000,
     reuseExistingServer: true,

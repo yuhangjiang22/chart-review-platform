@@ -1,0 +1,54 @@
+{
+  "schema_version": "1",
+  "patient_id": "patient_04",
+  "task_id": "locked-task",
+  "version": 3,
+  "updated_at": "2026-04-29T10:00:00Z",
+  "updated_by": "reviewer",
+  "review_status": "reviewer_validated",
+  "field_assessments": [
+    {
+      "field_id": "lung_pathology",
+      "answer": "no",
+      "source": "reviewer",
+      "status": "approved",
+      "updated_at": "2026-04-29T10:00:00Z",
+      "evidence": []
+    },
+    {
+      "field_id": "lung_imaging",
+      "answer": "no",
+      "source": "reviewer",
+      "status": "approved",
+      "updated_at": "2026-04-29T10:00:00Z",
+      "evidence": [
+        {
+          "source": "note",
+          "note_id": "patient_04__radiology_2024-09-01",
+          "doc_type": "radiology",
+          "span_offsets": [0, 40],
+          "verbatim_quote": "Lungs are clear. No mass identified.",
+          "evidence_date": "2024-09-01"
+        }
+      ]
+    },
+    {
+      "field_id": "age_at_index",
+      "answer": 64,
+      "source": "reviewer",
+      "status": "approved",
+      "updated_at": "2026-04-29T10:00:00Z",
+      "evidence": []
+    },
+    {
+      "field_id": "lung_status",
+      "answer": "absent",
+      "source": "reviewer",
+      "status": "approved",
+      "updated_at": "2026-04-29T10:00:00Z",
+      "evidence": []
+    }
+  ],
+  "selected_evidence": [],
+  "oracle_done": true
+}

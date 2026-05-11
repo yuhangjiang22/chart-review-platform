@@ -41,7 +41,7 @@ export function runCodify(taskId: string): CodifyResult | CodifyError {
       "-m", "chart_review.cli", "codify",
       "--task", taskId,
       "--package-dir", packageDir,
-      "--reviews-root", path.join(root, "reviews"),
+      "--reviews-root", process.env.CHART_REVIEW_REVIEWS_ROOT ?? path.join(root, "var", "reviews"),
     ],
     {
       cwd: libDir,

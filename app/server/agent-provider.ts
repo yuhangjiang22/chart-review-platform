@@ -54,10 +54,24 @@ export type AgentEvent =
     }
   | { type: "error"; error: string };
 
+/** Provider names recognized by the platform. Add new providers here
+ *  alongside their lazy import in `buildProvider`. */
+export type ProviderName = "claude" | "codex";
+export const PROVIDER_NAMES: ProviderName[] = ["claude", "codex"];
+
+export function isProviderName(s: unknown): s is ProviderName {
+  return s === "claude" || s === "codex";
+}
+
 /** Input shape for a single agent run. Re-uses ComposeAgentInput so
  *  call sites can construct the same options they always have, plus
- *  the user prompt. */
-export type AgentRunInput = ComposeAgentInput & { prompt: string };
+ *  the user prompt. `provider` is an optional per-call override of the
+ *  AGENT_PROVIDER env var — when set, runAgent builds a fresh provider
+ *  for this call instead of using the cached default. */
+export type AgentRunInput = ComposeAgentInput & {
+  prompt: string;
+  provider?: ProviderName;
+};
 
 /** Provider contract: one method that yields events. Implementations
  *  are responsible for translating their underlying SDK / CLI output
@@ -67,36 +81,46 @@ export interface AgentProvider {
   run(input: AgentRunInput): AsyncIterable<AgentEvent>;
 }
 
-/** Module-level singleton — selected at boot from the AGENT_PROVIDER
- *  env var. Lazy import keeps Claude SDK out of memory if/when a
- *  Codex-only deployment runs. */
-let cached: AgentProvider | null = null;
-
-export async function getAgentProvider(): Promise<AgentProvider> {
-  if (cached) return cached;
-  const choice = (process.env.AGENT_PROVIDER ?? "claude").toLowerCase();
-  switch (choice) {
+async function buildProvider(name: ProviderName): Promise<AgentProvider> {
+  switch (name) {
     case "claude": {
       const { ClaudeAgentProvider } = await import("./agent-provider-claude.js");
-      cached = new ClaudeAgentProvider();
-      return cached;
+      return new ClaudeAgentProvider();
     }
     case "codex": {
       const { CodexAgentProvider } = await import("./agent-provider-codex.js");
-      cached = new CodexAgentProvider();
-      return cached;
+      return new CodexAgentProvider();
     }
-    default:
-      throw new Error(
-        `Unknown AGENT_PROVIDER=${choice}. Supported: "claude" (default), "codex".`,
-      );
   }
+}
+
+/** Module-level singleton for the env-var default. Lazy import keeps
+ *  the Claude SDK out of memory in a Codex-only deployment (and vice
+ *  versa). Per-run overrides bypass this cache. */
+let cached: AgentProvider | null = null;
+
+export function defaultProviderName(): ProviderName {
+  const raw = (process.env.AGENT_PROVIDER ?? "claude").toLowerCase();
+  if (!isProviderName(raw)) {
+    throw new Error(
+      `Unknown AGENT_PROVIDER=${raw}. Supported: ${PROVIDER_NAMES.join(", ")}.`,
+    );
+  }
+  return raw;
+}
+
+export async function getAgentProvider(): Promise<AgentProvider> {
+  if (cached) return cached;
+  cached = await buildProvider(defaultProviderName());
+  return cached;
 }
 
 /** Convenience: run an agent and yield events directly. Most callers
  *  should use this — they don't need the provider object, only its
  *  output stream. */
 export async function* runAgent(input: AgentRunInput): AsyncIterable<AgentEvent> {
-  const provider = await getAgentProvider();
+  const provider = input.provider
+    ? await buildProvider(input.provider)
+    : await getAgentProvider();
   yield* provider.run(input);
 }

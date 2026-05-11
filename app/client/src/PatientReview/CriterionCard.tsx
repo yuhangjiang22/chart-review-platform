@@ -220,15 +220,17 @@ export function CriterionCard(props: CriterionCardProps) {
             <div className="flex items-baseline gap-2">
               <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-muted text-[10px] font-mono font-semibold text-muted-foreground">1</span>
               <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground font-semibold">
-                Compare answers
+                {a2 ? "Compare answers" : "Agent draft"}
               </span>
               <span className="text-[10.5px] text-muted-foreground/70 italic ml-auto">
-                agents are read-only · click an agent to soft-focus their citations in the source pane
+                {a2
+                  ? "agents are read-only · click an agent to soft-focus their citations in the source pane"
+                  : "agent draft is read-only · click to soft-focus citations in the source pane"}
               </span>
             </div>
-            <div className="grid grid-cols-2 gap-2 text-[11.5px] border border-border rounded-sm p-2">
+            <div className={cn("gap-2 text-[11.5px] border border-border rounded-sm p-2", a2 ? "grid grid-cols-2" : "grid grid-cols-1")}>
               {[a1, a2].map((d, i) => {
-                if (!d) return <div key={`empty-${i}`} />;
+                if (!d) return null;
                 const slot = (i + 1) as 1 | 2;
                 const citer: Citer = {
                   kind: "agent",
@@ -278,6 +280,18 @@ export function CriterionCard(props: CriterionCardProps) {
                       <span className={cn(isFocused ? "text-[hsl(var(--ochre))] font-semibold" : "text-muted-foreground")}>
                         Agent {slot}
                       </span>
+                      {d.provider && (
+                        <span
+                          className={cn(
+                            "inline-flex items-center px-1.5 rounded border text-[9px] font-mono normal-case tracking-normal",
+                            d.provider === "codex"
+                              ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                              : "bg-violet-100 text-violet-800 border-violet-300",
+                          )}
+                        >
+                          {d.provider === "codex" ? "Codex" : "Claude"}
+                        </span>
+                      )}
                       <span className="ml-auto text-[9px] tracking-[0.12em] text-muted-foreground/60 normal-case italic">
                         read-only
                       </span>

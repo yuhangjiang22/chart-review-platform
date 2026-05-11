@@ -7,14 +7,14 @@
   "scripts": {
     "dev": "concurrently \"npm:dev:server\" \"npm:dev:client\"",
     "dev:server": "tsx watch server/server.ts",
-    "dev:client": "vite --port 5173",
-    "build:client": "vite build",
+    "dev:client": "vite --port 5173 --config config/vite.config.ts",
+    "build:client": "vite build --config config/vite.config.ts",
     "start": "tsx server/server.ts",
     "migrate-drafts": "tsx scripts/migrate-drafts.ts",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:e2e": "./node_modules/.bin/playwright test --project=chromium",
-    "test:e2e:ui": "./node_modules/.bin/playwright test --project=chromium --ui"
+    "test": "vitest run --config config/vitest.config.ts",
+    "test:watch": "vitest --config config/vitest.config.ts",
+    "test:e2e": "./node_modules/.bin/playwright test --config config/playwright.config.ts --project=chromium",
+    "test:e2e:ui": "./node_modules/.bin/playwright test --config config/playwright.config.ts --project=chromium --ui"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.1.28",

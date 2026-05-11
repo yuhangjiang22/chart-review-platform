@@ -24,6 +24,7 @@ interface IterListing {
   n_patients?: number;
   started_at: string;
   started_by: string;
+  provider?: "claude" | "codex";
 }
 
 interface IterDetailResponse {
@@ -304,6 +305,18 @@ function RunStatusCard({
           <Badge variant={isReady ? "validated" : "primary"} className="!text-[10px]">
             {isReady ? "ready · validate" : "running"}
           </Badge>
+          {iter.provider && (
+            <span
+              className={
+                "inline-flex items-center px-1.5 py-0.5 rounded border text-[10px] font-mono " +
+                (iter.provider === "codex"
+                  ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                  : "bg-violet-100 text-violet-800 border-violet-300")
+              }
+            >
+              {iter.provider === "codex" ? "Codex" : "Claude"}
+            </span>
+          )}
         </div>
         <div className="text-[12px] text-muted-foreground">
           started {iter.started_at.slice(0, 16)} · {iter.started_by}

@@ -41,7 +41,11 @@ const ANTHROPIC_DEFAULTS: Record<ModelFeature, string | undefined> = {
 
 const CODEX_DEFAULTS: Record<ModelFeature, string | undefined> = {
   default: undefined, // let codex pick — ChatGPT auth restricts choices
-  judge: undefined,
+  // The judge calls Anthropic SDK directly (not via the swappable agent
+  // provider), so it always wants an Anthropic model. Falling back to
+  // CHART_REVIEW_MODEL (often set to a small/cheap chart-review model)
+  // tends to break the judge's strict-sentinel output format.
+  judge: "anthropic/claude-sonnet-4.6",
   phi: undefined,
 };
 

@@ -80,7 +80,7 @@ def codify(
 
     Args:
         package_dir: locked guideline at .claude/skills/chart-review-<task>/
-        reviews_root: usually <repo>/chart-review-platform/reviews/
+        reviews_root: usually <repo>/chart-review-platform/var/reviews/
         task_id: matches the per-patient subdirectory name
         note_metadata: optional {note_id: note_type} catalog. If None, the
             extractor relies on doc_type already on the evidence row, falling

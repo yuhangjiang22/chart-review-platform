@@ -21,7 +21,7 @@ import { getReviewsRootOverride } from "./domain/review/index.js";
 /** Exported for tests that want to know the default value. Not used
  *  internally after the lazy accessor below was introduced. */
 export const REVIEWS_ROOT =
-  process.env.CHART_REVIEW_REVIEWS_ROOT ?? path.join(PLATFORM_ROOT, "reviews");
+  process.env.CHART_REVIEW_REVIEWS_ROOT ?? path.join(PLATFORM_ROOT, "var", "reviews");
 
 /** Always re-read the override / env var so test code can change it
  *  without having to reset the module. The override (set by
@@ -30,7 +30,7 @@ export const REVIEWS_ROOT =
 function reviewsRoot(): string {
   const override = getReviewsRootOverride();
   if (override) return override;
-  return process.env.CHART_REVIEW_REVIEWS_ROOT ?? path.join(PLATFORM_ROOT, "reviews");
+  return process.env.CHART_REVIEW_REVIEWS_ROOT ?? path.join(PLATFORM_ROOT, "var", "reviews");
 }
 
 const MAX_RESULT_PREVIEW = 2000;

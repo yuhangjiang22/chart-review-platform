@@ -22,8 +22,8 @@ import { PLATFORM_ROOT } from "./patients.js";
 import { loadCompiledTask } from "./tasks.js";
 import { guidelineDir } from "./domain/rubric/index.js";
 
-const COHORTS_ROOT = path.join(PLATFORM_ROOT, "cohorts");
-const REVIEWS_ROOT = path.join(PLATFORM_ROOT, "reviews");
+const COHORTS_ROOT = path.join(PLATFORM_ROOT, "var", "cohorts");
+const REVIEWS_ROOT = path.join(PLATFORM_ROOT, "var", "reviews");
 
 export interface AnalyzeCohortOptions {
   task_id: string;

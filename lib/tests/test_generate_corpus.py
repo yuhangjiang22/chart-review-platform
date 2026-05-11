@@ -1,4 +1,4 @@
-"""Tests for tools/generate_corpus.py — hand-crafted code path."""
+"""Tests for scripts/generate_corpus.py — hand-crafted code path."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-GEN_SCRIPT = ROOT / "tools" / "generate_corpus.py"
+GEN_SCRIPT = ROOT / "scripts" / "generate_corpus.py"
 
 
 @pytest.fixture()

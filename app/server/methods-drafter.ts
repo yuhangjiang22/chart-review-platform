@@ -24,7 +24,7 @@ import { computeTaskSha } from "./lock.js";
 import { guidelineDir } from "./domain/rubric/index.js";
 
 function methodsRoot(): string {
-  return process.env.CHART_REVIEW_METHODS_ROOT ?? path.join(PLATFORM_ROOT, "methods");
+  return process.env.CHART_REVIEW_METHODS_ROOT ?? path.join(PLATFORM_ROOT, "var", "methods");
 }
 
 /** #50 — paper sections the drafter can produce. The chart-review-methods

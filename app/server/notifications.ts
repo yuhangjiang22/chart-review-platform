@@ -41,7 +41,7 @@ export interface NotificationWithRead extends Notification {
 }
 
 function notificationsRoot(): string {
-  return process.env.CHART_REVIEW_NOTIFICATIONS_ROOT ?? path.join(PLATFORM_ROOT, "notifications");
+  return process.env.CHART_REVIEW_NOTIFICATIONS_ROOT ?? path.join(PLATFORM_ROOT, "var", "notifications");
 }
 
 function inboxPath(recipientId: string): string {

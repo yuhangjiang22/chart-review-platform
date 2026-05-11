@@ -226,6 +226,10 @@ export interface PilotListing extends PilotManifest {
   phase: IterPhase;
   n_complete: number;
   n_patients: number;
+  /** Agent provider that produced this iter's draft, sourced from the run
+   *  manifest. Absent for pre-v0.7.1 runs that didn't record a provider —
+   *  consumers should display "(server default)" in that case. */
+  provider?: "claude" | "codex";
   /** Latest self-critique record (#12) for this iteration, if any. */
   critique?: {
     ran_at: string;
@@ -372,6 +376,7 @@ export function listPilotIterations(taskId: string): PilotListing[] {
     const m = getPilotManifest(taskId, name);
     if (!m) continue;
     const status = getRunStatus(m.run_id);
+    const runManifest = getRunManifest(m.run_id);
     const critique = getPilotCritique(taskId, m.iter_id);
     let accuracy_summary: PilotListing["accuracy_summary"] = null;
     const critiqueAccuracy = (critique as any)?.accuracy;
@@ -389,6 +394,7 @@ export function listPilotIterations(taskId: string): PilotListing[] {
       phase: derivePhase(m, runStatusValue),
       n_complete: status?.n_complete ?? 0,
       n_patients: status?.n_patients ?? 0,
+      ...(runManifest?.provider ? { provider: runManifest.provider } : {}),
       critique: critique
         ? {
             ran_at: critique.ran_at,
@@ -518,7 +524,7 @@ export interface PilotCritiqueRecord {
 }
 
 function reviewsRoot(): string {
-  return process.env.CHART_REVIEW_REVIEWS_ROOT ?? path.join(PLATFORM_ROOT, "reviews");
+  return process.env.CHART_REVIEW_REVIEWS_ROOT ?? path.join(PLATFORM_ROOT, "var", "reviews");
 }
 
 function pilotCritiquePath(taskId: string, iterId: string): string {
@@ -1048,7 +1054,7 @@ export function pilotIterationStats(taskId: string): PilotIterationStats[] {
     let nOverrides = 0;
     let totalCost = status?.total_cost_usd ?? 0;
     const runManifestPath = path.join(
-      process.env.CHART_REVIEW_RUNS_ROOT ?? path.join(PLATFORM_ROOT, "runs"),
+      process.env.CHART_REVIEW_RUNS_ROOT ?? path.join(PLATFORM_ROOT, "var", "runs"),
       m.run_id,
       "manifest.json",
     );

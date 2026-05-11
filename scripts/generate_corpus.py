@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generate the synthetic patient corpus.
 
-Reads tools/patient_seeds.yaml; for each entry:
+Reads scripts/patient_seeds.yaml; for each entry:
 
 - hand_crafted: true    — validates that the patient directory + notes exist;
                           regenerates meta.json + ground_truth.json from
@@ -16,8 +16,8 @@ Reads tools/patient_seeds.yaml; for each entry:
                           <id> to force re-creation.
 
 Usage:
-    chart-review-platform/.venv/bin/python tools/generate_corpus.py
-    chart-review-platform/.venv/bin/python tools/generate_corpus.py --regenerate <patient_id>
+    chart-review-platform/.venv/bin/python scripts/generate_corpus.py
+    chart-review-platform/.venv/bin/python scripts/generate_corpus.py --regenerate <patient_id>
 """
 
 from __future__ import annotations

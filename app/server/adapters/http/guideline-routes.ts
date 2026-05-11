@@ -95,7 +95,7 @@ export function guidelineRouter(): Router {
   router.get("/api/guideline-improvement/:taskId/cell-count", (req, res) => {
     const { taskId } = req.params as { taskId: string };
     const reviewsRoot =
-      process.env.CHART_REVIEW_REVIEWS_ROOT ?? path.join(PLATFORM_ROOT, "reviews");
+      process.env.CHART_REVIEW_REVIEWS_ROOT ?? path.join(PLATFORM_ROOT, "var", "reviews");
 
     let validated = 0;
     let total = 0;
@@ -180,7 +180,7 @@ export function guidelineRouter(): Router {
   router.get("/api/guideline-improvement/:taskId/analysis-summary", (req, res) => {
     const { taskId } = req.params as { taskId: string };
     const proposalsRoot =
-      process.env.CHART_REVIEW_PROPOSALS_ROOT ?? path.join(PLATFORM_ROOT, "proposals");
+      process.env.CHART_REVIEW_PROPOSALS_ROOT ?? path.join(PLATFORM_ROOT, "var", "proposals");
     const summaryPath = path.join(proposalsRoot, taskId, "ANALYSIS_SUMMARY.md");
     if (!fs.existsSync(summaryPath)) {
       return res.status(404).json({ error: "ANALYSIS_SUMMARY.md not found" });

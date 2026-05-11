@@ -21,6 +21,7 @@ import fs from "fs";
 import path from "path";
 import { PLATFORM_ROOT } from "../../patients.js";
 import type { AgentSpec } from "../../agent-specs.js";
+import { defaultProviderName, type ProviderName } from "../../agent-provider.js";
 
 export type RunState =
   | "running"
@@ -81,6 +82,10 @@ export interface RunManifest {
    * Absent for whole-guideline runs (default behavior).
    */
   target_field_ids?: string[];
+  /** Agent provider used for this run. Per-run override of the
+   *  AGENT_PROVIDER env var. Absent on manifests written before
+   *  v0.7.1 — readers should fall back to the env-var default. */
+  provider?: ProviderName;
 }
 
 export interface RunStatus {
@@ -106,6 +111,10 @@ export interface RunListing {
   n_patients: number;
   n_complete: number;
   n_error: number;
+  /** Agent provider used for this run. Absent on manifests written
+   *  before per-run provider support; readers should display "default"
+   *  or fall back to the env-var default in that case. */
+  provider?: ProviderName;
 }
 
 // ── manifest normalizer ───────────────────────────────────────────────────────
@@ -122,7 +131,7 @@ export function normalizeManifest(m: RunManifest): RunManifest {
 // ── filesystem layout ────────────────────────────────────────────────────────
 
 export function runsRoot(): string {
-  return process.env.CHART_REVIEW_RUNS_ROOT ?? path.join(PLATFORM_ROOT, "runs");
+  return process.env.CHART_REVIEW_RUNS_ROOT ?? path.join(PLATFORM_ROOT, "var", "runs");
 }
 
 export function runDir(runId: string): string {
@@ -202,6 +211,7 @@ export function listRuns(filter?: { task_id?: string }): RunListing[] {
       n_patients: s.n_patients,
       n_complete: s.n_complete,
       n_error: s.n_error,
+      ...(m.provider ? { provider: m.provider } : {}),
     });
   }
   return out.sort((a, b) => b.started_at.localeCompare(a.started_at));
@@ -371,6 +381,9 @@ export interface StartBatchRunOptions {
   /** When set, the run manifest records this cohort linkage so the run
    *  can be retrieved by cohort. No change to the run filesystem layout. */
   cohort_id?: string;
+  /** Per-run agent provider override. When omitted, falls back to the
+   *  AGENT_PROVIDER env var resolved at server start. */
+  provider?: ProviderName;
   /** Optional callback invoked after each status mutation. The driver
    *  calls this with the latest status; the route layer can broadcast
    *  on WS. */
@@ -427,6 +440,11 @@ export function startBatchRun(opts: StartBatchRunOptions): StartBatchRunResult {
   const guidelinePath = guidelineDir(opts.task_id);
   const guidelineSha = computeTaskSha(guidelinePath);
 
+  // Resolve "server default" to the concrete provider name so the manifest
+  // is self-describing forever. Without this, a null `provider` is ambiguous
+  // after the operator restarts the server with a different AGENT_PROVIDER.
+  const resolvedProvider: ProviderName = opts.provider ?? defaultProviderName();
+
   const runId = generateRunId();
   const manifest: RunManifest = {
     run_id: runId,
@@ -442,6 +460,7 @@ export function startBatchRun(opts: StartBatchRunOptions): StartBatchRunResult {
     cost_cap_usd: opts.cost_cap_usd ?? DEFAULT_COST_CAP_USD,
     kind: "agent_batch_run",
     agent_specs: specs,
+    provider: resolvedProvider,
     ...(opts.target_field_ids && opts.target_field_ids.length > 0
       ? { target_field_ids: opts.target_field_ids }
       : {}),
@@ -681,7 +700,7 @@ async function runOneAgent(
       task,
       sessionId,
       { onStateUpdate: () => {} },
-      { reviewsRoot: scratchRoot },
+      { reviewsRoot: scratchRoot, provider: manifest.provider },
     );
     const sdkHooks: Record<string, Array<{ hooks: any[] }>> = {
       PreToolUse: [{ hooks: [auditHooks.pre] }],
@@ -698,6 +717,7 @@ async function runOneAgent(
       maxTurns: manifest.max_turns_per_patient,
       permissionMode: "acceptEdits",
       model: spec.model,
+      provider: manifest.provider,
       extraSystemPrompt:
         "You are running unattended in batch mode. There is no human in the " +
         "loop for this patient — produce your draft and stop. Do not ask " +

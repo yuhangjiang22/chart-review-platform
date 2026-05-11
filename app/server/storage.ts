@@ -30,11 +30,12 @@ import { writeJsonAtomic } from "./lib/fs-atomic.js";
  *  instead of constructing paths inline so a future cloud-storage
  *  migration can swap the storage scheme in one place. */
 export const pathFor = {
-  /** `<root>/reviews/<patient>/<task>/review_state.json` —
+  /** `<root>/var/reviews/<patient>/<task>/review_state.json` —
    *  the per-patient ground-truth document the reviewer commits. */
   reviewState(patientId: string, taskId: string): string {
     return path.join(
       PLATFORM_ROOT,
+      "var",
       "reviews",
       patientId,
       taskId,
@@ -42,11 +43,12 @@ export const pathFor = {
     );
   },
 
-  /** `<root>/runs/<run_id>/per_patient/<patient>/agents/<agent>.json`
+  /** `<root>/var/runs/<run_id>/per_patient/<patient>/agents/<agent>.json`
    *  — one agent's draft for one patient in one run. */
   agentDraft(runId: string, patientId: string, agentId: string): string {
     return path.join(
       PLATFORM_ROOT,
+      "var",
       "runs",
       runId,
       "per_patient",
