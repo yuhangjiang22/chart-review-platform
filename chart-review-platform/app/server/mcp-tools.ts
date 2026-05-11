@@ -257,6 +257,10 @@ export interface BuildMcpServersOptions {
    *  honors (taking precedence over the default
    *  `<PLATFORM_ROOT>/reviews/`). */
   reviewsRoot?: string;
+  /** Per-run agent provider — when "codex", forces subprocess MCP
+   *  transport regardless of MCP_TRANSPORT env var. Falls back to
+   *  AGENT_PROVIDER env var when omitted. */
+  provider?: "claude" | "codex";
 }
 
 /**
@@ -290,9 +294,12 @@ export function buildMcpServersConfig(
 ): Record<string, unknown> {
   // Codex (and any future non-Anthropic provider) can't host an
   // in-process Anthropic-SDK server, so subprocess transport is the
-  // only viable shape. Auto-promote when AGENT_PROVIDER demands it,
-  // even if the operator didn't set MCP_TRANSPORT explicitly.
-  const provider = (process.env.AGENT_PROVIDER ?? "claude").toLowerCase();
+  // only viable shape. Auto-promote when the active provider demands
+  // it, even if the operator didn't set MCP_TRANSPORT explicitly.
+  // The per-run override (opts.provider) wins over the env var so a
+  // single server can host runs from both providers.
+  const provider = opts.provider
+    ?? ((process.env.AGENT_PROVIDER ?? "claude").toLowerCase() as "claude" | "codex");
   const wantsSubprocess =
     process.env.MCP_TRANSPORT === "subprocess" || provider === "codex";
   if (wantsSubprocess) {

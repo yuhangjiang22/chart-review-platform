@@ -24,16 +24,37 @@
 //   - System prompt is prepended to the user prompt (Codex's `-c
 //     instructions=...` per-call override is documented but untested
 //     and the prepend approach is portable across all providers).
-//   - ChatGPT-account auth (the default) restricts which models work;
-//     `gpt-5-codex` is rejected. Default model works.
+//   - Auth/routing is configured in ~/.codex/config.toml. The platform
+//     ships pointing at OpenRouter (model_provider = "openrouter") so
+//     any OpenRouter-served model works. Operators can switch to
+//     ChatGPT-account auth (`codex login`) or a direct OpenAI API key
+//     by editing that file; the provider code is auth-agnostic.
 
 import { spawn } from "node:child_process";
 import readline from "node:readline";
+import path from "node:path";
+import { PLATFORM_ROOT } from "./patients.js";
 import type {
   AgentProvider,
   AgentRunInput,
   AgentEvent,
 } from "./agent-provider.js";
+
+/**
+ * Project-local CODEX_HOME so teammates don't need to manage
+ * `~/.codex/config.toml` on their own machines. The codex CLI reads
+ * config.toml + auth.json + writes sessions/logs here. We override at
+ * spawn time so:
+ *   - the repo's checked-in config.toml is the source of truth
+ *   - codex's logs/sessions land in <repo>/.codex/ (gitignored) instead
+ *     of clobbering the user's personal ~/.codex used by other projects
+ *   - the user's existing ChatGPT-account login in ~/.codex stays
+ *     untouched
+ *
+ * Override with the CODEX_HOME env var if you want codex to fall back
+ * to your personal config (e.g. for ad-hoc debugging).
+ */
+const PROJECT_CODEX_HOME = path.join(PLATFORM_ROOT, ".codex");
 
 /**
  * Resolve the codex binary path. By default we look for it in the
@@ -75,13 +96,17 @@ export class CodexAgentProvider implements AgentProvider {
       "-C",
       input.cwd,
     ];
-    // Only pass -m when the model is plausibly something Codex can
-    // route to. Anthropic-prefixed model IDs (`anthropic/claude-...`)
-    // are common in CHART_REVIEW_MODEL when the platform was
-    // configured for Anthropic via OpenRouter; passing those to
-    // Codex would yield a 4xx. When in doubt, don't pass — let
-    // Codex pick its own default.
-    if (input.model && !input.model.startsWith("anthropic/")) {
+    // Codex CLI on ChatGPT-account auth (the default after our
+    // OpenRouter detour failed end-to-end on MCP) only accepts a
+    // narrow set of OpenAI-native models. Foreign IDs like
+    // anthropic/claude-* would 4xx; we skip -m for those and let
+    // codex use its account default. openai/* IDs are also risky
+    // (gpt-5-codex was rejected per the spike) — skip those too.
+    // The dropdown's model chip is therefore informational only on
+    // the codex path; to actually pick a model use the Claude
+    // provider (Anthropic SDK over OpenRouter), which honors any
+    // OpenRouter-supported model string.
+    if (input.model && !input.model.includes("/")) {
       args.push("-m", input.model);
     }
     // The actual prompt is the last positional arg.
@@ -92,6 +117,14 @@ export class CodexAgentProvider implements AgentProvider {
       cwd: input.cwd,
       env: {
         ...process.env,
+        // Point codex at the project-local config.toml unless the
+        // operator has explicitly set CODEX_HOME to override.
+        CODEX_HOME: process.env.CODEX_HOME ?? PROJECT_CODEX_HOME,
+        // The MCP server registration in config.toml resolves its
+        // command path via $CHART_REVIEW_PLATFORM_ROOT — make sure
+        // that's set so the bash -lc wrapper can expand it.
+        CHART_REVIEW_PLATFORM_ROOT:
+          process.env.CHART_REVIEW_PLATFORM_ROOT ?? PLATFORM_ROOT,
         // Tell our MCP subprocess where the per-run reviews root is.
         // Codex's config.toml registers the MCP server with these
         // env vars passed through (see docs).

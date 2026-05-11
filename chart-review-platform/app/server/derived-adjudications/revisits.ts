@@ -53,7 +53,7 @@ interface AgentDraft {
  * tests can override CHART_REVIEW_REVIEWS_ROOT without restarting the module.
  */
 function reviewsRootPath(): string {
-  return process.env.CHART_REVIEW_REVIEWS_ROOT ?? path.join(PLATFORM_ROOT, "reviews");
+  return process.env.CHART_REVIEW_REVIEWS_ROOT ?? path.join(PLATFORM_ROOT, "var", "reviews");
 }
 
 function readReviewState(taskId: string, patientId: string): PerPatientReviewState | null {

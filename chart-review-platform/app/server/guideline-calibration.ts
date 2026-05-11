@@ -24,10 +24,10 @@ import {
   type KappaResult,
 } from "./kappa.js";
 
-const CALIBRATION_ROOT = path.join(PLATFORM_ROOT, "calibration");
+const CALIBRATION_ROOT = path.join(PLATFORM_ROOT, "var", "calibration");
 
 function reviewsRoot(): string {
-  return process.env.CHART_REVIEW_REVIEWS_ROOT ?? path.join(PLATFORM_ROOT, "reviews");
+  return process.env.CHART_REVIEW_REVIEWS_ROOT ?? path.join(PLATFORM_ROOT, "var", "reviews");
 }
 
 export type KappaBucket = "excellent" | "acceptable" | "weak" | "poor" | "low_n";

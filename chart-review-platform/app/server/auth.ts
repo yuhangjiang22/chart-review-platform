@@ -177,12 +177,12 @@ export function reviewerIdOf(req: Request): string {
 // ---------------------------------------------------------------------------
 
 /** Always re-read the env var so tests can override it without resetting
- *  the module. Falls back to a sibling `reviews/` directory of the running
- *  server file, matching the same pattern used in review-state.ts. */
+ *  the module. Falls back to `<platform-root>/var/reviews/`, matching the
+ *  same pattern used in review-state.ts. */
 function reviewsRoot(): string {
   return (
     process.env.CHART_REVIEW_REVIEWS_ROOT ??
-    path.join(path.dirname(path.dirname(path.dirname(__dirname))), "reviews")
+    path.join(path.dirname(path.dirname(path.dirname(__dirname))), "var", "reviews")
   );
 }
 

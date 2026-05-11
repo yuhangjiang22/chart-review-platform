@@ -93,22 +93,22 @@ export interface ExportListing {
 }
 
 export function exportsRoot(): string {
-  return process.env.CHART_REVIEW_EXPORTS_ROOT ?? path.join(PLATFORM_ROOT, "exports");
+  return process.env.CHART_REVIEW_EXPORTS_ROOT ?? path.join(PLATFORM_ROOT, "var", "exports");
 }
 function reviewsRoot(): string {
-  return process.env.CHART_REVIEW_REVIEWS_ROOT ?? path.join(PLATFORM_ROOT, "reviews");
+  return process.env.CHART_REVIEW_REVIEWS_ROOT ?? path.join(PLATFORM_ROOT, "var", "reviews");
 }
 function cohortsRoot(): string {
-  return process.env.CHART_REVIEW_COHORTS_ROOT ?? path.join(PLATFORM_ROOT, "cohorts");
+  return process.env.CHART_REVIEW_COHORTS_ROOT ?? path.join(PLATFORM_ROOT, "var", "cohorts");
 }
 function methodsRootDir(): string {
-  return process.env.CHART_REVIEW_METHODS_ROOT ?? path.join(PLATFORM_ROOT, "methods");
+  return process.env.CHART_REVIEW_METHODS_ROOT ?? path.join(PLATFORM_ROOT, "var", "methods");
 }
 function proposalsRoot(): string {
-  return process.env.CHART_REVIEW_PROPOSALS_ROOT ?? path.join(PLATFORM_ROOT, "proposals");
+  return process.env.CHART_REVIEW_PROPOSALS_ROOT ?? path.join(PLATFORM_ROOT, "var", "proposals");
 }
 function runsRootDir(): string {
-  return process.env.CHART_REVIEW_RUNS_ROOT ?? path.join(PLATFORM_ROOT, "runs");
+  return process.env.CHART_REVIEW_RUNS_ROOT ?? path.join(PLATFORM_ROOT, "var", "runs");
 }
 
 function copyDirRecursive(src: string, dst: string): void {
@@ -486,7 +486,7 @@ export function listExports(taskId: string): ExportListing[] {
 // ── Deployment-validation surface (blueprint §3 + §4) ────────────────────────
 
 function deploymentCohortsRoot(): string {
-  return process.env.CHART_REVIEW_COHORTS_ROOT ?? path.join(PLATFORM_ROOT, "cohorts");
+  return process.env.CHART_REVIEW_COHORTS_ROOT ?? path.join(PLATFORM_ROOT, "var", "cohorts");
 }
 
 // Use the canonical deploymentIssuesRoot from domain/issue (which respects

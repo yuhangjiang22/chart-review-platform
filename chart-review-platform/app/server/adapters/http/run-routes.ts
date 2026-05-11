@@ -40,6 +40,7 @@ import {
   type RunStatus,
 } from "../../infra/batch-run/index.js";
 import { reviewerIdOf, isMethodologist } from "../../auth.js";
+import { isProviderName } from "../../agent-provider.js";
 
 export function runRouter(broadcastRunUpdate: (status: RunStatus) => void): Router {
   const router = Router();
@@ -56,9 +57,13 @@ export function runRouter(broadcastRunUpdate: (status: RunStatus) => void): Rout
       max_concurrency,
       max_turns_per_patient,
       cost_cap_usd,
+      provider,
     } = req.body ?? {};
     if (!task_id || !Array.isArray(patient_ids) || patient_ids.length === 0) {
       return res.status(400).json({ error: "task_id and non-empty patient_ids are required" });
+    }
+    if (provider !== undefined && !isProviderName(provider)) {
+      return res.status(400).json({ error: `unknown provider: ${provider}` });
     }
     try {
       const result = startBatchRun({
@@ -69,6 +74,7 @@ export function runRouter(broadcastRunUpdate: (status: RunStatus) => void): Rout
         max_concurrency,
         max_turns_per_patient,
         cost_cap_usd,
+        provider,
         onStatus: broadcastRunUpdate,
       });
       res.json(result);
@@ -106,7 +112,8 @@ export function runRouter(broadcastRunUpdate: (status: RunStatus) => void): Rout
       res.json({ drafts: [] });
       return;
     }
-    const drafts: Array<{ agent_id: string; field_assessments: unknown[] }> = [];
+    const provider = getRunManifest(runId)?.provider;
+    const drafts: Array<{ agent_id: string; field_assessments: unknown[]; provider?: string }> = [];
     for (const f of fs.readdirSync(dir)) {
       if (!f.endsWith(".json")) continue;
       const agentId = f.replace(/\.json$/, "");
@@ -115,6 +122,7 @@ export function runRouter(broadcastRunUpdate: (status: RunStatus) => void): Rout
         drafts.push({
           agent_id: agentId,
           field_assessments: Array.isArray(raw.field_assessments) ? raw.field_assessments : [],
+          ...(provider ? { provider } : {}),
         });
       } catch { /* skip malformed */ }
     }

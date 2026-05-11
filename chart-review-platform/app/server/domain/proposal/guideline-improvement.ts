@@ -19,11 +19,11 @@ import { PLATFORM_ROOT } from "../../patients.js";
 import { loadSkillBundle, guidelineDir } from "../rubric/index.js";
 
 function proposalsRoot(): string {
-  return process.env.CHART_REVIEW_PROPOSALS_ROOT ?? path.join(PLATFORM_ROOT, "proposals");
+  return process.env.CHART_REVIEW_PROPOSALS_ROOT ?? path.join(PLATFORM_ROOT, "var", "proposals");
 }
 
 function reviewsRoot(): string {
-  return process.env.CHART_REVIEW_REVIEWS_ROOT ?? path.join(PLATFORM_ROOT, "reviews");
+  return process.env.CHART_REVIEW_REVIEWS_ROOT ?? path.join(PLATFORM_ROOT, "var", "reviews");
 }
 
 export interface ImproveGuidelineOptions {

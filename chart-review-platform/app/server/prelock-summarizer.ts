@@ -82,6 +82,7 @@ export async function* preLockSummaryStream(
   const guidelinePath = guidelineDir(input.taskId);
   const reviewStateAbs = path.join(
     PLATFORM_ROOT,
+    "var",
     "reviews",
     input.patientId,
     input.taskId,

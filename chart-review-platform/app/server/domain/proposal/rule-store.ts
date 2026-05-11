@@ -76,7 +76,7 @@ export interface RuleProposal {
 
 function proposalsRoot(): string {
   return process.env.CHART_REVIEW_PROPOSALS_ROOT
-    ?? path.join(PLATFORM_ROOT, "proposals");
+    ?? path.join(PLATFORM_ROOT, "var", "proposals");
 }
 
 function proposalPath(taskId: string, ruleId: string): string {

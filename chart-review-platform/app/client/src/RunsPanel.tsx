@@ -13,6 +13,8 @@
 import { useEffect, useState } from "react";
 import { authFetch } from "./auth";
 
+type ProviderName = "claude" | "codex";
+
 interface RunListing {
   run_id: string;
   task_id: string;
@@ -22,6 +24,24 @@ interface RunListing {
   n_patients: number;
   n_complete: number;
   n_error: number;
+  provider?: ProviderName;
+}
+
+function ProviderBadge({ provider }: { provider?: ProviderName }) {
+  // No badge when the run inherited the server default — keeps the
+  // list tidy for legacy runs and for the common case where the
+  // operator just uses whatever AGENT_PROVIDER points at.
+  if (!provider) return null;
+  const label = provider === "codex" ? "Codex" : "Claude";
+  const cls =
+    provider === "codex"
+      ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+      : "bg-violet-100 text-violet-800 border-violet-300";
+  return (
+    <span className={`inline-flex items-center px-1.5 py-0.5 rounded border text-[10px] font-mono ${cls}`}>
+      {label}
+    </span>
+  );
 }
 
 interface PerPatientStatus {
@@ -60,6 +80,7 @@ interface RunManifest {
   max_concurrency: number;
   max_turns_per_patient: number;
   cost_cap_usd: number;
+  provider?: ProviderName;
 }
 
 export function RunsPanel({ taskId, taskIds, isMethodologist }: {
@@ -126,6 +147,7 @@ export function RunsPanel({ taskId, taskIds, isMethodologist }: {
               >
                 {r.label ?? r.run_id}
               </button>
+              <ProviderBadge provider={r.provider} />
               <span className="text-muted-foreground whitespace-nowrap">
                 <StatePill state={r.state} />
                 {" "}
@@ -336,6 +358,7 @@ export function RunDetailModal({ runId, onClose }: { runId: string; onClose: () 
         <header className="px-6 py-3 border-b border-border flex items-center justify-between">
           <div className="flex items-center gap-2 text-[14px] font-semibold">
             🤖 Run · <code className="text-[12px]">{runId}</code>
+            <ProviderBadge provider={manifest?.provider} />
           </div>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground text-[14px]">×</button>
         </header>
@@ -346,6 +369,7 @@ export function RunDetailModal({ runId, onClose }: { runId: string; onClose: () 
               <div className="border border-border rounded p-3 bg-muted/50 text-[11px]">
                 <div><strong>task:</strong> {manifest.task_id}</div>
                 <div><strong>label:</strong> {manifest.label ?? "—"}</div>
+                <div><strong>provider:</strong> {manifest.provider ?? "(server default)"}</div>
                 <div><strong>SHA:</strong> <code>{manifest.guideline_sha.slice(0, 12)}</code></div>
                 <div><strong>started:</strong> {manifest.started_at} by {manifest.started_by}</div>
                 <div><strong>concurrency:</strong> {manifest.max_concurrency} · <strong>maxTurns:</strong> {manifest.max_turns_per_patient} · <strong>cap:</strong> ${manifest.cost_cap_usd}</div>
@@ -405,6 +429,7 @@ function CreateRunModal({
   const [patientIdsRaw, setPatientIdsRaw] = useState("");
   const [label, setLabel] = useState("");
   const [maxConcurrency, setMaxConcurrency] = useState(3);
+  const [provider, setProvider] = useState<"default" | "claude" | "codex">("default");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -429,6 +454,7 @@ function CreateRunModal({
           patient_ids,
           label: label || undefined,
           max_concurrency: maxConcurrency,
+          provider: provider === "default" ? undefined : provider,
         }),
       });
       const body = await r.json();
@@ -506,6 +532,19 @@ function CreateRunModal({
               />
             </label>
           </div>
+
+          <label className="block">
+            <span className="text-[10px] uppercase tracking-wide text-muted-foreground">agent provider</span>
+            <select
+              value={provider}
+              onChange={(e) => setProvider(e.target.value as "default" | "claude" | "codex")}
+              className="w-full border border-border rounded px-2 py-1 mt-0.5"
+            >
+              <option value="default">server default (AGENT_PROVIDER env var)</option>
+              <option value="claude">Anthropic Claude</option>
+              <option value="codex">OpenAI Codex CLI</option>
+            </select>
+          </label>
 
           {error && <div className="text-[hsl(var(--oxblood))] text-[11px]">{error}</div>}
 

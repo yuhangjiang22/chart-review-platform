@@ -206,7 +206,7 @@ def main(argv: list[str] | None = None) -> int:
     p_codify = sub.add_parser("codify", help="Codify a locked guideline against its validated cohort")
     p_codify.add_argument("--task", required=True, help="task_id")
     p_codify.add_argument("--package-dir", default=None, help="path to .claude/skills/chart-review-<task>/")
-    p_codify.add_argument("--reviews-root", default=None, help="path to chart-review-platform/reviews/")
+    p_codify.add_argument("--reviews-root", default=None, help="path to chart-review-platform/var/reviews/")
     p_codify.set_defaults(func=cmd_codify)
 
     args = parser.parse_args(argv)

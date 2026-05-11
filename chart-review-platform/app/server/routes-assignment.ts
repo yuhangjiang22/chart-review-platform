@@ -11,7 +11,7 @@ import { assignRecords, unassignRecords, getReviewerQueue } from "./assignment.j
 
 // Helper to get reviewsRoot (matches review-state.ts pattern)
 function reviewsRoot(): string {
-  return process.env.CHART_REVIEW_REVIEWS_ROOT ?? path.join(PLATFORM_ROOT, "reviews");
+  return process.env.CHART_REVIEW_REVIEWS_ROOT ?? path.join(PLATFORM_ROOT, "var", "reviews");
 }
 
 export function assignmentRouter(): Router {

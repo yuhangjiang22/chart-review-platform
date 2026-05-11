@@ -1,0 +1,72 @@
+{
+  "schema_version": "1",
+  "patient_id": "patient_01",
+  "task_id": "locked-task",
+  "version": 5,
+  "updated_at": "2026-04-29T10:00:00Z",
+  "updated_by": "reviewer",
+  "review_status": "reviewer_validated",
+  "field_assessments": [
+    {
+      "field_id": "lung_pathology",
+      "answer": "yes",
+      "source": "reviewer",
+      "status": "approved",
+      "updated_at": "2026-04-29T10:00:00Z",
+      "evidence": [
+        {
+          "source": "note",
+          "note_id": "patient_01__pathology_2024-11-22",
+          "doc_type": "pathology",
+          "span_offsets": [120, 180],
+          "verbatim_quote": "Biopsy confirmed adenocarcinoma of the lung.",
+          "evidence_date": "2024-11-22"
+        },
+        {
+          "source": "omop",
+          "table": "condition_occurrence",
+          "row_id": "5101",
+          "concept_id": 4115276,
+          "concept_name": "Malignant tumor of lung",
+          "value": "C34.10",
+          "evidence_date": "2024-11-22"
+        }
+      ]
+    },
+    {
+      "field_id": "lung_imaging",
+      "answer": "yes",
+      "source": "reviewer",
+      "status": "approved",
+      "updated_at": "2026-04-29T10:00:00Z",
+      "evidence": [
+        {
+          "source": "note",
+          "note_id": "patient_01__radiology_2024-11-15",
+          "doc_type": "radiology",
+          "span_offsets": [50, 110],
+          "verbatim_quote": "Spiculated mass in the right upper lobe.",
+          "evidence_date": "2024-11-15"
+        }
+      ]
+    },
+    {
+      "field_id": "age_at_index",
+      "answer": 71,
+      "source": "reviewer",
+      "status": "approved",
+      "updated_at": "2026-04-29T10:00:00Z",
+      "evidence": []
+    },
+    {
+      "field_id": "lung_status",
+      "answer": "confirmed",
+      "source": "reviewer",
+      "status": "approved",
+      "updated_at": "2026-04-29T10:00:00Z",
+      "evidence": []
+    }
+  ],
+  "selected_evidence": [],
+  "oracle_done": true
+}

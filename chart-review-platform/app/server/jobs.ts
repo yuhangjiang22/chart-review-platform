@@ -61,7 +61,7 @@ export interface JobEvent {
 }
 
 function jobsRoot(): string {
-  return process.env.CHART_REVIEW_JOBS_ROOT ?? path.join(PLATFORM_ROOT, "jobs");
+  return process.env.CHART_REVIEW_JOBS_ROOT ?? path.join(PLATFORM_ROOT, "var", "jobs");
 }
 function jobDir(jobId: string): string { return path.join(jobsRoot(), jobId); }
 function manifestPath(jobId: string): string { return path.join(jobDir(jobId), "manifest.json"); }
