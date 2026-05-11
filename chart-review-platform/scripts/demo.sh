@@ -10,7 +10,8 @@
 
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "$0")" && pwd)"
+# Script lives at <platform-root>/scripts/demo.sh; ROOT is the parent.
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 LIB="$ROOT/lib"
 VENV="$ROOT/.venv"
 TASKS="$ROOT/tasks"

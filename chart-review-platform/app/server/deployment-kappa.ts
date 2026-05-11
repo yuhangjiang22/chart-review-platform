@@ -221,7 +221,7 @@ function computeCalibrationKappaPerField(
   fieldIds: string[],
 ): Map<string, number> {
   const reviewsRootPath =
-    process.env.CHART_REVIEW_REVIEWS_ROOT ?? path.join(PLATFORM_ROOT, "reviews");
+    process.env.CHART_REVIEW_REVIEWS_ROOT ?? path.join(PLATFORM_ROOT, "var", "reviews");
   const out = new Map<string, number>();
   if (!fs.existsSync(reviewsRootPath)) return out;
   for (const fid of fieldIds) {

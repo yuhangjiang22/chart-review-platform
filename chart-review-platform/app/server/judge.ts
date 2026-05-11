@@ -12,7 +12,7 @@
 // Output schema is documented in .claude/skills/chart-review-judge/SKILL.md.
 
 import path from "path";
-import { runAgent } from "./agent-provider.js";
+import { runAgent, type ProviderName } from "./agent-provider.js";
 import { modelFor } from "./model-config.js";
 import { patientDir, PLATFORM_ROOT, isPhiPatient } from "./patients.js";
 import { phenotypeSkillDir } from "./domain/rubric/index.js";
@@ -43,6 +43,11 @@ export interface JudgeInput {
   kind: "disagreement" | "low_confidence" | "type_drift";
   agent_a: JudgeAgentSnapshot;
   agent_b?: JudgeAgentSnapshot;
+  /** Provider to run the judge on. The caller passes the provider that
+   *  produced the run being judged so judge inherits the same backend
+   *  (Claude run → Claude judge, Codex run → Codex judge). When absent,
+   *  falls back to the AGENT_PROVIDER env-var default. */
+  provider?: ProviderName;
 }
 
 /** Strict-JSON schema the skill is instructed to emit. */
@@ -227,6 +232,7 @@ export async function judgeCell(input: JudgeInput): Promise<JudgeOutput> {
       phi: isPhiPatient(input.patientId),
       maxTurns: 24,
       model: JUDGE_MODEL,
+      provider: input.provider,
       extraSystemPrompt:
         "You are the chart-review-judge skill. Produce ONE strict-JSON " +
         "record wrapped in <JUDGE_ANALYSIS> sentinels. Do not commit, " +

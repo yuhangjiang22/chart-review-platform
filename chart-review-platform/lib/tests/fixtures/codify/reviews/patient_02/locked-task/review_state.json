@@ -1,0 +1,72 @@
+{
+  "schema_version": "1",
+  "patient_id": "patient_02",
+  "task_id": "locked-task",
+  "version": 4,
+  "updated_at": "2026-04-29T10:00:00Z",
+  "updated_by": "reviewer",
+  "review_status": "reviewer_validated",
+  "field_assessments": [
+    {
+      "field_id": "lung_pathology",
+      "answer": "yes",
+      "source": "reviewer",
+      "status": "approved",
+      "updated_at": "2026-04-29T10:00:00Z",
+      "evidence": [
+        {
+          "source": "note",
+          "note_id": "patient_02__pathology_2024-12-01",
+          "doc_type": "pathology",
+          "span_offsets": [40, 100],
+          "verbatim_quote": "Pathology report shows malignant cells; biopsy confirmed.",
+          "evidence_date": "2024-12-01"
+        },
+        {
+          "source": "omop",
+          "table": "condition_occurrence",
+          "row_id": "5102",
+          "concept_id": 4115276,
+          "concept_name": "Malignant tumor of lung",
+          "value": "C34.11",
+          "evidence_date": "2024-12-01"
+        }
+      ]
+    },
+    {
+      "field_id": "lung_imaging",
+      "answer": "yes",
+      "source": "reviewer",
+      "status": "approved",
+      "updated_at": "2026-04-29T10:00:00Z",
+      "evidence": [
+        {
+          "source": "note",
+          "note_id": "patient_02__radiology_2024-11-29",
+          "doc_type": "radiology",
+          "span_offsets": [10, 50],
+          "verbatim_quote": "Hilar mass on imaging.",
+          "evidence_date": "2024-11-29"
+        }
+      ]
+    },
+    {
+      "field_id": "age_at_index",
+      "answer": 68,
+      "source": "reviewer",
+      "status": "approved",
+      "updated_at": "2026-04-29T10:00:00Z",
+      "evidence": []
+    },
+    {
+      "field_id": "lung_status",
+      "answer": "confirmed",
+      "source": "reviewer",
+      "status": "approved",
+      "updated_at": "2026-04-29T10:00:00Z",
+      "evidence": []
+    }
+  ],
+  "selected_evidence": [],
+  "oracle_done": true
+}

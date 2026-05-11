@@ -50,6 +50,9 @@ export interface AgentFieldDraft {
   evidence?: Evidence[];
   rationale?: string;
   confidence?: "low" | "medium" | "high";
+  /** Provider that produced this draft. Sourced from the run manifest;
+   *  absent for runs that didn't record a provider. */
+  provider?: "claude" | "codex";
 }
 
 export interface PatientReviewProps {
@@ -189,9 +192,13 @@ export function PatientReview(p: PatientReviewProps) {
         );
         if (cancelled) return;
         if (!draftsRes.ok) continue;
-        const body: { drafts: Array<{ agent_id: string; field_assessments: Array<Record<string, unknown>> }> } = await draftsRes.json();
+        const body: { drafts: Array<{ agent_id: string; field_assessments: Array<Record<string, unknown>>; provider?: "claude" | "codex" }> } = await draftsRes.json();
         const drafts = body.drafts ?? [];
-        if (drafts.length < 2) continue;
+        // Surface even single-agent drafts so the "compare answers" panel
+        // becomes a "see agent draft" panel for default 1-agent runs.
+        // The card renders the slots conditionally so an empty slot 2 is
+        // hidden, not blank.
+        if (drafts.length < 1) continue;
         // Build the per-field map.
         const m = new Map<string, AgentFieldDraft[]>();
         for (const d of drafts) {
@@ -206,6 +213,7 @@ export function PatientReview(p: PatientReviewProps) {
               confidence: (["low", "medium", "high"] as const).includes(fa.confidence as never)
                 ? (fa.confidence as "low" | "medium" | "high")
                 : undefined,
+              ...(d.provider ? { provider: d.provider } : {}),
             };
             const arr = m.get(fid);
             if (arr) arr.push(entry);

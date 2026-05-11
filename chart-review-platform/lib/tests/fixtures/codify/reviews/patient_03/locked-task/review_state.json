@@ -1,0 +1,72 @@
+{
+  "schema_version": "1",
+  "patient_id": "patient_03",
+  "task_id": "locked-task",
+  "version": 3,
+  "updated_at": "2026-04-29T10:00:00Z",
+  "updated_by": "reviewer",
+  "review_status": "reviewer_validated",
+  "field_assessments": [
+    {
+      "field_id": "lung_pathology",
+      "answer": "yes",
+      "source": "reviewer",
+      "status": "approved",
+      "updated_at": "2026-04-29T10:00:00Z",
+      "evidence": [
+        {
+          "source": "note",
+          "note_id": "patient_03__pathology_2024-10-15",
+          "doc_type": "pathology",
+          "span_offsets": [0, 60],
+          "verbatim_quote": "Biopsy of right lung mass: small cell carcinoma.",
+          "evidence_date": "2024-10-15"
+        },
+        {
+          "source": "omop",
+          "table": "condition_occurrence",
+          "row_id": "5103",
+          "concept_id": 4115276,
+          "concept_name": "Malignant tumor of lung",
+          "value": "C34.31",
+          "evidence_date": "2024-10-15"
+        }
+      ]
+    },
+    {
+      "field_id": "lung_imaging",
+      "answer": "yes",
+      "source": "reviewer",
+      "status": "approved",
+      "updated_at": "2026-04-29T10:00:00Z",
+      "evidence": [
+        {
+          "source": "note",
+          "note_id": "patient_03__radiology_2024-10-10",
+          "doc_type": "radiology",
+          "span_offsets": [20, 80],
+          "verbatim_quote": "Right upper lobe mass, spiculated, suspicious for malignancy.",
+          "evidence_date": "2024-10-10"
+        }
+      ]
+    },
+    {
+      "field_id": "age_at_index",
+      "answer": 75,
+      "source": "reviewer",
+      "status": "approved",
+      "updated_at": "2026-04-29T10:00:00Z",
+      "evidence": []
+    },
+    {
+      "field_id": "lung_status",
+      "answer": "confirmed",
+      "source": "reviewer",
+      "status": "approved",
+      "updated_at": "2026-04-29T10:00:00Z",
+      "evidence": []
+    }
+  ],
+  "selected_evidence": [],
+  "oracle_done": true
+}

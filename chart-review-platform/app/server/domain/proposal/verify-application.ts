@@ -35,7 +35,7 @@ export interface VerifyApplicationArgs {
 }
 
 function reviewsRoot(): string {
-  return process.env.CHART_REVIEW_REVIEWS_ROOT ?? path.join(PLATFORM_ROOT, "reviews");
+  return process.env.CHART_REVIEW_REVIEWS_ROOT ?? path.join(PLATFORM_ROOT, "var", "reviews");
 }
 
 function readGroundTruth(taskId: string, patientId: string, fieldId: string): unknown {

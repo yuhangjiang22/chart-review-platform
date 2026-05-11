@@ -49,7 +49,7 @@ export interface CohortRunManifest extends RunManifest {
 // ── layout helpers ────────────────────────────────────────────────────────────
 
 export function cohortsRoot(): string {
-  return process.env.CHART_REVIEW_COHORTS_ROOT ?? path.join(PLATFORM_ROOT, "cohorts");
+  return process.env.CHART_REVIEW_COHORTS_ROOT ?? path.join(PLATFORM_ROOT, "var", "cohorts");
 }
 
 export function cohortDir(cohortId: string): string {
@@ -195,7 +195,7 @@ export function listCohortRuns(cohortId: string): Array<{ run_id: string; task_i
     .filter((r) => {
       // We need the full manifest to check cohort_id
       const manifestFile = path.join(
-        process.env.CHART_REVIEW_RUNS_ROOT ?? path.join(PLATFORM_ROOT, "runs"),
+        process.env.CHART_REVIEW_RUNS_ROOT ?? path.join(PLATFORM_ROOT, "var", "runs"),
         r.run_id,
         "manifest.json",
       );

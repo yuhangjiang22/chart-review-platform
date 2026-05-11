@@ -22,7 +22,7 @@ import type { ChatMessage } from "./types.js";
 function reviewsRoot(): string {
   const override = getReviewsRootOverride();
   if (override) return override;
-  return process.env.CHART_REVIEW_REVIEWS_ROOT ?? path.join(PLATFORM_ROOT, "reviews");
+  return process.env.CHART_REVIEW_REVIEWS_ROOT ?? path.join(PLATFORM_ROOT, "var", "reviews");
 }
 
 function chatPath(patientId: string): string {

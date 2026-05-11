@@ -17,7 +17,7 @@ import {
   extractDisagreements,
 } from "./domain/iter/index.js";
 import { pilotIterDir } from "./domain/iter/pilots.js";
-import { runDir, getRunStatus } from "./infra/batch-run/index.js";
+import { runDir, getRunStatus, getRunManifest } from "./infra/batch-run/index.js";
 import { loadAgentDrafts, type FieldAssessment } from "./disagreements.js";
 import { loadCriteria } from "./domain/rubric/index.js";
 import { atomicWriteJson } from "./storage.js";
@@ -202,6 +202,15 @@ function buildWorklist(taskId: string, iterId: string): JudgeInput[] {
         }
       }
     }
+  }
+
+  // Stamp each cell with the run's provider so the judge inherits the
+  // same backend the agent run used. Codex run → Codex judge, Claude
+  // run → Claude judge. Pre-v0.7.1 manifests have no provider — leave
+  // it undefined so the env-var default (AGENT_PROVIDER) wins.
+  const runProvider = getRunManifest(manifest.run_id)?.provider;
+  if (runProvider) {
+    for (const cell of worklist) cell.provider = runProvider;
   }
 
   return worklist;
