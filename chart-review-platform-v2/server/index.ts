@@ -62,6 +62,8 @@ import { jobsRoutes } from "./jobs-routes.js";
 import { methodsRoutes } from "./methods-routes.js";
 import { authoringRoutes } from "./authoring-routes.js";
 import { feedbackRoutes } from "./feedback-routes.js";
+import { runRoutes } from "./run-routes.js";
+import { guidelineRoutes } from "./guideline-routes.js";
 
 const PORT = Number(process.env.PORT ?? 3002);
 const REVIEWS_ROOT = process.env.CHART_REVIEW_REVIEWS_ROOT
@@ -198,6 +200,8 @@ const paramRouter = makeRouter([
   ...methodsRoutes,
   ...authoringRoutes,
   ...feedbackRoutes,
+  ...runRoutes,
+  ...guidelineRoutes,
 ]);
 
 // ── http plumbing ───────────────────────────────────────────────────
