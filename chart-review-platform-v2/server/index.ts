@@ -53,6 +53,9 @@ import {
 import { makeRouter } from "./router.js";
 import { pilotReadRoutes, pilotWriteRoutes, versionsRoutes } from "./pilot-routes.js";
 import { proposalRoutes } from "./proposal-routes.js";
+import { issueRoutes } from "./issue-routes.js";
+import { lockTestRoutes } from "./lock-test-routes.js";
+import { cohortRoutes } from "./cohort-routes.js";
 
 const PORT = Number(process.env.PORT ?? 3002);
 const REVIEWS_ROOT = process.env.CHART_REVIEW_REVIEWS_ROOT
@@ -180,6 +183,9 @@ const paramRouter = makeRouter([
   ...pilotWriteRoutes,
   ...versionsRoutes,
   ...proposalRoutes,
+  ...issueRoutes,
+  ...lockTestRoutes,
+  ...cohortRoutes,
 ]);
 
 // ── http plumbing ───────────────────────────────────────────────────
