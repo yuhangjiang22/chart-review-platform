@@ -49,11 +49,9 @@ if (fs.existsSync(v1EnvPath)) {
   }
 }
 
-// Until each v1 API route is ported into v2, proxy unmatched /api/*
-// and /ws/* to the v1 server at $V1_TARGET (default localhost:3001).
-// This lets v2's port serve the full v1 Studio without re-implementing
-// dozens of routes up-front. Replace one passthrough at a time.
-const V1_TARGET = process.env.V1_TARGET ?? "http://localhost:3001";
+// As of M7.5 every UI-consumed surface lives in v2 natively (HTTP +
+// WebSocket + builder). No proxy fallback to v1 remains; unmatched
+// /api/* paths get a 404.
 import { makeChartReviewClarify, makeLitExtractClarify } from "../modules/1-clarify/index.js";
 import { makeChartReviewFormGen, makeLitExtractFormGen } from "../modules/2-form-gen/index.js";
 import { makeChartReviewDiscover, makeLitExtractDiscover } from "../modules/3-discover/index.js";
@@ -253,30 +251,6 @@ async function readBody(req: http.IncomingMessage): Promise<unknown> {
   catch { throw httpError(400, "invalid JSON body"); }
 }
 
-function proxyToV1(req: http.IncomingMessage, res: http.ServerResponse): void {
-  const target = new URL(V1_TARGET);
-  const upstream = http.request(
-    {
-      protocol: target.protocol,
-      hostname: target.hostname,
-      port: target.port,
-      method: req.method,
-      path: req.url,
-      headers: { ...req.headers, host: target.host },
-    },
-    (upstreamRes) => {
-      res.writeHead(upstreamRes.statusCode ?? 502, upstreamRes.headers);
-      upstreamRes.pipe(res);
-    },
-  );
-  upstream.on("error", (err) => {
-    res.statusCode = 502;
-    res.setHeader("Content-Type", "application/json");
-    res.end(JSON.stringify({ error: `v1 proxy failed: ${err.message}`, target: V1_TARGET }));
-  });
-  req.pipe(upstream);
-}
-
 const server = http.createServer(async (req, res) => {
   const url = req.url ?? "/";
   // 0. /api/builder/* — delegate to the Express bridge (vendored
@@ -343,8 +317,11 @@ const server = http.createServer(async (req, res) => {
       }
       return;
     }
-    if (url.startsWith("/api/") || url.startsWith("/ws")) {
-      proxyToV1(req, res);
+    // Unmatched /api/* in v2 → 404. No more proxy fallback.
+    if (url.startsWith("/api/")) {
+      res.statusCode = 404;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify({ error: `no route ${req.method} ${url}` }));
       return;
     }
   }
