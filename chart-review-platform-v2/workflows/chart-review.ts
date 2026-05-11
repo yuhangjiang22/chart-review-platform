@@ -30,8 +30,10 @@ export function makeChartReviewPipeline(opts: ChartReviewPipelineOpts) {
   const formGen = makeChartReviewFormGen();
   const discover = makeChartReviewDiscover({ corpusRoot: opts.corpusRoot });
   // Two extractors — v1's default + skeptical pattern, real LLM runs.
-  const extractDefault = makeV1AgentExtract({ cwd: opts.corpusRoot, provider: opts.providers?.[0] });
-  const extractSkeptical = makeV1AgentExtract({ cwd: opts.corpusRoot, provider: opts.providers?.[1] });
+  // makeV1AgentExtract composes the full v1 agent context (skills,
+  // MCP, audit hooks, withReviewsRoot wrap) — see its docstring.
+  const extractDefault = makeV1AgentExtract({ reviewsRoot: opts.reviewsRoot, provider: opts.providers?.[0] });
+  const extractSkeptical = makeV1AgentExtract({ reviewsRoot: opts.reviewsRoot, provider: opts.providers?.[1] });
   const reconciler = makeReconciler();
   const correctLog = makeCorrectLog({ reviewsRoot: path.join(opts.reviewsRoot, "chart-review") });
 

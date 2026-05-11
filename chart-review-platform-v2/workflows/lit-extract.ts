@@ -25,9 +25,8 @@ export function makeLitExtractPipeline(opts: LitExtractPipelineOpts) {
   const clarify = makeLitExtractClarify();
   const formGen = makeLitExtractFormGen();
   const discover = makeLitExtractDiscover({ fixtureRoot: opts.fixtureRoot });
-  const cwd = opts.fixtureRoot ?? process.cwd();
-  const extractA = makeV1AgentExtract({ cwd, provider: opts.providers?.[0] });
-  const extractB = makeV1AgentExtract({ cwd, provider: opts.providers?.[1] });
+  const extractA = makeV1AgentExtract({ reviewsRoot: opts.reviewsRoot, provider: opts.providers?.[0] });
+  const extractB = makeV1AgentExtract({ reviewsRoot: opts.reviewsRoot, provider: opts.providers?.[1] });
   const reconciler = makeReconciler();
   const correctLog = makeCorrectLog({ reviewsRoot: path.join(opts.reviewsRoot, "lit-extract") });
 

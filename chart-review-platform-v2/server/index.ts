@@ -86,7 +86,7 @@ const routes: Record<string, Handler> = {
       extractor_id: string; provider?: ProviderName;
     };
     const extractor = makeV1AgentExtract({
-      cwd: path.join(CORPUS_ROOT, subject.id),
+      reviewsRoot: REVIEWS_ROOT,
       provider,
     });
     const output = await extractor.extract(form, subject, corpus, extractor_id);

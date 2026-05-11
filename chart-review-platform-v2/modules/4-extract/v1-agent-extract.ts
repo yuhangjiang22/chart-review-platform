@@ -1,32 +1,44 @@
-// Real ExtractModule adapter — wraps v1's runAgent.
+// Real ExtractModule — wraps v1's runAgent and builds the same agent
+// context v1's batch-run driver builds before each call.
 //
-// v1's agent-provider.ts already abstracts Claude / Codex / per-run
-// provider choice. We just feed the form + corpus into a prompt and
-// collect the streamed AgentEvents back into one ExtractorOutput.
+// What "the same context" means concretely:
+//   - cwd = patientDir(subject.id)       — agent's working dir is the patient's note dir
+//   - guidelinePath = guidelineDir(taskId) — points at the active skill bundle so
+//                                             chart-review + chart-review-<task>-phenotype
+//                                             skills activate via Claude SDK's walk-up
+//   - mcpServers = buildMcpServersConfig(...) — the 7 chart_review_state MCP tools
+//                                                (set_field_assessment, find_quote_offsets, …)
+//   - hooks = buildAuditHooks(...)        — every tool call captured to v1's audit-trail
+//   - extraSystemPrompt                   — batch-mode framing ("you are running unattended")
+//   - withReviewsRoot wrap                — redirects MCP writes into v2's reviewsRoot
 //
-// This is the "port v1's extraction" item from v2's README. The stub
-// in stub.ts is kept for offline smoke testing; this adapter is the
-// real thing.
+// In short: v2's extraction looks bit-identical to v1's batch-run from
+// the agent's perspective. The same skills load, the same MCP tools
+// are available, the same audit log gets written, faithfulness
+// gating happens at the MCP boundary (v1's mcp-handlers.ts).
 
+import path from "node:path";
 import type {
-  ExtractModule, ExtractorOutput, FieldAssessment, FormSpec,
+  ExtractModule, ExtractorOutput, FormSpec,
   SubjectRef, EvidenceUnit, ProviderName,
 } from "../../shared/types.js";
 import { runAgent } from "../../../chart-review-platform/app/server/agent-provider.js";
+import { patientDir } from "../../../chart-review-platform/app/server/patients.js";
+import { guidelineDir } from "../../../chart-review-platform/app/server/domain/rubric/index.js";
+import { loadCompiledTask } from "../../../chart-review-platform/app/server/tasks.js";
+import { buildMcpServersConfig } from "../../../chart-review-platform/app/server/mcp-tools.js";
+import { buildAuditHooks } from "../../../chart-review-platform/app/server/audit-trail.js";
+import { withReviewsRoot } from "../../../chart-review-platform/app/server/domain/review/index.js";
 
 export interface V1AgentExtractOptions {
-  /** "claude" or "codex" — passed to v1's runAgent.provider override. */
+  /** Provider override; falls back to AGENT_PROVIDER env var. */
   provider?: ProviderName;
-  /** Model string per OpenRouter / Anthropic / Codex conventions. */
+  /** Per-call model override (e.g., "anthropic/claude-sonnet-4.6"). */
   model?: string;
-  /** Working directory the agent reads files from. Chart-review
-   *  expects the patient's note dir; lit-extract can point at a
-   *  scratch dir holding the paper. */
-  cwd: string;
-  /** mcpServers config passed through to runAgent. The chart-review
-   *  workflow already builds this via buildMcpServersConfig() in v1;
-   *  callers can either pass it through directly or build their own. */
-  mcpServers?: unknown;
+  /** Where MCP-written drafts should land. The agent's `set_field_assessment`
+   *  calls write to <reviewsRoot>/<patient>/<task>/review_state.json; the
+   *  pipeline then renames that into per_patient/<pid>/agents/<id>.json. */
+  reviewsRoot: string;
   maxTurns?: number;
 }
 
@@ -38,58 +50,108 @@ export function makeV1AgentExtract(opts: V1AgentExtractOptions): ExtractModule {
       corpus: EvidenceUnit[],
       extractor_id: string,
     ): Promise<ExtractorOutput> {
-      // Build a self-contained prompt: form criteria + corpus excerpts.
-      // A production adapter would lean on v1's compose-agent.ts to
-      // assemble the full system+user prompts the chart-review or
-      // lit-extract skill expects; this is the minimal viable prompt.
-      const prompt = buildPrompt(form, subject, corpus);
-      const cells: FieldAssessment[] = [];
-
-      // Stream events from v1's runAgent. Tool calls + tool results
-      // produce the field_assessments — but the MCP write path is
-      // what actually populates them in v1, not the event stream
-      // itself. For the v2 adapter we collect them from the event
-      // payloads. (Production: read from the MCP-written scratch
-      // file after the run, like v1 does in runs.ts.)
-      for await (const event of runAgent({
-        prompt,
-        cwd: opts.cwd,
-        patientId: subject.id,
-        taskId: form.task_id,
-        guidelinePath: opts.cwd, // placeholder; real impl wires the skill path
-        mcpServers: opts.mcpServers as Record<string, unknown>,
-        maxTurns: opts.maxTurns ?? 60,
-        permissionMode: "acceptEdits",
-        model: opts.model,
-        provider: opts.provider,
-      })) {
-        // Tool-call results from MCP write-side are how v1 reports
-        // field_assessment commits. We don't deserialize them here in
-        // the MVP — the production path is to read the scratch
-        // review_state.json after the for-await finishes (see v1's
-        // runs.ts:710-720).
-        if (event.type === "result") {
-          // turn-completed event; loop exits next iteration.
-        }
+      const task = loadCompiledTask(form.task_id);
+      if (!task) {
+        throw new Error(`extract: no compiled task for ${form.task_id}`);
       }
 
+      // Per-extractor scratch dir so multiple extractors writing the
+      // same (patient, task) don't clobber each other.
+      const scratchRoot = path.join(opts.reviewsRoot, "_scratch", extractor_id);
+      const sessionId = `v2-${extractor_id}-${subject.id}-${Date.now()}`;
+
+      // The audit hooks v1 uses: every tool_call_pre / tool_call_post
+      // lands in v1's audit-trail JSONL.
+      const auditHooks = buildAuditHooks({
+        patientId: subject.id,
+        taskId: form.task_id,
+        sessionId,
+      });
+      const sdkHooks: Record<string, Array<{ hooks: any[] }>> = {
+        PreToolUse: [{ hooks: [auditHooks.pre] }],
+        PostToolUse: [{ hooks: [auditHooks.post] }],
+      };
+
+      // The chart_review_state MCP server config v1 builds. Per-run
+      // reviewsRoot redirect rides on the subprocess transport (when
+      // AGENT_PROVIDER=codex) via env var, and on in-process transport
+      // (when AGENT_PROVIDER=claude) via withReviewsRoot below.
+      const mcpServers = buildMcpServersConfig(
+        subject.id,
+        task,
+        sessionId,
+        { onStateUpdate: () => {} },
+        { reviewsRoot: scratchRoot, provider: opts.provider },
+      );
+
+      const cwd = patientDir(subject.id);
+      const userPrompt = buildPrompt(form, subject, corpus);
+
+      // withReviewsRoot routes the in-process MCP writes' AsyncLocalStorage
+      // lookup to scratchRoot for the duration of this for-await.
+      await withReviewsRoot(scratchRoot, async () => {
+        for await (const _event of runAgent({
+          prompt: userPrompt,
+          cwd,
+          patientId: subject.id,
+          taskId: form.task_id,
+          guidelinePath: guidelineDir(form.task_id),
+          mcpServers,
+          hooks: sdkHooks,
+          maxTurns: opts.maxTurns ?? 60,
+          permissionMode: "acceptEdits",
+          model: opts.model,
+          provider: opts.provider,
+          extraSystemPrompt:
+            "You are running unattended in batch mode (chart-review-platform-v2). " +
+            "There is no human in the loop for this subject — produce your draft and stop. " +
+            "Do not ask clarifying questions; pick the most defensible answer with the " +
+            "evidence available.",
+        })) {
+          // We don't process events here — agent commits via MCP, which
+          // writes review_state.json under scratchRoot. We read it after.
+        }
+      });
+
+      // MCP server has written field_assessments to scratchRoot. Read
+      // them back as the ExtractorOutput.cells.
+      const cells = await readScratchAssessments(scratchRoot, subject.id, form.task_id);
       return { extractor_id, task_id: form.task_id, subject_id: subject.id, cells };
     },
   };
 }
 
+async function readScratchAssessments(
+  scratchRoot: string,
+  patientId: string,
+  taskId: string,
+): Promise<ExtractorOutput["cells"]> {
+  const fs = await import("node:fs");
+  const fp = path.join(scratchRoot, patientId, taskId, "review_state.json");
+  if (!fs.existsSync(fp)) return [];
+  try {
+    const state = JSON.parse(await fs.promises.readFile(fp, "utf8")) as {
+      field_assessments?: ExtractorOutput["cells"];
+    };
+    return state.field_assessments ?? [];
+  } catch {
+    return [];
+  }
+}
+
 function buildPrompt(form: FormSpec, subject: SubjectRef, corpus: EvidenceUnit[]): string {
   return [
-    `# Task: ${form.task_id}`,
-    `# Subject: ${subject.type} ${subject.id}`,
+    "You are running in batch mode. Activate the `chart-review` skill.",
+    `If a skill named \`chart-review-${form.task_id}-phenotype\` exists, activate it as well — it provides the rubric scope.`,
     "",
-    `# Criteria to fill (${form.criteria.length}):`,
-    ...form.criteria.map((c) => `- ${c.id}: ${c.prompt ?? "(no prompt)"}`),
+    `Active subject: ${subject.type} ${subject.id}`,
+    `Active guideline: ${form.task_id}`,
+    `Criteria to fill: ${form.criteria.length} (${form.criteria.filter((c) => !c.derivation).length} leaf, ${form.criteria.filter((c) => c.derivation).length} derived)`,
     "",
-    `# Evidence units in scope (${corpus.length}):`,
-    ...corpus.slice(0, 5).map((u) => `- ${u.unit_id}: ${u.text.slice(0, 80)}…`),
-    "",
-    "Commit one assessment per leaf criterion via the chart_review_state MCP tools.",
-    "Cite verbatim quotes with byte offsets (use find_quote_offsets BEFORE citing).",
+    "Read the patient's notes (under your cwd), then commit one assessment per",
+    "leaf criterion via the chart_review_state MCP tools (set_field_assessment,",
+    "select_evidence). Use find_quote_offsets BEFORE citing any note quote so",
+    "faithfulness validation passes. After all leaf criteria are answered,",
+    "you are done — emit a brief summary line and stop.",
   ].join("\n");
 }
