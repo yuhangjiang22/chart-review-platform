@@ -32,11 +32,11 @@ import {
   type RuleProposal,
   type RuleStatus,
   type ProposedEdit,
-} from "../../chart-review-platform/app/server/domain/proposal/index.js";
-import { loadSkillBundle, guidelineDir } from "../../chart-review-platform/app/server/domain/rubric/index.js";
-import { REVIEWS_ROOT } from "../../chart-review-platform/app/server/domain/review/index.js";
-import { computeTaskSha } from "../../chart-review-platform/app/server/lock.js";
-import { notify } from "../../chart-review-platform/app/server/notifications.js";
+} from "./lib/domain/proposal/index.js";
+import { loadSkillBundle, guidelineDir } from "./lib/domain/rubric/index.js";
+import { REVIEWS_ROOT } from "./lib/domain/review/index.js";
+import { computeTaskSha } from "./lib/lock.js";
+import { notify } from "./lib/notifications.js";
 
 /** Structured rejection reasons (#44). Stored on the proposal so
  *  rejections become a queryable critique signal. */

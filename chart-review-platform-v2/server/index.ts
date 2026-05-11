@@ -23,10 +23,31 @@ import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import dotenv from "dotenv";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const CLIENT_DIR = path.resolve(__dirname, "..", "client");
+
+// Load env from v2 first (if present), then v1 as a fallback. dotenv
+// doesn't clobber already-set vars, so v2's .env wins when both define
+// the same key. v1's app/.env stays the canonical secret store until
+// users migrate.
+//
+// EXCLUDE PORT from v1's .env — v1 sets PORT=3001 for its own server
+// and we'd inherit that and collide with v1 if it's already running.
+// v2 wants its own port (3002 default). Same logic for any other key
+// that names a v1-specific listener.
+const V1_ENV_BLOCKLIST = new Set(["PORT"]);
+dotenv.config({ path: path.resolve(__dirname, "..", ".env") });
+const v1EnvPath = path.resolve(__dirname, "..", "..", "chart-review-platform", "app", ".env");
+if (fs.existsSync(v1EnvPath)) {
+  const parsed = dotenv.parse(fs.readFileSync(v1EnvPath));
+  for (const [k, v] of Object.entries(parsed)) {
+    if (V1_ENV_BLOCKLIST.has(k)) continue;
+    if (process.env[k] === undefined) process.env[k] = v;
+  }
+}
 
 // Until each v1 API route is ported into v2, proxy unmatched /api/*
 // and /ws/* to the v1 server at $V1_TARGET (default localhost:3001).
@@ -57,6 +78,7 @@ import { issueRoutes } from "./issue-routes.js";
 import { lockTestRoutes } from "./lock-test-routes.js";
 import { cohortRoutes } from "./cohort-routes.js";
 import { coreRoutes, type RawBody, type SSEStream } from "./core-routes.js";
+import { reconcilePilotStatesOnStartup } from "./lib/domain/iter/index.js";
 import { miscRoutes } from "./misc-routes.js";
 import { jobsRoutes } from "./jobs-routes.js";
 import { methodsRoutes } from "./methods-routes.js";
@@ -401,6 +423,14 @@ server.on("upgrade", (req, clientSocket, head) => {
 server.listen(PORT, () => {
   console.log(`chart-review-platform-v2 listening on http://localhost:${PORT}`);
   console.log(`reviewsRoot: ${REVIEWS_ROOT}`);
+  // Catch any pilot iters that finished while the server was down and got
+  // stuck in "running". v1 does this on boot; the screenshot of a 100%-
+  // complete iter still marked RUNNING is the bug this prevents.
+  try {
+    reconcilePilotStatesOnStartup();
+  } catch (err) {
+    console.warn("[startup] reconcilePilotStatesOnStartup failed:", (err as Error).message);
+  }
   console.log("routes:");
   for (const k of Object.keys(routes)) console.log("  " + k);
 });

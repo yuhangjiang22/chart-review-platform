@@ -15,4 +15,4 @@ export {
   type Applicability,
   type TaskField,
   type MinimalTask,
-} from "../../chart-review-platform/app/server/contract-eval.js";
+} from "../server/lib/contract-eval.js";

@@ -20,15 +20,15 @@ import { readReviewerFromRequest } from "./auth.js";
 import {
   listJobs, getJobManifest, getJobStatus, readJobTranscript,
   type JobKind,
-} from "../../chart-review-platform/app/server/jobs.js";
+} from "./lib/jobs.js";
 import {
   issueViewerToken, listViewerTokens, revokeViewerToken,
-} from "../../chart-review-platform/app/server/auth.js";
-import { loadVersionedTask } from "../../chart-review-platform/app/server/version-archive.js";
-import { computeTaskDiff } from "../../chart-review-platform/app/server/task-diff.js";
+} from "./lib/auth.js";
+import { loadVersionedTask } from "./lib/version-archive.js";
+import { computeTaskDiff } from "./lib/task-diff.js";
 import {
   getRunManifest,
-} from "../../chart-review-platform/app/server/infra/batch-run/index.js";
+} from "./lib/infra/batch-run/index.js";
 
 function platformRoot(): string {
   return process.env.CHART_REVIEW_PLATFORM_ROOT

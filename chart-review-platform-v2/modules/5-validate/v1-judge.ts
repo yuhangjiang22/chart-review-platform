@@ -16,7 +16,7 @@ import type {
 } from "../../shared/types.js";
 import {
   judgeCell, type JudgeInput, type JudgeAgentSnapshot,
-} from "../../../chart-review-platform/app/server/judge.js";
+} from "../../server/lib/judge.js";
 
 export interface V1JudgeAdapterOptions {
   taskId: string;

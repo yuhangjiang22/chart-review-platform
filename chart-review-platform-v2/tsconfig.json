@@ -13,17 +13,14 @@
     "noEmit": true,
     "isolatedModules": true
   },
-  // v2 cross-imports v1's source via plain relative paths
-  // ("../chart-review-platform/app/server/*"); transitive deps resolve
-  // through the node_modules symlink to v1's install.
+  // v2 owns its source outright (M7.1 vendored v1's app/server/* into
+  // server/lib/). No more cross-project includes.
   "include": [
     "shared/**/*.ts", "modules/**/*.ts", "workflows/**/*.ts",
-    "examples/**/*.ts", "server/**/*.ts",
-    "../chart-review-platform/app/server/disagreements.ts",
-    "../chart-review-platform/app/server/contract-eval.ts",
-    "../chart-review-platform/app/server/agent-provider.ts",
-    "../chart-review-platform/app/server/tasks.ts",
-    "../chart-review-platform/app/server/audit-trail.ts",
-    "../chart-review-platform/app/server/judge.ts"
+    "examples/**/*.ts", "server/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules", "dist", "client",
+    "server/lib/**/__tests__/**"
   ]
 }

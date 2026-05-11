@@ -24,15 +24,24 @@ import type { RawBody } from "./core-routes.js";
 import { isMethodologist, readReviewerFromRequest } from "./auth.js";
 import {
   startBatchRun, getRunManifest, getRunStatus, listRuns,
-  readDraft as readRunDraft, readAuditLines as readRunAuditLines,
+  readDraft as readRunDraft,
   deleteRun, perPatientDir, type RunStatus,
-} from "../../chart-review-platform/app/server/infra/batch-run/index.js";
-import { isProviderName } from "../../chart-review-platform/app/server/agent-provider.js";
+} from "./lib/infra/batch-run/index.js";
+import { isProviderName } from "./lib/agent-provider.js";
+import { maybeAutoAdvancePilotOnRunStatus } from "./lib/domain/iter/index.js";
 
 function httpErr(status: number, message: string): Error & { status: number } {
   const err = new Error(message) as Error & { status: number };
   err.status = status;
   return err;
+}
+
+function platformRoot(): string {
+  return process.env.CHART_REVIEW_PLATFORM_ROOT
+    ?? path.resolve(process.cwd(), "..", "chart-review-platform");
+}
+function runsRoot(): string {
+  return process.env.CHART_REVIEW_RUNS_ROOT ?? path.join(platformRoot(), "var", "runs");
 }
 
 function gateMethodologist(req: Parameters<RouteEntry["handler"]>[1], action: string): string {
@@ -43,7 +52,14 @@ function gateMethodologist(req: Parameters<RouteEntry["handler"]>[1], action: st
   return reviewerId!;
 }
 
-function noopBroadcast(_status: RunStatus): void { /* M6.7c */ }
+/** v1's broadcastRunUpdate did two things: (1) auto-advance the pilot
+ *  iter when its batch run terminates, (2) push an agent_run_update over
+ *  WS to subscribed clients. WS broadcasting moves to M6.7c, but the
+ *  auto-advance side-effect MUST keep firing — without it pilot iters
+ *  stay stuck in "running" after the run actually completes. */
+function onRunStatus(status: RunStatus): void {
+  maybeAutoAdvancePilotOnRunStatus(status.run_id, status.state);
+}
 
 export const runRoutes: RouteEntry[] = [
   {
@@ -71,7 +87,7 @@ export const runRoutes: RouteEntry[] = [
           started_by: reviewerId, label,
           max_concurrency, max_turns_per_patient, cost_cap_usd,
           provider: provider as Parameters<typeof startBatchRun>[0]["provider"],
-          onStatus: noopBroadcast,
+          onStatus: onRunStatus,
         });
       } catch (e) {
         throw httpErr(500, (e as Error).message);
@@ -150,8 +166,71 @@ export const runRoutes: RouteEntry[] = [
   {
     method: "GET", pattern: "/api/runs/:runId/patients/:patientId/audit",
     handler: async (_b, _r, p) => {
-      const lines = readRunAuditLines(p.runId, p.patientId);
-      if (lines.length === 0) throw httpErr(404, "audit not found");
+      // Audit log locations:
+      //   In-flight (per agent): <runDir>/_scratch_state_<agentId>/<pid>/<taskId>/chat/*.jsonl
+      //   Final (after completion): <runDir>/per_patient/<pid>/agents/<agentId>_audit/*.jsonl
+      //   Legacy: <runDir>/per_patient/<pid>/audit.jsonl
+      // Merge everything we can find and sort by ts. Dedupe duplicate
+      // lines (running runs may have the same record in both places once
+      // the post-run copy fires).
+      const runDirPath = path.join(runsRoot(), p.runId);
+      const baseDir = perPatientDir(p.runId, p.patientId);
+      const merged = new Set<string>();
+
+      const pushFile = (filePath: string) => {
+        try {
+          const text = fs.readFileSync(filePath, "utf8");
+          for (const line of text.split("\n")) {
+            const t = line.trim();
+            if (t.length > 0) merged.add(t);
+          }
+        } catch { /* skip unreadable */ }
+      };
+
+      // (1) In-flight: scan _scratch_state_<agentId> dirs.
+      if (fs.existsSync(runDirPath)) {
+        for (const entry of fs.readdirSync(runDirPath)) {
+          if (!entry.startsWith("_scratch_state_")) continue;
+          const scratchPatientDir = path.join(runDirPath, entry, p.patientId);
+          if (!fs.existsSync(scratchPatientDir)) continue;
+          // <pid>/<taskId>/chat/*.jsonl — taskId varies, so walk one level.
+          for (const taskDir of fs.readdirSync(scratchPatientDir)) {
+            const chatDir = path.join(scratchPatientDir, taskDir, "chat");
+            if (!fs.existsSync(chatDir)) continue;
+            for (const file of fs.readdirSync(chatDir)) {
+              if (file.endsWith(".jsonl")) pushFile(path.join(chatDir, file));
+            }
+          }
+        }
+      }
+
+      // (2) Final per-agent audit dirs.
+      const agentsDir = path.join(baseDir, "agents");
+      if (fs.existsSync(agentsDir)) {
+        for (const entry of fs.readdirSync(agentsDir)) {
+          if (!entry.endsWith("_audit")) continue;
+          const dir = path.join(agentsDir, entry);
+          if (!fs.statSync(dir).isDirectory()) continue;
+          for (const file of fs.readdirSync(dir)) {
+            if (file.endsWith(".jsonl")) pushFile(path.join(dir, file));
+          }
+        }
+      }
+
+      // (3) Legacy singular audit.jsonl.
+      const legacy = path.join(baseDir, "audit.jsonl");
+      if (fs.existsSync(legacy)) pushFile(legacy);
+
+      if (merged.size === 0) throw httpErr(404, "audit not found");
+
+      const lines = Array.from(merged).sort((a, b) => {
+        try {
+          const ta = (JSON.parse(a) as { ts?: string }).ts ?? "";
+          const tb = (JSON.parse(b) as { ts?: string }).ts ?? "";
+          return ta.localeCompare(tb);
+        } catch { return 0; }
+      });
+
       const raw: RawBody = {
         __raw: true,
         contentType: "application/x-ndjson",

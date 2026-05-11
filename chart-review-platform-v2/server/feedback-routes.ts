@@ -17,16 +17,16 @@ import { readReviewerFromRequest } from "./auth.js";
 import {
   analyzeCohort, loadCohortFeedback,
   listCohortRuns as listFeedbackCohortRuns, readCohortRun,
-} from "../../chart-review-platform/app/server/feedback.js";
+} from "./lib/feedback.js";
 import {
   translateRule, replayRule, writeProposal, transitionStatus,
   type RuleProposal,
-} from "../../chart-review-platform/app/server/domain/proposal/index.js";
+} from "./lib/domain/proposal/index.js";
 import {
   loadSkillBundle, guidelineDir,
-} from "../../chart-review-platform/app/server/domain/rubric/index.js";
-import { REVIEWS_ROOT } from "../../chart-review-platform/app/server/domain/review/index.js";
-import { computeTaskSha } from "../../chart-review-platform/app/server/lock.js";
+} from "./lib/domain/rubric/index.js";
+import { REVIEWS_ROOT } from "./lib/domain/review/index.js";
+import { computeTaskSha } from "./lib/lock.js";
 
 function httpErr(status: number, message: string, payload?: unknown): Error & { status: number; payload?: unknown } {
   const err = new Error(message) as Error & { status: number; payload?: unknown };

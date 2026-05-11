@@ -13,14 +13,14 @@ import { readReviewerFromRequest } from "./auth.js";
 import {
   startLockTest, finalizeLockTest, listLockTests,
   readLockTestManifest, writeLockTestManifest,
-} from "../../chart-review-platform/app/server/lock-test.js";
-import { readCohortSampling } from "../../chart-review-platform/app/server/domain/cohort/index.js";
+} from "./lib/lock-test.js";
+import { readCohortSampling } from "./lib/domain/cohort/index.js";
 import {
   readPrimaryCriterionIds, computeIterAccuracy,
-} from "../../chart-review-platform/app/server/domain/iter/index.js";
-import { startBatchRun } from "../../chart-review-platform/app/server/infra/batch-run/index.js";
-import { guidelineDir } from "../../chart-review-platform/app/server/domain/rubric/index.js";
-import { computeTaskSha } from "../../chart-review-platform/app/server/lock.js";
+} from "./lib/domain/iter/index.js";
+import { startBatchRun } from "./lib/infra/batch-run/index.js";
+import { guidelineDir } from "./lib/domain/rubric/index.js";
+import { computeTaskSha } from "./lib/lock.js";
 
 function platformRoot(): string {
   return process.env.CHART_REVIEW_PLATFORM_ROOT

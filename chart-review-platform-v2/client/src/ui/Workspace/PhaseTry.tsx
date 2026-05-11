@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { AgentConfigPanel, type AgentSpecForm } from "../PilotsTab/AgentConfigPanel";
+import { AgentLogPanel } from "./AgentLogPanel";
 
 interface Patient {
   patient_id: string;
@@ -25,6 +26,7 @@ interface IterListing {
   started_at: string;
   started_by: string;
   provider?: "claude" | "codex";
+  run_id?: string;
 }
 
 interface IterDetailResponse {
@@ -354,6 +356,14 @@ function RunStatusCard({
           </details>
         )}
       </div>
+
+      {iter.run_id && patientIds.length > 0 && (
+        <AgentLogPanel
+          runId={iter.run_id}
+          patientIds={patientIds}
+          live={isRunning}
+        />
+      )}
 
       {error && <div className="text-[12px] text-[hsl(var(--oxblood))]">{error}</div>}
 

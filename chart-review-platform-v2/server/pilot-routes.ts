@@ -27,29 +27,31 @@ import {
   persistIterAccuracy,
   writeIterReport,
   readPrimaryCriterionIds,
+  maybeAutoAdvancePilotOnRunStatus,
   type PilotState,
-} from "../../chart-review-platform/app/server/domain/iter/index.js";
-import { evaluateStopRule } from "../../chart-review-platform/app/server/domain/iter/stop-rule.js";
-import { extractDisagreements } from "../../chart-review-platform/app/server/domain/iter/pilots.js";
-import { loadCriteria, guidelineDir, phenotypeSkillDir } from "../../chart-review-platform/app/server/domain/rubric/index.js";
-import { readCohortSampling } from "../../chart-review-platform/app/server/domain/cohort/index.js";
+} from "./lib/domain/iter/index.js";
+import type { RunStatus } from "./lib/infra/batch-run/index.js";
+import { evaluateStopRule } from "./lib/domain/iter/stop-rule.js";
+import { extractDisagreements } from "./lib/domain/iter/pilots.js";
+import { loadCriteria, guidelineDir, phenotypeSkillDir } from "./lib/domain/rubric/index.js";
+import { readCohortSampling } from "./lib/domain/cohort/index.js";
 import {
   writeAdjudication, listAdjudications, type Adjudication,
-} from "../../chart-review-platform/app/server/adjudications.js";
+} from "./lib/adjudications.js";
 import {
   criterionSchemaHash, computeRerunPlan,
-} from "../../chart-review-platform/app/server/criterion-hash.js";
-import { computeEligibility, type IterSnapshot } from "../../chart-review-platform/app/server/eligibility.js";
+} from "./lib/criterion-hash.js";
+import { computeEligibility, type IterSnapshot } from "./lib/eligibility.js";
 import {
   getRunManifest, getRunStatus,
-} from "../../chart-review-platform/app/server/infra/batch-run/index.js";
+} from "./lib/infra/batch-run/index.js";
 import {
   readJudgeAnalyses, isJudgeBatchRunning, runJudgeBatch,
   lockJudgeBatch, unlockJudgeBatch,
-} from "../../chart-review-platform/app/server/judge-batch.js";
+} from "./lib/judge-batch.js";
 import {
   computeRevisitsForIter, bulkKeepRevisits,
-} from "../../chart-review-platform/app/server/derived-adjudications/revisits.js";
+} from "./lib/derived-adjudications/revisits.js";
 
 /** Throw a methodologist-only 403 (or 401 in required-auth mode) when
  *  the caller can't run this endpoint. Inline because the parameterized
@@ -69,6 +71,13 @@ function gateMethodologist(req: Parameters<RouteEntry["handler"]>[1], action: st
     throw err;
   }
   return reviewerId;
+}
+
+/** Pilot iter auto-advance — fires when the underlying batch run terminates.
+ *  Without this the iter manifest stays on "running" forever. WS broadcast
+ *  to subscribed clients moves to M6.7c; the state-flip must run regardless. */
+function onPilotRunStatus(status: RunStatus): void {
+  maybeAutoAdvancePilotOnRunStatus(status.run_id, status.state);
 }
 
 /** v1's disagreements.json may carry pre-cluster-3 shape (flat string
@@ -297,6 +306,7 @@ export const pilotWriteRoutes: RouteEntry[] = [
         max_turns_per_patient,
         cost_cap_usd,
         agent_specs: agent_specs as Parameters<typeof startPilotIteration>[0]["agent_specs"],
+        onRunStatus: onPilotRunStatus,
       });
     },
   },
@@ -579,6 +589,7 @@ export const versionsRoutes: RouteEntry[] = [
         task_id: p.taskId,
         patient_ids: patientIds,
         started_by: reviewerId,
+        onRunStatus: onPilotRunStatus,
       });
       const newManifest = startResult.pilot;
       const oldHashes = (source as any).criterion_schema_hashes ?? {};

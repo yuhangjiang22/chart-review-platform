@@ -13,26 +13,26 @@ export type {
   Disagreement,
   DisagreementKind,
   DisagreementSummary,
-} from "../../chart-review-platform/app/server/disagreements.js";
+} from "../server/lib/disagreements.js";
 
 // v1's CompiledField is what form-gen emits as a Criterion.
-export type { CompiledField, CompiledTask } from "../../chart-review-platform/app/server/tasks.js";
+export type { CompiledField, CompiledTask } from "../server/lib/tasks.js";
 
 // v1's agent-provider abstraction (Claude / Codex / per-run dropdown)
 // IS our ExtractModule's underlying runner.
 export type { ProviderName, AgentRunInput, AgentEvent, AgentProvider }
-  from "../../chart-review-platform/app/server/agent-provider.js";
+  from "../server/lib/agent-provider.js";
 
 // v1's audit-trail union — v2's correct-log module writes these.
 export type { AuditEntry as V1AuditEntry, AuditCoordinates }
-  from "../../chart-review-platform/app/server/audit-trail.js";
+  from "../server/lib/audit-trail.js";
 
 // ── v2-specific wrappers ────────────────────────────────────────────
 
-import type { CompiledField } from "../../chart-review-platform/app/server/tasks.js";
+import type { CompiledField } from "../server/lib/tasks.js";
 import type {
   FieldAssessment, EvidenceRef, DisagreementSummary,
-} from "../../chart-review-platform/app/server/disagreements.js";
+} from "../server/lib/disagreements.js";
 
 /** Alias for v1's CompiledField — that's our Criterion. The MVP keeps
  *  the v2 name visible so module-level docs read naturally. */

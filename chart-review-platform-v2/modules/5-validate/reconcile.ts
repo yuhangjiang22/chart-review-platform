@@ -17,7 +17,7 @@ import type {
 import {
   compareDrafts,
   type AgentDraft, type Disagreement,
-} from "../../../chart-review-platform/app/server/disagreements.js";
+} from "../../server/lib/disagreements.js";
 
 export interface Judge {
   /** v1's chart-review-judge skill is the canonical implementation —

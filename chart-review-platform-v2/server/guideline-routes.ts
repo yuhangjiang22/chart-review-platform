@@ -38,24 +38,24 @@ import { isMethodologist, readReviewerFromRequest } from "./auth.js";
 // Bundle imports
 import {
   exportBundle, listExports, exportsRoot, makeTarball,
-} from "../../chart-review-platform/app/server/domain/bundle/index.js";
-import { cohortSpend } from "../../chart-review-platform/app/server/infra/batch-run/index.js";
+} from "./lib/domain/bundle/index.js";
+import { cohortSpend } from "./lib/infra/batch-run/index.js";
 
 // Preflight import
-import { runPreflight } from "../../chart-review-platform/app/server/adapters/http/preflight-routes.js";
+import { runPreflight } from "./lib/adapters/http/preflight-routes.js";
 
 // Guideline imports
 import {
   improveGuideline, listImprovementProposals, readImprovementProposal,
-} from "../../chart-review-platform/app/server/domain/proposal/index.js";
-import { calibrateGuideline } from "../../chart-review-platform/app/server/guideline-calibration.js";
-import { guidelineDir } from "../../chart-review-platform/app/server/domain/rubric/index.js";
-import { computeTaskSha } from "../../chart-review-platform/app/server/lock.js";
+} from "./lib/domain/proposal/index.js";
+import { calibrateGuideline } from "./lib/guideline-calibration.js";
+import { guidelineDir } from "./lib/domain/rubric/index.js";
+import { computeTaskSha } from "./lib/lock.js";
 import {
   getMaturity, transitionMaturity, setCalibrationBlinded,
   MATURITY_STATES, type MaturityState,
-} from "../../chart-review-platform/app/server/maturity.js";
-import { forkLockedToDraft } from "../../chart-review-platform/app/server/authoring.js";
+} from "./lib/maturity.js";
+import { forkLockedToDraft } from "./lib/authoring.js";
 
 function platformRoot(): string {
   return process.env.CHART_REVIEW_PLATFORM_ROOT

@@ -22,13 +22,13 @@ import type {
   ExtractModule, ExtractorOutput, FormSpec,
   SubjectRef, EvidenceUnit, ProviderName,
 } from "../../shared/types.js";
-import { runAgent } from "../../../chart-review-platform/app/server/agent-provider.js";
-import { patientDir } from "../../../chart-review-platform/app/server/patients.js";
-import { guidelineDir } from "../../../chart-review-platform/app/server/domain/rubric/index.js";
-import { loadCompiledTask } from "../../../chart-review-platform/app/server/tasks.js";
-import { buildMcpServersConfig } from "../../../chart-review-platform/app/server/mcp-tools.js";
-import { buildAuditHooks } from "../../../chart-review-platform/app/server/audit-trail.js";
-import { withReviewsRoot } from "../../../chart-review-platform/app/server/domain/review/index.js";
+import { runAgent } from "../../server/lib/agent-provider.js";
+import { patientDir } from "../../server/lib/patients.js";
+import { guidelineDir } from "../../server/lib/domain/rubric/index.js";
+import { loadCompiledTask } from "../../server/lib/tasks.js";
+import { buildMcpServersConfig } from "../../server/lib/mcp-tools.js";
+import { buildAuditHooks } from "../../server/lib/audit-trail.js";
+import { withReviewsRoot } from "../../server/lib/domain/review/index.js";
 
 export interface V1AgentExtractOptions {
   /** Provider override; falls back to AGENT_PROVIDER env var. */

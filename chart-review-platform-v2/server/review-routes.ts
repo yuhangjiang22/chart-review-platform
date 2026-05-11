@@ -39,21 +39,21 @@ import {
   applyUiAction, loadOrCreate as loadOrCreateReviewState,
   resetReviewState, ReviewStateError,
   type ReviewState, type UiAction,
-} from "../../chart-review-platform/app/server/domain/review/index.js";
+} from "./lib/domain/review/index.js";
 import {
   appendAuditEntry, listAuditSessions, readAuditEntries, readFieldHistory,
-} from "../../chart-review-platform/app/server/audit-trail.js";
-import { loadCompiledTask } from "../../chart-review-platform/app/server/tasks.js";
-import { getMaturity } from "../../chart-review-platform/app/server/maturity.js";
+} from "./lib/audit-trail.js";
+import { loadCompiledTask } from "./lib/tasks.js";
+import { getMaturity } from "./lib/maturity.js";
 import {
   suggestOverrideReason, suggestOverrideReasonStream,
-} from "../../chart-review-platform/app/server/override-suggester.js";
+} from "./lib/override-suggester.js";
 import {
   preLockSummary, preLockSummaryStream,
-} from "../../chart-review-platform/app/server/prelock-summarizer.js";
+} from "./lib/prelock-summarizer.js";
 import {
   findQuoteOffsetsImpl,
-} from "../../chart-review-platform/app/server/find-quote-offsets-impl.js";
+} from "./lib/find-quote-offsets-impl.js";
 
 function httpErr(status: number, payload: unknown, message?: string): Error & { status: number; payload?: unknown } {
   const err = new Error(message ?? (typeof payload === "object" && payload && "message" in payload

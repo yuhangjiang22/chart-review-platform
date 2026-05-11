@@ -23,15 +23,15 @@ import {
   startCohortRun, drawStratifiedSample, readValidationState,
   writeValidationState, buildSampleQueue, readCohortAgentDraft,
   blindDraft, type SampleStrategy,
-} from "../../chart-review-platform/app/server/domain/cohort/index.js";
+} from "./lib/domain/cohort/index.js";
 import {
   getRunManifest, getRunStatus,
-} from "../../chart-review-platform/app/server/infra/batch-run/index.js";
+} from "./lib/infra/batch-run/index.js";
 import {
   computeDeploymentKappa, computeAndPersistDeploymentKappa,
   loadPersistedReport,
-} from "../../chart-review-platform/app/server/deployment-kappa.js";
-import type { AgentDraft } from "../../chart-review-platform/app/server/disagreements.js";
+} from "./lib/deployment-kappa.js";
+import type { AgentDraft } from "./lib/disagreements.js";
 
 function platformRoot(): string {
   return process.env.CHART_REVIEW_PLATFORM_ROOT

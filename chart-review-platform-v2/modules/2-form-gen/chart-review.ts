@@ -11,7 +11,7 @@
 
 import { createHash } from "node:crypto";
 import type { FormGenModule, FormSpec, TaskSpec, CompiledField } from "../../shared/types.js";
-import { loadCompiledTask } from "../../../chart-review-platform/app/server/tasks.js";
+import { loadCompiledTask } from "../../server/lib/tasks.js";
 
 function hashField(f: CompiledField): string {
   // v1's CompiledField doesn't carry schema_hash directly; compute one

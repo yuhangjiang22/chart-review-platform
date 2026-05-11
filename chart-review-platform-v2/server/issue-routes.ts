@@ -11,8 +11,11 @@ import { isMethodologist, readReviewerFromRequest } from "./auth.js";
 import {
   appendIssue, appendPromotion, appendTriageUpdate, listIssues,
   type DeploymentIssue,
-} from "../../chart-review-platform/app/server/domain/issue/index.js";
-import { startPilotIteration } from "../../chart-review-platform/app/server/domain/iter/index.js";
+} from "./lib/domain/issue/index.js";
+import {
+  startPilotIteration, maybeAutoAdvancePilotOnRunStatus,
+} from "./lib/domain/iter/index.js";
+import type { RunStatus } from "./lib/infra/batch-run/index.js";
 
 function httpErr(status: number, message: string): Error & { status: number } {
   const err = new Error(message) as Error & { status: number };
@@ -136,6 +139,7 @@ export const issueRoutes: RouteEntry[] = [
           patient_ids: patientIds,
           started_by: started_by || reviewerId!,
           notes: `Promoted from ${promotable.length} deployment issues against ${p.guidelineSha}`,
+          onRunStatus: (s: RunStatus) => maybeAutoAdvancePilotOnRunStatus(s.run_id, s.state),
         });
       } catch (e) {
         throw httpErr(400, (e as Error).message);

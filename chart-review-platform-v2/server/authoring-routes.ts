@@ -19,10 +19,10 @@ import { readReviewerFromRequest } from "./auth.js";
 import type { RawBody } from "./core-routes.js";
 import {
   listDrafts, readDraft, promoteDraft, startDraftJob,
-} from "../../chart-review-platform/app/server/authoring.js";
+} from "./lib/authoring.js";
 import {
   isCodifyError, runCodify,
-} from "../../chart-review-platform/app/server/codify.js";
+} from "./lib/codify.js";
 
 function httpErr(status: number, message: string, payload?: unknown): Error & { status: number; payload?: unknown } {
   const err = new Error(message) as Error & { status: number; payload?: unknown };

@@ -19,7 +19,7 @@ import type {
 } from "../../shared/types.js";
 import {
   appendAuditEntry, readAuditEntries, type AuditCoordinates, type AuditEntry,
-} from "../../../chart-review-platform/app/server/audit-trail.js";
+} from "../../server/lib/audit-trail.js";
 
 export interface CorrectLogOpts {
   /** Reviews root override (mapped to CHART_REVIEW_REVIEWS_ROOT for v1's

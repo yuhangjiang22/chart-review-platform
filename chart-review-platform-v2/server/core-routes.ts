@@ -21,12 +21,12 @@ import type { RouteEntry, RouteHandler } from "./router.js";
 import { authMode } from "./auth.js";
 import {
   listPatients, listNotes, readNote, readStructured,
-} from "../../chart-review-platform/app/server/patients.js";
-import { chatStore } from "../../chart-review-platform/app/server/chat-store.js";
+} from "./lib/patients.js";
+import { chatStore } from "./lib/chat-store.js";
 import {
   listCompiledTasks, loadCompiledTask,
-} from "../../chart-review-platform/app/server/tasks.js";
-import { modelFor } from "../../chart-review-platform/app/server/model-config.js";
+} from "./lib/tasks.js";
+import { modelFor } from "./lib/model-config.js";
 
 const DEFAULT_TASK_ID =
   process.env.CHART_REVIEW_TASK_ID ?? "lung-cancer-phenotype";

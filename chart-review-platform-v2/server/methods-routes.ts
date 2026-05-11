@@ -13,10 +13,10 @@ import type { RouteEntry } from "./router.js";
 import { readReviewerFromRequest } from "./auth.js";
 import {
   draftMethodsSection, listMethodsDrafts, readMethodsDraft,
-} from "../../chart-review-platform/app/server/methods-drafter.js";
-import { simulateImpact } from "../../chart-review-platform/app/server/impact-simulator.js";
-import { runMigration } from "../../chart-review-platform/app/server/migration.js";
-import { computeQAStats } from "../../chart-review-platform/app/server/qa-panel.js";
+} from "./lib/methods-drafter.js";
+import { simulateImpact } from "./lib/impact-simulator.js";
+import { runMigration } from "./lib/migration.js";
+import { computeQAStats } from "./lib/qa-panel.js";
 
 function platformRoot(): string {
   return process.env.CHART_REVIEW_PLATFORM_ROOT

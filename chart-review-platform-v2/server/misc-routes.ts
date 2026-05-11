@@ -16,11 +16,11 @@ import type { RouteEntry } from "./router.js";
 import { isMethodologist, readReviewerFromRequest } from "./auth.js";
 import {
   listNotifications, unreadCount, markRead, markAllRead,
-} from "../../chart-review-platform/app/server/notifications.js";
-import { listAvailablePresets } from "../../chart-review-platform/app/server/agent-specs.js";
+} from "./lib/notifications.js";
+import { listAvailablePresets } from "./lib/agent-specs.js";
 import {
   modelFor, describeAllModels,
-} from "../../chart-review-platform/app/server/model-config.js";
+} from "./lib/model-config.js";
 
 function httpErr(status: number, message: string): Error & { status: number } {
   const err = new Error(message) as Error & { status: number };
