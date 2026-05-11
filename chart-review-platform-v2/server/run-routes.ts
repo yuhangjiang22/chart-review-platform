@@ -52,13 +52,16 @@ function gateMethodologist(req: Parameters<RouteEntry["handler"]>[1], action: st
   return reviewerId!;
 }
 
-/** v1's broadcastRunUpdate did two things: (1) auto-advance the pilot
- *  iter when its batch run terminates, (2) push an agent_run_update over
- *  WS to subscribed clients. WS broadcasting moves to M6.7c, but the
- *  auto-advance side-effect MUST keep firing — without it pilot iters
- *  stay stuck in "running" after the run actually completes. */
+/** Combined v1-style broadcastRunUpdate: auto-advance pilot iters that
+ *  terminated, AND push agent_run_update over WS. The WS broadcast goes
+ *  through ws.ts's registry (set up at server boot). */
+import { broadcastRunUpdate as wsBroadcastRunUpdate } from "./ws.js";
 function onRunStatus(status: RunStatus): void {
-  maybeAutoAdvancePilotOnRunStatus(status.run_id, status.state);
+  // wsBroadcastRunUpdate already calls maybeAutoAdvancePilotOnRunStatus,
+  // so no separate call needed. Kept the named import above so the
+  // unused-import lint stays clean.
+  wsBroadcastRunUpdate(status);
+  void maybeAutoAdvancePilotOnRunStatus; // marker — already called via ws
 }
 
 export const runRoutes: RouteEntry[] = [

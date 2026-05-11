@@ -87,6 +87,7 @@ import { feedbackRoutes } from "./feedback-routes.js";
 import { runRoutes } from "./run-routes.js";
 import { guidelineRoutes } from "./guideline-routes.js";
 import { reviewRoutes } from "./review-routes.js";
+import { attachWebSocketServer, registerBroadcasters } from "./ws.js";
 
 const PORT = Number(process.env.PORT ?? 3002);
 const REVIEWS_ROOT = process.env.CHART_REVIEW_REVIEWS_ROOT
@@ -390,34 +391,38 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-// WebSocket upgrades (/ws/*) — forward the raw TCP socket to v1.
-// v1's server still owns the WebSocket endpoints until each is ported.
-server.on("upgrade", (req, clientSocket, head) => {
-  if (!req.url?.startsWith("/ws")) {
-    clientSocket.destroy();
+// WebSocket /ws — v2-native (M7.3). v1's proxy fallback is gone.
+// Routes still proxied to v1 (HTTP only): /api/builder/* until M7.4.
+const wsServer = attachWebSocketServer(server);
+registerBroadcasters(wsServer);
+server.on("upgrade", (req, socket, head) => {
+  if (req.url?.startsWith("/ws")) {
+    wsServer.handleUpgrade(req, socket, head);
     return;
   }
-  const target = new URL(V1_TARGET);
-  const upstream = http.request({
-    hostname: target.hostname,
-    port: target.port,
-    path: req.url,
-    method: "GET",
-    headers: req.headers,
-  });
-  upstream.end();
-  upstream.on("upgrade", (_upstreamRes, upstreamSocket, upstreamHead) => {
-    clientSocket.write(
-      "HTTP/1.1 101 Switching Protocols\r\n" +
-      "Upgrade: websocket\r\n" +
-      "Connection: Upgrade\r\n" +
-      "\r\n",
-    );
-    upstreamSocket.write(upstreamHead);
-    clientSocket.pipe(upstreamSocket).pipe(clientSocket);
-  });
-  upstream.on("error", () => clientSocket.destroy());
-  if (head.length > 0) upstream.write(head);
+  // /api/builder/sessions/:taskId/stream is an upgrade endpoint v1 owns.
+  // Proxy WS upgrades to it until M7.4.
+  if (req.url && /^\/api\/builder\/sessions\/[^/]+\/stream/.test(req.url)) {
+    const target = new URL(V1_TARGET);
+    const upstream = http.request({
+      hostname: target.hostname, port: target.port, path: req.url,
+      method: "GET", headers: req.headers,
+    });
+    upstream.end();
+    upstream.on("upgrade", (_res, upSocket, upHead) => {
+      socket.write(
+        "HTTP/1.1 101 Switching Protocols\r\n" +
+        "Upgrade: websocket\r\n" +
+        "Connection: Upgrade\r\n\r\n",
+      );
+      upSocket.write(upHead);
+      socket.pipe(upSocket).pipe(socket);
+    });
+    upstream.on("error", () => socket.destroy());
+    if (head.length > 0) upstream.write(head);
+    return;
+  }
+  socket.destroy();
 });
 
 server.listen(PORT, () => {

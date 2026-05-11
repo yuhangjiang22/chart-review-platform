@@ -31,9 +31,7 @@ function httpErr(status: number, message: string, payload?: unknown): Error & { 
   return err;
 }
 
-function noopBroadcast(_jobId: string): void {
-  // No-op until v2 owns the WS broadcaster (M6.7).
-}
+import { broadcastJobUpdate } from "./ws.js";
 
 export const authoringRoutes: RouteEntry[] = [
   // POST /api/authoring/draft — async job
@@ -48,7 +46,7 @@ export const authoringRoutes: RouteEntry[] = [
       try {
         const { job_id } = startDraftJob(
           { task_id, objective, references, started_by: reviewerId } as Parameters<typeof startDraftJob>[0],
-          noopBroadcast,
+          broadcastJobUpdate,
         );
         return { job_id };
       } catch (e) {

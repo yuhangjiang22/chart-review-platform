@@ -76,10 +76,8 @@ function reviewStateErr(e: unknown): never {
   throw httpErr(400, { ok: false, message: (e as Error).message }, (e as Error).message);
 }
 
-/** No-op WS broadcaster; M6.7c wires the real one. */
-function noopBroadcast(_patientId: string, _state: ReviewState, _taskId?: string): void {
-  /* M6.7c */
-}
+// WS broadcaster wired in M7.3.
+import { broadcastReviewStateUpdate } from "./ws.js";
 
 /** Shared mutate pipeline. Mirrors v1's applyReviewerAction (audit +
  *  broadcast). The reviewer session id is patient-stable but
@@ -116,7 +114,7 @@ function applyReviewerAction(
       }),
     },
   );
-  noopBroadcast(patientId, result.state, taskId);
+  broadcastReviewStateUpdate(patientId, result.state, taskId);
   return { ok: true, ...result };
 }
 
@@ -219,7 +217,7 @@ export const reviewRoutes: RouteEntry[] = [
       if (!task) throw httpErr(404, { error: "task not found" });
       try {
         const state = resetReviewState(p.patientId, task);
-        noopBroadcast(p.patientId, state, p.taskId);
+        broadcastReviewStateUpdate(p.patientId, state, p.taskId);
         return { ok: true, state };
       } catch (e) {
         throw httpErr(400, { ok: false, message: (e as Error).message });
