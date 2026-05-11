@@ -88,6 +88,10 @@ import { runRoutes } from "./run-routes.js";
 import { guidelineRoutes } from "./guideline-routes.js";
 import { reviewRoutes } from "./review-routes.js";
 import { attachWebSocketServer, registerBroadcasters } from "./ws.js";
+import {
+  isBuilderPath, delegateBuilder,
+  isBuilderUpgradePath, handleBuilderUpgrade,
+} from "./builder-bridge.js";
 
 const PORT = Number(process.env.PORT ?? 3002);
 const REVIEWS_ROOT = process.env.CHART_REVIEW_REVIEWS_ROOT
@@ -275,6 +279,13 @@ function proxyToV1(req: http.IncomingMessage, res: http.ServerResponse): void {
 
 const server = http.createServer(async (req, res) => {
   const url = req.url ?? "/";
+  // 0. /api/builder/* — delegate to the Express bridge (vendored
+  //    builder-routes.ts depends on Express + multer; cheaper than
+  //    rewriting every endpoint into our parameterized router).
+  if (isBuilderPath(url)) {
+    delegateBuilder(req, res);
+    return;
+  }
   const key = `${req.method} ${url.split("?")[0]}`;
   const handler = routes[key];
 
@@ -400,26 +411,9 @@ server.on("upgrade", (req, socket, head) => {
     wsServer.handleUpgrade(req, socket, head);
     return;
   }
-  // /api/builder/sessions/:taskId/stream is an upgrade endpoint v1 owns.
-  // Proxy WS upgrades to it until M7.4.
-  if (req.url && /^\/api\/builder\/sessions\/[^/]+\/stream/.test(req.url)) {
-    const target = new URL(V1_TARGET);
-    const upstream = http.request({
-      hostname: target.hostname, port: target.port, path: req.url,
-      method: "GET", headers: req.headers,
-    });
-    upstream.end();
-    upstream.on("upgrade", (_res, upSocket, upHead) => {
-      socket.write(
-        "HTTP/1.1 101 Switching Protocols\r\n" +
-        "Upgrade: websocket\r\n" +
-        "Connection: Upgrade\r\n\r\n",
-      );
-      upSocket.write(upHead);
-      socket.pipe(upSocket).pipe(socket);
-    });
-    upstream.on("error", () => socket.destroy());
-    if (head.length > 0) upstream.write(head);
+  // /api/builder/sessions/:taskId/stream — v2-native via the bridge.
+  if (isBuilderUpgradePath(req.url)) {
+    handleBuilderUpgrade(req, socket, head);
     return;
   }
   socket.destroy();

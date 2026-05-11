@@ -51,7 +51,10 @@ export function useBuilderSocket(
 
   useEffect(() => {
     if (!taskId || !token) return;
-    const url = `ws://${window.location.hostname}:3001/api/builder/sessions/${encodeURIComponent(
+    // Same-origin WS — Vite dev proxy (or v2 server in prod) forwards it
+    // to the builder bridge. Avoid hardcoding the v1 port (:3001).
+    const wsProto = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const url = `${wsProto}//${window.location.host}/api/builder/sessions/${encodeURIComponent(
       taskId,
     )}/stream?token=${encodeURIComponent(token)}`;
     const ws = new WebSocket(url);
