@@ -46,7 +46,6 @@ async function main() {
   const pipeline = makeChartReviewPipeline({
     corpusRoot: CORPUS_ROOT,
     reviewsRoot: tmpRoot,
-    extractorMode: "v1-agent",
     runJudge: true,
   });
 

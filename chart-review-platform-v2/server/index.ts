@@ -29,7 +29,7 @@ import { makeChartReviewClarify, makeLitExtractClarify } from "../modules/1-clar
 import { makeChartReviewFormGen, makeLitExtractFormGen } from "../modules/2-form-gen/index.js";
 import { makeChartReviewDiscover, makeLitExtractDiscover } from "../modules/3-discover/index.js";
 import {
-  makeStubExtract, makeV1AgentExtract, verifyEvidenceFaithfulness,
+  makeV1AgentExtract, verifyEvidenceFaithfulness,
 } from "../modules/4-extract/index.js";
 import { makeReconciler, makeV1Judge } from "../modules/5-validate/index.js";
 import { makeCorrectLog } from "../modules/6-correct-log/index.js";
@@ -81,13 +81,14 @@ const routes: Record<string, Handler> = {
   },
 
   "POST /api/v2/extract": async (body) => {
-    const { form, subject, corpus, extractor_id, mode, provider } = body as {
+    const { form, subject, corpus, extractor_id, provider } = body as {
       form: FormSpec; subject: SubjectRef; corpus: EvidenceUnit[];
-      extractor_id: string; mode?: "stub" | "v1-agent"; provider?: ProviderName;
+      extractor_id: string; provider?: ProviderName;
     };
-    const extractor = mode === "v1-agent"
-      ? makeV1AgentExtract({ cwd: path.join(CORPUS_ROOT, subject.id), provider })
-      : makeStubExtract();
+    const extractor = makeV1AgentExtract({
+      cwd: path.join(CORPUS_ROOT, subject.id),
+      provider,
+    });
     const output = await extractor.extract(form, subject, corpus, extractor_id);
     const faithfulness = verifyEvidenceFaithfulness(output, corpus);
     if (!faithfulness.ok) {
@@ -131,22 +132,16 @@ const routes: Record<string, Handler> = {
   },
 
   "POST /api/v2/run": async (body) => {
-    const { prompt, subject, mode, run_judge, domain } = body as {
-      prompt: string; subject: SubjectRef; mode?: "stub" | "v1-agent";
-      run_judge?: boolean; domain: Domain;
+    const { prompt, subject, run_judge, domain } = body as {
+      prompt: string; subject: SubjectRef; run_judge?: boolean; domain: Domain;
     };
     if (domain === "lit-extract") {
-      const p = makeLitExtractPipeline({
-        reviewsRoot: REVIEWS_ROOT,
-        extractorMode: mode,
-        runJudge: run_judge,
-      });
+      const p = makeLitExtractPipeline({ reviewsRoot: REVIEWS_ROOT, runJudge: run_judge });
       return p.runOne(prompt, subject);
     }
     const p = makeChartReviewPipeline({
       corpusRoot: CORPUS_ROOT,
       reviewsRoot: REVIEWS_ROOT,
-      extractorMode: mode,
       runJudge: run_judge,
     });
     return p.runOne(prompt, subject);

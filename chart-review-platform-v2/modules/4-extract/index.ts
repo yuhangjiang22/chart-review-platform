@@ -13,9 +13,8 @@
 
 export type { ExtractModule, ExtractorOutput, FieldAssessment, EvidenceRef } from "../../shared/types.js";
 
-export { makeStubExtract } from "./stub.js";
 export { verifyEvidenceFaithfulness } from "./faithfulness.js";
-
-// Real adapter that wraps v1's runAgent (Claude/Codex swappable, MCP-backed).
-// Use this in production; keep makeStubExtract for the offline smoke test.
+// makeV1AgentExtract wraps v1's runAgent (Claude/Codex swappable,
+// MCP-backed, faithfulness gated at the MCP boundary). It is the
+// only extractor — v2 always uses real LLM runs.
 export { makeV1AgentExtract } from "./v1-agent-extract.js";

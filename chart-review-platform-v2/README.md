@@ -88,10 +88,13 @@ chart-review-platform-v2/
 cd chart-review-platform-v2
 npm install
 npm run typecheck            # confirm contracts compile
-npm run smoke                # offline: stub extractor, both workflows
-npm run smoke:real           # real Claude/Codex via v1's runAgent + chart-review-judge
+npm run smoke                # end-to-end on a real patient via v1's runAgent + chart-review-judge
 npm run server               # boot HTTP server (PORT=3002) exposing 6 modules as REST
 ```
+
+`npm run smoke` spends real tokens (~$0.01/patient with Haiku, more with
+Codex/Azure). Set `AGENT_PROVIDER=codex` or `=claude` to pick; default is
+whatever `chart-review-platform/app/.env`'s `AGENT_PROVIDER` says.
 
 ### Server endpoints
 

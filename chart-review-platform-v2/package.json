@@ -5,8 +5,7 @@
   "type": "module",
   "description": "MVP scaffold: 6-module pluggable pipeline shared by chart-review and lit-extract workflows.",
   "scripts": {
-    "smoke": "tsx examples/smoke-test.ts",
-    "smoke:real": "tsx examples/smoke-real.ts",
+    "smoke": "tsx examples/smoke.ts",
     "server": "tsx server/index.ts",
     "typecheck": "tsc --noEmit"
   },

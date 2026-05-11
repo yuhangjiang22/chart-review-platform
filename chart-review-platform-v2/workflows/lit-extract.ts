@@ -5,8 +5,7 @@ import { makeLitExtractClarify } from "../modules/1-clarify/index.js";
 import { makeLitExtractFormGen } from "../modules/2-form-gen/index.js";
 import { makeLitExtractDiscover } from "../modules/3-discover/index.js";
 import {
-  makeStubExtract, makeV1AgentExtract, verifyEvidenceFaithfulness,
-  type ExtractModule,
+  makeV1AgentExtract, verifyEvidenceFaithfulness,
 } from "../modules/4-extract/index.js";
 import { makeReconciler, makeV1Judge } from "../modules/5-validate/index.js";
 import { makeCorrectLog } from "../modules/6-correct-log/index.js";
@@ -18,7 +17,6 @@ export interface LitExtractPipelineOpts {
   /** Optional offline fixtures (one .txt per subject.id). */
   fixtureRoot?: string;
   reviewsRoot: string;
-  extractorMode?: "stub" | "v1-agent";
   providers?: [ProviderName | undefined, ProviderName | undefined];
   runJudge?: boolean;
 }
@@ -27,18 +25,9 @@ export function makeLitExtractPipeline(opts: LitExtractPipelineOpts) {
   const clarify = makeLitExtractClarify();
   const formGen = makeLitExtractFormGen();
   const discover = makeLitExtractDiscover({ fixtureRoot: opts.fixtureRoot });
-
-  let extractA: ExtractModule;
-  let extractB: ExtractModule;
-  if (opts.extractorMode === "v1-agent") {
-    const cwd = opts.fixtureRoot ?? process.cwd();
-    extractA = makeV1AgentExtract({ cwd, provider: opts.providers?.[0] });
-    extractB = makeV1AgentExtract({ cwd, provider: opts.providers?.[1] });
-  } else {
-    extractA = makeStubExtract({ answerBias: "yes", confidenceBias: "high" });
-    extractB = makeStubExtract({ answerBias: "yes", confidenceBias: "medium" });
-  }
-
+  const cwd = opts.fixtureRoot ?? process.cwd();
+  const extractA = makeV1AgentExtract({ cwd, provider: opts.providers?.[0] });
+  const extractB = makeV1AgentExtract({ cwd, provider: opts.providers?.[1] });
   const reconciler = makeReconciler();
   const correctLog = makeCorrectLog({ reviewsRoot: path.join(opts.reviewsRoot, "lit-extract") });
 
