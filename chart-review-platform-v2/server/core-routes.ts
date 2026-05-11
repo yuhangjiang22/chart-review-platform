@@ -49,6 +49,15 @@ function httpErr(status: number, message: string): Error & { status: number } {
  *  not JSON." server/index.ts unwraps it when present. */
 export interface RawBody { __raw: true; contentType: string; body: string; }
 
+/** Marker that tells the response writer "this is an SSE stream — pump
+ *  the generator into the response and don't touch the content-type or
+ *  call res.end yourself." Used for prelock-summary/stream and
+ *  suggest-override-reason/stream. */
+export interface SSEStream {
+  __sse: true;
+  generator: AsyncGenerator<unknown, void, void>;
+}
+
 export const coreRoutes: RouteEntry[] = [
   // GET /api/runtime — header info
   {

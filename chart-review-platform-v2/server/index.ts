@@ -56,7 +56,7 @@ import { proposalRoutes } from "./proposal-routes.js";
 import { issueRoutes } from "./issue-routes.js";
 import { lockTestRoutes } from "./lock-test-routes.js";
 import { cohortRoutes } from "./cohort-routes.js";
-import { coreRoutes, type RawBody } from "./core-routes.js";
+import { coreRoutes, type RawBody, type SSEStream } from "./core-routes.js";
 import { miscRoutes } from "./misc-routes.js";
 import { jobsRoutes } from "./jobs-routes.js";
 import { methodsRoutes } from "./methods-routes.js";
@@ -64,6 +64,7 @@ import { authoringRoutes } from "./authoring-routes.js";
 import { feedbackRoutes } from "./feedback-routes.js";
 import { runRoutes } from "./run-routes.js";
 import { guidelineRoutes } from "./guideline-routes.js";
+import { reviewRoutes } from "./review-routes.js";
 
 const PORT = Number(process.env.PORT ?? 3002);
 const REVIEWS_ROOT = process.env.CHART_REVIEW_REVIEWS_ROOT
@@ -202,6 +203,7 @@ const paramRouter = makeRouter([
   ...feedbackRoutes,
   ...runRoutes,
   ...guidelineRoutes,
+  ...reviewRoutes,
 ]);
 
 // ── http plumbing ───────────────────────────────────────────────────
@@ -263,6 +265,29 @@ const server = http.createServer(async (req, res) => {
       try {
         const body = await readBody(req);
         const out = await matched.handler(body, req, matched.params, matched.query);
+        // SSEStream escape hatch: handlers returning { __sse: true, generator }
+        // pump the generator as text/event-stream and leave content-type
+        // / end management to the writer here. Used by prelock-summary
+        // and suggest-override-reason stream endpoints.
+        const sse = out as Partial<SSEStream>;
+        if (sse && sse.__sse === true && sse.generator) {
+          res.setHeader("Content-Type", "text/event-stream");
+          res.setHeader("Cache-Control", "no-cache, no-transform");
+          res.setHeader("Connection", "keep-alive");
+          res.setHeader("X-Accel-Buffering", "no");
+          res.statusCode = 200;
+          res.flushHeaders?.();
+          try {
+            for await (const ev of sse.generator) {
+              res.write(`data: ${JSON.stringify(ev)}\n\n`);
+            }
+          } catch (streamErr) {
+            res.write(`data: ${JSON.stringify({ type: "error", error: String(streamErr) })}\n\n`);
+          } finally {
+            res.end();
+          }
+          return;
+        }
         // RawBody escape hatch: handlers returning { __raw: true, contentType, body }
         // skip JSON.stringify and use the requested content-type. Used by
         // text/plain note bodies; everything else stays JSON.
