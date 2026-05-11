@@ -1,0 +1,4 @@
+[
+  { "row_id": 5001, "concept_id": 320128, "concept_name": "Essential hypertension", "icd10cm": "I10", "status": "active", "date": "2018-04-12" },
+  { "row_id": 5002, "concept_id": 4119911, "concept_name": "Cough, chronic", "icd10cm": "R05.3", "status": "active", "date": "2024-08-22" }
+]

@@ -1,0 +1,24 @@
+task_type: phenotype_validation
+review_unit: patient
+manual_version: '2026-05-07-draft'
+index_anchor: index_date
+time_windows:
+  - id: lookback_lifetime
+    anchor: index_anchor
+    start_offset: -P10Y
+    end_offset: P0D
+    label: 10-year lookback (CHA₂DS₂-VASc uses chronic conditions in patient history)
+final_output: stroke_risk_tier
+overview_prose: |
+  Score adults with non-valvular atrial fibrillation on the CHA₂DS₂-VASc scale
+  for stroke risk stratification. Sum of 7 weighted components yields a total
+  0–9; the total maps to a risk tier (low / moderate / high) used to guide
+  anticoagulation decisions.
+
+  Population: adults (≥18) with documented non-valvular AFib in the chart.
+  Index date: the most recent AFib-related encounter (problem list entry, ECG
+  documenting AFib, or provider note discussing AFib management).
+
+  Component definitions follow the original Birmingham 2010 schema (Lip et al.):
+  CHF, hypertension, age (≥75 = 2pts; 65–74 = 1pt), diabetes, prior stroke/TIA
+  (= 2pts), vascular disease (MI / PAD / aortic plaque), and female sex.

@@ -1,0 +1,18 @@
+[
+  {
+    "row_id": 120001,
+    "concept_id": 4300374,
+    "icd10cm": "C34.31",
+    "concept_name": "Malignant neoplasm of lower lobe, right bronchus or lung",
+    "status": "active",
+    "date": "2025-03-25"
+  },
+  {
+    "row_id": 120002,
+    "concept_id": 255573,
+    "icd10cm": "J44.1",
+    "concept_name": "Chronic obstructive pulmonary disease with acute exacerbation",
+    "status": "active",
+    "date": "2025-04-22"
+  }
+]

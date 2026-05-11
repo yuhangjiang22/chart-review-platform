@@ -1,0 +1,29 @@
+NORTHWEST CANCER CARE — THORACIC ONCOLOGY CLINIC
+PROGRESS / NEW PATIENT NOTE
+Date: 2025-04-22
+Patient: Gerald R. Whitmore  DOB: 1949-08-22  MRN: 774509
+Attending: Dr. Carolyn M. Chu, MD (Medical Oncology — Thoracic)
+
+SUBJECTIVE:
+Mr. Whitmore is a 75-year-old man with a 60 pack-year active smoking history referred for management of newly diagnosed lung cancer. He reports progressive cough productive of blood-tinged sputum, 18-pound unintentional weight loss over 4 months, and increasing dyspnea on exertion limiting him to less than one block. He lives alone in Tacoma; his daughter accompanies him today. ECOG PS 2.
+
+OBJECTIVE:
+Vitals: BP 146/88, HR 84, RR 18, SpO2 92% on room air, Weight 62.8 kg
+Exam: Decreased breath sounds right lower lobe. No supraclavicular nodes palpable. Mild digital clubbing.
+PET/CT (2025-04-10): Hypermetabolic RLL mass (SUVmax 14.2), station 4R and 7 nodes (SUVmax 7.3–9.1), no distant organ metastases. Brain MRI (2025-04-14): No intracranial metastases.
+Pathology reviewed: squamous cell carcinoma, p40+/CK5/6+, TTF-1 negative. PD-L1 TPS 40%. EGFR/ALK negative.
+
+ASSESSMENT:
+Stage IIIB non-small cell lung cancer, squamous cell carcinoma subtype, right lower lobe primary (cT2bN3M0 by AJCC 8th edition). Pathology-confirmed on bronchoscopic biopsy and EBUS-TBNA dated 2025-03-25.
+
+PLAN:
+1. Concurrent chemoradiation with carboplatin/paclitaxel and thoracic RT (60 Gy in 30 fractions) — treatment planning appointment scheduled 2025-04-29.
+2. Durvalumab consolidation therapy planned following concurrent CRT if no disease progression.
+3. Smoking cessation: re-engaged with pharmacist; varenicline initiated.
+4. Nutritional support: referred to oncology dietitian for cachexia management.
+5. Return to clinic 3 weeks after start of chemoradiation. Patient and daughter given written care plan.
+
+ICD-10: C34.31 (Malignant neoplasm of lower lobe, right bronchus or lung)
+
+Electronically signed: Dr. Carolyn M. Chu, MD
+Date/Time: 2025-04-22  14:30

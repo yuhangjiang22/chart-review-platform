@@ -1,0 +1,96 @@
+id: response_to_readministration
+title: "Response to Readministration (Rechallenge)"
+description: |
+  Assesses whether re-exposing the patient to the suspect MS-DMT causes liver enzymes to
+  increase again. A positive rechallenge (doubling of liver enzymes with drug alone) is
+  highly specific for drug causality. However, rechallenge is often not done or not safe
+  in clinical practice, especially for MS-DMTs with documented hepatotoxicity.
+
+instructions: |
+  1. Determine if rechallenge was attempted:
+
+     YES - Rechallenge was performed:
+     See steps 2-4 below for scoring
+
+     NO - Rechallenge was NOT attempted or NOT interpretable:
+     Score as 0 (not done or not interpretable)
+     Note: Most MS-DMT patients with suspected DILI are NOT rechallenged due to safety concerns
+
+  2. For POSITIVE rechallenge (hepatocellular type):
+     Score +3 (Highest causality support):
+     - Suspect MS-DMT was restarted or continued
+     - ALT doubled (or increased >2× baseline after initial improvement) with drug ALONE
+     - No other concomitant hepatotoxic drugs started at same time
+     - This strongly confirms causality
+
+  3. For COMPATIBLE rechallenge (hepatocellular type):
+     Score +1 (Moderate causality support):
+     - Suspect MS-DMT was restarted or continued
+     - ALT doubled (or increased >2× baseline) but ALSO with concomitant hepatotoxic drug(s)
+     - Cannot isolate the MS-DMT's role (confounded by other agents)
+
+  4. For NEGATIVE rechallenge (hepatocellular type):
+     Score -2 (Against causality):
+     - Suspect MS-DMT was restarted or continued
+     - ALT increased but LESS than doubling (i.e., increased to <2× baseline)
+     - This suggests the MS-DMT was NOT the primary cause
+
+  5. For cholestatic type (Alk P or bilirubin):
+     Apply similar logic:
+     - +3: Doubling of Alk P or bilirubin with drug alone
+     - +1: Doubling of Alk P/bilirubin with concomitant drug
+     - -2: Increase but <doubling
+
+  6. Calculate doubling:
+     - Doubling = peak value after rechallenge ≥ 2× the baseline value at start of rechallenge
+     - Baseline at rechallenge = the level after initial improvement (before restarting drug)
+     - If patient has not recovered to normal, use the stable value at time of rechallenge
+
+  7. Clinical context for MS-DMT rechallenge:
+     - Many MS patients with documented DILI will NOT be rechallenged due to safety
+     - Rechallenge is most likely if:
+       * Injury was mild or the MS-DMT is essential for MS control
+       * Alternative DMTs are not available or less effective
+       * Patient has recovered substantially and physician judges rechallenge acceptable
+     - For most cases, expect score of 0 (not done)
+
+  8. Edge case - Inadvertent rechallenge:
+     Some patients may "self-rechallenge" by restarting the drug without medical supervision.
+     If documented, score accordingly (as intentional rechallenge).
+
+  9. Edge case - Drug continuation (not stopped initially):
+     If the MS-DMT was NEVER stopped after injury (patient continued despite abnormal LFTs):
+     - This is poor clinical practice but sometimes occurs
+     - Cannot assess rechallenge in traditional sense
+     - Score as 0 (not interpretable as formal rechallenge)
+
+evidence_sources: |
+  - Documentation of rechallenge attempt (clinical notes, medication reconciliation)
+  - Baseline liver enzyme value at time of rechallenge initiation
+  - Follow-up liver enzyme values after rechallenge (at 1 week, 2 weeks, 1 month as available)
+  - Whether enzyme doubling occurred
+  - Other medications started at time of rechallenge (to assess if confounded)
+  - Timeline of enzyme increase relative to rechallenge
+  - Patient tolerance/adverse effects noted at time of rechallenge
+
+assessment_options:
+  - label: "+3 (Positive rechallenge)"
+    value: 3
+    description: "Enzyme doubling with suspect MS-DMT alone (highest causality)"
+  - label: "+1 (Compatible rechallenge)"
+    value: 1
+    description: "Enzyme doubling but with concomitant drug(s) (confounded)"
+  - label: "-2 (Negative rechallenge)"
+    value: -2
+    description: "Enzyme increase but <doubling with MS-DMT (against causality)"
+  - label: "0 (Not done or not interpretable)"
+    value: 0
+    description: "Rechallenge was not performed, or context unclear"
+
+clinical_note: |
+  Rechallenge is RARELY performed for MS-DMT DILI in routine practice due to safety concerns.
+  A score of 0 (not done) is the most common result and does NOT weaken the overall RUCAM score.
+  Positive rechallenge is the MOST SPECIFIC indicator of causality but requires intentional re-exposure,
+  which is often ethically problematic for hepatotoxic drugs.
+
+output_format: "Rechallenge Score: {value}"

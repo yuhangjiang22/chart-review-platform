@@ -1,0 +1,30 @@
+[
+  {
+    "row_id": 120010,
+    "concept_id": 4013905,
+    "cpt": "71260",
+    "concept_name": "CT thorax with contrast",
+    "procedure_date": "2025-03-04"
+  },
+  {
+    "row_id": 120011,
+    "concept_id": 4248025,
+    "cpt": "31625",
+    "concept_name": "Bronchoscopy with endobronchial biopsy",
+    "procedure_date": "2025-03-24"
+  },
+  {
+    "row_id": 120012,
+    "concept_id": 4171651,
+    "cpt": "78816",
+    "concept_name": "PET/CT whole body",
+    "procedure_date": "2025-04-10"
+  },
+  {
+    "row_id": 120013,
+    "concept_id": 4162316,
+    "cpt": "70553",
+    "concept_name": "MRI brain with and without contrast",
+    "procedure_date": "2025-04-14"
+  }
+]

@@ -1,0 +1,30 @@
+DATE: 2025-01-19
+PATIENT: Male, 62 yo | PROVIDER: Dr. C. Nguyen, MD — Primary Care
+VISIT: Office visit — right knee pain
+
+CC: Right knee pain, worsening over 3 months.
+
+HPI: Mr. [K.] reports 3-month history of progressive right knee aching and stiffness, worse with stairs and prolonged standing, partially relieved by rest and naproxen. No acute trauma. Mild medial swelling. No locking or giving way. Avid hiker with significant functional limitation.
+
+ROS: No fevers, weight loss, night sweats. No cough or dyspnea. No malignancy history.
+
+PMH: Suspected osteoarthritis right knee (evaluation ongoing), hypertension. Former smoker (12 pack-years, quit 2000).
+MEDS: Lisinopril 5 mg daily, naproxen 500 mg BID PRN.
+ALLERGIES: Penicillin (rash).
+SOC HX: Retired engineer, Portland OR. Moderate alcohol. Former smoker, quit 2000.
+
+EXAM:
+VS: BP 130/82, HR 74, SpO2 97%, BMI 27.4
+General: NAD, well-nourished.
+Lungs: CTA bilaterally, no adventitious sounds.
+Right knee: Mild medial JL tenderness. Trace effusion. ROM 0-120° (pain limited). McMurray mildly positive medially. No laxity. Crepitus on flexion/extension.
+
+A/P:
+1. Right knee pain — likely OA vs medial meniscal pathology.
+   - Weight-bearing knee X-rays ordered.
+   - Naproxen 500 mg BID with food; add omeprazole 20 mg daily.
+   - Orthopedic referral if X-ray unremarkable.
+   - Physical therapy referral for quad strengthening.
+2. HTN — BP 130/82. Increase lisinopril to 10 mg daily. Recheck 4-6 weeks.
+
+F/U in 6-8 weeks or sooner if pain worsens.

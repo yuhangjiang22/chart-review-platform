@@ -1,0 +1,32 @@
+[
+  {
+    "row_id": "520001",
+    "visit_occurrence_id": 520001,
+    "person_id": "patient_easy_neg_02",
+    "visit_start_date": "2025-01-19",
+    "visit_end_date": "2025-01-19",
+    "visit_concept_name": "Outpatient Visit",
+    "provider_specialty": "Primary Care",
+    "note_type": "pcp_visit"
+  },
+  {
+    "row_id": "520002",
+    "visit_occurrence_id": 520002,
+    "person_id": "patient_easy_neg_02",
+    "visit_start_date": "2025-04-04",
+    "visit_end_date": "2025-04-04",
+    "visit_concept_name": "Emergency Room Visit",
+    "provider_specialty": "Emergency Medicine",
+    "note_type": "er_visit"
+  },
+  {
+    "row_id": "520003",
+    "visit_occurrence_id": 520003,
+    "person_id": "patient_easy_neg_02",
+    "visit_start_date": "2025-05-12",
+    "visit_end_date": "2025-05-12",
+    "visit_concept_name": "Outpatient Visit",
+    "provider_specialty": "Primary Care",
+    "note_type": "pcp_followup"
+  }
+]

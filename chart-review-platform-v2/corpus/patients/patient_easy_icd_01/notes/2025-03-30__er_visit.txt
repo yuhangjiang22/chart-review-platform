@@ -1,0 +1,34 @@
+EMERGENCY DEPARTMENT NOTE
+Date: 2025-03-30
+Patient: Male, 69 years
+Provider: Dr. K. Nguyen, MD — Emergency Medicine
+Disposition: Discharged to home
+
+CHIEF COMPLAINT: Left ankle pain after fall.
+
+HPI: Mr. J.H. is a 69-year-old male who tripped on a step at home ~3 hours ago, landing on his left ankle. Immediate sharp pain, unable to bear weight. Ice applied at home without relief. No head injury, loss of consciousness, or chest trauma.
+
+PAST MEDICAL HISTORY (registration problem list):
+- Hypertension, hyperlipidemia, type 2 diabetes, BPH
+- C34.10 — imported from problem list
+
+MEDICATIONS: Lisinopril, atorvastatin, metformin, tamsulosin.
+
+PHYSICAL EXAMINATION:
+Vitals: BP 142/84, HR 88, SpO2 99%.
+Left ankle: Tenderness over lateral malleolus, moderate soft-tissue swelling. Ottawa rules positive for X-ray. Neurovascular intact distally.
+
+RESULTS: Left ankle X-ray (3-view) — no fracture. Soft-tissue swelling consistent with lateral ankle sprain.
+
+ASSESSMENT AND PLAN:
+1. Acute lateral ankle sprain, left (S93.402A) — Grade II. RICE therapy, air stirrup splint applied, crutches provided. Ibuprofen 600 mg q6h PRN; acetaminophen 500 mg q6h alternating.
+2. Follow up with PCP in 7–10 days.
+3. Return precautions: neurovascular compromise, worsening pain, fever.
+
+Discharge diagnoses (billing, problem-list pull-through):
+- S93.402A Sprain left ankle, initial encounter
+- C34.10 Bronchus/lung upper lobe, unspecified (chronic, problem list carry-forward)
+- I10 Essential hypertension
+- E11.9 Type 2 diabetes mellitus
+
+Patient discharged with crutches in stable condition.

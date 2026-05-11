@@ -1,0 +1,53 @@
+{
+  "task_id": "lung-cancer-phenotype",
+  "iter_id": "iter_032",
+  "iter_num": 32,
+  "run_id": "2026-05-11T18-36-21-487Z",
+  "guideline_sha": "98ff5f92b8dc50c3",
+  "started_at": "2026-05-11T18:36:21.489Z",
+  "started_by": "yuhang",
+  "state": "abandoned",
+  "agent_specs": [
+    {
+      "id": "agent_1",
+      "search_mode_preset": "smart-search",
+      "interpretation_preset": "default"
+    },
+    {
+      "id": "agent_2",
+      "search_mode_preset": "smart-search",
+      "interpretation_preset": "skeptical"
+    }
+  ],
+  "criterion_schema_hashes": {
+    "clinical_diagnosis_lung_cancer": "2fa2477e839913f0",
+    "cytology_supports_lung_primary": "537fbc0eee10a84e",
+    "icd_lung_cancer_present": "ae7876eda31a24ad",
+    "imaging_lung_lesion": "91eb9b576622cb6f",
+    "lowest_hemoglobin_in_window": "7c2cda21adcd6358",
+    "lung_cancer_status": "50f0a9499acbaf1a",
+    "oncologist_lung_cancer_diagnosis_in_note": "1fe940ad11aaf179",
+    "pathology_confirms_lung_cancer": "03c77ce7dcc3fc06",
+    "pathology_lung_primary": "893c998bc3fad868",
+    "pathology_report_present": "6887f46d3d20536d",
+    "pre_treatment_anemia_present": "ca4154f6dbb2694d"
+  },
+  "rerun_plan": {
+    "carried_from": "iter_031",
+    "carried_criteria": [
+      "clinical_diagnosis_lung_cancer",
+      "cytology_supports_lung_primary",
+      "icd_lung_cancer_present",
+      "imaging_lung_lesion",
+      "lowest_hemoglobin_in_window",
+      "lung_cancer_status",
+      "oncologist_lung_cancer_diagnosis_in_note",
+      "pathology_confirms_lung_cancer",
+      "pathology_lung_primary",
+      "pathology_report_present",
+      "pre_treatment_anemia_present"
+    ],
+    "rerun_criteria": []
+  },
+  "completed_at": "2026-05-11T18:55:45.947Z"
+}

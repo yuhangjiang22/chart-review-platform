@@ -1,0 +1,5 @@
+[
+  { "row_id": 6101, "concept_id": 4096774, "concept_name": "Computed tomography of thorax", "cpt": "71260", "procedure_date": "2024-11-22", "provider_specialty": "Radiology" },
+  { "row_id": 6102, "concept_id": 4321756, "concept_name": "CT-guided lung biopsy", "cpt": "32408", "procedure_date": "2024-12-12", "provider_specialty": "Interventional Radiology" },
+  { "row_id": 6103, "concept_id": 4023758, "concept_name": "FDG PET-CT", "cpt": "78815", "procedure_date": "2024-12-16", "provider_specialty": "Nuclear Medicine" }
+]

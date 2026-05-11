@@ -1,0 +1,29 @@
+id: confirmed
+title: Confirmed Lung Cancer
+description: >-
+  Patient has a tissue diagnosis of lung cancer confirmed by pathology or cytology.
+
+guidance: |
+  ## Confirmed Lung Cancer
+
+  A patient meets this criterion if there is **pathology or cytology evidence** of malignant
+  lung cancer in the chart.
+
+  ### What counts as confirmation:
+  - **Histopathology report** showing malignant cells consistent with lung cancer
+    (e.g., adenocarcinoma, squamous cell carcinoma, small cell carcinoma, large cell carcinoma)
+  - **Cytology report** showing malignant cells from lung origin (sputum, bronchial brushings, FNA)
+  - **Autopsy findings** confirming lung cancer
+
+  ### Key points:
+  - The diagnosis must be from tissue/cell examination, not imaging alone
+  - The malignancy must be clearly documented as originating from the lung
+  - Metastatic disease TO the lung from another primary cancer does NOT count
+
+  ### Evidence sources to look for:
+  - Pathology reports (section header: "DIAGNOSIS" or "IMPRESSION")
+  - Cytology reports
+  - Oncology consultation notes referencing pathology confirmation
+  - Staging workup notes referencing confirmed diagnosis
+
+output_value: confirmed

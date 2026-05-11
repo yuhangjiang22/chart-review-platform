@@ -1,0 +1,22 @@
+[
+  {
+    "row_id": "310031",
+    "drug_exposure_id": "310031",
+    "drug_concept_id": "1308216",
+    "drug_concept_name": "Lisinopril 10 MG Oral Tablet",
+    "drug_source_value": "RxNorm:314076",
+    "drug_exposure_start_date": "2020-03-10",
+    "drug_exposure_end_date": null,
+    "sig": "10 mg by mouth daily"
+  },
+  {
+    "row_id": "310032",
+    "drug_exposure_id": "310032",
+    "drug_concept_id": "904453",
+    "drug_concept_name": "Omeprazole 20 MG Oral Capsule",
+    "drug_source_value": "RxNorm:40790",
+    "drug_exposure_start_date": "2018-06-01",
+    "drug_exposure_end_date": null,
+    "sig": "20 mg by mouth daily before breakfast"
+  }
+]

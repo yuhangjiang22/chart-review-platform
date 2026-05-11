@@ -1,0 +1,29 @@
+SOUTHEASTERN HEALTH SYSTEM — HEMATOLOGY / ONCOLOGY
+POST-SURGICAL ONCOLOGY CONSULTATION
+Date: 2025-02-11
+Patient: William D. Tanner  DOB: 1942-09-03  MRN: 993084
+Attending: Dr. Annette R. Dupont, MD (Medical Oncology)
+
+SUBJECTIVE:
+Mr. Tanner is an 82-year-old man (45 pack-years, quit 2002) here for first oncology visit post left lower lobectomy 2025-01-20. Dyspnea improving; walks two blocks. Weight stable. ECOG PS 2. Son present.
+
+OBJECTIVE:
+Vitals: BP 134/82, HR 76, SpO2 94% on room air, Weight 71.0 kg
+Exam: Well-healed thoracotomy scar. Decreased breath sounds at left base; no concerning consolidation. No palpable lymphadenopathy.
+Pathology reviewed (SHS-SP-2025-00872): squamous cell carcinoma, poorly differentiated, 3.5 cm; p40+/CK5/6+; pT2aN1M0; 2/3 N1 nodes positive; visceral pleural invasion PL1.
+PD-L1 TPS: 65%. EGFR/ALK: not applicable per squamous histology per institutional protocol.
+Post-op PET/CT (2025-02-03): No evidence of distant metastatic disease.
+
+ASSESSMENT:
+Stage IIB non-small cell lung cancer, squamous cell carcinoma subtype, left lower lobe (pT2aN1M0), resected via left lower lobectomy 2025-01-20. Pathology-confirmed on surgical specimen. High PD-L1 expression.
+
+PLAN:
+1. Adjuvant carboplatin/paclitaxel (reduced intensity given age/PS) preferred over cisplatin/vinorelbine; family in agreement.
+2. Adjuvant atezolizumab eligibility deferred until post-chemotherapy re-assessment.
+3. CT chest every 6 months x 2 years, then annually.
+4. Cardiac clearance obtained; Cycle 1 to initiate in 4 weeks.
+
+ICD-10: C34.32 (Malignant neoplasm of lower lobe, left bronchus or lung)
+
+Electronically signed: Dr. Annette R. Dupont, MD
+Date/Time: 2025-02-11  10:48

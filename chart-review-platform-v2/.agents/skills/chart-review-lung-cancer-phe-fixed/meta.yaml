@@ -1,0 +1,18 @@
+# lung-cancer-phe-fixed — chart-review guideline (draft)
+task_id: lung-cancer-phe-fixed
+task_type: phenotype_validation
+review_unit: patient
+manual_version: 0.1.0-draft
+index_anchor: index_date
+output_shape: outcome-first
+overview_prose: |
+  This guideline determines whether a patient has lung cancer by evaluating pathology findings, imaging results, clinical diagnosis statements, treatment records, and staging information. The phenotype uses a three-level hierarchy: a patient receives "Confirmed" status if pathology evidence establishes malignancy; "Probable" status if imaging and clinical assessment together suggest lung cancer without definitive pathology; and "Absent" if no credible evidence of malignancy exists. The guideline prioritizes pathology findings as the gold standard, incorporates imaging and clinical documentation as supporting evidence, and accounts for treatment patterns that may indicate underlying malignancy.
+denominator: "All patients in the cohort"
+index_event: "Index date"
+time_windows:
+  - id: baseline
+    anchor: index_date
+    start_offset: "-P999Y"
+    end_offset: "P0D"
+    label: "All available history"
+final_output: lung_cancer_status

@@ -1,0 +1,16 @@
+[
+  {
+    "row_id": 110030,
+    "concept_id": 1308216,
+    "concept_name": "Lisinopril 10 MG Oral Tablet",
+    "drug_start_date": "2023-04-01",
+    "status": "active"
+  },
+  {
+    "row_id": 110031,
+    "concept_id": 19078461,
+    "concept_name": "Ondansetron 4 MG Oral Tablet",
+    "drug_start_date": "2025-01-05",
+    "status": "active"
+  }
+]
