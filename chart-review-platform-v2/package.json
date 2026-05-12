@@ -16,7 +16,7 @@
     "smoke": "tsx examples/smoke.ts",
     "server": "tsx server/index.ts",
     "build:client": "vite build --config config/vite.config.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "node --max-old-space-size=8192 ./node_modules/.bin/tsc --noEmit"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.1.28",
@@ -52,7 +52,8 @@
     "ulid": "^3.0.2",
     "uuid": "^10.0.0",
     "ws": "^8.18.0",
-    "yaml": "^2.6.0"
+    "yaml": "^2.6.0",
+    "zod": "^3.23.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
