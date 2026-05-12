@@ -5,3 +5,15 @@ dist/
 
 # Runtime data: finalized assessments + audit logs land here.
 var/
+
+# Codex CLI runtime state — sqlite logs, install id, memories, etc.
+# Tracked content under .codex/ (config.toml, skills/, environments/)
+# is checked in; everything else is per-machine state.
+.codex/*.sqlite
+.codex/*.sqlite-shm
+.codex/*.sqlite-wal
+.codex/installation_id
+.codex/memories/
+.codex/shell_snapshots/
+.codex/tmp/
+.codex/.tmp/
