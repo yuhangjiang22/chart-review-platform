@@ -1,0 +1,36 @@
+{
+  "name": "@chart-review/domain-iter",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Pilot iteration aggregate: lifecycle (running → ready_to_validate → complete), self-critique, iter-accuracy, disagreement extraction, stop-rule evaluator, regression-gate, validating-transition. The unit of calibration.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": { "types": "./src/index.ts", "default": "./src/index.ts" },
+    "./pilots": { "types": "./src/pilots.ts", "default": "./src/pilots.ts" },
+    "./stop-rule": { "types": "./src/stop-rule.ts", "default": "./src/stop-rule.ts" },
+    "./iter-accuracy": { "types": "./src/iter-accuracy.ts", "default": "./src/iter-accuracy.ts" },
+    "./regression-gate": { "types": "./src/regression-gate.ts", "default": "./src/regression-gate.ts" },
+    "./auto-advance-on-run-complete": { "types": "./src/auto-advance-on-run-complete.ts", "default": "./src/auto-advance-on-run-complete.ts" },
+    "./validating-transition": { "types": "./src/validating-transition.ts", "default": "./src/validating-transition.ts" }
+  },
+  "dependencies": {
+    "@chart-review/adjudications": "*",
+    "@chart-review/agent-provider": "*",
+    "@chart-review/agent-specs": "*",
+    "@chart-review/audit-trail": "*",
+    "@chart-review/contract-eval": "*",
+    "@chart-review/criterion-hash": "*",
+    "@chart-review/disagreements": "*",
+    "@chart-review/domain-proposal": "*",
+    "@chart-review/domain-review": "*",
+    "@chart-review/infra-batch-run": "*",
+    "@chart-review/lock": "*",
+    "@chart-review/model-config": "*",
+    "@chart-review/patients": "*",
+    "@chart-review/rubric": "*",
+    "@chart-review/storage": "*",
+    "@chart-review/tasks": "*"
+  }
+}
