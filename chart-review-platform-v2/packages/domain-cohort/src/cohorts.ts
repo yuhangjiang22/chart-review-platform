@@ -26,7 +26,7 @@ import {
   type RunManifest,
   type StartBatchRunOptions,
   type StartBatchRunResult,
-} from "../../../server/lib/infra/batch-run/index.js";
+} from "@chart-review/infra-batch-run";
 
 // ── interfaces ────────────────────────────────────────────────────────────────
 

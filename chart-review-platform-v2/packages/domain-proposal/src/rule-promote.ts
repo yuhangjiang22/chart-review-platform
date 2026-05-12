@@ -3,15 +3,15 @@ import fs from "fs";
 import path from "path";
 import { stringify as stringifyYaml } from "yaml";
 import { computeTaskSha } from "@chart-review/lock";
-import { archiveVersion } from "../../../server/lib/version-archive.js";
-import { runMigration } from "../../../server/lib/migration.js";
-import { generateBenchmark } from "../../../server/lib/benchmark-generator.js";
+import { archiveVersion } from "@chart-review/version-archive";
+import { runMigration } from "@chart-review/migration";
+import { generateBenchmark } from "@chart-review/benchmark-generator";
 import { readProposal, writeProposal, findSiblingsOnField, transitionStatus, ProposedEdit } from "./rule-store.js";
 
 import { guidelineDir } from "@chart-review/rubric";
 import { yamlCriterionToSkillMarkdown } from "@chart-review/rubric/yaml-to-markdown";
 import { loadPhenotypeCriteria } from "@chart-review/rubric/phenotype-skill";
-import { getMaturity } from "../../../server/lib/maturity.js";
+import { getMaturity } from "@chart-review/maturity";
 import { PLATFORM_ROOT } from "@chart-review/patients";
 
 function reviewsRoot(): string {

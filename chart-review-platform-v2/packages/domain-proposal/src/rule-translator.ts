@@ -1,7 +1,7 @@
 // app/server/domain/proposal/rule-translator.ts
 import Anthropic from "@anthropic-ai/sdk";
 import { CompiledTask } from "@chart-review/rubric";
-import { validateDSL } from "../../../server/lib/dsl-validator.js";
+import { validateDSL } from "@chart-review/dsl-validator";
 import type { ProposedEdit } from "./rule-store.js";
 
 export interface TranslateInput {

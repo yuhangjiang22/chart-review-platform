@@ -33,11 +33,11 @@ import type { CompiledTask } from "@chart-review/tasks";
 import type { CrossCriterionAlert } from "@chart-review/platform-types";
 import { recomputeLiveAlerts } from "@chart-review/live-alerts";
 import { evalDerivation } from "@chart-review/contract-eval";
-import { checkDrift } from "../../../server/lib/drift-detector.js";
+import { checkDrift } from "@chart-review/drift-detector";
 import { appendAuditEntry } from "@chart-review/audit-trail";
-import { shouldAutoRoleC, fireAutoRoleC } from "../../../server/lib/auto-role-c.js";
+import { shouldAutoRoleC, fireAutoRoleC } from "@chart-review/auto-role-c";
 import { writeJsonAtomic } from "@chart-review/fs-atomic";
-import { snapshotCriterionHashesSync, maybeTransitionIterToValidating } from "../../../server/lib/domain/iter/pilots.js";
+import { snapshotCriterionHashesSync, maybeTransitionIterToValidating } from "@chart-review/domain-iter/pilots";
 
 /** Exported for tests that want to know the default value. Not used
  *  internally after the lazy accessor below was introduced. */
