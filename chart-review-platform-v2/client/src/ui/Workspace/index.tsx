@@ -12,7 +12,7 @@ import {
 import { PHASE_ORDER, PhasePillBar } from "./PhasePillBar";
 import { PHASE_SLUG_TO_ID } from "./phases";
 import { PhaseHeadline } from "./PhaseHeadline";
-import { ShowAllToolsToggle } from "./ShowAllToolsToggle";
+import { WorkspaceSettings } from "./WorkspaceSettings";
 import { PhaseDraft } from "./PhaseDraft";
 import { PhaseTry } from "./PhaseTry";
 import { PhaseJudge } from "./PhaseJudge";
@@ -90,6 +90,25 @@ export function Workspace({
   const [revisitsTotal, setRevisitsTotal] = useState(0);
   const [deployedCohortExists, setDeployedCohortExists] = useState(false);
   const [showAllTools, setShowAllTools] = useState(false);
+
+  // Per-task enabled phases — fetched from /api/tasks/:taskId/phases.
+  // null until the fetch resolves (PhasePillBar treats null as "all enabled").
+  const [enabledPhases, setEnabledPhases] = useState<Phase[] | null>(null);
+
+  useEffect(() => {
+    if (!taskId) return;
+    let cancelled = false;
+    authFetch(`/api/tasks/${encodeURIComponent(taskId)}/phases`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (cancelled || !d) return;
+        const ids: string[] = Array.isArray(d.enabled) ? d.enabled : [];
+        // map "author" → "AUTHOR" etc.
+        setEnabledPhases(ids.map((id) => id.toUpperCase() as Phase));
+      })
+      .catch(() => { /* fall back to all phases */ });
+    return () => { cancelled = true; };
+  }, [taskId]);
 
   /** True when pre-flight reports error-level diagnostics in the AUTHOR phase. */
   const [preflightHasErrors, setPreflightHasErrors] = useState(false);
@@ -281,8 +300,9 @@ export function Workspace({
           activePhase={activePhase}
           donePhases={donePhases}
           onPhaseClick={(phase) => setPhase(phase)}
+          enabledPhases={enabledPhases ?? undefined}
         />
-        <ShowAllToolsToggle taskId={taskId} onChange={setShowAllTools} />
+        <WorkspaceSettings taskId={taskId} onShowAllToolsChange={setShowAllTools} />
       </div>
 
       {/* Phase headline */}

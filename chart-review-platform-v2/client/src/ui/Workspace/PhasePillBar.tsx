@@ -62,6 +62,10 @@ interface PhasePillBarProps {
    *  using the maturity-keyed mapping instead of donePhases. */
   maturity?: MaturityState | "authoring" | "deployed";
   onPhaseClick?: (phase: Phase) => void;
+  /** Optional filter: only render phases in this list. When undefined,
+   *  every phase from PHASE_DEFS shows. Populated by Workspace from
+   *  GET /api/tasks/:taskId/phases.enabled (per-task meta.yaml config). */
+  enabledPhases?: Phase[];
 }
 
 export function PhasePillBar({
@@ -69,12 +73,21 @@ export function PhasePillBar({
   donePhases,
   maturity,
   onPhaseClick,
+  enabledPhases,
 }: PhasePillBarProps) {
   // When maturity is provided, derive done-phases from the keyed mapping;
   // fall back to the explicit donePhases prop otherwise. (cluster 9 — W2)
   const effectiveDone: Phase[] = maturity !== undefined
     ? maturityToDonePhases(maturity)
     : donePhases;
+
+  // Per-task phase filter. When set, only these phases render.
+  const enabledSet: Set<Phase> | null = enabledPhases
+    ? new Set(enabledPhases)
+    : null;
+  const isEnabled = (p: Phase) => !enabledSet || enabledSet.has(p);
+  const iterPhasesToRender = ITER_PHASES.filter(isEnabled);
+  const exitPhasesToRender = EXIT_PHASES.filter(isEnabled);
 
   function renderPill(phase: Phase, withConnector: boolean) {
     const isDone = effectiveDone.includes(phase);
@@ -125,7 +138,7 @@ export function PhasePillBar({
        *  loop-back affordance on the right edge of the group. The icon is
        *  clickable as a shortcut for "back to Author to start the next iter". */}
       <div className="flex items-center gap-1 rounded-full border border-dashed border-border/70 px-2 py-1">
-        {ITER_PHASES.map((phase, i) => renderPill(phase, i > 0))}
+        {iterPhasesToRender.map((phase, i) => renderPill(phase, i > 0))}
         <button
           type="button"
           onClick={() => onPhaseClick?.("AUTHOR")}
@@ -146,9 +159,11 @@ export function PhasePillBar({
       </span>
 
       {/* Terminal group — Lock + Deploy, the one-way exit. */}
-      <div className="flex items-center gap-1">
-        {EXIT_PHASES.map((phase, i) => renderPill(phase, i > 0))}
-      </div>
+      {exitPhasesToRender.length > 0 && (
+        <div className="flex items-center gap-1">
+          {exitPhasesToRender.map((phase, i) => renderPill(phase, i > 0))}
+        </div>
+      )}
     </nav>
   );
 }

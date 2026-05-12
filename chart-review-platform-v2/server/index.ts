@@ -85,6 +85,7 @@ import { feedbackRoutes } from "./feedback-routes.js";
 import { runRoutes } from "./run-routes.js";
 import { guidelineRoutes } from "./guideline-routes.js";
 import { reviewRoutes } from "./review-routes.js";
+import { phasesRoutes } from "./phases-routes.js";
 import { attachWebSocketServer, registerBroadcasters } from "./ws.js";
 import {
   isBuilderPath, delegateBuilder,
@@ -229,6 +230,7 @@ const paramRouter = makeRouter([
   ...runRoutes,
   ...guidelineRoutes,
   ...reviewRoutes,
+  ...phasesRoutes,
 ]);
 
 // ── http plumbing ───────────────────────────────────────────────────
