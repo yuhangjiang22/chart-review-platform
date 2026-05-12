@@ -6,6 +6,7 @@
   "description": "6-module pluggable pipeline shared by chart-review and lit-extract workflows.",
   "workspaces": [
     ".agents/skills/*",
+    "client",
     "packages/*",
     "packages/skills/*",
     "packages/skills/phenotypes/*"
