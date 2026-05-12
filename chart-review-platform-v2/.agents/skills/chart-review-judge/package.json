@@ -1,0 +1,7 @@
+{
+  "name": "@chart-review/skill-chart-review-judge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Chart-review utility skill: chart-review-judge.",
+  "files": ["SKILL.md", "meta.yaml", "references", "README.md"]
+}

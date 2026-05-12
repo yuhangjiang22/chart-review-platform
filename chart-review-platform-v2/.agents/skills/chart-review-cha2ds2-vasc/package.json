@@ -1,0 +1,7 @@
+{
+  "name": "@chart-review/skill-chart-review-cha2ds2-vasc",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Phenotype skill bundle: criteria + keyword_sets + code_sets + edge_cases for the chart-review-cha2ds2-vasc task.",
+  "files": ["SKILL.md", "meta.yaml", "references", "README.md"]
+}

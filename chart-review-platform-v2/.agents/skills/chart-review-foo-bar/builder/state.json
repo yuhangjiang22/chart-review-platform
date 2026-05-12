@@ -1,0 +1,7 @@
+{
+  "task_id": "foo-bar",
+  "phase": "gathering",
+  "sample_mode": false,
+  "conversation_cursor": 0,
+  "last_activity_at": "2026-05-11T22:31:00.758Z"
+}
