@@ -17,3 +17,8 @@ var/
 .codex/shell_snapshots/
 .codex/tmp/
 .codex/.tmp/
+
+# Per-machine env (paths + provider defaults). Check in .env.example
+# instead to document the contract.
+.env
+.env.local
