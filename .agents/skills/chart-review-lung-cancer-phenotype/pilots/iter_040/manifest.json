@@ -1,12 +1,12 @@
 {
   "task_id": "lung-cancer-phenotype",
-  "iter_id": "iter_009",
-  "iter_num": 9,
-  "run_id": "2026-05-07T18-44-30-737Z",
-  "guideline_sha": "5890e8a4c24ee699",
-  "started_at": "2026-05-07T18:44:30.740Z",
+  "iter_id": "iter_040",
+  "iter_num": 40,
+  "run_id": "2026-05-11T19-52-31-682Z",
+  "guideline_sha": "6778bd266b1a15c5",
+  "started_at": "2026-05-11T19:52:31.685Z",
   "started_by": "yuhang",
-  "state": "abandoned",
+  "state": "ready_to_validate",
   "agent_specs": [
     {
       "id": "agent_1",
@@ -33,7 +33,7 @@
     "pre_treatment_anemia_present": "ca4154f6dbb2694d"
   },
   "rerun_plan": {
-    "carried_from": "iter_008",
+    "carried_from": "iter_039",
     "carried_criteria": [
       "clinical_diagnosis_lung_cancer",
       "cytology_supports_lung_primary",
@@ -48,6 +48,5 @@
       "pre_treatment_anemia_present"
     ],
     "rerun_criteria": []
-  },
-  "completed_at": "2026-05-10T17:27:06.229Z"
+  }
 }

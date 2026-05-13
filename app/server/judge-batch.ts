@@ -208,9 +208,18 @@ function buildWorklist(taskId: string, iterId: string): JudgeInput[] {
   // same backend the agent run used. Codex run → Codex judge, Claude
   // run → Claude judge. Pre-v0.7.1 manifests have no provider — leave
   // it undefined so the env-var default (AGENT_PROVIDER) wins.
+  //
+  // Override: CHART_REVIEW_JUDGE_PROVIDER (when set, always wins).
+  // Codex's response format omits the <JUDGE_ANALYSIS> sentinel the
+  // parser requires, so for cohort + iter runs that use Codex the
+  // judge ends up failing every cell. Setting JUDGE_PROVIDER=claude
+  // pins the judge to Claude regardless of how the agent run was
+  // dispatched.
+  const judgeProviderEnv = process.env.CHART_REVIEW_JUDGE_PROVIDER;
   const runProvider = getRunManifest(manifest.run_id)?.provider;
-  if (runProvider) {
-    for (const cell of worklist) cell.provider = runProvider;
+  const effectiveProvider = judgeProviderEnv || runProvider;
+  if (effectiveProvider) {
+    for (const cell of worklist) cell.provider = effectiveProvider as typeof cell.provider;
   }
 
   return worklist;
