@@ -41,4 +41,3 @@ phases:
   - validate
   - decide
   - lock
-  - deploy

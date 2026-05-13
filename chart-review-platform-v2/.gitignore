@@ -17,6 +17,7 @@ var/
 .codex/shell_snapshots/
 .codex/tmp/
 .codex/.tmp/
+.codex/skills/.system/
 
 # Per-machine env (paths + provider defaults). Check in .env.example
 # instead to document the contract.

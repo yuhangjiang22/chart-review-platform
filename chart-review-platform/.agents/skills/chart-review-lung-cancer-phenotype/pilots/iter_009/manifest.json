@@ -6,7 +6,7 @@
   "guideline_sha": "5890e8a4c24ee699",
   "started_at": "2026-05-07T18:44:30.740Z",
   "started_by": "yuhang",
-  "state": "validating",
+  "state": "abandoned",
   "agent_specs": [
     {
       "id": "agent_1",
@@ -48,5 +48,6 @@
       "pre_treatment_anemia_present"
     ],
     "rerun_criteria": []
-  }
+  },
+  "completed_at": "2026-05-10T17:27:06.229Z"
 }

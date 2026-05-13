@@ -38,6 +38,12 @@ interface PilotIterListing {
   state: "running" | "ready_to_validate" | "complete" | "abandoned";
 }
 
+// Three-state load tracker for the pilots fetch. Distinguishes "still
+// loading" from "server returned but list is empty" from "fetch failed"
+// — without this the JUDGE/VALIDATE empty-state mis-reports a transient
+// dev-server restart as "no run yet". See [Workspace empty-state copy].
+type PilotsState = "loading" | "error" | PilotIterListing[];
+
 interface PilotIterDetail {
   patient_status: Array<{ patient_id: string; oracle_done: boolean; agent_done: boolean }>;
 }
@@ -85,7 +91,7 @@ export function Workspace({
   onTabChange,
 }: WorkspaceProps) {
   const [maturity, setMaturity] = useState<MaturityState>("draft");
-  const [pilots, setPilots] = useState<PilotIterListing[]>([]);
+  const [pilots, setPilots] = useState<PilotsState>("loading");
   const [iterDetail, setIterDetail] = useState<PilotIterDetail | null>(null);
   const [revisitsTotal, setRevisitsTotal] = useState(0);
   const [deployedCohortExists, setDeployedCohortExists] = useState(false);
@@ -173,18 +179,21 @@ export function Workspace({
   // ── Data fetching ─────────────────────────────────────────────────────────
 
   const refresh = useCallback(async () => {
-    const [mat, pilotList] = await Promise.all([
+    const [mat, pilotsResult] = await Promise.all([
       authFetch(`/api/guidelines/${encodeURIComponent(taskId)}/maturity`)
         .then((r) => (r.ok ? r.json() : null))
         .catch(() => null),
       authFetch(`/api/pilots/${encodeURIComponent(taskId)}`)
-        .then((r) => (r.ok ? r.json() : []))
-        .catch(() => [] as PilotIterListing[]),
+        .then(async (r): Promise<PilotsState> =>
+          r.ok ? ((await r.json()) as PilotIterListing[]) : "error",
+        )
+        .catch((): PilotsState => "error"),
     ]);
     setMaturity((mat?.state as MaturityState) ?? "draft");
-    setPilots(pilotList ?? []);
+    setPilots(pilotsResult);
 
-    const activeIter = pickActiveIter(pilotList ?? []);
+    const pilotList = Array.isArray(pilotsResult) ? pilotsResult : [];
+    const activeIter = pickActiveIter(pilotList);
     if (!activeIter) {
       setIterDetail(null);
       setRevisitsTotal(0);
@@ -219,7 +228,10 @@ export function Workspace({
 
   // ── Phase derivation ──────────────────────────────────────────────────────
 
-  const activeIter = useMemo(() => pickActiveIter(pilots), [pilots]);
+  const activeIter = useMemo(
+    () => (Array.isArray(pilots) ? pickActiveIter(pilots) : null),
+    [pilots],
+  );
 
   const cells = useMemo((): CellCounts => {
     const patientCount = iterDetail?.patient_status.length ?? 0;
@@ -354,9 +366,7 @@ export function Workspace({
           />
         )}
         {activePhase === "JUDGE" && !activeIter && (
-          <div className="text-[13px] text-muted-foreground">
-            No active iteration to judge. Start an agent run in the TRY phase first.
-          </div>
+          <PilotsEmptyState pilots={pilots} verb="judge" onRetry={refresh} />
         )}
         {activePhase === "VALIDATE" && activeIter && (
           <PhaseValidate
@@ -366,9 +376,7 @@ export function Workspace({
           />
         )}
         {activePhase === "VALIDATE" && !activeIter && (
-          <div className="text-[13px] text-muted-foreground">
-            No active iteration to validate. Start an agent run in the TRY phase first.
-          </div>
+          <PilotsEmptyState pilots={pilots} verb="validate" onRetry={refresh} />
         )}
         {activePhase === "DECIDE" && (
           <PhaseDecide
@@ -446,4 +454,31 @@ function pickActiveIter(pilots: PilotIterListing[]): PilotIterListing | null {
   const candidates = pilots.filter((p) => p.state !== "abandoned");
   if (candidates.length === 0) return null;
   return [...candidates].sort((a, b) => b.iter_num - a.iter_num)[0];
+}
+
+function PilotsEmptyState({
+  pilots, verb, onRetry,
+}: {
+  pilots: PilotsState;
+  verb: "judge" | "validate";
+  onRetry: () => void;
+}) {
+  if (pilots === "loading") {
+    return <div className="text-[13px] text-muted-foreground">Loading…</div>;
+  }
+  if (pilots === "error") {
+    return (
+      <div className="space-y-2">
+        <div className="text-[13px] text-[hsl(var(--oxblood))]">
+          Couldn't load pilots list. The dev server may have just restarted.
+        </div>
+        <Button size="sm" variant="outline" onClick={onRetry}>Retry</Button>
+      </div>
+    );
+  }
+  return (
+    <div className="text-[13px] text-muted-foreground">
+      No active iteration to {verb}. Start an agent run in the TRY phase first.
+    </div>
+  );
 }

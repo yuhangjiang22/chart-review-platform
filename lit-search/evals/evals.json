@@ -1,0 +1,23 @@
+{
+  "skill_name": "lit-search",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "/lit-search I need to find recent papers (last 5 years) on using large language models for clinical trial eligibility criteria matching. I'm working in the Ultraman project folder at 01 BUILDING-BLOCKS/Ultraman/",
+      "expected_output": "Phase-gated interview: confirms project folder, asks about PICOS/rigor tier, generates PubMed/arXiv keyword queries, conducts dual-LLM screening, produces provenance file at 01 BUILDING-BLOCKS/Ultraman/lit-search/",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "/lit-search rapid scan: what's the state of evidence on GLP-1 receptor agonists and cardiovascular outcomes? Just a quick overview, 2023-2026, PubMed and Europe PMC only.",
+      "expected_output": "Rapid tier, 2 sources, auto-accepted keywords, internal-only screening, core extraction fields only, quick synthesis",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "/lit-search I need a comprehensive systematic review search on telehealth interventions for chronic pain management. Full PRISMA. I have the external LLM configured in config.json.",
+      "expected_output": "Full PRISMA tier, 5+ sources, iterative keyword refinement, dual-LLM screening with full reconciliation and Cohen's kappa, full extraction form including RoB tool, complete provenance file",
+      "files": []
+    }
+  ]
+}
