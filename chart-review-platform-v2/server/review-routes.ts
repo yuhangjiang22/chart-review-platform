@@ -32,6 +32,10 @@
 // still see their own changes (REST returns the new state) but other
 // connected clients don't get a push.
 
+import fs from "node:fs";
+import path from "node:path";
+import { createHash } from "node:crypto";
+import { readNote } from "@chart-review/patients";
 import type { RouteEntry } from "./router.js";
 import type { SSEStream } from "./core-routes.js";
 import { isMethodologist, readReviewerFromRequest } from "./auth.js";
@@ -42,8 +46,11 @@ import {
 } from "./lib/domain/review/index.js";
 import {
   appendAuditEntry, listAuditSessions, readAuditEntries, readFieldHistory,
+  readUnitHistory,
 } from "./lib/audit-trail.js";
 import { loadCompiledTask } from "./lib/tasks.js";
+import { pathFor } from "@chart-review/storage";
+import { writeJsonAtomic } from "@chart-review/fs-atomic";
 import { getMaturity } from "./lib/maturity.js";
 import {
   suggestOverrideReason, suggestOverrideReasonStream,
@@ -340,6 +347,22 @@ export const reviewRoutes: RouteEntry[] = [
     },
   },
 
+  // NER sibling to field-history. Same audit store, filters by
+  // payload_span_id (unit_kind="span") instead of payload_field_id.
+  // The audit-trail readUnitHistory function handles both shapes; here
+  // we call it with unitKind="span" so only span events come back.
+  {
+    method: "GET", pattern: "/api/reviews/:patientId/:taskId/span-history/:spanId",
+    handler: async (_b, _r, p) => {
+      try {
+        const entries = readUnitHistory(p.patientId, p.taskId, p.spanId, "span");
+        return { span_id: p.spanId, entries };
+      } catch (e) {
+        throw httpErr(400, { error: (e as Error).message });
+      }
+    },
+  },
+
   {
     method: "GET", pattern: "/api/reviews/:patientId/:taskId/audit/:sessionId",
     handler: async (_b, _r, p) => {
@@ -381,6 +404,266 @@ export const reviewRoutes: RouteEntry[] = [
         throw httpErr(400, { error: "note_id and snippet must be strings" });
       }
       return findQuoteOffsetsImpl(p.patientId, note_id, snippet);
+    },
+  },
+
+  // ── Cluster D — NER span mutations (Phase 1.8) ──────────────────────
+  // PATCH /api/reviews/:patientId/:taskId/spans/:spanId
+  //   body: { status?, concept_name?, override_reason? }
+  // Reviewer-facing mutation for spans. Only applicable when the task's
+  // task_kind is "ner". The MCP set_span_status tool is for agents; this
+  // route is the HTTP entrypoint used by the SpanReview UI.
+  {
+    method: "PATCH", pattern: "/api/reviews/:patientId/:taskId/spans/:spanId",
+    handler: async (body, req, p) => {
+      const task = loadCompiledTask(p.taskId);
+      if (!task) throw httpErr(404, { error: "task not found" });
+      if (task.task_kind !== "ner") {
+        throw httpErr(400, { error: `task ${p.taskId} is not an NER task` });
+      }
+      const { status, concept_name, override_reason } = (body ?? {}) as {
+        status?: "mapped" | "novel_candidate" | "rejected";
+        concept_name?: string;
+        override_reason?: string;
+      };
+      if (status === undefined && concept_name === undefined) {
+        throw httpErr(400, { error: "at least one of status, concept_name required" });
+      }
+      const reviewerId = readReviewerFromRequest(req) ?? "anonymous-reviewer";
+      const state = loadOrCreateReviewState(p.patientId, task);
+      const spans = state.span_labels ?? [];
+      const idx = spans.findIndex((s) => s.span_id === p.spanId);
+      if (idx < 0) throw httpErr(404, { error: `span_id ${p.spanId} not found` });
+      const before = { ...spans[idx]! };
+      if (concept_name !== undefined) spans[idx]!.concept_name = concept_name;
+      // Status is derived from concept_name presence — non-empty maps to
+      // "mapped", empty maps to "novel_candidate". An explicit status in
+      // the body still wins so agent tools / programmatic callers can
+      // override (e.g. set "rejected"), but reviewer concept-name edits
+      // alone keep status in sync.
+      if (status !== undefined) {
+        spans[idx]!.status = status;
+      } else if (concept_name !== undefined) {
+        spans[idx]!.status = concept_name.trim() ? "mapped" : "novel_candidate";
+      }
+      if (override_reason !== undefined) spans[idx]!.override_reason = override_reason;
+      state.span_labels = spans;
+      state.version = (state.version ?? 0) + 1;
+      state.updated_at = new Date().toISOString();
+      state.updated_by = "reviewer";
+      const fp = pathFor.reviewState(p.patientId, p.taskId);
+      fs.mkdirSync(path.dirname(fp), { recursive: true });
+      writeJsonAtomic(fp, state);
+      appendAuditEntry(
+        { patientId: p.patientId, taskId: p.taskId, sessionId: `reviewer__${reviewerId}` },
+        {
+          ts: new Date().toISOString(),
+          session_id: `reviewer__${reviewerId}`,
+          step_type: "ui_action",
+          action_type: "patch_span",
+          source: "reviewer",
+          payload_summary: [
+            status !== undefined ? `status=${before.status ?? "(none)"}→${status}` : null,
+            concept_name !== undefined ? `concept=${before.concept_name}→${concept_name}` : null,
+          ].filter(Boolean).join(" "),
+          payload_span_id: p.spanId,
+        },
+      );
+      return { ok: true, span: spans[idx], version: state.version };
+    },
+  },
+
+  // DELETE /api/reviews/:patientId/:taskId/spans/:spanId — remove a span
+  // entirely. The reviewer-facing "reject" affordance: the UI uses this
+  // when the reviewer decides the span is not just wrong-status but
+  // shouldn't exist at all (e.g. agent over-extraction). Idempotent —
+  // returns 404 if the span is not present.
+  {
+    method: "DELETE", pattern: "/api/reviews/:patientId/:taskId/spans/:spanId",
+    handler: async (_b, req, p) => {
+      const task = loadCompiledTask(p.taskId);
+      if (!task) throw httpErr(404, { error: "task not found" });
+      if (task.task_kind !== "ner") {
+        throw httpErr(400, { error: `task ${p.taskId} is not an NER task` });
+      }
+      const reviewerId = readReviewerFromRequest(req) ?? "anonymous-reviewer";
+      const state = loadOrCreateReviewState(p.patientId, task);
+      const spans = state.span_labels ?? [];
+      const idx = spans.findIndex((s) => s.span_id === p.spanId);
+      if (idx < 0) throw httpErr(404, { error: `span_id ${p.spanId} not found` });
+      const removed = spans[idx]!;
+      spans.splice(idx, 1);
+      state.span_labels = spans;
+      state.version = (state.version ?? 0) + 1;
+      state.updated_at = new Date().toISOString();
+      state.updated_by = "reviewer";
+      const fp = pathFor.reviewState(p.patientId, p.taskId);
+      fs.mkdirSync(path.dirname(fp), { recursive: true });
+      writeJsonAtomic(fp, state);
+      appendAuditEntry(
+        { patientId: p.patientId, taskId: p.taskId, sessionId: `reviewer__${reviewerId}` },
+        {
+          ts: new Date().toISOString(),
+          session_id: `reviewer__${reviewerId}`,
+          step_type: "ui_action",
+          action_type: "delete_span",
+          source: "reviewer",
+          payload_summary: `entity_type=${removed.entity_type} text=${JSON.stringify(removed.text).slice(0, 60)}`,
+          payload_span_id: p.spanId,
+        },
+      );
+      return { ok: true, version: state.version };
+    },
+  },
+
+  // POST /api/reviews/:patientId/:taskId/spans — click-and-drag span
+  // creation from SpanReview. Body shape mirrors the NerSpan minus
+  // span_id (server computes a stable hash). Faithfulness-gated:
+  // refuses writes where source[start:end] !== text.
+  {
+    method: "POST", pattern: "/api/reviews/:patientId/:taskId/spans",
+    handler: async (body, req, p) => {
+      const task = loadCompiledTask(p.taskId);
+      if (!task) throw httpErr(404, { error: "task not found" });
+      if (task.task_kind !== "ner") {
+        throw httpErr(400, { error: `task ${p.taskId} is not an NER task` });
+      }
+      const b = (body ?? {}) as {
+        note_id?: string;
+        text?: string;
+        anchor?: string;
+        start?: number;
+        end?: number;
+        entity_type?: string;
+        concept_name?: string;
+        status?: "mapped" | "novel_candidate" | "rejected";
+      };
+      if (!b.note_id || typeof b.note_id !== "string") {
+        throw httpErr(400, { error: "note_id required" });
+      }
+      if (typeof b.text !== "string" || b.text.length === 0) {
+        throw httpErr(400, { error: "text required" });
+      }
+      if (typeof b.start !== "number" || typeof b.end !== "number" || b.start < 0 || b.end <= b.start) {
+        throw httpErr(400, { error: "valid start/end offsets required" });
+      }
+      if (typeof b.entity_type !== "string" || !b.entity_type) {
+        throw httpErr(400, { error: "entity_type required" });
+      }
+      // Faithfulness check: source[start:end] must equal text.
+      const noteFilename = b.note_id.endsWith(".txt") ? b.note_id : `${b.note_id}.txt`;
+      let source: string;
+      try {
+        source = readNote(p.patientId, noteFilename);
+      } catch (e) {
+        throw httpErr(404, { error: `note ${b.note_id}: ${(e as Error).message}` });
+      }
+      if (b.end > source.length) {
+        throw httpErr(400, { error: `end=${b.end} exceeds note length ${source.length}` });
+      }
+      const observed = source.slice(b.start, b.end);
+      if (observed !== b.text) {
+        throw httpErr(400, {
+          error: `faithfulness_violation: source[${b.start}:${b.end}]=${JSON.stringify(observed)} != text=${JSON.stringify(b.text)}`,
+        });
+      }
+      // Compute span_id (matches the MCP write path's hash).
+      const noteId = b.note_id.replace(/\.txt$/, "");
+      const hash = createHash("sha256");
+      hash.update(`${noteId}|${b.start}|${b.end}|${b.entity_type}`);
+      const spanId = hash.digest("hex").slice(0, 16);
+
+      const reviewerId = readReviewerFromRequest(req) ?? "anonymous-reviewer";
+      const state = loadOrCreateReviewState(p.patientId, task);
+      const spans = state.span_labels ?? [];
+      const existing = spans.findIndex((s) => s.span_id === spanId);
+      const prevProposers = existing >= 0 ? (spans[existing]!.proposed_by ?? []) : [];
+      const nextProposers = prevProposers.includes("reviewer")
+        ? prevProposers
+        : [...prevProposers, "reviewer"];
+      const span: import("@chart-review/platform-types").SpanLabel = {
+        span_id: spanId,
+        note_id: noteId,
+        text: b.text,
+        anchor: b.anchor ?? b.text,
+        start: b.start,
+        end: b.end,
+        entity_type: b.entity_type,
+        concept_name: b.concept_name ?? "",
+        status: b.status ?? (b.concept_name ? "mapped" : "novel_candidate"),
+        proposed_by: nextProposers,
+      };
+      if (existing >= 0) spans[existing] = span;
+      else spans.push(span);
+      state.span_labels = spans;
+      state.version = (state.version ?? 0) + 1;
+      state.updated_at = new Date().toISOString();
+      state.updated_by = "reviewer";
+      const fp = pathFor.reviewState(p.patientId, p.taskId);
+      fs.mkdirSync(path.dirname(fp), { recursive: true });
+      writeJsonAtomic(fp, state);
+      appendAuditEntry(
+        { patientId: p.patientId, taskId: p.taskId, sessionId: `reviewer__${reviewerId}` },
+        {
+          ts: new Date().toISOString(),
+          session_id: `reviewer__${reviewerId}`,
+          step_type: "ui_action",
+          action_type: existing >= 0 ? "update_span" : "create_span",
+          source: "reviewer",
+          payload_summary: `entity_type=${b.entity_type} concept=${b.concept_name ?? "(novel)"} text=${JSON.stringify(b.text).slice(0, 60)}`,
+          payload_span_id: spanId,
+        },
+      );
+      return { ok: true, span, version: state.version, created: existing < 0 };
+    },
+  },
+
+  // POST /api/reviews/:patientId/:taskId/notes/:noteId/validation
+  //   body: { validated: boolean }
+  // Note-level validation toggle for NER tasks. Maintains a
+  // `validated_notes: string[]` list on the review_state — defaults to
+  // empty (nothing validated). Per-note validation is the unit of
+  // progress the reviewer manipulates; patient-level rollup is
+  // derived (every-note-validated → patient is done).
+  {
+    method: "POST", pattern: "/api/reviews/:patientId/:taskId/notes/:noteId/validation",
+    handler: async (body, req, p) => {
+      const task = loadCompiledTask(p.taskId);
+      if (!task) throw httpErr(404, { error: "task not found" });
+      if (task.task_kind !== "ner") {
+        throw httpErr(400, { error: `task ${p.taskId} is not an NER task` });
+      }
+      const { validated } = (body ?? {}) as { validated?: boolean };
+      if (typeof validated !== "boolean") {
+        throw httpErr(400, { error: "validated:boolean required" });
+      }
+      const reviewerId = readReviewerFromRequest(req) ?? "anonymous-reviewer";
+      const state = loadOrCreateReviewState(p.patientId, task);
+      if (state.review_status === "locked") {
+        throw httpErr(409, { error: "patient is locked; validation cannot be changed" });
+      }
+      const noteId = p.noteId.replace(/\.txt$/, "");
+      const set = new Set(state.validated_notes ?? []);
+      if (validated) set.add(noteId); else set.delete(noteId);
+      state.validated_notes = [...set].sort();
+      state.version = (state.version ?? 0) + 1;
+      state.updated_at = new Date().toISOString();
+      state.updated_by = "reviewer";
+      const fp = pathFor.reviewState(p.patientId, p.taskId);
+      fs.mkdirSync(path.dirname(fp), { recursive: true });
+      writeJsonAtomic(fp, state);
+      appendAuditEntry(
+        { patientId: p.patientId, taskId: p.taskId, sessionId: `reviewer__${reviewerId}` },
+        {
+          ts: new Date().toISOString(),
+          session_id: `reviewer__${reviewerId}`,
+          step_type: "ui_action",
+          action_type: validated ? "mark_note_validated" : "mark_note_unvalidated",
+          source: "reviewer",
+          payload_summary: `note_id=${noteId}`,
+        },
+      );
+      return { ok: true, validated_notes: state.validated_notes, version: state.version };
     },
   },
 ];

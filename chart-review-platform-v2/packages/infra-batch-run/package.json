@@ -17,6 +17,7 @@
     "@chart-review/domain-review": "*",
     "@chart-review/lock": "*",
     "@chart-review/mcp-server-anthropic": "*",
+    "@chart-review/mcp-server-ner-anthropic": "*",
     "@chart-review/model-config": "*",
     "@chart-review/patients": "*",
     "@chart-review/rubric": "*",

@@ -85,6 +85,39 @@ export const pathFor = {
   pilotManifest(phenotypeSkillRoot: string, iterId: string): string {
     return path.join(phenotypeSkillRoot, "pilots", iterId, "manifest.json");
   },
+
+  /** `<root>/var/ontologies/<ontology_id>/<version>/concepts.json` —
+   *  immutable snapshot of an ontology version, pinned by an NER task
+   *  via `ontology_pin: "<id>@<version>"`. Lock-self-contained: read by
+   *  the NER MCP server's `normalize_to_ontology` / `get_concept_tree`
+   *  tools so a locked task always sees the exact concept tree it was
+   *  validated against. */
+  ontologySnapshot(ontologyId: string, version: string): string {
+    return path.join(
+      PLATFORM_ROOT,
+      "var",
+      "ontologies",
+      ontologyId,
+      version,
+      "concepts.json",
+    );
+  },
+
+  /** `<root>/var/ner-corpus/<task_id>/<patient>/<note_id>.txt` —
+   *  byte-stable source-text snapshot for an NER review. `locate_in_source`
+   *  reads this to resolve authoritative span offsets at write time;
+   *  re-reads at validate time go through the same file so reviewer and
+   *  agent agree on what byte 38 was. */
+  nerCorpus(taskId: string, patientId: string, noteId: string): string {
+    return path.join(
+      PLATFORM_ROOT,
+      "var",
+      "ner-corpus",
+      taskId,
+      patientId,
+      `${noteId}.txt`,
+    );
+  },
 };
 
 // ── core I/O primitives ──────────────────────────────────────────────

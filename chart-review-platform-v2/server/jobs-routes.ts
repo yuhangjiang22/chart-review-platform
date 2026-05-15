@@ -30,9 +30,15 @@ import {
   getRunManifest,
 } from "./lib/infra/batch-run/index.js";
 
+// Path resolution — uses the canonical PLATFORM_ROOT from
+// @chart-review/patients (v2's directory), not this file's old default
+// that walked up to v1. Without this, the import route looks for run
+// directories at v1's path even though startBatchRun wrote them under
+// v2.
+import { PLATFORM_ROOT as V2_PLATFORM_ROOT } from "@chart-review/patients";
+
 function platformRoot(): string {
-  return process.env.CHART_REVIEW_PLATFORM_ROOT
-    ?? path.resolve(process.cwd(), "..", "chart-review-platform");
+  return process.env.CHART_REVIEW_PLATFORM_ROOT ?? V2_PLATFORM_ROOT;
 }
 function reviewsRoot(): string {
   return process.env.CHART_REVIEW_REVIEWS_ROOT ?? path.join(platformRoot(), "var", "reviews");
@@ -138,8 +144,23 @@ export const jobsRoutes: RouteEntry[] = [
   },
 
   // ── /api/runs/:runId/patients/:patientId/import ─────────────────────
-  // Refuses to overwrite an existing review_state unless force:true.
-  // Vendored from server.ts so v2 can ingest agent drafts without v1.
+  // Copies the agent draft (phenotype field_assessments OR NER span_labels)
+  // into reviews/<patient>/<task>/review_state.json so the reviewer has
+  // something to validate against. Refuses to overwrite an existing
+  // review_state unless force:true.
+  //
+  // Three on-disk shapes:
+  //   1. per_patient/<pid>/agent_draft.json — legacy single-agent
+  //      (phenotype). Imported verbatim.
+  //   2. per_patient/<pid>/agents/agent_1.json — multi-agent path,
+  //      single agent. Imported verbatim.
+  //   3. per_patient/<pid>/agents/agent_1.json + agent_2.json + … —
+  //      multi-agent run with N>1 agents (NER). Span lists are MERGED
+  //      with per-span provenance: a span proposed by both agents is
+  //      deduped by span_id and carries `proposed_by: [agent_1, agent_2]`.
+  //      Phenotype field_assessments take the first agent's draft
+  //      verbatim (multi-agent merging on field_assessments lives in
+  //      pilot routes, not here).
   {
     method: "POST", pattern: "/api/runs/:runId/patients/:patientId/import",
     handler: async (body, _req, p) => {
@@ -147,8 +168,22 @@ export const jobsRoutes: RouteEntry[] = [
       const manifest = getRunManifest(p.runId);
       if (!manifest) throw httpErr(404, "run not found");
 
-      const draftPath = path.join(runsRoot(), p.runId, "per_patient", p.patientId, "agent_draft.json");
-      if (!fs.existsSync(draftPath)) {
+      const legacyDraft = path.join(runsRoot(), p.runId, "per_patient", p.patientId, "agent_draft.json");
+      const agentsDir = path.join(runsRoot(), p.runId, "per_patient", p.patientId, "agents");
+      // Enumerate agent drafts. Sort so agent_1 wins ties (matches the
+      // legacy "first agent's draft" semantics for phenotype).
+      const agentDrafts: { id: string; path: string }[] = [];
+      if (fs.existsSync(agentsDir)) {
+        for (const f of fs.readdirSync(agentsDir).sort()) {
+          if (f.endsWith(".json")) {
+            agentDrafts.push({ id: f.replace(/\.json$/, ""), path: path.join(agentsDir, f) });
+          }
+        }
+      }
+      // Resolve drafts to read. Legacy single-file path is the fallback.
+      const hasMultiAgent = agentDrafts.length > 0;
+      const legacyExists = fs.existsSync(legacyDraft);
+      if (!hasMultiAgent && !legacyExists) {
         throw httpErr(404, "draft not found for this patient in this run");
       }
 
@@ -160,17 +195,73 @@ export const jobsRoutes: RouteEntry[] = [
         throw err;
       }
 
-      const draft = JSON.parse(fs.readFileSync(draftPath, "utf8"));
+      type AnyDraft = {
+        field_assessments?: unknown[];
+        span_labels?: Array<{ span_id?: string; [k: string]: unknown }>;
+        task_kind?: string;
+      };
+
+      // Phenotype field_assessments: use the first agent's draft (or
+      // legacy single-file). NER span_labels: merge all agent drafts by
+      // span_id with per-span proposed_by[] provenance.
+      let fieldAssessments: unknown[] = [];
+      const mergedSpans = new Map<string, Record<string, unknown> & { proposed_by: string[] }>();
+      const sources: string[] = [];
+
+      const ingest = (id: string, draft: AnyDraft) => {
+        if (Array.isArray(draft.field_assessments) && fieldAssessments.length === 0) {
+          fieldAssessments = draft.field_assessments;
+        }
+        if (Array.isArray(draft.span_labels)) {
+          for (const s of draft.span_labels) {
+            const sid = String(s.span_id ?? "");
+            if (!sid) continue;
+            const existing = mergedSpans.get(sid);
+            if (existing) {
+              if (!existing.proposed_by.includes(id)) existing.proposed_by.push(id);
+            } else {
+              mergedSpans.set(sid, { ...s, proposed_by: [id] });
+            }
+          }
+        }
+      };
+
+      if (hasMultiAgent) {
+        for (const a of agentDrafts) {
+          try {
+            ingest(a.id, JSON.parse(fs.readFileSync(a.path, "utf8")) as AnyDraft);
+            sources.push(a.path);
+          } catch { /* skip malformed */ }
+        }
+      } else {
+        try {
+          ingest("agent", JSON.parse(fs.readFileSync(legacyDraft, "utf8")) as AnyDraft);
+          sources.push(legacyDraft);
+        } catch { /* skip malformed */ }
+      }
+
       fs.mkdirSync(path.dirname(reviewStatePath), { recursive: true });
-      fs.writeFileSync(reviewStatePath, JSON.stringify({
+      const reviewState: Record<string, unknown> = {
         patient_id: p.patientId,
         task_id: taskId,
         review_status: "agent_drafted",
-        field_assessments: draft.field_assessments ?? [],
+        field_assessments: fieldAssessments,
         imported_from_run: p.runId,
         imported_at: new Date().toISOString(),
-      }, null, 2));
-      return { ok: true, imported_to: reviewStatePath };
+        imported_agents: hasMultiAgent ? agentDrafts.map((a) => a.id) : ["agent"],
+      };
+      if (mergedSpans.size > 0) {
+        reviewState.span_labels = [...mergedSpans.values()];
+        reviewState.task_kind = "ner";
+      }
+      fs.writeFileSync(reviewStatePath, JSON.stringify(reviewState, null, 2));
+      return {
+        ok: true,
+        imported_to: reviewStatePath,
+        sources,
+        agents: hasMultiAgent ? agentDrafts.map((a) => a.id) : ["agent"],
+        span_count: mergedSpans.size,
+      };
     },
   },
 ];

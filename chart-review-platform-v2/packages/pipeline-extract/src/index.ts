@@ -17,4 +17,16 @@ export { verifyEvidenceFaithfulness } from "./faithfulness.js";
 // makeV1AgentExtract wraps v1's runAgent (Claude/Codex swappable,
 // MCP-backed, faithfulness gated at the MCP boundary). It is the
 // only extractor — v2 always uses real LLM runs.
-export { makeV1AgentExtract } from "./v1-agent-extract.js";
+//
+// The `profile` option is the task-kind hook: phenotype uses the default
+// profile (existing behavior), NER passes its own profile that supplies the
+// NER MCP server, prompt, and span-shaped scratch reader.
+export {
+  makeV1AgentExtract,
+  defaultPhenotypeProfile,
+} from "./v1-agent-extract.js";
+export type {
+  V1AgentExtractOptions,
+  ExtractorProfile,
+  ExtractorProfileContext,
+} from "./v1-agent-extract.js";

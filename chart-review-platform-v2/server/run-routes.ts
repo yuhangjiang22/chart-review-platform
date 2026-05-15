@@ -29,6 +29,7 @@ import {
 } from "./lib/infra/batch-run/index.js";
 import { isProviderName } from "./lib/agent-provider.js";
 import { maybeAutoAdvancePilotOnRunStatus } from "./lib/domain/iter/index.js";
+import { loadCompiledTask } from "@chart-review/tasks";
 
 function httpErr(status: number, message: string): Error & { status: number } {
   const err = new Error(message) as Error & { status: number };
@@ -84,6 +85,11 @@ export const runRoutes: RouteEntry[] = [
       if (provider !== undefined && !isProviderName(provider)) {
         throw httpErr(400, `unknown provider: ${provider}`);
       }
+      // task_kind dispatch lives inside startBatchRun (runOneAgent
+      // branches on task.task_kind). Routes just hand off; no early
+      // gate here. We keep the import for the type but no longer need
+      // an explicit load.
+      void loadCompiledTask; // marker: dispatch happens downstream
       try {
         return startBatchRun({
           task_id, patient_ids,

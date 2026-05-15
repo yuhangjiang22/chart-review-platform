@@ -71,6 +71,27 @@ env_vars = [
   "PATH",
 ]
 
+# NER MCP server — chart_review_ner. Active when the agent runs an
+# NER-kind task. Same transport pattern as chart_review_state; the
+# Codex provider forwards CHART_REVIEW_NER_* env vars into Codex's
+# spawn context so this subprocess gets the per-(patient, task,
+# session) context.
+[mcp_servers.chart_review_ner]
+command = "bash"
+args = [
+  "-lc",
+  "exec npx tsx \"${CHART_REVIEW_PLATFORM_ROOT}/packages/mcp-server-ner-stdio/src/index.ts\"",
+]
+env_vars = [
+  "CHART_REVIEW_NER_PATIENT_ID",
+  "CHART_REVIEW_NER_TASK_ID",
+  "CHART_REVIEW_NER_SESSION_ID",
+  "CHART_REVIEW_NER_ONTOLOGY_PATH",
+  "CHART_REVIEW_REVIEWS_ROOT",
+  "CHART_REVIEW_PLATFORM_ROOT",
+  "PATH",
+]
+
 # Project trust is what codex calls workspace allowlist. The path
 # below is computed at runtime by CodexAgentProvider — checked-in
 # values here are placeholders so codex stops nagging on first run

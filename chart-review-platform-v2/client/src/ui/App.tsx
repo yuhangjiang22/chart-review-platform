@@ -11,6 +11,7 @@ import { useAgentSocket } from "../useAgentSocket";
 import { AppShell } from "./AppShell";
 import { QueueView } from "./QueueView";
 import { PatientReview } from "./PatientReview";
+import { SpanReview } from "./SpanReview";
 import { CommandPalette, type PaletteAction } from "./CommandPalette";
 import { Studio } from "./Studio";
 import { Workspace } from "./Workspace";
@@ -176,6 +177,11 @@ export function App() {
     const reviewState = sock.reviewState;
     if (!reviewState) return;
     if ((reviewState.field_assessments?.length ?? 0) > 0) return;
+    // NER tasks carry their work in span_labels, not field_assessments —
+    // without this guard the effect would fire force:true import every
+    // refresh on an NER patient, overwriting any spans the reviewer just
+    // created.
+    if ((reviewState.span_labels?.length ?? 0) > 0) return;
     let cancelled = false;
     const patientId = activePatient.patient_id;
     const taskId = task.task_id;
@@ -310,7 +316,19 @@ export function App() {
       )}
 
       {route.page === "patient" && task && route.patientId &&
-        (taskFields.length > 0 ? (
+        // task_kind dispatch — NER tasks render SpanReview (Phase 1.6),
+        // phenotype tasks render PatientReview (the criterion-row UI).
+        // The TaskSummary's task_type is the raw meta.yaml field;
+        // task_type === "ner" maps to task_kind="ner" (see
+        // packages/tasks/src/index.ts taskKindFromTaskType).
+        (task.task_type === "ner" ? (
+          <SpanReview
+            patientId={route.patientId}
+            patientDisplay={activePatient?.display_name ?? route.patientId}
+            taskId={task.task_id}
+            onBack={() => navigate(studioHash(task.task_id, lastStudioSubTabRef.current))}
+          />
+        ) : taskFields.length > 0 ? (
           // Patient pages use PatientReview — the lean ground-truth surface
           // (one card per criterion with inline accept/override). The dual-
           // agent comparison is for adjudication of pilot disagreements and

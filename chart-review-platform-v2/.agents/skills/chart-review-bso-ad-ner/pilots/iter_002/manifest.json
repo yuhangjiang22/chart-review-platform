@@ -1,0 +1,27 @@
+{
+  "task_id": "bso-ad-ner",
+  "iter_id": "iter_002",
+  "iter_num": 2,
+  "run_id": "2026-05-14T21-16-36-689Z",
+  "guideline_sha": "d66921efdbd87c54",
+  "started_at": "2026-05-14T21:16:36.690Z",
+  "started_by": "yj38",
+  "state": "ready_to_validate",
+  "notes": "Two-agent run: default + skeptical",
+  "agent_specs": [
+    {
+      "id": "agent_1",
+      "role_preset": "default",
+      "role_version": "v1"
+    },
+    {
+      "id": "agent_2",
+      "role_preset": "skeptical",
+      "role_version": "v1"
+    }
+  ],
+  "rerun_plan": {
+    "carried_criteria": [],
+    "rerun_criteria": []
+  }
+}

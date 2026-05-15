@@ -1,7 +1,11 @@
 .DS_Store
 
 # Local tool/runtime state
-.claude/settings.local.json
+.claude/
+
+# Upstream reference repo — vendored locally as a research mirror but
+# not part of this project's history.
+claude-agent-sdk-benchmark/
 
 # Python
 .venv/

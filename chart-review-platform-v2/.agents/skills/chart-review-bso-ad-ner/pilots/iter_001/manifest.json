@@ -1,0 +1,18 @@
+{
+  "task_id": "bso-ad-ner",
+  "iter_id": "iter_001",
+  "iter_num": 1,
+  "run_id": "2026-05-14T00-58-45-679Z",
+  "guideline_sha": "c8353a255b277e76",
+  "started_at": "2026-05-14T00:58:45.679Z",
+  "started_by": "yuhang",
+  "state": "abandoned",
+  "agent_specs": [
+    {
+      "id": "agent_1",
+      "role_preset": "default",
+      "role_version": "v1"
+    }
+  ],
+  "completed_at": "2026-05-14T20:45:11.352Z"
+}

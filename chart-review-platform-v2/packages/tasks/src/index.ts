@@ -3,6 +3,14 @@ import path from "path";
 import { guidelineDir, guidelinesRoot, loadSkillBundle, isSkillBundleAt } from "@chart-review/rubric";
 
 /**
+ * Top-level task kind discriminator. Used to dispatch phase routes, MCP
+ * server selection, review-state schema, and judge/calibrate/etc. across
+ * the two task families. Derived from meta.yaml's `task_type` field —
+ * see `taskKindFromTaskType` for the normalization rules.
+ */
+export type TaskKind = "phenotype" | "ner";
+
+/**
  * A field on a compiled task. Mirrors the contract in
  * ../../contracts/compiled_task.schema.json — only the keys we use here
  * are typed, the rest pass through.
@@ -24,6 +32,13 @@ export interface CompiledField {
 export interface CompiledTask {
   task_id: string;
   task_type?: string;
+  /**
+   * Derived discriminator. Set by `loadCompiledTask` / `listCompiledTasks`
+   * via `taskKindFromTaskType(task_type)`. Defaults to `"phenotype"` when
+   * `task_type` is absent or unrecognized — matches the implicit
+   * assumption that pre-NER code carried.
+   */
+  task_kind?: TaskKind;
   review_unit?: string;
   manual_version?: string;
   source_document_sha: string;
@@ -34,6 +49,23 @@ export interface CompiledTask {
   fields: CompiledField[];
 }
 
+/**
+ * Normalize the raw meta.yaml `task_type` string to the typed `TaskKind`
+ * discriminator. Existing meta.yaml files use `phenotype_validation`
+ * (most) or `outcome_adjudication` (a few label-prediction skills) —
+ * both are treated as the phenotype kind for now. NER tasks declare
+ * `task_type: ner`.
+ */
+export function taskKindFromTaskType(taskType: string | undefined): TaskKind {
+  if (taskType === "ner") return "ner";
+  return "phenotype";
+}
+
+function applyTaskKind<T extends { task_type?: string; task_kind?: TaskKind }>(t: T): T {
+  t.task_kind = taskKindFromTaskType(t.task_type);
+  return t;
+}
+
 /** Load a compiled task from .claude/skills/chart-review-<tid>/. All chart-review
  *  skills (drafts and locked) live at this canonical path; draft maturity is
  *  signaled by `status: draft` in meta.yaml. The legacy
@@ -42,7 +74,7 @@ export interface CompiledTask {
 export function loadCompiledTask(taskId: string): CompiledTask | null {
   if (!isSkillBundleAt(guidelineDir(taskId))) return null;
   try {
-    return loadSkillBundle(taskId) as unknown as CompiledTask;
+    return applyTaskKind(loadSkillBundle(taskId) as unknown as CompiledTask);
   } catch {
     return null;
   }
@@ -66,7 +98,7 @@ export function listCompiledTasks(): CompiledTask[] {
     if (!isSkillBundleAt(sub)) continue;
     const taskId = name.slice("chart-review-".length);
     try {
-      out.push(loadSkillBundle(taskId) as unknown as CompiledTask);
+      out.push(applyTaskKind(loadSkillBundle(taskId) as unknown as CompiledTask));
     } catch {
       /* skip malformed */
     }

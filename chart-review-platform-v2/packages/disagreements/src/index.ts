@@ -232,3 +232,99 @@ export function loadAgentDrafts(runDir: string, patientId: string): AgentDraft[]
   }
   return drafts;
 }
+
+// ── NER (span-shaped) disagreements ──────────────────────────────────
+//
+// Parallel surface for task_kind="ner". Where compareDrafts compares
+// cell-shaped FieldAssessments, compareSpanDrafts compares span lists.
+// The underlying math lives in @chart-review/eval-span-iaa; this layer
+// just iterates pairs, calls computeSpanIaa, and returns a summary
+// shaped for the judge / pilot routes to consume.
+
+import {
+  computeSpanIaa,
+  type SpanDisagreement,
+  type SpanIaaReport,
+} from "@chart-review/eval-span-iaa";
+import type { SpanLabel } from "@chart-review/platform-types";
+
+export type { SpanDisagreement } from "@chart-review/eval-span-iaa";
+
+export interface AgentSpanDraft {
+  agent_id: string;
+  patient_id: string;
+  span_labels: SpanLabel[];
+}
+
+export interface SpanDisagreementSummary {
+  task_kind: "ner";
+  patient_id: string;
+  pairs_compared: Array<{ agent_a: string; agent_b: string }>;
+  /** One row per pair × span. Carries the pair identity inline so
+   *  consumers can filter by pair without grouping. */
+  rows: Array<SpanDisagreement & { pair: { agent_a: string; agent_b: string } }>;
+  /** Per-pair aggregate IAA (F1 / κ) from computeSpanIaa. */
+  per_pair: Array<{
+    agent_a: string; agent_b: string;
+    macro_f1: number | undefined;
+    tuple_kappa: number | undefined;
+  }>;
+}
+
+export function compareSpanDrafts(drafts: AgentSpanDraft[]): SpanDisagreementSummary {
+  const patientId = drafts[0]?.patient_id ?? "";
+  const summary: SpanDisagreementSummary = {
+    task_kind: "ner",
+    patient_id: patientId,
+    pairs_compared: [],
+    rows: [],
+    per_pair: [],
+  };
+  if (drafts.length < 2) return summary;
+
+  for (let i = 0; i < drafts.length; i++) {
+    for (let j = i + 1; j < drafts.length; j++) {
+      const a = drafts[i]!;
+      const b = drafts[j]!;
+      const pair = { agent_a: a.agent_id, agent_b: b.agent_id };
+      const iaa: SpanIaaReport = computeSpanIaa(a.span_labels, b.span_labels);
+      summary.pairs_compared.push(pair);
+      summary.per_pair.push({
+        agent_a: a.agent_id, agent_b: b.agent_id,
+        macro_f1: iaa.macro_f1,
+        tuple_kappa: iaa.tuple_kappa,
+      });
+      // Only emit non-agree rows — judge + UI surface disagreements,
+      // not the (typically larger) set of full agreements.
+      for (const row of iaa.pairs) {
+        if (row.kind === "agree") continue;
+        summary.rows.push({ ...row, pair });
+      }
+    }
+  }
+  return summary;
+}
+
+/** Read NER agent drafts under runs/<run_id>/per_patient/<pid>/agents/.
+ *  Parallel to loadAgentDrafts; reads `span_labels` instead of
+ *  `field_assessments`. */
+export function loadAgentSpanDrafts(runDir: string, patientId: string): AgentSpanDraft[] {
+  const dir = path.join(runDir, "per_patient", patientId, "agents");
+  if (!fs.existsSync(dir)) return [];
+  const drafts: AgentSpanDraft[] = [];
+  for (const f of fs.readdirSync(dir)) {
+    if (!f.endsWith(".json")) continue;
+    const agentId = f.replace(/\.json$/, "");
+    try {
+      const raw = JSON.parse(fs.readFileSync(path.join(dir, f), "utf8")) as {
+        span_labels?: SpanLabel[];
+      };
+      drafts.push({
+        agent_id: agentId,
+        patient_id: patientId,
+        span_labels: Array.isArray(raw.span_labels) ? raw.span_labels : [],
+      });
+    } catch { /* skip malformed */ }
+  }
+  return drafts;
+}

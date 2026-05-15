@@ -85,6 +85,11 @@ export type AuditEntry =
       result_version?: number;
       added_evidence_id?: string;
       payload_field_id?: string;
+      /** Set by NER ui_action entries (e.g. `set_span_label`,
+       *  `set_span_status`). Stable hash of (note_id|start|end|entity_type)
+       *  computed by the MCP write tool. Audit-trail matchers accept it
+       *  as a unit identifier alongside payload_field_id. */
+      payload_span_id?: string;
       payload_answer?: unknown;
     })
   | (BaseEntry & {
@@ -215,15 +220,22 @@ export function readAuditEntries(c: AuditCoordinates): AuditEntry[] {
     .map((l) => JSON.parse(l) as AuditEntry);
 }
 
+/** Audit-trail unit-kind discriminator. `"field"` for phenotype tasks (the
+ *  unit_id is a field_id from the rubric); `"span"` for NER tasks (the
+ *  unit_id is a stable hash of `(note_id|start|end|entity_type)`). When
+ *  unitKind is omitted, both shapes are matched — preserves the
+ *  pre-existing duck-typed lookup behavior. */
+export type UnitKind = "field" | "span";
+
 /** #43 — per-record adjudication trail. Walks every audit session for the
- *  patient×task and returns entries scoped to a specific field, in
- *  chronological order. The CriterionPane renders this as "who-did-what" so
- *  the reviewer can see the field's history without opening the full audit
- *  view. */
-export function readFieldHistory(
+ *  patient×task and returns entries scoped to a specific unit (field for
+ *  phenotype, span for NER) in chronological order. Field-history and
+ *  span-history routes both call into this. */
+export function readUnitHistory(
   patientId: string,
   taskId: string,
-  fieldId: string,
+  unitId: string,
+  unitKind?: UnitKind,
 ): AuditEntry[] {
   const dir = path.join(reviewsRoot(), patientId, taskId, "chat");
   if (!fs.existsSync(dir)) return [];
@@ -238,7 +250,7 @@ export function readFieldHistory(
     for (const l of lines) {
       try {
         const e = JSON.parse(l) as AuditEntry;
-        if (matchesField(e, fieldId)) {
+        if (matchesUnit(e, unitId, unitKind)) {
           out.push({ ...e, session_id: e.session_id ?? sessionId });
         }
       } catch {
@@ -251,14 +263,35 @@ export function readFieldHistory(
   return out;
 }
 
-function matchesField(e: AuditEntry, fieldId: string): boolean {
-  // ui_action entries carry payload_field_id; accept_agent_draft + a few
-  // others carry field_id directly. Older record_validated / record_locked
-  // entries are global per-record so we don't include them.
-  const anyE = e as unknown as { payload_field_id?: string; field_id?: string; fields?: string[] };
-  if (anyE.payload_field_id === fieldId) return true;
-  if (anyE.field_id === fieldId) return true;
-  if (Array.isArray(anyE.fields) && anyE.fields.includes(fieldId)) return true;
+/** Backcompat alias retained because ~30+ call sites import this name.
+ *  New code should call `readUnitHistory` directly with an explicit
+ *  unitKind so spans don't accidentally match field ids and vice versa
+ *  in mixed-task review states. */
+export function readFieldHistory(
+  patientId: string,
+  taskId: string,
+  fieldId: string,
+): AuditEntry[] {
+  return readUnitHistory(patientId, taskId, fieldId, "field");
+}
+
+function matchesUnit(e: AuditEntry, unitId: string, unitKind?: UnitKind): boolean {
+  const anyE = e as unknown as {
+    payload_field_id?: string;
+    payload_span_id?: string;
+    field_id?: string;
+    fields?: string[];
+  };
+  // When kind is unspecified, accept any unit-id shape — matches the
+  // pre-rename duck-typed behavior.
+  if (unitKind === undefined || unitKind === "field") {
+    if (anyE.payload_field_id === unitId) return true;
+    if (anyE.field_id === unitId) return true;
+    if (Array.isArray(anyE.fields) && anyE.fields.includes(unitId)) return true;
+  }
+  if (unitKind === undefined || unitKind === "span") {
+    if (anyE.payload_span_id === unitId) return true;
+  }
   return false;
 }
 

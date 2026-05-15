@@ -14,6 +14,8 @@ import { PHASE_SLUG_TO_ID } from "./phases";
 import { PhaseHeadline } from "./PhaseHeadline";
 import { WorkspaceSettings } from "./WorkspaceSettings";
 import { PhaseDraft } from "./PhaseDraft";
+import { PhaseSpanAuthor } from "./PhaseSpanAuthor";
+import { taskKindUi } from "./task-kind-registry";
 import { PhaseTry } from "./PhaseTry";
 import { PhaseJudge } from "./PhaseJudge";
 import { PhaseValidate } from "./PhaseValidate";
@@ -46,6 +48,14 @@ type PilotsState = "loading" | "error" | PilotIterListing[];
 
 interface PilotIterDetail {
   patient_status: Array<{ patient_id: string; oracle_done: boolean; agent_done: boolean }>;
+}
+
+interface SpanStatsTotals {
+  total: number;
+  mapped: number;
+  novel: number;
+  rejected: number;
+  validated: number;
 }
 
 interface RevisitsResponse {
@@ -96,6 +106,10 @@ export function Workspace({
   const [revisitsTotal, setRevisitsTotal] = useState(0);
   const [deployedCohortExists, setDeployedCohortExists] = useState(false);
   const [showAllTools, setShowAllTools] = useState(false);
+  // NER span stats (Phase 4.4) — only fetched when task_kind=ner.
+  // For phenotype tasks this stays null and the cells useMemo computes
+  // from field_assessments × criterionCount as before.
+  const [spanStats, setSpanStats] = useState<SpanStatsTotals | null>(null);
 
   // Per-task enabled phases — fetched from /api/tasks/:taskId/phases.
   // null until the fetch resolves (PhasePillBar treats null as "all enabled").
@@ -226,6 +240,26 @@ export function Workspace({
       .catch(() => setDeployedCohortExists(false));
   }, [taskId]);
 
+  // NER span stats — fetched only when task_kind=ner and an active iter
+  // exists. Phenotype tasks leave `spanStats=null` so the cells useMemo
+  // falls back to its existing field_assessments × criterionCount math.
+  const isNerTask = task?.task_type === "ner";
+  const activeIterId = Array.isArray(pilots)
+    ? pickActiveIter(pilots)?.iter_id ?? null
+    : null;
+  useEffect(() => {
+    if (!isNerTask || !activeIterId) { setSpanStats(null); return; }
+    let cancelled = false;
+    authFetch(`/api/pilots/${encodeURIComponent(taskId)}/${encodeURIComponent(activeIterId)}/span-stats`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { totals?: SpanStatsTotals } | null) => {
+        if (cancelled || !d) return;
+        if (d.totals) setSpanStats(d.totals);
+      })
+      .catch(() => { if (!cancelled) setSpanStats(null); });
+    return () => { cancelled = true; };
+  }, [isNerTask, activeIterId, taskId]);
+
   // ── Phase derivation ──────────────────────────────────────────────────────
 
   const activeIter = useMemo(
@@ -235,6 +269,16 @@ export function Workspace({
 
   const cells = useMemo((): CellCounts => {
     const patientCount = iterDetail?.patient_status.length ?? 0;
+    // NER tasks use the span-stats totals; phenotype tasks use the
+    // historical field_assessments × criterionCount derivation.
+    if (isNerTask && spanStats) {
+      return {
+        validated: spanStats.validated,
+        total: Math.max(spanStats.total, spanStats.validated),
+        stale: revisitsTotal,
+        patient_count: patientCount,
+      };
+    }
     const total = patientCount * Math.max(criterionCount, 1);
     const validated = (iterDetail?.patient_status.filter((p) => p.oracle_done).length ?? 0) * Math.max(criterionCount, 1);
     return {
@@ -243,7 +287,7 @@ export function Workspace({
       stale: revisitsTotal,
       patient_count: patientCount,
     };
-  }, [iterDetail, criterionCount, revisitsTotal]);
+  }, [iterDetail, criterionCount, revisitsTotal, isNerTask, spanStats]);
 
   const phaseInfo = useMemo(
     () =>
@@ -319,7 +363,7 @@ export function Workspace({
 
       {/* Phase headline */}
       <div className="pt-3 pb-1">
-        <PhaseHeadline phaseInfo={{ ...phaseInfo, phase: activePhase }} versionTag={versionTag} />
+        <PhaseHeadline phaseInfo={{ ...phaseInfo, phase: activePhase }} versionTag={versionTag} taskKind={isNerTask ? "ner" : "phenotype"} />
       </div>
 
       {/* Legacy secondary nav — only when Show all tools is on */}
@@ -347,10 +391,17 @@ export function Workspace({
       {/* Active phase surface */}
       <main className="min-h-[400px] py-6">
         {activePhase === "AUTHOR" && (
-          <PhaseDraft
-            taskId={taskId}
-            onPreflightHasErrors={setPreflightHasErrors}
-          />
+          task?.task_type === "ner" ? (
+            <PhaseSpanAuthor
+              taskId={taskId}
+              canEdit={isMethodologist}
+            />
+          ) : (
+            <PhaseDraft
+              taskId={taskId}
+              onPreflightHasErrors={setPreflightHasErrors}
+            />
+          )
         )}
         {activePhase === "TRY" && (
           <PhaseTry
@@ -363,6 +414,8 @@ export function Workspace({
             taskId={taskId}
             iterId={activeIter.iter_id}
             onSkipToValidate={() => setPhase("VALIDATE")}
+            taskKind={task?.task_type === "ner" ? "ner" : "phenotype"}
+            onOpenSpan={(pid) => onOpenPatient?.(pid)}
           />
         )}
         {activePhase === "JUDGE" && !activeIter && (
@@ -373,6 +426,7 @@ export function Workspace({
             taskId={taskId}
             iterId={activeIter.iter_id}
             onOpenPatient={(pid) => onOpenPatient?.(pid)}
+            taskKind={task?.task_type === "ner" ? "ner" : "phenotype"}
           />
         )}
         {activePhase === "VALIDATE" && !activeIter && (
@@ -385,6 +439,7 @@ export function Workspace({
             cells={cells}
             patientIds={iterDetail?.patient_status.map((p) => p.patient_id) ?? []}
             canLock={cells.stale === 0 && cells.validated >= cells.total && cells.total > 0}
+            taskKind={isNerTask ? "ner" : "phenotype"}
             onRevise={() => {
               setPhase("AUTHOR");
               onEditGuideline?.(maturity);

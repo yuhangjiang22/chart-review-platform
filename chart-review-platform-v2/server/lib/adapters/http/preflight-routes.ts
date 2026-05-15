@@ -13,9 +13,14 @@ import fs from "fs";
 import path from "path";
 import { parse as parseYaml } from "yaml";
 import { draftPathForTask } from "../../builder-session.js";
+import { PLATFORM_ROOT } from "@chart-review/patients";
 
-// Required top-level keys in meta.yaml (per task-meta.schema.json)
-const REQUIRED_META_KEYS = [
+// Required top-level keys in meta.yaml (per task-meta.schema.json).
+// Phenotype tasks need temporal anchoring (index_anchor + time_windows)
+// because criteria evaluate against per-window evidence. NER tasks don't
+// have criteria, and the temporal anchoring is meaningless for span
+// extraction — so we use a smaller required set when task_type=ner.
+const REQUIRED_META_KEYS_PHENOTYPE = [
   "task_type",
   "review_unit",
   "manual_version",
@@ -23,6 +28,11 @@ const REQUIRED_META_KEYS = [
   "time_windows",
   "final_output",
   "overview_prose",
+] as const;
+const REQUIRED_META_KEYS_NER = [
+  "task_type",
+  "manual_version",
+  "source_document_sha",
 ] as const;
 
 const TODO_RE = /^\s*#\s*TODO/im;
@@ -73,8 +83,12 @@ export function runPreflight(taskId: string): PreflightResult {
       });
     }
 
-    // Check required keys
-    for (const key of REQUIRED_META_KEYS) {
+    // Check required keys — picked by task kind so NER tasks aren't
+    // dinged for missing phenotype-specific keys (index_anchor, etc.).
+    const requiredKeys = meta.task_type === "ner"
+      ? REQUIRED_META_KEYS_NER
+      : REQUIRED_META_KEYS_PHENOTYPE;
+    for (const key of requiredKeys) {
       const val = meta[key];
       const missing =
         val === undefined ||
@@ -187,6 +201,51 @@ export function runPreflight(taskId: string): PreflightResult {
     }
 
     criterionData.push({ filePath, parsed });
+  }
+
+  // 2b. task_kind dispatch — NER tasks have no criteria; the cross-
+  // reference checks below would all error. Run NER-specific checks
+  // instead and skip the criterion-shaped cross-refs.
+  const taskKindRaw = typeof meta.task_kind === "string"
+    ? meta.task_kind
+    : (meta.task_type === "ner" ? "ner" : "phenotype");
+  if (taskKindRaw === "ner") {
+    // Ontology must be reachable: either ontology_pin resolves under
+    // var/ontologies, or references/ontology/concepts.json exists in
+    // the skill bundle.
+    const pin = typeof meta.ontology_pin === "string" ? meta.ontology_pin : null;
+    const vendoredOnt = path.join(draftPath, "references", "ontology", "concepts.json");
+    let ontologyOk = false;
+    if (pin && pin.includes("@")) {
+      const [id, version] = pin.split("@");
+      const snapPath = path.join(
+        PLATFORM_ROOT, "var", "ontologies", id ?? "", version ?? "", "concepts.json",
+      );
+      if (fs.existsSync(snapPath)) ontologyOk = true;
+    }
+    if (!ontologyOk && fs.existsSync(vendoredOnt)) ontologyOk = true;
+    if (!ontologyOk) {
+      diagnostics.push({
+        code: "ner_ontology_unresolved",
+        path: pin ? `var/ontologies/${pin.replace("@", "/")}/concepts.json` : vendoredOnt,
+        message: `NER task has no resolvable ontology — set ontology_pin to "<id>@<version>" pointing at var/ontologies/, or vendor concepts.json into references/ontology/`,
+        level: "error",
+      });
+    }
+    // final_output for NER should be "span_labels" (or absent).
+    if (
+      typeof meta.final_output === "string" &&
+      meta.final_output !== "span_labels"
+    ) {
+      diagnostics.push({
+        code: "ner_unexpected_final_output",
+        path: metaPath,
+        message: `NER task has final_output="${meta.final_output}" — expected "span_labels" (or omit the field). Span lists are the only commit shape for task_kind=ner.`,
+        level: "warning",
+      });
+    }
+    const isOk = !diagnostics.some((d) => d.level === "error");
+    return { ok: isOk, diagnostics };
   }
 
   // 3. Cross-reference: meta.final_output must match a criterion with is_final_output: true

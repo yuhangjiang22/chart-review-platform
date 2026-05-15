@@ -27,6 +27,11 @@ import {
   listCompiledTasks, loadCompiledTask,
 } from "./lib/tasks.js";
 import { modelFor } from "./lib/model-config.js";
+import { pathFor as storagePathFor } from "@chart-review/storage";
+
+function reviewStatePath(patientId: string, taskId: string): string {
+  return storagePathFor.reviewState(patientId, taskId);
+}
 
 const DEFAULT_TASK_ID =
   process.env.CHART_REVIEW_TASK_ID ?? "lung-cancer-phenotype";
@@ -93,7 +98,16 @@ export const coreRoutes: RouteEntry[] = [
     },
   },
 
-  // GET /api/patients — optional ?task_id= enriches with review-state metadata
+  // GET /api/patients — optional ?task_id= enriches with review-state metadata.
+  //
+  // For NER tasks (Phase 4.5), `review_status` is *derived* from the
+  // span_labels array rather than read from the top-level field —
+  // because no code path currently flips the top-level status as
+  // individual spans get validated via PATCH /spans/:spanId. Derivation:
+  //   - explicit `review_status: "locked"` wins
+  //   - no spans                    → "agent_proposed" (or whatever the file says)
+  //   - any span lacks a terminal status (mapped/rejected) → "in_progress"
+  //   - all spans terminal          → "reviewer_validated"
   {
     method: "GET", pattern: "/api/patients",
     handler: async (_b, _r, _p, query) => {
@@ -101,12 +115,23 @@ export const coreRoutes: RouteEntry[] = [
       const patients = listPatients();
       if (!taskId) return patients;
       return patients.map((pt) => {
-        const rsPath = path.join(reviewsRoot(), pt.patient_id, taskId, "review_state.json");
+        // Use the canonical pathFor (resolves to v2's var/reviews/) instead
+        // of this file's ad-hoc reviewsRoot() which still points at v1's
+        // path. NER MCP writes land at the v2 path; without this fix the
+        // derived review_status for NER tasks is always absent.
+        const rsPath = reviewStatePath(pt.patient_id, taskId);
         if (!fs.existsSync(rsPath)) return pt;
         try {
           const rs = JSON.parse(fs.readFileSync(rsPath, "utf8")) as {
-            assigned_to?: string[]; review_status?: string;
+            assigned_to?: string[];
+            review_status?: string;
+            task_kind?: string;
+            span_labels?: Array<{ status?: string }>;
+            field_assessments?: unknown[];
           };
+          // NER validation is a manual reviewer decision (POST
+          // /validation), not derived from per-span statuses — so we
+          // just surface whatever the file says.
           return { ...pt, assigned_to: rs.assigned_to, review_status: rs.review_status };
         } catch { return pt; }
       });

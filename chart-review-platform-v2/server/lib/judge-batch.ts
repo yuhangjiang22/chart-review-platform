@@ -337,6 +337,220 @@ export async function runJudgeBatch(
   };
 }
 
+// ── NER (span-shaped) judge batch (Phase 2.3) ────────────────────────
+//
+// Parallel surface for task_kind="ner". Same structure as runJudgeBatch
+// but the worklist enumerates span disagreements + novel_candidate
+// spans instead of cell disagreements + low-confidence cells. Writes
+// to the same `judge_analyses.json` file with a `task_kind: "ner"`
+// discriminator so the GET endpoint can return either shape.
+
+import {
+  compareSpanDrafts, loadAgentSpanDrafts,
+  type SpanDisagreement,
+} from "./disagreements.js";
+import {
+  judgeSpan,
+  type JudgeSpanAnalysis,
+  type JudgeSpanInput,
+  type JudgeSpanSnapshot,
+} from "./judge.js";
+import type { SpanLabel } from "@chart-review/platform-types";
+
+export interface JudgeSpanAnalysisRecord {
+  patient_id: string;
+  span_id: string;
+  note_id: string;
+  entity_type: string;
+  kind: JudgeSpanInput["kind"];
+  agent_a: JudgeSpanSnapshot | null;
+  agent_b?: JudgeSpanSnapshot | null;
+  analysis?: JudgeSpanAnalysis;
+  error?: string;
+  cost_usd?: number;
+  duration_ms: number;
+  generated_at: string;
+}
+
+export interface JudgeSpanAnalysesFile {
+  task_kind: "ner";
+  iter_id: string;
+  task_id: string;
+  generated_at: string;
+  generated_by: string;
+  model: string;
+  total_cost_usd: number;
+  total_duration_ms: number;
+  cells_analyzed: number;
+  cells_failed: number;
+  analyses: JudgeSpanAnalysisRecord[];
+}
+
+function snapshotFromSpan(agentId: string, s: SpanLabel | null): JudgeSpanSnapshot | null {
+  if (!s) return null;
+  return {
+    agent_id: agentId,
+    note_id: s.note_id,
+    text: s.text,
+    anchor: s.anchor,
+    start: s.start,
+    end: s.end,
+    entity_type: s.entity_type,
+    concept_name: s.concept_name,
+    status: s.status,
+  };
+}
+
+function buildSpanWorklist(taskId: string, iterId: string): JudgeSpanInput[] {
+  const manifest = getPilotManifest(taskId, iterId);
+  if (!manifest) throw new Error(`pilot ${iterId} not found for ${taskId}`);
+  const rd = runDir(manifest.run_id);
+  const status = getRunStatus(manifest.run_id);
+  const patientIds = status?.per_patient ? Object.keys(status.per_patient) : [];
+
+  const out: JudgeSpanInput[] = [];
+  const seen = new Set<string>(); // `${pid}::${span_id}`
+
+  for (const patientId of patientIds) {
+    const drafts = loadAgentSpanDrafts(rd, patientId);
+    if (drafts.length === 0) continue;
+
+    // Two-or-more-agent disagreements (hard / soft / boundary / type_diff / miss).
+    if (drafts.length >= 2) {
+      const summary = compareSpanDrafts(drafts);
+      for (const row of summary.rows) {
+        const span = row.a ?? row.b!;
+        const spanId = span.span_id;
+        const key = `${patientId}::${spanId}::${row.pair.agent_a}::${row.pair.agent_b}`;
+        if (seen.has(key)) continue;
+        out.push({
+          patientId,
+          taskId,
+          span_id: spanId,
+          note_id: row.note_id,
+          entity_type: row.entity_type,
+          kind: row.kind === "agree"
+            ? "hard" // shouldn't happen — agree rows are filtered upstream
+            : row.kind as JudgeSpanInput["kind"],
+          agent_a: snapshotFromSpan(row.pair.agent_a, row.a),
+          agent_b: snapshotFromSpan(row.pair.agent_b, row.b),
+        });
+        seen.add(key);
+      }
+    }
+
+    // Single-agent novel_candidates — feed them to judge for ontology-extend triage.
+    for (const draft of drafts) {
+      for (const s of draft.span_labels) {
+        if (s.status !== "novel_candidate") continue;
+        const key = `${patientId}::${s.span_id}::novel::${draft.agent_id}`;
+        if (seen.has(key)) continue;
+        out.push({
+          patientId,
+          taskId,
+          span_id: s.span_id,
+          note_id: s.note_id,
+          entity_type: s.entity_type,
+          kind: "novel_candidate",
+          agent_a: snapshotFromSpan(draft.agent_id, s),
+        });
+        seen.add(key);
+      }
+    }
+  }
+  return out;
+}
+
+export async function runJudgeSpanBatch(
+  opts: RunJudgeBatchOpts,
+): Promise<RunJudgeBatchResult> {
+  const { taskId, iterId, startedBy } = opts;
+  const maxCells = opts.maxCells ?? 200;
+  const concurrency = Math.max(1, opts.concurrency ?? 2);
+
+  const worklist = buildSpanWorklist(taskId, iterId).slice(0, maxCells);
+  const startedAt = Date.now();
+  const records: JudgeSpanAnalysisRecord[] = [];
+  let totalCost = 0;
+  let firstModel: string | undefined;
+
+  let idx = 0;
+  async function worker() {
+    while (true) {
+      const i = idx++;
+      if (i >= worklist.length) return;
+      const cell = worklist[i]!;
+      const generated_at = new Date().toISOString();
+      try {
+        const out = await judgeSpan(cell);
+        if (typeof out.cost_usd === "number") totalCost += out.cost_usd;
+        if (!firstModel && out.model) firstModel = out.model;
+        records.push({
+          patient_id: cell.patientId,
+          span_id: cell.span_id,
+          note_id: cell.note_id,
+          entity_type: cell.entity_type,
+          kind: cell.kind,
+          agent_a: cell.agent_a,
+          agent_b: cell.agent_b,
+          analysis: out.analysis,
+          error: out.error,
+          cost_usd: out.cost_usd,
+          duration_ms: out.duration_ms,
+          generated_at,
+        });
+      } catch (e) {
+        records.push({
+          patient_id: cell.patientId,
+          span_id: cell.span_id,
+          note_id: cell.note_id,
+          entity_type: cell.entity_type,
+          kind: cell.kind,
+          agent_a: cell.agent_a,
+          agent_b: cell.agent_b,
+          error: (e as Error).message,
+          duration_ms: 0,
+          generated_at,
+        });
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: concurrency }, () => worker()));
+
+  records.sort((a, b) =>
+    a.patient_id !== b.patient_id
+      ? a.patient_id.localeCompare(b.patient_id)
+      : a.span_id.localeCompare(b.span_id),
+  );
+
+  const cellsFailed = records.filter((r) => !r.analysis).length;
+  const file: JudgeSpanAnalysesFile = {
+    task_kind: "ner",
+    iter_id: iterId,
+    task_id: taskId,
+    generated_at: new Date().toISOString(),
+    generated_by: startedBy,
+    model: firstModel ?? "(unknown)",
+    total_cost_usd: totalCost,
+    total_duration_ms: Date.now() - startedAt,
+    cells_analyzed: records.length - cellsFailed,
+    cells_failed: cellsFailed,
+    analyses: records,
+  };
+  const fp = judgeAnalysesPath(taskId, iterId);
+  atomicWriteJson(fp, file);
+
+  return {
+    ok: true,
+    cells_total: records.length,
+    cells_analyzed: file.cells_analyzed,
+    cells_failed: file.cells_failed,
+    total_cost_usd: file.total_cost_usd,
+    total_duration_ms: file.total_duration_ms,
+    written_to: fp,
+  };
+}
+
 /** Read the judge analyses file from disk. Returns null if not yet generated. */
 export function readJudgeAnalyses(
   taskId: string,

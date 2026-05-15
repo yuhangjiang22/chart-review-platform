@@ -30,7 +30,7 @@ import { getReviewsRootOverride, withReviewsRoot as _withReviewsRoot } from "@ch
 import type { Evidence } from "@chart-review/faithfulness";
 import { verifyEvidence } from "@chart-review/faithfulness";
 import type { CompiledTask } from "@chart-review/tasks";
-import type { CrossCriterionAlert } from "@chart-review/platform-types";
+import type { CrossCriterionAlert, SpanLabel } from "@chart-review/platform-types";
 import { recomputeLiveAlerts } from "@chart-review/live-alerts";
 import { evalDerivation } from "@chart-review/contract-eval";
 import { checkDrift } from "@chart-review/drift-detector";
@@ -198,6 +198,22 @@ export interface ReviewState {
    *  When the guideline declares fields with encounter_scoped=true, the UI
    *  iterates this list and shows one row per (encounter, field_id). */
   encounters?: Encounter[];
+  /** NER (task_kind="ner") span lists. Lives in the union-shaped
+   *  review_state.json alongside field_assessments — phenotype tasks
+   *  leave this absent. Reader / writer code paths key on `task_kind`
+   *  on the parent CompiledTask, not on this field's presence; absent
+   *  span_labels in an NER review means "no spans committed yet". */
+  span_labels?: SpanLabel[];
+  /** Optional discriminator copy of the task's kind. Persisted by the
+   *  NER MCP write tools so downstream consumers can identify NER state
+   *  files without re-loading the task. Optional — phenotype state
+   *  files written before this field existed remain valid. */
+  task_kind?: "phenotype" | "ner";
+  /** NER-only: note IDs (without .txt suffix) the reviewer has marked
+   *  as validated for this patient × task. Used for per-note progress
+   *  in the SpanReview UI; empty / absent means nothing validated yet.
+   *  Maintained via POST /api/reviews/:pid/:tid/notes/:nid/validation. */
+  validated_notes?: string[];
 }
 
 function reviewDir(patientId: string, taskId: string): string {

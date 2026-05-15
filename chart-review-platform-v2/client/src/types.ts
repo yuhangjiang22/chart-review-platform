@@ -152,6 +152,14 @@ export interface ReviewState {
   assigned_to?: string[];
   /** #45 — encounter/episode list. */
   encounters?: Encounter[];
+  /** NER tasks carry their work here instead of field_assessments. Kept
+   *  as `unknown[]` on the client so we don't pull the SpanLabel type
+   *  into every reviewState consumer; the SpanReview surface narrows. */
+  span_labels?: unknown[];
+  task_kind?: "phenotype" | "ner";
+  /** NER-only: note IDs the reviewer has marked validated for this
+   *  patient × task. Defaults to empty (nothing validated). */
+  validated_notes?: string[];
 }
 
 /** Cross-pane navigation: jump-to-source signal from ReviewForm → NoteViewer. */

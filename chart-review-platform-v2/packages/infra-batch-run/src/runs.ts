@@ -290,11 +290,12 @@ import { runAgent } from "@chart-review/agent-provider";
 import { modelFor } from "@chart-review/model-config";
 import { atomicWriteJson } from "@chart-review/storage";
 import { buildMcpServersConfig } from "@chart-review/mcp-server-anthropic";
+import { buildNerMcpServersConfig } from "@chart-review/mcp-server-ner-anthropic";
 import { buildAuditHooks } from "@chart-review/audit-trail";
 import { loadCompiledTask } from "@chart-review/tasks";
 import { computeTaskSha } from "@chart-review/lock";
 import { guidelineDir, phenotypeSkillDir } from "@chart-review/rubric";
-import { patientDir } from "@chart-review/patients";
+import { patientDir, listNotes } from "@chart-review/patients";
 import { resolveRolePrompt, validateAgentSpec } from "@chart-review/agent-specs";
 
 // #47 — env-driven defaults so a deployment can lock in a cost ceiling
@@ -661,7 +662,14 @@ async function runOneAgent(
         ].join("\n")
       : "";
 
-  const userPrompt = [
+  // task_kind dispatch — phenotype tasks use the chart_review_state MCP
+  // server (7 cell tools, set_field_assessment, find_quote_offsets, …).
+  // NER tasks use chart_review_ner (7 span tools, set_span_label,
+  // locate_in_source, …) plus a span-shaped batch prompt. Same runAgent
+  // loop, same scratch + audit promotion logic afterwards.
+  const isNerTask = task.task_kind === "ner";
+
+  const phenotypePrompt = [
     `You are running in batch mode. Activate the \`chart-review\` skill.`,
     `If a skill named \`chart-review-${taskId}-phenotype\` exists, activate it as well — it provides the rubric scope.`,
     "",
@@ -682,6 +690,52 @@ async function runOneAgent(
     "you are done — emit a brief summary line and stop.",
   ].join("\n");
 
+  const nerPrompt = (() => {
+    let noteSummary = "";
+    try {
+      const notes = listNotes(patientId);
+      noteSummary = notes
+        .map((n) => `  - ${n.filename.replace(/\.txt$/, "")}`
+          + (n.date ? ` (${n.date})` : "")
+          + (n.doctype ? ` [${n.doctype}]` : ""))
+        .join("\n");
+    } catch {
+      noteSummary = "  (note listing unavailable; explore the cwd directly)";
+    }
+    return [
+      "You are running an NER (named-entity recognition) task in batch mode.",
+      "Activate the `chart-review-ner` universal skill.",
+      `If a skill named \`chart-review-${taskId}\` exists, activate it as well — it carries the ontology + annotation guidance for THIS task.`,
+      "",
+      `Active patient: ${patientId}`,
+      `Active task: ${taskId} (task_kind=ner)`,
+      "",
+      `--- Role framing ---`,
+      rolePrompt,
+      `--- End role framing ---`,
+      "",
+      "Notes for this patient (each is a .txt file in your cwd):",
+      noteSummary,
+      "",
+      "Workflow per note (commit through the `chart_review_ner` MCP server):",
+      "1. Call `list_entity_types` to discover the supported entity-type root labels.",
+      "2. For each candidate span:",
+      "   a. `normalize_to_ontology(entity_type, label)` to canonicalize.",
+      "      found=true → use the returned concept_name + status='mapped'.",
+      "      found=false → either retry with an alternative or use status='novel_candidate' (concept_name='').",
+      "   b. Pick an `anchor` (verbatim substring containing the entity + unique).",
+      "      anchor==text for unambiguous long entities; extend with context words for short/ambiguous values.",
+      "   c. `locate_in_source(note_id, anchor, text)` to get authoritative (start, end). DO NOT guess offsets.",
+      "   d. `set_span_label(note_id, text, anchor, start, end, entity_type, concept_name, status)`.",
+      "      The platform faithfulness-checks source[start:end] === text and refuses bad writes.",
+      "3. When all candidate spans across all notes are committed, emit a brief summary line and stop.",
+      "",
+      "Be exhaustive. Prefer the MOST SPECIFIC concept_name available; don't default to the root.",
+    ].join("\n");
+  })();
+
+  const userPrompt = isNerTask ? nerPrompt : phenotypePrompt;
+
   let cost: number | undefined;
   const auditHooks = buildAuditHooks({ patientId, taskId, sessionId });
 
@@ -695,13 +749,15 @@ async function runOneAgent(
     // path uses AsyncLocalStorage (`withReviewsRoot`) to redirect
     // writes here, but that context doesn't cross process boundaries.
     // The subprocess server reads CHART_REVIEW_REVIEWS_ROOT env var.
-    const mcpServers: Record<string, unknown> = buildMcpServersConfig(
-      patientId,
-      task,
-      sessionId,
-      { onStateUpdate: () => {} },
-      { reviewsRoot: scratchRoot, provider: manifest.provider },
-    );
+    const mcpServers: Record<string, unknown> = isNerTask
+      ? buildNerMcpServersConfig(
+          patientId, task, sessionId, { onStateUpdate: () => {} },
+          { reviewsRoot: scratchRoot, provider: manifest.provider },
+        )
+      : buildMcpServersConfig(
+          patientId, task, sessionId, { onStateUpdate: () => {} },
+          { reviewsRoot: scratchRoot, provider: manifest.provider },
+        );
     const sdkHooks: Record<string, Array<{ hooks: any[] }>> = {
       PreToolUse: [{ hooks: [auditHooks.pre] }],
       PostToolUse: [{ hooks: [auditHooks.post] }],
@@ -748,15 +804,24 @@ async function runOneAgent(
   try {
     const draft = JSON.parse(fs.readFileSync(agentDraftPath(runId, patientId, spec.id), "utf8")) as {
       field_assessments?: Array<{ confidence?: "low" | "medium" | "high" }>;
+      span_labels?: Array<{ entity_type?: string }>;
     };
-    fieldCount = draft.field_assessments?.length;
-    if (draft.field_assessments) {
-      confidenceSummary = { low: 0, medium: 0, high: 0, unknown: 0 };
-      for (const f of draft.field_assessments) {
-        if (f.confidence === "low") confidenceSummary.low++;
-        else if (f.confidence === "medium") confidenceSummary.medium++;
-        else if (f.confidence === "high") confidenceSummary.high++;
-        else confidenceSummary.unknown++;
+    if (isNerTask) {
+      // For NER tasks, `field_count` semantically becomes "span count".
+      // The post-run pipeline (auto-advance, status broadcaster) uses it
+      // as a non-zero-progress indicator; the exact label doesn't matter.
+      // Confidence summary is left undefined — NER spans don't carry it.
+      fieldCount = draft.span_labels?.length;
+    } else {
+      fieldCount = draft.field_assessments?.length;
+      if (draft.field_assessments) {
+        confidenceSummary = { low: 0, medium: 0, high: 0, unknown: 0 };
+        for (const f of draft.field_assessments) {
+          if (f.confidence === "low") confidenceSummary.low++;
+          else if (f.confidence === "medium") confidenceSummary.medium++;
+          else if (f.confidence === "high") confidenceSummary.high++;
+          else confidenceSummary.unknown++;
+        }
       }
     }
   } catch { /* leave unset */ }

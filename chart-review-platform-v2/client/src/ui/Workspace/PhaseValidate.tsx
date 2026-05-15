@@ -37,6 +37,10 @@ interface PhaseValidateProps {
   iterId: string;
   /** Navigate to the patient chart for validation. */
   onOpenPatient: (patientId: string) => void;
+  /** Active task_kind. NER tasks skip the cell-shaped disagreements
+   *  fetch (which would return empty + mislabel chips as "all agreed")
+   *  and rely on chip-level navigation into SpanReview. */
+  taskKind?: "phenotype" | "ner";
 }
 
 /**
@@ -50,7 +54,10 @@ interface PhaseValidateProps {
  *   does it fall back to all-agreed patients (so the reviewer just needs to
  *   press "Approve all agreements" once each).
  */
-export function PhaseValidate({ taskId, iterId, onOpenPatient }: PhaseValidateProps) {
+export function PhaseValidate({
+  taskId, iterId, onOpenPatient, taskKind,
+}: PhaseValidateProps) {
+  const isNer = taskKind === "ner";
   const [patients, setPatients] = useState<PatientStatus[]>([]);
   const [patientsWithDisagreements, setPatientsWithDisagreements] = useState<Set<string>>(
     new Set(),
@@ -73,8 +80,16 @@ export function PhaseValidate({ taskId, iterId, onOpenPatient }: PhaseValidatePr
     };
   }, [taskId, iterId]);
 
-  // Load disagreement summary once to classify patients.
+  // Load disagreement summary once to classify patients. The
+  // /disagreements endpoint is cell-shaped today; for NER tasks we
+  // skip the fetch — the chip color will fall back to neutral ("ready"
+  // vs "running"), and the reviewer adjudicates spans inside SpanReview
+  // (where span-level disagreements surface via the judge panel).
   useEffect(() => {
+    if (isNer) {
+      setPatientsWithDisagreements(new Set());
+      return;
+    }
     let cancelled = false;
     authFetch(`/api/pilots/${taskId}/${iterId}/disagreements`)
       .then((r) => (r.ok ? r.json() : null))
@@ -89,7 +104,7 @@ export function PhaseValidate({ taskId, iterId, onOpenPatient }: PhaseValidatePr
     return () => {
       cancelled = true;
     };
-  }, [taskId, iterId]);
+  }, [taskId, iterId, isNer]);
 
   const validated = patients.filter((p) => p.oracle_done).length;
 
@@ -136,9 +151,11 @@ export function PhaseValidate({ taskId, iterId, onOpenPatient }: PhaseValidatePr
                 {ps.oracle_done
                   ? "validated"
                   : draftReady
-                    ? hasDisagreements
-                      ? "disagreements"
-                      : "all agreed"
+                    ? isNer
+                      ? "spans ready"
+                      : hasDisagreements
+                        ? "disagreements"
+                        : "all agreed"
                     : "running…"}
               </div>
             </button>

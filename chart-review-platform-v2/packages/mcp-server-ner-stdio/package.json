@@ -1,0 +1,22 @@
+{
+  "name": "@chart-review/mcp-server-ner-stdio",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Standalone subprocess MCP server for chart_review_ner — speaks JSON-RPC over stdio via @modelcontextprotocol/sdk. Spawned by the agent runtime when the active provider can't host the in-process Anthropic-SDK server (Codex, etc.). Same 7 NER handlers as the in-process adapter; only transport differs.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@chart-review/mcp-core-ner": "*",
+    "@chart-review/mcp-server-ner-anthropic": "*",
+    "@chart-review/tasks": "*",
+    "zod": "^3.23.0"
+  }
+}

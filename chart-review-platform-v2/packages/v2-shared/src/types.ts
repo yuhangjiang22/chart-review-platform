@@ -74,7 +74,14 @@ export interface ExtractorOutput {
   extractor_id: string;
   task_id: string;
   subject_id: string;
+  /** Per-criterion answers — populated when the task is phenotype-shaped.
+   *  Empty array for NER tasks (which populate `spans` instead). */
   cells: FieldAssessment[];
+  /** Per-span entity labels — populated when the task is NER-shaped.
+   *  Optional so phenotype extractors don't need to set it. Imported as
+   *  `unknown[]` here to keep this package free of NER-specific types;
+   *  consumers cast to `SpanLabel[]` from `@chart-review/platform-types`. */
+  spans?: unknown[];
 }
 
 /** Per-cell categorization the reconciler emits. Hard / soft come

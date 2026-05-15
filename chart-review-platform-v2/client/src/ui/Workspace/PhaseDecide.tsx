@@ -16,6 +16,8 @@ interface PhaseDecideProps {
   /** True when every cell is fresh (stale === 0 and validated === total). Lock is only
    *  enabled when this is true. */
   canLock: boolean;
+  /** Active task_kind. NER tasks render "spans" terminology; phenotype renders "cells". */
+  taskKind?: "phenotype" | "ner";
   /** Run the chart-review-improve skill against the validated annotations.
    *  Caller resolves the cohort + handles the long-running agent call. */
   onImprove?: () => void;
@@ -48,9 +50,12 @@ export function PhaseDecide({
   isImproving,
   improveProposalCount,
   improveRefreshKey,
+  taskKind,
 }: PhaseDecideProps) {
   const staleCount = cells.stale;
   const unvalidated = cells.total - cells.validated;
+  const unit = taskKind === "ner" ? "note" : "cell";
+  const unitPl = taskKind === "ner" ? "notes" : "cells";
 
   return (
     <div className="mx-auto max-w-[640px] space-y-8 py-8">
@@ -63,21 +68,24 @@ export function PhaseDecide({
           className="mt-2 font-display text-[28px] tracking-tight"
           style={{ fontVariationSettings: '"opsz" 28, "SOFT" 50' }}
         >
-          {cells.validated} of {cells.total} cells validated
+          {cells.validated} of {cells.total} {unitPl} validated
         </h2>
         {staleCount > 0 && (
           <p className="mt-2 text-[13px] text-[hsl(var(--ochre))]">
-            {staleCount} stale {staleCount === 1 ? "cell" : "cells"} — criteria changed since last validation.
+            {staleCount} stale {staleCount === 1 ? unit : unitPl}
+            {taskKind === "ner"
+              ? " — ontology or guidance changed since last validation."
+              : " — criteria changed since last validation."}
           </p>
         )}
         {unvalidated > 0 && staleCount === 0 && (
           <p className="mt-2 text-[13px] text-muted-foreground">
-            {unvalidated} {unvalidated === 1 ? "cell" : "cells"} not yet validated.
+            {unvalidated} {unvalidated === 1 ? unit : unitPl} not yet validated.
           </p>
         )}
         {canLock && (
           <p className="mt-2 text-[13px] text-[hsl(var(--sage))]">
-            All cells are fresh and validated. Ready to lock.
+            All {unitPl} are fresh and validated. Ready to lock.
           </p>
         )}
       </div>
@@ -85,9 +93,9 @@ export function PhaseDecide({
       {/* Lock gate explanation */}
       {!canLock && (
         <div className="rounded-md border border-[hsl(var(--ochre))]/30 bg-[hsl(var(--ochre))]/5 px-4 py-3 text-[12.5px] text-[hsl(var(--ochre))]">
-          <strong>Lock requires every cell to be fresh.</strong> Resolve stale cells or
-          finish validation before locking. Alternatively, revise the rubric to start
-          a new version.
+          <strong>Lock requires every {unit} to be fresh.</strong> Resolve stale {unitPl} or
+          finish validation before locking. Alternatively, revise the
+          {taskKind === "ner" ? " annotation guidance" : " rubric"} to start a new version.
         </div>
       )}
 

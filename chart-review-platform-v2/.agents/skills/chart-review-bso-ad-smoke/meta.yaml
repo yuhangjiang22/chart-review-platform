@@ -1,0 +1,5 @@
+task_type: ner
+manual_version: smoke-1
+source_document_sha: sha256:smoke
+phases:
+  - author

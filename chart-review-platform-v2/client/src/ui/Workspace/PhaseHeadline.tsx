@@ -1,5 +1,6 @@
 import type { PhaseInfo } from "./phase-logic";
 import { PHASE_LABEL as PHASE_LABEL_DEFS } from "./phases";
+import { taskKindUi } from "./task-kind-registry";
 
 // Headline uses uppercase labels for visual consistency with the pill
 // bar; derived from the canonical labels in phases.ts.
@@ -11,14 +12,17 @@ interface PhaseHeadlineProps {
   phaseInfo: PhaseInfo;
   /** Version tag, e.g. "v3" or the task's manual_version. */
   versionTag: string | null;
+  /** Active task_kind. NER tasks render "spans" instead of "cells". */
+  taskKind?: "phenotype" | "ner";
 }
 
-export function PhaseHeadline({ phaseInfo, versionTag }: PhaseHeadlineProps) {
+export function PhaseHeadline({ phaseInfo, versionTag, taskKind }: PhaseHeadlineProps) {
   const { phase, completeness, status_label } = phaseInfo;
 
+  const { unitLabel } = taskKindUi(taskKind);
   const countFragment =
     completeness && completeness.total > 0
-      ? `${completeness.done} of ${completeness.total} cells validated`
+      ? `${completeness.done} of ${completeness.total} ${unitLabel.plural} validated`
       : null;
 
   return (

@@ -278,14 +278,24 @@ export class CodexAgentProvider implements AgentProvider {
 function extractMcpEnvVars(
   mcpServers: Record<string, unknown>,
 ): Record<string, string> {
-  const cfg = (mcpServers as any)?.chart_review_state;
-  if (!cfg || typeof cfg !== "object") return {};
-  const env = cfg.env as Record<string, string> | undefined;
-  if (!env) return {};
   const out: Record<string, string> = {};
-  for (const [k, v] of Object.entries(env)) {
-    if (k.startsWith("CHART_REVIEW_MCP_") || k === "CHART_REVIEW_REVIEWS_ROOT") {
-      out[k] = v;
+  // Each known server type contributes its session env vars. The codex
+  // provider only carries the env across to the subprocess; the actual
+  // MCP server registration (and thus tool surface) lives in
+  // .codex/config.toml.
+  for (const serverKey of ["chart_review_state", "chart_review_ner"]) {
+    const cfg = (mcpServers as Record<string, unknown>)[serverKey];
+    if (!cfg || typeof cfg !== "object") continue;
+    const env = (cfg as { env?: Record<string, string> }).env;
+    if (!env) continue;
+    for (const [k, v] of Object.entries(env)) {
+      if (
+        k.startsWith("CHART_REVIEW_MCP_") ||
+        k.startsWith("CHART_REVIEW_NER_") ||
+        k === "CHART_REVIEW_REVIEWS_ROOT"
+      ) {
+        out[k] = v;
+      }
     }
   }
   return out;
