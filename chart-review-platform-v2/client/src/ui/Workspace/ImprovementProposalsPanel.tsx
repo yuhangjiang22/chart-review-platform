@@ -54,6 +54,40 @@ export function ImprovementProposalsPanel({
 
   // ── Proposals list ──────────────────────────────────────────────────────────
   const [proposals, setProposals] = useState<Proposal[]>([]);
+  // Per-row expansion state. Keyed by proposal id; value is the fetched
+  // YAML body or null while it's loading or unfetched.
+  const [expandedBodies, setExpandedBodies] = useState<Record<string, string | null>>({});
+  // Per-row error message (display only — fetch fails don't crash the panel).
+  const [bodyErrors, setBodyErrors] = useState<Record<string, string>>({});
+
+  function toggleBody(proposalId: string) {
+    setExpandedBodies((prev) => {
+      if (proposalId in prev) {
+        // Already loaded / loading — toggle off.
+        const next = { ...prev };
+        delete next[proposalId];
+        return next;
+      }
+      // First open — mark loading and fire the fetch.
+      authFetch(
+        `/api/guideline-improvement/${encodeURIComponent(taskId)}/proposals/${encodeURIComponent(proposalId)}`,
+      )
+        .then(async (r) => {
+          if (!r.ok) {
+            setBodyErrors((e) => ({ ...e, [proposalId]: `HTTP ${r.status}` }));
+            setExpandedBodies((s) => ({ ...s, [proposalId]: "" }));
+            return;
+          }
+          const text = await r.text();
+          setExpandedBodies((s) => ({ ...s, [proposalId]: text }));
+        })
+        .catch((e: Error) => {
+          setBodyErrors((er) => ({ ...er, [proposalId]: e.message }));
+          setExpandedBodies((s) => ({ ...s, [proposalId]: "" }));
+        });
+      return { ...prev, [proposalId]: null };
+    });
+  }
 
   // Fetch analysis summary on mount and after each improve run.
   function fetchAnalysisSummary() {
@@ -133,25 +167,56 @@ export function ImprovementProposalsPanel({
                 ? summary.slice(0, 100) + "…"
                 : summary;
               const author = p.created_by ?? "—";
+              const isOpen = id in expandedBodies;
+              const body = expandedBodies[id];
+              const err = bodyErrors[id];
               return (
                 <li
                   key={id}
-                  className="rounded-md border border-border bg-card px-4 py-3 text-[12.5px]"
+                  className="rounded-md border border-border bg-card text-[12.5px]"
                 >
-                  <div className="flex items-center gap-2">
-                    {p.field_id && (
-                      <code className="text-[11.5px] text-foreground font-mono">
-                        {p.field_id}
-                      </code>
-                    )}
-                    <span className="flex-1 truncate text-muted-foreground">
-                      {truncatedSummary}
-                    </span>
-                  </div>
-                  <div className="mt-1 text-[10.5px] text-muted-foreground">
-                    #{id.slice(0, 8)} · by {author}
-                    {ts ? ` · ${ts.slice(0, 10)}` : ""}
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => toggleBody(id)}
+                    className="flex w-full items-center gap-2 px-4 py-3 text-left hover:bg-muted/40 transition-colors"
+                  >
+                    {isOpen
+                      ? <ChevronDown size={14} className="shrink-0 text-muted-foreground" />
+                      : <ChevronRight size={14} className="shrink-0 text-muted-foreground" />}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        {p.field_id && (
+                          <code className="text-[11.5px] text-foreground font-mono">
+                            {p.field_id}
+                          </code>
+                        )}
+                        <span className="flex-1 truncate text-muted-foreground">
+                          {truncatedSummary}
+                        </span>
+                      </div>
+                      <div className="mt-1 text-[10.5px] text-muted-foreground">
+                        #{id.slice(0, 8)} · by {author}
+                        {ts ? ` · ${ts.slice(0, 10)}` : ""}
+                      </div>
+                    </div>
+                  </button>
+                  {isOpen && (
+                    <div className="border-t border-border/60 bg-muted/20 px-4 py-3">
+                      {body === null && (
+                        <div className="text-[11.5px] text-muted-foreground italic">
+                          Loading…
+                        </div>
+                      )}
+                      {err && (
+                        <div className="text-[11.5px] text-[hsl(var(--oxblood))]">
+                          Failed to load proposal: {err}
+                        </div>
+                      )}
+                      {body && body.length > 0 && (
+                        <pre className="whitespace-pre-wrap font-mono text-[11.5px] leading-relaxed text-foreground/90">{body}</pre>
+                      )}
+                    </div>
+                  )}
                 </li>
               );
             })}
