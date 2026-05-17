@@ -105,6 +105,14 @@ export function PhaseSpanAuthor({ taskId, canEdit = true }: PhaseSpanAuthorProps
         <div className="text-[11.5px] text-muted-foreground">
           {ontologyCount} entity type{ontologyCount === 1 ? "" : "s"} from the active ontology · {authoredCount} authored
         </div>
+        <div className="mt-2 text-[11.5px] text-muted-foreground bg-muted/40 border border-border/60 rounded px-3 py-2">
+          <strong className="text-foreground">What the agent reads:</strong>{" "}
+          every entity type below corresponds to one YAML file the agents
+          load <em>verbatim</em> before tagging spans. The guidance prose,
+          exemplars, negative examples, and edge cases on this page are
+          exactly what the agents see — edit here and the next run uses
+          the updated rules.
+        </div>
       </div>
       <div className="flex-1 overflow-y-auto p-4 space-y-2">
         {data.entity_types.map((et) => (
@@ -159,24 +167,57 @@ function EntityTypeCard({
   }
 
   const filled = guidance !== null;
+  // First sentence (~120 chars) of the guidance prose, for the collapsed
+  // preview. If guidance is empty, the row is "empty" — no preview.
+  const previewProse = (() => {
+    const g = guidance?.guidance?.trim();
+    if (!g) return null;
+    // Stop at the first period or 140 chars, whichever comes first.
+    const periodIdx = g.indexOf(". ");
+    const cut = periodIdx > 0 && periodIdx < 140 ? periodIdx + 1 : 140;
+    return g.length > cut ? g.slice(0, cut).trim() + "…" : g;
+  })();
+  const exemplarsN = guidance?.exemplars?.length ?? 0;
+  const negN = guidance?.negative_examples?.length ?? 0;
+  const edgeN = guidance?.edge_cases?.length ?? 0;
 
   return (
     <div className="border border-border rounded-md">
       <button
         type="button"
         onClick={onToggle}
-        className="w-full px-3 py-2 flex items-center gap-2 text-left hover:bg-muted/40 rounded-md"
+        className="w-full px-3 py-2 flex items-start gap-2 text-left hover:bg-muted/40 rounded-md"
       >
-        {expanded ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
-        <span className="font-mono text-[12.5px] flex-1">{entityType}</span>
-        <span className={cn(
-          "text-[10px] uppercase tracking-[0.1em] px-1.5 py-0.5 rounded border",
-          filled
-            ? "bg-green-50 text-green-900 border-green-200"
-            : "bg-amber-50 text-amber-900 border-amber-200",
-        )}>
-          {filled ? "authored" : "empty"}
+        <span className="mt-0.5">
+          {expanded ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
         </span>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-[12.5px]">{entityType}</span>
+            <span className={cn(
+              "text-[10px] uppercase tracking-[0.1em] px-1.5 py-0.5 rounded border ml-auto shrink-0",
+              filled
+                ? "bg-green-50 text-green-900 border-green-200"
+                : "bg-amber-50 text-amber-900 border-amber-200",
+            )}>
+              {filled ? "authored" : "empty"}
+            </span>
+          </div>
+          {!expanded && filled && (
+            <div className="mt-1 space-y-0.5">
+              {previewProse && (
+                <div className="text-[11.5px] text-muted-foreground">
+                  {previewProse}
+                </div>
+              )}
+              <div className="text-[10.5px] text-muted-foreground/80">
+                {exemplarsN} exemplar{exemplarsN === 1 ? "" : "s"} ·{" "}
+                {negN} negative example{negN === 1 ? "" : "s"} ·{" "}
+                {edgeN} edge case{edgeN === 1 ? "" : "s"}
+              </div>
+            </div>
+          )}
+        </div>
       </button>
       {expanded && (
         <div className="px-4 py-3 border-t border-border space-y-3 text-[12.5px]">

@@ -7,21 +7,30 @@ guidance: |
   ("former smoker", "occasional alcohol") map to specific concepts in the
   subtree — prefer those over the generic parent.
 exemplars:
-  - "current smoker"
-  - "former smoker"
-  - "never smoker"
-  - "occasional alcohol use"
-  - "sedentary lifestyle"
-  - "regular exercise"
+  - current smoker
+  - former smoker
+  - never smoker
+  - occasional alcohol use
+  - sedentary lifestyle
+  - regular exercise
 negative_examples:
-  - phrase: "denies tobacco use"
-    reason: "negation in patient-reported denial — tag the entity 'tobacco use' only if the active concept maps it; otherwise skip"
-  - phrase: "smoking gun evidence"
-    reason: "idiomatic, not a behavior fact about the patient"
+  - phrase: denies tobacco use
+    reason: negation in patient-reported denial — tag the entity 'tobacco use' only
+      if the active concept maps it; otherwise skip
+  - phrase: smoking gun evidence
+    reason: idiomatic, not a behavior fact about the patient
 edge_cases:
-  - pattern: "1 PPD x 30 years"
-    correct: "tag 'PPD' / 'pack per day' as smoking quantity"
-    reason: "abbreviation encodes the behavior + intensity"
-  - pattern: "former smoker, quit 10 years ago"
-    correct: "tag 'former smoker' as the status; don't tag 'quit' separately"
-    reason: "one entity per fact, choose the most-specific concept"
+  - pattern: 1 PPD x 30 years
+    correct: tag 'PPD' / 'pack per day' as smoking quantity
+    reason: abbreviation encodes the behavior + intensity
+  - pattern: former smoker, quit 10 years ago
+    correct: tag 'former smoker' as the status; don't tag 'quit' separately
+    reason: one entity per fact, choose the most-specific concept
+  - pattern: <N> pack-year smoking history (e.g., '55 pack-year smoking history')
+    correct: split into (a) '<N> pack-year' as smoking quantity (map if a
+      pack-year/quantity concept exists; else novel_candidate) and (b) 'smoking
+      history' as Tobacco_Smoking (or a more-specific smoking status concept
+      when present)
+    reason: pack-year phrasing encodes both the behavior fact and an intensity
+      quantity; splitting matches reviewer-added spans and avoids dropping
+      intensity details
