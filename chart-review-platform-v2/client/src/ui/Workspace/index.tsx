@@ -517,7 +517,7 @@ export function Workspace({
             <ArrowRight size={12} strokeWidth={1.75} />
           </Button>
         </footer>
-      ) : activePhase !== "DECIDE" && activePhase !== "TRY" && activePhase !== "VALIDATE" ? (
+      ) : activePhase !== "DECIDE" && activePhase !== "TRY" && activePhase !== "VALIDATE" && activePhase !== "LOCK" ? (
         <footer className="sticky bottom-0 border-t border-border/60 bg-background/80 backdrop-blur-sm py-3 flex justify-end">
           <Button size="sm" className="gap-1.5" onClick={handleCTA}>
             {cta.label}
