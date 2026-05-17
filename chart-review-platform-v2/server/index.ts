@@ -89,6 +89,7 @@ import { phasesRoutes } from "./phases-routes.js";
 import { ontologyRoutes } from "./ontology-routes.js";
 import { entityTypeGuidanceRoutes } from "./entity-type-guidance-routes.js";
 import { spanStatsRoutes } from "./span-stats-routes.js";
+import { nerCalibrationRoutes } from "./ner-calibration-routes.js";
 import { attachWebSocketServer, registerBroadcasters } from "./ws.js";
 import {
   isBuilderPath, delegateBuilder,
@@ -237,6 +238,7 @@ const paramRouter = makeRouter([
   ...ontologyRoutes,
   ...entityTypeGuidanceRoutes,
   ...spanStatsRoutes,
+  ...nerCalibrationRoutes,
 ]);
 
 // ── http plumbing ───────────────────────────────────────────────────

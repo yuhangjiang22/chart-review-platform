@@ -481,6 +481,7 @@ export function Workspace({
             taskId={taskId}
             reviewerId={reviewerId}
             isMethodologist={isMethodologist}
+            taskKind={isNerTask ? "ner" : "phenotype"}
           />
         )}
         {activePhase === "DEPLOY" && <PhaseDeploy />}

@@ -3,18 +3,38 @@ import { CalibrationFigure, RulesFigure, MethodsFigure, BundlesFigure } from "..
 import { cn } from "@/lib/utils";
 import { CheckSquare, Square } from "lucide-react";
 import { CodifyButton } from "./CodifyButton";
+import { NerCalibrationFigure } from "./NerCalibrationFigure";
 
 interface PhaseLockProps {
   taskId: string;
   reviewerId: string;
   isMethodologist: boolean;
+  /** NER vs phenotype — gates the rules-queue step (vestigial for NER)
+   *  and swaps the calibration figure for a F1-against-reviewer one. */
+  taskKind?: "phenotype" | "ner";
 }
 
 type LockStep = "calibration" | "rules" | "methods" | "bundles";
 
-const STEPS: Array<{ id: LockStep; label: string; description: string }> = [
-  { id: "calibration", label: "Run calibration (κ)", description: "Measure inter-rater agreement — overall κ ≥ 0.6 required." },
-  { id: "rules", label: "Drain rule queue", description: "Accept or reject all pending rule proposals." },
+interface StepDef {
+  id: LockStep;
+  label: string;
+  description: string;
+  /** When true, this step is omitted for NER tasks. */
+  phenotypeOnly?: boolean;
+}
+
+const PHENOTYPE_CALIBRATION: StepDef = {
+  id: "calibration", label: "Run calibration (κ)",
+  description: "Measure inter-rater agreement — overall κ ≥ 0.6 required.",
+};
+const NER_CALIBRATION: StepDef = {
+  id: "calibration", label: "Check agent-vs-reviewer F1",
+  description: "Compute per-entity-type F1 of each agent's draft against your validated spans.",
+};
+const STEPS: StepDef[] = [
+  // calibration is inserted dynamically based on task_kind
+  { id: "rules", label: "Drain rule queue", description: "Accept or reject all pending rule proposals.", phenotypeOnly: true },
   { id: "methods", label: "Draft methods section", description: "Generate the manuscript methods section from the locked rubric." },
   { id: "bundles", label: "Export reproducibility bundle", description: "Package everything for the collaborator handoff." },
 ];
@@ -23,7 +43,16 @@ const STEPS: Array<{ id: LockStep; label: string; description: string }> = [
  * LOCK phase — presents the four lock prerequisites as a sequential checklist.
  * Each step expands to show the corresponding existing figure from Studio.
  */
-export function PhaseLock({ taskId, reviewerId, isMethodologist }: PhaseLockProps) {
+export function PhaseLock({ taskId, reviewerId, isMethodologist, taskKind }: PhaseLockProps) {
+  const isNer = taskKind === "ner";
+  // Build the effective step list — NER tasks drop the rules-queue step
+  // (vestigial after my DECIDE proposals refactor) and use the F1
+  // calibration variant.
+  const calibrationStep = isNer ? NER_CALIBRATION : PHENOTYPE_CALIBRATION;
+  const effectiveSteps: StepDef[] = [
+    calibrationStep,
+    ...STEPS.filter((s) => !s.phenotypeOnly || !isNer),
+  ];
   const [openStep, setOpenStep] = useState<LockStep>("calibration");
   const [done, setDone] = useState<Set<LockStep>>(new Set());
 
@@ -42,7 +71,7 @@ export function PhaseLock({ taskId, reviewerId, isMethodologist }: PhaseLockProp
       <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
         Lock prerequisites — complete each step before locking the version.
       </div>
-      {STEPS.map((step) => {
+      {effectiveSteps.map((step) => {
         const isOpen = openStep === step.id;
         const isDone = done.has(step.id);
         return (
@@ -78,7 +107,11 @@ export function PhaseLock({ taskId, reviewerId, isMethodologist }: PhaseLockProp
             </div>
             {isOpen && (
               <div className="border-t border-border/60 px-4 py-4">
-                {step.id === "calibration" && <CalibrationFigure taskId={taskId} />}
+                {step.id === "calibration" && (
+                  isNer
+                    ? <NerCalibrationFigure taskId={taskId} />
+                    : <CalibrationFigure taskId={taskId} />
+                )}
                 {step.id === "rules" && (
                   <RulesFigure
                     taskId={taskId}
