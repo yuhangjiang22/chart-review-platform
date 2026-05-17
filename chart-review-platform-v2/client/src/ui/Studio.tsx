@@ -1287,13 +1287,39 @@ function BundleRow({ taskId, bundle }: { taskId: string; bundle: BundleListing }
         <code className="font-mono text-[12px] text-foreground">{bundle.bundle_id}</code>
         <span className="text-[11.5px] text-muted-foreground">{bundle.exported_at.slice(0, 16)}</span>
         <span className="flex-1" />
-        <a
-          href={`/api/exports/${taskId}/${bundle.bundle_id}/download`}
-          className="text-[11.5px] text-foreground underline-offset-4 hover:underline"
-          download
+        <button
+          type="button"
+          className="text-[11.5px] text-foreground underline-offset-4 hover:underline disabled:opacity-50"
+          onClick={async () => {
+            // Plain <a href> can't attach the bearer token, so the
+            // methodologist gate on /download rejects the link click
+            // with a 403. Fetch through authFetch instead and trigger
+            // a Blob download client-side.
+            try {
+              const r = await authFetch(
+                `/api/exports/${encodeURIComponent(taskId)}/${encodeURIComponent(bundle.bundle_id)}/download`,
+              );
+              if (!r.ok) {
+                const body = await r.json().catch(() => ({}));
+                alert(`Download failed (${r.status}): ${body?.error ?? r.statusText}`);
+                return;
+              }
+              const blob = await r.blob();
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = `${taskId}-${bundle.bundle_id}.tar.gz`;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(url);
+            } catch (e) {
+              alert(`Download error: ${(e as Error).message}`);
+            }
+          }}
         >
           download .tar.gz
-        </a>
+        </button>
       </div>
       {manifest && <BundleContents contents={manifest.contents} gitCommit={manifest.git_commit} />}
     </li>
