@@ -380,6 +380,7 @@ export function Workspace({
         <PhasePillBar
           activePhase={activePhase}
           donePhases={donePhases}
+          maturity={maturity}
           onPhaseClick={(phase) => setPhase(phase)}
           enabledPhases={enabledPhases ?? undefined}
         />
