@@ -35,7 +35,7 @@ const NER_CALIBRATION: StepDef = {
 const STEPS: StepDef[] = [
   // calibration is inserted dynamically based on task_kind
   { id: "rules", label: "Drain rule queue", description: "Accept or reject all pending rule proposals.", phenotypeOnly: true },
-  { id: "methods", label: "Draft methods section", description: "Generate the manuscript methods section from the locked rubric." },
+  { id: "methods", label: "Draft methods section", description: "Generate the manuscript methods section from the locked rubric.", phenotypeOnly: true },
   { id: "bundles", label: "Export reproducibility bundle", description: "Package everything for the collaborator handoff." },
 ];
 
