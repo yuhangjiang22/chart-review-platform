@@ -51,8 +51,18 @@ function httpErr(status: number, message: string): Error & { status: number } {
 }
 
 /** Marker that tells the response writer "this is a text/plain body,
- *  not JSON." server/index.ts unwraps it when present. */
-export interface RawBody { __raw: true; contentType: string; body: string; }
+ *  not JSON." server/index.ts unwraps it when present.
+ *
+ *  `body` may be either:
+ *    - a string (default; written as-is with the declared content-type)
+ *    - a Buffer (binary; written without UTF-8 re-encoding — required
+ *      for gzip / tar / png / pdf and any other binary download).
+ */
+export interface RawBody {
+  __raw: true;
+  contentType: string;
+  body: string | Buffer;
+}
 
 /** Marker that tells the response writer "this is an SSE stream — pump
  *  the generator into the response and don't touch the content-type or

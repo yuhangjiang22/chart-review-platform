@@ -308,12 +308,25 @@ const server = http.createServer(async (req, res) => {
         }
         // RawBody escape hatch: handlers returning { __raw: true, contentType, body }
         // skip JSON.stringify and use the requested content-type. Used by
-        // text/plain note bodies; everything else stays JSON.
+        // text/plain note bodies AND binary downloads (tarballs, etc).
+        // For Buffer bodies the write must NOT go through Node's default
+        // string encoding — that re-encodes bytes >0x7F as UTF-8
+        // sequences and corrupts gzip / tar headers.
         const raw = out as Partial<RawBody>;
-        if (raw && raw.__raw === true && typeof raw.body === "string") {
-          res.setHeader("Content-Type", raw.contentType ?? "text/plain; charset=utf-8");
-          res.statusCode = 200;
-          res.end(raw.body);
+        if (raw && raw.__raw === true) {
+          if (Buffer.isBuffer(raw.body)) {
+            res.setHeader("Content-Type", raw.contentType ?? "application/octet-stream");
+            res.statusCode = 200;
+            res.end(raw.body);
+          } else if (typeof raw.body === "string") {
+            res.setHeader("Content-Type", raw.contentType ?? "text/plain; charset=utf-8");
+            res.statusCode = 200;
+            res.end(raw.body);
+          } else {
+            res.setHeader("Content-Type", "application/json");
+            res.statusCode = 500;
+            res.end(JSON.stringify({ error: "raw body must be string or Buffer" }));
+          }
         } else {
           res.setHeader("Content-Type", "application/json");
           res.statusCode = 200;

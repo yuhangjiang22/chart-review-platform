@@ -137,10 +137,14 @@ export const guidelineRoutes: RouteEntry[] = [
         try { makeTarball(bundleDir); }
         catch (e) { throw httpErr(500, `tar failed: ${(e as Error).message}`); }
       }
+      // Read as Buffer; the response writer in server/index.ts handles
+      // Buffer bodies without UTF-8 re-encoding (a string round-trip
+      // here would corrupt the gzip and the user sees "unsupported
+      // format" when they try to open the tar.gz).
       const raw: RawBody = {
         __raw: true,
         contentType: "application/gzip",
-        body: fs.readFileSync(archive).toString("binary"),
+        body: fs.readFileSync(archive),
       };
       return raw;
     },
