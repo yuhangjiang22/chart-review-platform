@@ -7,6 +7,11 @@
 # not part of this project's history.
 claude-agent-sdk-benchmark/
 
+# Private patient samples — real-or-real-shaped clinical notes the
+# methodologist drops in for local-only runs. Never commit.
+chart-review-platform-v2/corpus/patients/patient_sample_*/
+chart-review-platform-v2/corpus/patients/patient_private_*/
+
 # Python
 .venv/
 venv/

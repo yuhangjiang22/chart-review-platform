@@ -101,15 +101,19 @@ export function patientDir(patientId: string): string {
 export function listPatients(): PatientSummary[] {
   const index = readIndex();
 
-  // If index.json is missing or empty, fall back to scanning patients/.
-  const ids = index.length
-    ? index.map((e) => e.patient_id)
-    : fs.existsSync(PATIENTS_ROOT)
-      ? fs
-          .readdirSync(PATIENTS_ROOT)
-          .filter((d) => d.startsWith("patient_"))
-          .sort()
-      : [];
+  // Union of index.json + dir-scan so locally-added patient dirs (e.g.
+  // gitignored patient_sample_*/) show up in the UI even if they're not
+  // checked into index.json. Index order wins for the patients it lists;
+  // dir-scan extras are appended (sorted) at the end.
+  const indexIds = index.map((e) => e.patient_id);
+  const scanned = fs.existsSync(PATIENTS_ROOT)
+    ? fs.readdirSync(PATIENTS_ROOT)
+        .filter((d) => d.startsWith("patient_"))
+        .sort()
+    : [];
+  const inIndex = new Set(indexIds);
+  const extras = scanned.filter((id) => !inIndex.has(id));
+  const ids = [...indexIds, ...extras];
 
   return ids.map((id): PatientSummary => {
     const idx = index.find((e) => e.patient_id === id);
