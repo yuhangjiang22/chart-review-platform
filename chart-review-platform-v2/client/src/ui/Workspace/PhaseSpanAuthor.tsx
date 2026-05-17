@@ -105,14 +105,6 @@ export function PhaseSpanAuthor({ taskId, canEdit = true }: PhaseSpanAuthorProps
         <div className="text-[11.5px] text-muted-foreground">
           {ontologyCount} entity type{ontologyCount === 1 ? "" : "s"} from the active ontology · {authoredCount} authored
         </div>
-        <div className="mt-2 text-[11.5px] text-muted-foreground bg-muted/40 border border-border/60 rounded px-3 py-2">
-          <strong className="text-foreground">What the agent reads:</strong>{" "}
-          every entity type below corresponds to one YAML file the agents
-          load <em>verbatim</em> before tagging spans. The guidance prose,
-          exemplars, negative examples, and edge cases on this page are
-          exactly what the agents see — edit here and the next run uses
-          the updated rules.
-        </div>
       </div>
       <div className="flex-1 overflow-y-auto p-4 space-y-2">
         {data.entity_types.map((et) => (

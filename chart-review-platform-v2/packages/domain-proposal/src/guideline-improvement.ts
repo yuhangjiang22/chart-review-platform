@@ -234,8 +234,11 @@ export async function improveGuideline(
     })) {
       if (event.type === "result") {
         // Per AgentEvent docs: subtype is Anthropic-specific. Codex
-        // doesn't set it — treat undefined as success.
+        // doesn't set it — treat undefined as success. A result event
+        // supersedes any mid-stream error events (transient reconnect
+        // blips, etc.) so a successful completion clears errorMessage.
         success = event.subtype === undefined || event.subtype === "success";
+        if (success) errorMessage = undefined;
         cost = event.cost_usd;
       } else if (event.type === "error") {
         errorMessage = event.error;

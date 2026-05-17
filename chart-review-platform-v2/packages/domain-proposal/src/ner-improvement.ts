@@ -342,9 +342,13 @@ export async function improveNerTask(
     })) {
       if (event.type === "result") {
         // Per AgentEvent docs: subtype is Anthropic-specific. Codex
-        // doesn't set it — treat undefined as success.
+        // doesn't set it — treat undefined as success. A result event
+        // always supersedes any mid-stream error events; transient
+        // events like content-filter blips during a reconnect are
+        // recoverable, so clear errorMessage when the run completes.
         success = event.subtype === undefined || event.subtype === "success";
         cost = event.cost_usd;
+        if (success) errorMessage = undefined;
       } else if (event.type === "error") {
         errorMessage = event.error;
       }
