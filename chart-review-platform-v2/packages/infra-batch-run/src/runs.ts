@@ -699,18 +699,11 @@ async function runOneAgent(
     "you are done — emit a brief summary line and stop.",
   ].join("\n");
 
-  const nerPrompt = (() => {
-    let noteSummary = "";
-    try {
-      const notes = listNotes(patientId);
-      noteSummary = notes
-        .map((n) => `  - ${n.filename.replace(/\.txt$/, "")}`
-          + (n.date ? ` (${n.date})` : "")
-          + (n.doctype ? ` [${n.doctype}]` : ""))
-        .join("\n");
-    } catch {
-      noteSummary = "  (note listing unavailable; explore the cwd directly)";
-    }
+  // NER: prompt is built PER NOTE (one runAgent call per note) — keeps
+  // the model's context tiny so Azure / OpenAI don't choke on aggregated
+  // clinical content. The set_span_label MCP writes accumulate across
+  // calls into the same review_state.json (same scratchRoot).
+  function buildNerPromptForNote(noteId: string): string {
     return [
       "You are running an NER (named-entity recognition) task in batch mode.",
       "Activate the `chart-review-ner` universal skill.",
@@ -718,32 +711,28 @@ async function runOneAgent(
       "",
       `Active patient: ${patientId}`,
       `Active task: ${taskId} (task_kind=ner)`,
+      `Active note for this turn: ${noteId}  (only process THIS note; ignore other .txt files in cwd)`,
       "",
       `--- Role framing ---`,
       rolePrompt,
       `--- End role framing ---`,
       "",
-      "Notes for this patient (each is a .txt file in your cwd):",
-      noteSummary,
+      "Workflow (commit through the `chart_review_ner` MCP server):",
+      "1. Read the entity-type guidance YAMLs from the activated scope skill.",
+      `2. Read \`${noteId}.txt\` (the only note for this turn).`,
+      "3. Call `list_entity_types` to discover supported root labels.",
+      "4. For each candidate span in the note:",
+      "   a. `normalize_to_ontology(entity_type, label)` → concept_name + status",
+      "   b. Pick verbatim `anchor` (extend with context if short/ambiguous).",
+      "   c. `locate_in_source(note_id, anchor, text)` → authoritative offsets.",
+      "   d. `set_span_label(...)` — faithfulness-gated.",
+      "5. Emit a one-line summary and stop. Do NOT process other notes — the runner will invoke you again for the next note.",
       "",
-      "Workflow per note (commit through the `chart_review_ner` MCP server):",
-      "1. Call `list_entity_types` to discover the supported entity-type root labels.",
-      "2. For each candidate span:",
-      "   a. `normalize_to_ontology(entity_type, label)` to canonicalize.",
-      "      found=true → use the returned concept_name + status='mapped'.",
-      "      found=false → either retry with an alternative or use status='novel_candidate' (concept_name='').",
-      "   b. Pick an `anchor` (verbatim substring containing the entity + unique).",
-      "      anchor==text for unambiguous long entities; extend with context words for short/ambiguous values.",
-      "   c. `locate_in_source(note_id, anchor, text)` to get authoritative (start, end). DO NOT guess offsets.",
-      "   d. `set_span_label(note_id, text, anchor, start, end, entity_type, concept_name, status)`.",
-      "      The platform faithfulness-checks source[start:end] === text and refuses bad writes.",
-      "3. When all candidate spans across all notes are committed, emit a brief summary line and stop.",
-      "",
-      "Be exhaustive. Prefer the MOST SPECIFIC concept_name available; don't default to the root.",
+      "Be exhaustive within this single note. Prefer the MOST SPECIFIC concept_name; don't default to the root.",
     ].join("\n");
-  })();
+  }
 
-  const userPrompt = isNerTask ? nerPrompt : phenotypePrompt;
+  const userPrompt = isNerTask ? "" /* unused — NER loops per-note */ : phenotypePrompt;
 
   let cost: number | undefined;
   const auditHooks = buildAuditHooks({ patientId, taskId, sessionId });
@@ -771,27 +760,42 @@ async function runOneAgent(
       PreToolUse: [{ hooks: [auditHooks.pre] }],
       PostToolUse: [{ hooks: [auditHooks.post] }],
     };
-    for await (const event of runAgent({
-      prompt: userPrompt,
-      cwd: patientDir(patientId),
-      patientId,
-      taskId,
-      guidelinePath: guidelineDir(taskId),
-      mcpServers,
-      hooks: sdkHooks,
-      maxTurns: manifest.max_turns_per_patient,
-      permissionMode: "acceptEdits",
-      model: spec.model,
-      provider: manifest.provider,
-      transcriptPath: agentTranscriptPath(runId, patientId, spec.id),
-      extraSystemPrompt:
-        "You are running unattended in batch mode. There is no human in the " +
-        "loop for this patient — produce your draft and stop. Do not ask " +
-        "clarifying questions; pick the most defensible answer with the " +
-        "evidence available.",
-    })) {
-      if (event.type === "result" && typeof event.cost_usd === "number") {
-        cost = event.cost_usd;
+    const extraSystem =
+      "You are running unattended in batch mode. There is no human in the " +
+      "loop for this patient — produce your draft and stop. Do not ask " +
+      "clarifying questions; pick the most defensible answer with the " +
+      "evidence available.";
+
+    // For NER: one runAgent call per note. Smaller context per call =
+    // Azure / OpenAI don't choke on aggregated clinical content; spans
+    // accumulate across calls via the shared scratchRoot review_state.
+    // For phenotype: single call as before (one patient = one assessment).
+    const callsToMake: Array<{ prompt: string; label: string }> = isNerTask
+      ? listNotes(patientId).map((n) => {
+          const noteId = n.filename.replace(/\.txt$/, "");
+          return { prompt: buildNerPromptForNote(noteId), label: noteId };
+        })
+      : [{ prompt: userPrompt, label: "patient" }];
+
+    for (const call of callsToMake) {
+      for await (const event of runAgent({
+        prompt: call.prompt,
+        cwd: patientDir(patientId),
+        patientId,
+        taskId,
+        guidelinePath: guidelineDir(taskId),
+        mcpServers,
+        hooks: sdkHooks,
+        maxTurns: manifest.max_turns_per_patient,
+        permissionMode: "acceptEdits",
+        model: spec.model,
+        provider: manifest.provider,
+        transcriptPath: agentTranscriptPath(runId, patientId, spec.id),
+        extraSystemPrompt: extraSystem,
+      })) {
+        if (event.type === "result" && typeof event.cost_usd === "number") {
+          cost = (cost ?? 0) + event.cost_usd;
+        }
       }
     }
   });
