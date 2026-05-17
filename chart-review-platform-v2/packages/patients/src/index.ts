@@ -103,8 +103,9 @@ export function listPatients(): PatientSummary[] {
 
   // Union of index.json + dir-scan so locally-added patient dirs (e.g.
   // gitignored patient_sample_*/) show up in the UI even if they're not
-  // checked into index.json. Index order wins for the patients it lists;
-  // dir-scan extras are appended (sorted) at the end.
+  // checked into index.json. Dir-scan extras render FIRST so methodologists
+  // who just dropped a private import find it without scrolling past 20+
+  // synthetic test patients; index.json order is preserved for the rest.
   const indexIds = index.map((e) => e.patient_id);
   const scanned = fs.existsSync(PATIENTS_ROOT)
     ? fs.readdirSync(PATIENTS_ROOT)
@@ -113,7 +114,7 @@ export function listPatients(): PatientSummary[] {
     : [];
   const inIndex = new Set(indexIds);
   const extras = scanned.filter((id) => !inIndex.has(id));
-  const ids = [...indexIds, ...extras];
+  const ids = [...extras, ...indexIds];
 
   return ids.map((id): PatientSummary => {
     const idx = index.find((e) => e.patient_id === id);
