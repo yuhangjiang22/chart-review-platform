@@ -153,12 +153,37 @@ export function Workspace({
   const [improveRefreshKey, setImproveRefreshKey] = useState(0);
   async function runImprovement() {
     if (isImproving) return;
-    const validatedPids = (iterDetail?.patient_status ?? [])
-      .filter((p) => p.oracle_done)
-      .map((p) => p.patient_id);
-    if (validatedPids.length === 0) {
-      alert("No validated patients yet — finish validating before running improvement.");
-      return;
+    // Cohort selection differs by task_kind:
+    //   - phenotype: per-patient validation (oracle_done flag) — gate on
+    //     "patient marked validated"
+    //   - NER: per-note validation (validated_notes[] inside review_state).
+    //     Hand the driver every patient with a review_state.json; the
+    //     server-side driver filters by validated_notes internally and
+    //     only clusters spans inside validated notes. Gate on "at least
+    //     one note validated across the cohort" via spanStats.
+    let cohortPids: string[] = [];
+    const isNer = task?.task_type === "ner";
+    if (isNer) {
+      cohortPids = (iterDetail?.patient_status ?? [])
+        .filter((p) => p.agent_done)
+        .map((p) => p.patient_id);
+      const totalsValidated = spanStats?.validated ?? 0;
+      if (totalsValidated === 0) {
+        alert(
+          "No notes validated yet — validate at least one note before "
+          + "running improvement (the driver clusters only spans inside "
+          + "validated notes).",
+        );
+        return;
+      }
+    } else {
+      cohortPids = (iterDetail?.patient_status ?? [])
+        .filter((p) => p.oracle_done)
+        .map((p) => p.patient_id);
+      if (cohortPids.length === 0) {
+        alert("No validated patients yet — finish validating before running improvement.");
+        return;
+      }
     }
     setIsImproving(true);
     setImproveProposalCount(undefined);
@@ -166,7 +191,7 @@ export function Workspace({
       const r = await authFetch(`/api/guideline-improvement/${encodeURIComponent(taskId)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ patient_ids: validatedPids }),
+        body: JSON.stringify({ patient_ids: cohortPids }),
       });
       const body = await r.json();
       if (!r.ok || !body.ok) {

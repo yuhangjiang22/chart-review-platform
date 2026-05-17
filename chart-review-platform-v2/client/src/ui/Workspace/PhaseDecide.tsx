@@ -108,44 +108,72 @@ export function PhaseDecide({
           <div className="flex items-start gap-2">
             <Sparkles size={14} className="text-[hsl(var(--ochre))] mt-0.5 shrink-0" />
             <div className="flex-1 text-[12.5px] space-y-1">
-              <strong className="text-[hsl(var(--ochre))]">Improve the guideline.</strong>{" "}
+              <strong className="text-[hsl(var(--ochre))]">
+                {taskKind === "ner" ? "Improve the annotation guidance." : "Improve the guideline."}
+              </strong>{" "}
               <span className="text-muted-foreground">
-                The chart-review-improve skill reads your validated annotations and
-                clusters disagreement signal into concrete criterion-level edits.
+                {taskKind === "ner"
+                  ? "The chart-review-ner-improve skill diffs the agent drafts against your validated spans and proposes concrete entity-type-guidance edits."
+                  : "The chart-review-improve skill reads your validated annotations and clusters disagreement signal into concrete criterion-level edits."}
               </span>
               <details className="text-[11.5px] text-muted-foreground/90 mt-1">
                 <summary className="cursor-pointer hover:text-foreground">
                   What signals does it use?
                 </summary>
-                <ul className="list-disc pl-4 mt-1 space-y-0.5">
-                  <li>
-                    <strong>Reviewer overrides</strong> — fields where you changed an
-                    agent's draft answer.
-                  </li>
-                  <li>
-                    <strong>Comments</strong> — anything you typed in the optional
-                    "Comment · used to refine guideline" field on a criterion.
-                  </li>
-                  <li>
-                    <strong>Reviewer-vs-agent answer divergence</strong> — your
-                    submitted answer differs from every agent's draft answer on the
-                    same criterion (compared via files in <code>runs/</code> vs
-                    <code> reviews/</code>).
-                  </li>
-                  <li>
-                    <strong>Rationale departures</strong> — your written rationale
-                    diverges from the agent's reasoning across multiple patients.
-                  </li>
-                </ul>
+                {taskKind === "ner" ? (
+                  <ul className="list-disc pl-4 mt-1 space-y-0.5">
+                    <li>
+                      <strong>Deleted spans</strong> — agents emitted them, you removed them
+                      (false positives, surfaced as <code>add_negative_example</code> candidates).
+                    </li>
+                    <li>
+                      <strong>Added spans</strong> — you tagged them but no agent proposed them
+                      (false negatives, surfaced as <code>add_exemplar</code> candidates).
+                    </li>
+                    <li>
+                      <strong>Edited concept_name</strong> — same span boundary, you changed the
+                      concept name (mapping errors, surfaced as <code>add_concept_alias</code> or
+                      <code>edit_guidance</code> candidates).
+                    </li>
+                    <li>
+                      <strong>Validated notes only</strong> — only spans inside notes you marked
+                      validated count as ground truth.
+                    </li>
+                  </ul>
+                ) : (
+                  <ul className="list-disc pl-4 mt-1 space-y-0.5">
+                    <li>
+                      <strong>Reviewer overrides</strong> — fields where you changed an
+                      agent's draft answer.
+                    </li>
+                    <li>
+                      <strong>Comments</strong> — anything you typed in the optional
+                      "Comment · used to refine guideline" field on a criterion.
+                    </li>
+                    <li>
+                      <strong>Reviewer-vs-agent answer divergence</strong> — your
+                      submitted answer differs from every agent's draft answer on the
+                      same criterion (compared via files in <code>runs/</code> vs
+                      <code> reviews/</code>).
+                    </li>
+                    <li>
+                      <strong>Rationale departures</strong> — your written rationale
+                      diverges from the agent's reasoning across multiple patients.
+                    </li>
+                  </ul>
+                )}
                 <p className="mt-1">
-                  If your validation was mostly "Copy from Agent" + Submit (no edits,
-                  no comments), the skill has nothing to cluster and will report zero
-                  proposals — that's correct, not a bug.
+                  {taskKind === "ner"
+                    ? "If every disagreement is a one-off (no entity_type cluster ≥ 2 spans), the skill writes zero proposals and reports why — that's correct, not a bug."
+                    : "If your validation was mostly \"Copy from Agent\" + Submit (no edits, no comments), the skill has nothing to cluster and will report zero proposals — that's correct, not a bug."}
                 </p>
               </details>
               <p className="text-[11.5px] text-muted-foreground">
-                Output: rule proposals at <code>proposals/&lt;guideline-id&gt;/*.yaml</code> →
-                visible in <strong>Lock → Drain rule queue</strong>.
+                {taskKind === "ner" ? (
+                  <>Output: proposal YAMLs at <code>proposals/&lt;task-id&gt;/*.yaml</code> targeting <code>references/entity_type_guidance/&lt;EntityType&gt;.yaml</code> — read each and apply by hand.</>
+                ) : (
+                  <>Output: rule proposals at <code>proposals/&lt;guideline-id&gt;/*.yaml</code> → visible in <strong>Lock → Drain rule queue</strong>.</>
+                )}
               </p>
             </div>
           </div>
