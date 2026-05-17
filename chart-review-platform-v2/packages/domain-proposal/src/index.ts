@@ -41,3 +41,10 @@ export {
   readProposal as readImprovementProposal,
   type ImproveGuidelineResult,
 } from "./guideline-improvement.js";
+
+// ner-improvement: span-shaped auto-critique driver for task_kind=ner
+export {
+  improveNerTask,
+  type ImproveNerTaskOptions,
+  type ImproveNerTaskResult,
+} from "./ner-improvement.js";

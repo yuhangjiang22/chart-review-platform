@@ -71,6 +71,12 @@ export function isProviderName(s: unknown): s is ProviderName {
 export type AgentRunInput = ComposeAgentInput & {
   prompt: string;
   provider?: ProviderName;
+  /** Optional absolute path to a JSONL file. When set, every AgentEvent
+   *  produced by the underlying provider is appended (tool_result outputs
+   *  truncated at 4 KB) so the run is fully auditable after the fact.
+   *  Provider-agnostic — works for both Claude and Codex. Set
+   *  CHART_REVIEW_TRANSCRIPTS=0 to disable even when a path is supplied. */
+  transcriptPath?: string;
 };
 
 /** Provider contract: one method that yields events. Implementations
@@ -115,12 +121,60 @@ export async function getAgentProvider(): Promise<AgentProvider> {
   return cached;
 }
 
+/** Cap on per-tool_result payload size persisted to the transcript.
+ *  Read tool calls against large files can blow up the JSONL otherwise. */
+const TRANSCRIPT_MAX_RESULT_BYTES = 4096;
+
+function truncateForTranscript(o: unknown): unknown {
+  if (typeof o === "string") {
+    if (o.length <= TRANSCRIPT_MAX_RESULT_BYTES) return o;
+    return o.slice(0, TRANSCRIPT_MAX_RESULT_BYTES)
+      + `… [truncated, ${o.length - TRANSCRIPT_MAX_RESULT_BYTES} more chars]`;
+  }
+  try {
+    const s = JSON.stringify(o);
+    if (s.length <= TRANSCRIPT_MAX_RESULT_BYTES) return o;
+    return s.slice(0, TRANSCRIPT_MAX_RESULT_BYTES)
+      + `… [truncated, ${s.length - TRANSCRIPT_MAX_RESULT_BYTES} more chars]`;
+  } catch {
+    return o;
+  }
+}
+
+function sanitizeForTranscript(e: AgentEvent): AgentEvent {
+  if (e.type === "tool_result") {
+    return { ...e, output: truncateForTranscript(e.output) };
+  }
+  return e;
+}
+
+async function appendTranscript(fp: string, event: AgentEvent): Promise<void> {
+  const fs = await import("node:fs/promises");
+  const path = await import("node:path");
+  await fs.mkdir(path.dirname(fp), { recursive: true });
+  const line = JSON.stringify({
+    ts: new Date().toISOString(),
+    ...sanitizeForTranscript(event),
+  }) + "\n";
+  await fs.appendFile(fp, line);
+}
+
 /** Convenience: run an agent and yield events directly. Most callers
  *  should use this — they don't need the provider object, only its
- *  output stream. */
+ *  output stream. When `transcriptPath` is set and
+ *  CHART_REVIEW_TRANSCRIPTS!=0, every event is appended to that file
+ *  as JSONL before being yielded downstream. */
 export async function* runAgent(input: AgentRunInput): AsyncIterable<AgentEvent> {
   const provider = input.provider
     ? await buildProvider(input.provider)
     : await getAgentProvider();
-  yield* provider.run(input);
+  const transcriptEnabled =
+    input.transcriptPath && process.env.CHART_REVIEW_TRANSCRIPTS !== "0";
+  for await (const event of provider.run(input)) {
+    if (transcriptEnabled) {
+      try { await appendTranscript(input.transcriptPath!, event); }
+      catch { /* transcript persistence is best-effort; never fail the run */ }
+    }
+    yield event;
+  }
 }

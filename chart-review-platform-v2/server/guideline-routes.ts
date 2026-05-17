@@ -46,8 +46,10 @@ import { runPreflight } from "./lib/adapters/http/preflight-routes.js";
 
 // Guideline imports
 import {
-  improveGuideline, listImprovementProposals, readImprovementProposal,
+  improveGuideline, improveNerTask,
+  listImprovementProposals, readImprovementProposal,
 } from "./lib/domain/proposal/index.js";
+import { loadCompiledTask } from "./lib/tasks.js";
 import { calibrateGuideline } from "./lib/guideline-calibration.js";
 import { guidelineDir } from "./lib/domain/rubric/index.js";
 import { computeTaskSha } from "./lib/lock.js";
@@ -180,13 +182,27 @@ export const guidelineRoutes: RouteEntry[] = [
   {
     method: "POST", pattern: "/api/guideline-improvement/:taskId",
     handler: async (body, _r, p) => {
-      const { patient_ids, focus_criterion } = (body ?? {}) as {
-        patient_ids?: string[]; focus_criterion?: string;
+      const { patient_ids, focus_criterion, focus_entity_type } = (body ?? {}) as {
+        patient_ids?: string[];
+        focus_criterion?: string;
+        focus_entity_type?: string;
       };
       if (!Array.isArray(patient_ids) || patient_ids.length === 0) {
         throw httpErr(400, "patient_ids[] required (non-empty)");
       }
+      // task_kind dispatch: NER tasks use a span-shaped driver that
+      // diffs agent drafts against the reviewer-validated review_state
+      // and proposes edits to entity-type-guidance YAMLs instead of
+      // criteria. Phenotype falls through to the existing driver.
+      const task = loadCompiledTask(p.taskId);
       try {
+        if (task?.task_kind === "ner") {
+          const result = await improveNerTask({
+            task_id: p.taskId, patient_ids, focus_entity_type,
+          });
+          if (!result.ok) throw httpErr(500, (result as { error?: string }).error ?? "improveNerTask failed", result);
+          return result;
+        }
         const result = await improveGuideline({
           guideline_id: p.taskId, patient_ids, focus_criterion,
         });

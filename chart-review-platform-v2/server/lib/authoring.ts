@@ -164,7 +164,9 @@ export async function draftTask(
           payload: { tool_use_id: event.tool_use_id, is_error: false },
         });
       } else if (event.type === "result") {
-        success = event.subtype === "success";
+        // Per AgentEvent docs: subtype is Anthropic-specific. Codex
+        // doesn't set it — treat undefined as success.
+        success = event.subtype === undefined || event.subtype === "success";
         cost = event.cost_usd;
         emit({
           kind: "result",

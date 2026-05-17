@@ -163,6 +163,15 @@ export function agentDraftPath(runId: string, patientId: string, agentId: string
   return path.join(perPatientDir(runId, patientId), "agents", `${agentId}.json`);
 }
 
+/** Path for per-agent transcript (AgentEvent JSONL). Captures every
+ *  tool_use / tool_result / text / result event emitted by the
+ *  provider — provider-agnostic, so we can verify what the agent
+ *  actually read / called even when the SDK hooks don't fire (e.g.
+ *  the codex provider). Sits next to the agent draft. */
+export function agentTranscriptPath(runId: string, patientId: string, agentId: string): string {
+  return path.join(perPatientDir(runId, patientId), "agents", `${agentId}_transcript.jsonl`);
+}
+
 /** Returns true if the patient has at least one agent draft from this run. */
 export function hasAnyAgentDraft(runId: string, patientId: string): boolean {
   const dir = path.join(perPatientDir(runId, patientId), "agents");
@@ -774,6 +783,7 @@ async function runOneAgent(
       permissionMode: "acceptEdits",
       model: spec.model,
       provider: manifest.provider,
+      transcriptPath: agentTranscriptPath(runId, patientId, spec.id),
       extraSystemPrompt:
         "You are running unattended in batch mode. There is no human in the " +
         "loop for this patient — produce your draft and stop. Do not ask " +

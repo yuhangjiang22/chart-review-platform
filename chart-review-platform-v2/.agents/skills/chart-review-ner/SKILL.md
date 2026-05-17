@@ -44,6 +44,34 @@ source-of-truth for span offsets.
 
 ---
 
+## Pre-extraction reading — MANDATORY
+
+Before you read any note or call any MCP tool, you MUST complete these
+steps in order:
+
+1. Read the scope skill's `SKILL.md` at
+   `.agents/skills/chart-review-<task_id>/SKILL.md`.
+2. Enumerate every YAML file under
+   `.agents/skills/chart-review-<task_id>/references/entity_type_guidance/`
+   (use `ls`).
+3. **Read EVERY YAML file in that directory** — not just the entity types
+   you think apply. The methodologist authored guidance, exemplars,
+   negative_examples, and edge_cases that you must consult before
+   deciding to emit OR skip a candidate span. A `negative_examples`
+   entry only protects you from a false positive if you have actually
+   read it. Skipping a file because "this entity type seems unlikely
+   in this chart" is the exact failure mode the strict reading rule
+   exists to prevent.
+4. Only after every YAML has been read may you call `list_entity_types`
+   and begin extraction.
+
+If the `references/entity_type_guidance/` directory does not exist or
+is empty, fall back to the SKILL.md "Annotation guidance (summary)"
+section, but emit a `text` message noting the absence so the
+methodologist knows to author the YAMLs.
+
+---
+
 ## Data access — ontology via MCP
 
 Tools on the `chart_review_ner` server. Always call `list_entity_types`

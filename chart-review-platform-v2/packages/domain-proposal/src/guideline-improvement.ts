@@ -233,7 +233,9 @@ export async function improveGuideline(
         "`guidelines/`.",
     })) {
       if (event.type === "result") {
-        success = event.subtype === "success";
+        // Per AgentEvent docs: subtype is Anthropic-specific. Codex
+        // doesn't set it — treat undefined as success.
+        success = event.subtype === undefined || event.subtype === "success";
         cost = event.cost_usd;
       } else if (event.type === "error") {
         errorMessage = event.error;
