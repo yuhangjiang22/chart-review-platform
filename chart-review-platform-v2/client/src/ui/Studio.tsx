@@ -1205,6 +1205,7 @@ interface BundleManifest {
 export function BundlesFigure({ taskId }: { taskId: string }) {
   const [bundles, setBundles] = useState<BundleListing[]>([]);
   const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
   useEffect(() => {
     authFetch(`/api/exports/${taskId}`)
       .then((r) => (r.ok ? r.json() : []))
@@ -1214,16 +1215,30 @@ export function BundlesFigure({ taskId }: { taskId: string }) {
 
   async function exportNew() {
     setExporting(true);
+    setExportError(null);
     try {
       const r = await authFetch(`/api/exports/${taskId}?tarball=1`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),
       });
-      if (r.ok) {
-        const fresh = await authFetch(`/api/exports/${taskId}`).then((r) => r.json());
-        setBundles(fresh);
+      if (!r.ok) {
+        // Surface the server message so silent failures (expired
+        // session → 403 "exporting requires methodologist privilege",
+        // 500s, etc) don't look like a frozen button.
+        const body = await r.json().catch(() => ({} as { error?: string }));
+        const msg = body?.error ?? `HTTP ${r.status}`;
+        setExportError(
+          r.status === 403
+            ? `${msg}. Try signing in again — your session may have expired.`
+            : msg,
+        );
+        return;
       }
+      const fresh = await authFetch(`/api/exports/${taskId}`).then((res) => res.json());
+      setBundles(fresh);
+    } catch (e) {
+      setExportError(`Network error: ${(e as Error).message}`);
     } finally {
       setExporting(false);
     }
@@ -1247,11 +1262,16 @@ export function BundlesFigure({ taskId }: { taskId: string }) {
 
       <Separator className="my-8" />
 
-      <div className="mb-4">
+      <div className="mb-4 space-y-2">
         <Button onClick={exportNew} disabled={exporting} variant="default">
           <Archive size={13} />
           {exporting ? "exporting…" : "Export new bundle (.tar.gz)"}
         </Button>
+        {exportError && (
+          <div className="text-[11.5px] text-[hsl(var(--oxblood))]">
+            Export failed: {exportError}
+          </div>
+        )}
       </div>
 
       {bundles.length === 0 ? (
