@@ -190,8 +190,12 @@ export function PhaseDecide({
             </Button>
             {improveProposalCount != null && improveProposalCount > 0 && (
               <span className="text-[11.5px] text-[hsl(var(--sage))]">
-                ✓ {improveProposalCount} proposal{improveProposalCount === 1 ? "" : "s"} written.
-                Review them in <strong>Lock → Drain rule queue</strong>.
+                ✓ {improveProposalCount} proposal{improveProposalCount === 1 ? "" : "s"} written.{" "}
+                {taskKind === "ner" ? (
+                  <>Read them in <code>var/proposals/&lt;task-id&gt;/*.yaml</code> and apply by hand to the matching <code>entity_type_guidance/&lt;EntityType&gt;.yaml</code>.</>
+                ) : (
+                  <>Review them in <strong>Lock → Drain rule queue</strong>.</>
+                )}
               </span>
             )}
             {improveProposalCount === 0 && (
@@ -217,7 +221,8 @@ export function PhaseDecide({
             This iteration — keep going around the cycle?
           </div>
           <div className="rounded-md border border-border bg-card/40 px-4 py-3 text-[12.5px] text-muted-foreground">
-            <strong className="text-foreground">Improve</strong> generates rule proposals
+            <strong className="text-foreground">Improve</strong> generates{" "}
+            {taskKind === "ner" ? "annotation-guidance proposals" : "rule proposals"}{" "}
             from this iteration's data (above).{" "}
             <strong className="text-foreground">Revise</strong> takes you back to{" "}
             <strong>Author</strong> to apply edits and start the next iteration —
@@ -233,7 +238,9 @@ export function PhaseDecide({
               <Pencil size={16} />
               <span>Revise → next iteration</span>
               <span className="text-[10px] font-normal text-muted-foreground">
-                edit guideline, re-run agents, re-validate
+                {taskKind === "ner"
+                  ? "edit annotation guidance, re-run agents, re-validate"
+                  : "edit guideline, re-run agents, re-validate"}
               </span>
             </Button>
           </div>
