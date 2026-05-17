@@ -9,27 +9,34 @@ guidance: |
   dementia") should NOT be tagged — the entity isn't present in the
   patient's state.
 exemplars:
-  - "Alzheimer's disease"
-  - "mild cognitive impairment"
-  - "MCI"
-  - "moderate-stage AD"
-  - "memory loss"
-  - "disorientation"
-  - "executive dysfunction"
+  - Alzheimer's disease
+  - mild cognitive impairment
+  - MCI
+  - moderate-stage AD
+  - memory loss
+  - disorientation
+  - executive dysfunction
 negative_examples:
-  - phrase: "no memory complaints"
-    reason: "negated — the symptom is absent"
-  - phrase: "family history of dementia"
-    reason: "family history, not the patient's diagnosis"
-  - phrase: "ruled out dementia"
-    reason: "negated by clinical assessment"
+  - phrase: no memory complaints
+    reason: negated — the symptom is absent
+  - phrase: family history of dementia
+    reason: family history, not the patient's diagnosis
+  - phrase: ruled out dementia
+    reason: negated by clinical assessment
 edge_cases:
-  - pattern: "MCI converting to AD"
-    correct: "tag BOTH 'MCI' and 'AD' as separate spans"
-    reason: "two distinct diagnoses in a temporal sequence"
-  - pattern: "Alzheimer's-type dementia"
-    correct: "tag once as 'Alzheimer's disease' (or the most-specific match)"
-    reason: "one diagnosis, even though two words from the subtree appear"
-  - pattern: "early-onset Alzheimer's"
-    correct: "tag as 'Early-Onset Alzheimer's' if that child exists; else 'Alzheimer's disease'"
-    reason: "the qualifier maps to a more-specific concept when present in the ontology"
+  - pattern: MCI converting to AD
+    correct: tag BOTH 'MCI' and 'AD' as separate spans
+    reason: two distinct diagnoses in a temporal sequence
+  - pattern: Alzheimer's-type dementia
+    correct: tag once as 'Alzheimer's disease' (or the most-specific match)
+    reason: one diagnosis, even though two words from the subtree appear
+  - pattern: early-onset Alzheimer's
+    correct: tag as 'Early-Onset Alzheimer's' if that child exists; else
+      'Alzheimer's disease'
+    reason: the qualifier maps to a more-specific concept when present in the ontology
+  - pattern: isolated radiology protocol / laterality fragments (e.g., 'venous',
+      'right')
+    correct: do NOT tag as Dementia; ignore unless part of an explicit cognitive
+      diagnosis/symptom phrase
+    reason: common in imaging text and otherwise causes spurious Dementia
+      novel_candidates

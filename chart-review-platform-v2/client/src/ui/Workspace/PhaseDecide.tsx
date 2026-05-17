@@ -99,85 +99,13 @@ export function PhaseDecide({
         </div>
       )}
 
-      {/* Improve — a third option that uses the validated annotations
-       *  + override comments to propose criterion-level guideline edits.
-       *  Sits between Revise and Lock conceptually: "look at what humans
-       *  disagreed with, propose tightening for the next iter." */}
+      {/* Suggestions panel — one compact Improve trigger above; the
+       *  ImprovementProposalsPanel below renders proposal cards (plain
+       *  English + Accept/Dismiss). Collapsed from the old 3-section
+       *  layout into one block since the cards explain themselves. */}
       {onImprove && (
-        <div className="rounded-md border border-[hsl(var(--ochre))]/30 bg-[hsl(var(--ochre))]/5 px-4 py-3 space-y-2">
-          <div className="flex items-start gap-2">
-            <Sparkles size={14} className="text-[hsl(var(--ochre))] mt-0.5 shrink-0" />
-            <div className="flex-1 text-[12.5px] space-y-1">
-              <strong className="text-[hsl(var(--ochre))]">
-                {taskKind === "ner" ? "Improve the annotation guidance." : "Improve the guideline."}
-              </strong>{" "}
-              <span className="text-muted-foreground">
-                {taskKind === "ner"
-                  ? "The chart-review-ner-improve skill diffs the agent drafts against your validated spans and proposes concrete entity-type-guidance edits."
-                  : "The chart-review-improve skill reads your validated annotations and clusters disagreement signal into concrete criterion-level edits."}
-              </span>
-              <details className="text-[11.5px] text-muted-foreground/90 mt-1">
-                <summary className="cursor-pointer hover:text-foreground">
-                  What signals does it use?
-                </summary>
-                {taskKind === "ner" ? (
-                  <ul className="list-disc pl-4 mt-1 space-y-0.5">
-                    <li>
-                      <strong>Deleted spans</strong> — agents emitted them, you removed them
-                      (false positives, surfaced as <code>add_negative_example</code> candidates).
-                    </li>
-                    <li>
-                      <strong>Added spans</strong> — you tagged them but no agent proposed them
-                      (false negatives, surfaced as <code>add_exemplar</code> candidates).
-                    </li>
-                    <li>
-                      <strong>Edited concept_name</strong> — same span boundary, you changed the
-                      concept name (mapping errors, surfaced as <code>add_concept_alias</code> or
-                      <code>edit_guidance</code> candidates).
-                    </li>
-                    <li>
-                      <strong>Validated notes only</strong> — only spans inside notes you marked
-                      validated count as ground truth.
-                    </li>
-                  </ul>
-                ) : (
-                  <ul className="list-disc pl-4 mt-1 space-y-0.5">
-                    <li>
-                      <strong>Reviewer overrides</strong> — fields where you changed an
-                      agent's draft answer.
-                    </li>
-                    <li>
-                      <strong>Comments</strong> — anything you typed in the optional
-                      "Comment · used to refine guideline" field on a criterion.
-                    </li>
-                    <li>
-                      <strong>Reviewer-vs-agent answer divergence</strong> — your
-                      submitted answer differs from every agent's draft answer on the
-                      same criterion (compared via files in <code>runs/</code> vs
-                      <code> reviews/</code>).
-                    </li>
-                    <li>
-                      <strong>Rationale departures</strong> — your written rationale
-                      diverges from the agent's reasoning across multiple patients.
-                    </li>
-                  </ul>
-                )}
-                <p className="mt-1">
-                  {taskKind === "ner"
-                    ? "If every disagreement is a one-off (no entity_type cluster ≥ 2 spans), the skill writes zero proposals and reports why — that's correct, not a bug."
-                    : "If your validation was mostly \"Copy from Agent\" + Submit (no edits, no comments), the skill has nothing to cluster and will report zero proposals — that's correct, not a bug."}
-                </p>
-              </details>
-              <p className="text-[11.5px] text-muted-foreground">
-                {taskKind === "ner" ? (
-                  <>Output: proposal YAMLs at <code>proposals/&lt;task-id&gt;/*.yaml</code> targeting <code>references/entity_type_guidance/&lt;EntityType&gt;.yaml</code> — read each and apply by hand.</>
-                ) : (
-                  <>Output: rule proposals at <code>proposals/&lt;guideline-id&gt;/*.yaml</code> → visible in <strong>Lock → Drain rule queue</strong>.</>
-                )}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 pt-1">
+        <div className="space-y-3">
+          <div className="flex items-center gap-3">
             <Button
               variant="outline"
               size="sm"
@@ -186,88 +114,55 @@ export function PhaseDecide({
               className="gap-1.5"
             >
               <Sparkles size={12} />
-              {isImproving ? "Running improvement… (~30s-2m)" : "Run improvement"}
+              {isImproving ? "Looking for improvements… (~30s-2m)" : "Look for improvements"}
             </Button>
-            {improveProposalCount != null && improveProposalCount > 0 && (
-              <span className="text-[11.5px] text-[hsl(var(--sage))]">
-                ✓ {improveProposalCount} proposal{improveProposalCount === 1 ? "" : "s"} written.{" "}
-                {taskKind === "ner" ? (
-                  <>Read them in <code>var/proposals/&lt;task-id&gt;/*.yaml</code> and apply by hand to the matching <code>entity_type_guidance/&lt;EntityType&gt;.yaml</code>.</>
-                ) : (
-                  <>Review them in <strong>Lock → Drain rule queue</strong>.</>
-                )}
-              </span>
-            )}
-            {improveProposalCount === 0 && (
-              <span className="text-[11.5px] text-muted-foreground">
-                ✓ Run complete — 0 new proposals. Either your validations match the
-                agents (no signal to cluster) or no patterns crossed the cluster
-                threshold. Add reviewer comments or override agent answers to
-                generate signal.
-              </span>
-            )}
+            <span className="text-[11.5px] text-muted-foreground">
+              {taskKind === "ner"
+                ? "Diffs the agent drafts against your validated spans and suggests edits to the annotation guidance."
+                : "Reads your validated annotations and proposes criterion-level edits."}
+            </span>
           </div>
+          <ImprovementProposalsPanel taskId={taskId} patientIds={patientIds} />
+          {improveProposalCount === 0 && (
+            <div className="text-[11.5px] text-muted-foreground">
+              ✓ Run complete — no new suggestions. Either your validation matches
+              the agents or no patterns crossed the cluster threshold.
+            </div>
+          )}
         </div>
       )}
 
-      {/* Iterate vs exit — explicit framing. The two iteration paths
-       *  (Improve + Revise) belong to the cycle the reviewer is currently
-       *  in; Lock is the exit ramp out of the cycle. Splitting them into
-       *  two visually-distinct rows makes the "you're going around again"
-       *  vs "you're done iterating" decision obvious. */}
-      <div className="space-y-4">
-        <div>
-          <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground mb-2">
-            This iteration — keep going around the cycle?
-          </div>
-          <div className="rounded-md border border-border bg-card/40 px-4 py-3 text-[12.5px] text-muted-foreground">
-            <strong className="text-foreground">Improve</strong> generates{" "}
-            {taskKind === "ner" ? "annotation-guidance proposals" : "rule proposals"}{" "}
-            from this iteration's data (above).{" "}
-            <strong className="text-foreground">Revise</strong> takes you back to{" "}
-            <strong>Author</strong> to apply edits and start the next iteration —
-            agents re-run, you re-validate, then come back here.
-          </div>
-          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Button
-              variant="outline"
-              size="lg"
-              className="h-16 flex-col gap-1"
-              onClick={onRevise}
-            >
-              <Pencil size={16} />
-              <span>Revise → next iteration</span>
-              <span className="text-[10px] font-normal text-muted-foreground">
-                {taskKind === "ner"
-                  ? "edit annotation guidance, re-run agents, re-validate"
-                  : "edit guideline, re-run agents, re-validate"}
-              </span>
-            </Button>
-          </div>
-        </div>
-
-        <div className="border-t border-border/60 pt-4">
-          <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground mb-2">
-            Exit the cycle — freeze this version
-          </div>
-          <Button
-            variant="default"
-            size="lg"
-            className="h-16 w-full flex-col gap-1"
-            disabled={!canLock}
-            onClick={onLock}
-          >
-            <Lock size={16} />
-            <span>Lock</span>
-            <span className="text-[10px] font-normal opacity-70">
-              one-way · no further edits accepted on this version
-            </span>
-          </Button>
-        </div>
+      {/* Bottom action row: Revise + Lock side by side. Lock is gated by
+       *  canLock; the warning banner above already explains why. */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 pt-2">
+        <Button
+          variant="outline"
+          size="lg"
+          className="h-16 flex-col gap-1"
+          onClick={onRevise}
+        >
+          <Pencil size={16} />
+          <span>Revise → next iteration</span>
+          <span className="text-[10px] font-normal text-muted-foreground">
+            {taskKind === "ner"
+              ? "edit annotation guidance, re-run agents, re-validate"
+              : "edit guideline, re-run agents, re-validate"}
+          </span>
+        </Button>
+        <Button
+          variant="default"
+          size="lg"
+          className="h-16 flex-col gap-1"
+          disabled={!canLock}
+          onClick={onLock}
+        >
+          <Lock size={16} />
+          <span>Lock</span>
+          <span className="text-[10px] font-normal opacity-70">
+            one-way · no further edits accepted
+          </span>
+        </Button>
       </div>
-
-      {/* Improvement proposals — runs + error banner (A4) + analysis summary (A5) */}
-      <ImprovementProposalsPanel taskId={taskId} patientIds={patientIds} />
     </div>
   );
 }

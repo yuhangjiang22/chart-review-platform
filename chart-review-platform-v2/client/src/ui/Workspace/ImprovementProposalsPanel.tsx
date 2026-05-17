@@ -1,42 +1,55 @@
 /**
- * ImprovementProposalsPanel — DECIDE phase card that lets the methodologist
- * run guideline improvement and view the resulting proposals + analysis summary.
+ * ImprovementProposalsPanel — DECIDE-phase panel that lists the proposals
+ * produced by the improve flow.
  *
- * A4: Catches non-200 responses from the improve POST and renders an error
- *     banner inside the card (verbatim server message + actionable hint).
- *     The button resets to idle state on error so the user can retry.
+ * NER proposals (the common case in v2) render as a plain-English card
+ * (entity_type + a sentence-form suggestion + evidence + Accept/Dismiss
+ * buttons). The raw YAML body is hidden behind a "Show YAML" toggle.
  *
- * A5: Fetches ANALYSIS_SUMMARY.md on mount. If present, renders a collapsible
- *     markdown block ABOVE the proposals list. Defaults to collapsed with a
- *     200-char preview. Uses the codebase's existing `Markdown` renderer.
+ * Phenotype proposals from the legacy rule-store flow fall through to a
+ * minimal listing with the same Accept/Dismiss affordance disabled
+ * (the rule-store has its own promotion UI in the Lock phase).
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { parse as parseYaml } from "yaml";
 import { authFetch } from "../../auth";
 import { Markdown } from "../../markdown";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Check, ChevronDown, ChevronRight, FileCode, Sparkles, Trash2, X } from "lucide-react";
 
-/** The proposals endpoint returns either:
- *  - the legacy "rule" shape ({rule_id, nl_rule, field_id, created_at, ...}),
- *    produced by the rule-translate pipeline, OR
- *  - the directory-listing shape ({proposal_id, path, modified_at, size_bytes})
- *    produced by chart-review-improve when it writes per-patient proposal
- *    YAML files.
- *  The render uses optional chaining and `??` fallbacks so either shape
- *  displays without crashing — full content of the YAML files isn't shown
- *  inline; the listing surfaces the id + timestamp + a link to inspect. */
-interface Proposal {
+/** Directory-listing shape returned by GET .../proposals. */
+interface ProposalListing {
   rule_id?: string;
   field_id?: string;
   status?: string;
   nl_rule?: string;
   created_at?: string;
   created_by?: string;
-  // Directory-listing shape:
   proposal_id?: string;
   path?: string;
   modified_at?: string;
   size_bytes?: number;
+}
+
+/** Parsed NER proposal shape — the friendly render keys off these. */
+interface NerProposalDoc {
+  proposal_id?: string;
+  entity_type?: string;
+  change_kind?: string;
+  rationale?: string;
+  evidence?: {
+    patient_ids?: string[];
+    span_examples?: Array<{
+      note_id?: string;
+      text?: string;
+      agent_concept?: string;
+      reviewer_concept?: string;
+      reviewer_action?: string;
+      reason?: string;
+    }>;
+  };
+  proposed_patch?: Record<string, unknown>;
 }
 
 interface ImprovementProposalsPanelProps {
@@ -44,52 +57,41 @@ interface ImprovementProposalsPanelProps {
   patientIds: string[];
 }
 
+/** Translate a `change_kind` enum into the verb the methodologist actually
+ *  cares about ("Adds to: …"). */
+function changeKindToTargetSection(kind: string | undefined): string {
+  switch (kind) {
+    case "add_negative_example": return "negative_examples";
+    case "add_exemplar": return "exemplars";
+    case "add_edge_case": return "edge_cases";
+    case "edit_guidance": return "guidance prose";
+    case "add_concept_alias": return "concept_aliases (manual)";
+    default: return kind ?? "";
+  }
+}
+
 export function ImprovementProposalsPanel({
   taskId,
   patientIds,
 }: ImprovementProposalsPanelProps) {
-  // ── Analysis summary (A5) ───────────────────────────────────────────────────
+  // suppress unused-prop warning (kept for parity with phenotype caller)
+  void patientIds;
+
   const [analysisSummary, setAnalysisSummary] = useState<string | null>(null);
   const [summaryExpanded, setSummaryExpanded] = useState(false);
 
-  // ── Proposals list ──────────────────────────────────────────────────────────
-  const [proposals, setProposals] = useState<Proposal[]>([]);
-  // Per-row expansion state. Keyed by proposal id; value is the fetched
-  // YAML body or null while it's loading or unfetched.
-  const [expandedBodies, setExpandedBodies] = useState<Record<string, string | null>>({});
-  // Per-row error message (display only — fetch fails don't crash the panel).
-  const [bodyErrors, setBodyErrors] = useState<Record<string, string>>({});
+  const [proposals, setProposals] = useState<ProposalListing[]>([]);
+  /** Parsed NER doc per proposal id, or null while loading. Phenotype
+   *  proposals stay absent from this map (no friendly render). */
+  const [parsed, setParsed] = useState<Record<string, NerProposalDoc | "yaml-error">>({});
+  /** Raw YAML text, keyed by proposal id, for the "Show YAML" toggle. */
+  const [rawYaml, setRawYaml] = useState<Record<string, string>>({});
+  /** Per-row UI flags. */
+  const [showYaml, setShowYaml] = useState<Record<string, boolean>>({});
+  const [applying, setApplying] = useState<Record<string, boolean>>({});
+  const [dismissing, setDismissing] = useState<Record<string, boolean>>({});
+  const [rowError, setRowError] = useState<Record<string, string>>({});
 
-  function toggleBody(proposalId: string) {
-    setExpandedBodies((prev) => {
-      if (proposalId in prev) {
-        // Already loaded / loading — toggle off.
-        const next = { ...prev };
-        delete next[proposalId];
-        return next;
-      }
-      // First open — mark loading and fire the fetch.
-      authFetch(
-        `/api/guideline-improvement/${encodeURIComponent(taskId)}/proposals/${encodeURIComponent(proposalId)}`,
-      )
-        .then(async (r) => {
-          if (!r.ok) {
-            setBodyErrors((e) => ({ ...e, [proposalId]: `HTTP ${r.status}` }));
-            setExpandedBodies((s) => ({ ...s, [proposalId]: "" }));
-            return;
-          }
-          const text = await r.text();
-          setExpandedBodies((s) => ({ ...s, [proposalId]: text }));
-        })
-        .catch((e: Error) => {
-          setBodyErrors((er) => ({ ...er, [proposalId]: e.message }));
-          setExpandedBodies((s) => ({ ...s, [proposalId]: "" }));
-        });
-      return { ...prev, [proposalId]: null };
-    });
-  }
-
-  // Fetch analysis summary on mount and after each improve run.
   function fetchAnalysisSummary() {
     authFetch(`/api/guideline-improvement/${encodeURIComponent(taskId)}/analysis-summary`)
       .then((r) => (r.ok ? r.text() : null))
@@ -97,13 +99,14 @@ export function ImprovementProposalsPanel({
       .catch(() => setAnalysisSummary(null));
   }
 
-  // Fetch proposals list.
-  function fetchProposals() {
+  const fetchProposals = useCallback(() => {
     authFetch(`/api/guideline-improvement/${encodeURIComponent(taskId)}/proposals`)
       .then((r) => (r.ok ? r.json() : []))
-      .then((list) => setProposals(Array.isArray(list) ? list : []))
+      .then((list: ProposalListing[]) => {
+        setProposals(Array.isArray(list) ? list : []);
+      })
       .catch(() => setProposals([]));
-  }
+  }, [taskId]);
 
   useEffect(() => {
     fetchAnalysisSummary();
@@ -111,20 +114,88 @@ export function ImprovementProposalsPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskId]);
 
-  // ── Render ──────────────────────────────────────────────────────────────────
+  // Fetch + parse every proposal's body. Done eagerly so cards can render
+  // the friendly summary without a click; bodies are small (~2 KB each).
+  useEffect(() => {
+    let cancelled = false;
+    for (const p of proposals) {
+      const id = p.proposal_id ?? p.rule_id;
+      if (!id || id in rawYaml) continue;
+      authFetch(
+        `/api/guideline-improvement/${encodeURIComponent(taskId)}/proposals/${encodeURIComponent(id)}`,
+      )
+        .then((r) => (r.ok ? r.text() : null))
+        .then((text) => {
+          if (cancelled || text === null) return;
+          setRawYaml((m) => ({ ...m, [id]: text }));
+          try {
+            const doc = parseYaml(text) as NerProposalDoc;
+            setParsed((m) => ({ ...m, [id]: doc ?? "yaml-error" }));
+          } catch {
+            setParsed((m) => ({ ...m, [id]: "yaml-error" }));
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setRowError((m) => ({ ...m, [id]: "failed to load proposal body" }));
+          }
+        });
+    }
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [proposals, taskId]);
+
+  function applyProposal(id: string) {
+    if (applying[id]) return;
+    setApplying((m) => ({ ...m, [id]: true }));
+    setRowError((m) => { const n = { ...m }; delete n[id]; return n; });
+    authFetch(
+      `/api/guideline-improvement/${encodeURIComponent(taskId)}/proposals/${encodeURIComponent(id)}/apply`,
+      { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" },
+    )
+      .then(async (r) => {
+        const body = await r.json().catch(() => ({}));
+        if (!r.ok) {
+          const msg = body?.payload?.error ?? body?.error ?? `apply failed: ${r.status}`;
+          setRowError((m) => ({ ...m, [id]: msg }));
+          return;
+        }
+        fetchProposals();
+      })
+      .catch((e: Error) => setRowError((m) => ({ ...m, [id]: e.message })))
+      .finally(() => setApplying((m) => { const n = { ...m }; delete n[id]; return n; }));
+  }
+
+  function dismissProposal(id: string) {
+    if (dismissing[id]) return;
+    if (!confirm("Delete this proposal? This cannot be undone.")) return;
+    setDismissing((m) => ({ ...m, [id]: true }));
+    setRowError((m) => { const n = { ...m }; delete n[id]; return n; });
+    authFetch(
+      `/api/guideline-improvement/${encodeURIComponent(taskId)}/proposals/${encodeURIComponent(id)}`,
+      { method: "DELETE" },
+    )
+      .then(async (r) => {
+        if (!r.ok) {
+          const body = await r.json().catch(() => ({}));
+          const msg = body?.payload?.error ?? body?.error ?? `dismiss failed: ${r.status}`;
+          setRowError((m) => ({ ...m, [id]: msg }));
+          return;
+        }
+        fetchProposals();
+      })
+      .catch((e: Error) => setRowError((m) => ({ ...m, [id]: e.message })))
+      .finally(() => setDismissing((m) => { const n = { ...m }; delete n[id]; return n; }));
+  }
+
   const previewChars = 200;
-  const summaryPreview =
-    analysisSummary != null
-      ? analysisSummary.slice(0, previewChars) + (analysisSummary.length > previewChars ? "…" : "")
-      : null;
+  const summaryPreview = analysisSummary != null
+    ? analysisSummary.slice(0, previewChars) + (analysisSummary.length > previewChars ? "…" : "")
+    : null;
 
   return (
     <div className="space-y-6">
-      {/* The "Run improvement" trigger lives in PhaseDecide's top block. This
-       *  panel is the read-only home for what that run produces: the analysis
-       *  summary + the proposals list. */}
-
-      {/* A5 — Analysis summary collapsible block, shown above proposals */}
+      {/* Analysis summary (phenotype path; absent for NER). */}
       {analysisSummary != null && (
         <div className="rounded-md border border-border bg-card overflow-hidden">
           <button
@@ -132,11 +203,9 @@ export function ImprovementProposalsPanel({
             onClick={() => setSummaryExpanded((e) => !e)}
             className="flex w-full items-center gap-2 px-5 py-3 text-left text-[12.5px] font-medium hover:bg-muted/40 transition-colors"
           >
-            {summaryExpanded ? (
-              <ChevronDown size={14} className="shrink-0 text-muted-foreground" />
-            ) : (
-              <ChevronRight size={14} className="shrink-0 text-muted-foreground" />
-            )}
+            {summaryExpanded
+              ? <ChevronDown size={14} className="shrink-0 text-muted-foreground" />
+              : <ChevronRight size={14} className="shrink-0 text-muted-foreground" />}
             <span>View analysis summary</span>
             {!summaryExpanded && (
               <span className="ml-2 truncate text-[11.5px] text-muted-foreground font-normal">
@@ -152,38 +221,134 @@ export function ImprovementProposalsPanel({
         </div>
       )}
 
-      {/* Proposals list */}
       {proposals.length > 0 && (
-        <div className="space-y-2">
+        <div className="space-y-3">
           <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-            Proposals ({proposals.length})
+            Suggestions ({proposals.length})
           </div>
-          <ul className="space-y-2">
+          <ul className="space-y-3">
             {proposals.map((p, i) => {
-              const id = p.rule_id ?? p.proposal_id ?? `proposal_${i}`;
-              const ts = p.created_at ?? p.modified_at ?? "";
-              const summary = p.nl_rule ?? p.path ?? "";
-              const truncatedSummary = summary.length > 100
-                ? summary.slice(0, 100) + "…"
-                : summary;
-              const author = p.created_by ?? "—";
-              const isOpen = id in expandedBodies;
-              const body = expandedBodies[id];
-              const err = bodyErrors[id];
+              const id = p.proposal_id ?? p.rule_id ?? `proposal_${i}`;
+              const doc = parsed[id];
+              const isNer = doc && doc !== "yaml-error" && typeof doc.entity_type === "string";
+              const yaml = rawYaml[id];
+              const showRaw = !!showYaml[id];
+              const err = rowError[id];
+              const isApplying = !!applying[id];
+              const isDismissing = !!dismissing[id];
+
               return (
                 <li
                   key={id}
-                  className="rounded-md border border-border bg-card text-[12.5px]"
+                  className="rounded-md border border-border bg-card overflow-hidden"
                 >
-                  <button
-                    type="button"
-                    onClick={() => toggleBody(id)}
-                    className="flex w-full items-center gap-2 px-4 py-3 text-left hover:bg-muted/40 transition-colors"
-                  >
-                    {isOpen
-                      ? <ChevronDown size={14} className="shrink-0 text-muted-foreground" />
-                      : <ChevronRight size={14} className="shrink-0 text-muted-foreground" />}
-                    <div className="flex-1 min-w-0">
+                  {/* Friendly NER render */}
+                  {isNer && doc !== "yaml-error" && (
+                    <div className="p-4 space-y-3">
+                      {/* Header: entity_type + change_kind verb */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Sparkles size={14} className="text-[hsl(var(--ochre))] shrink-0" />
+                        <span className="text-[10.5px] uppercase tracking-[0.14em] font-medium text-[hsl(var(--ochre))]">
+                          {doc.entity_type}
+                        </span>
+                        <span className="text-[10.5px] text-muted-foreground">·</span>
+                        <span className="text-[10.5px] uppercase tracking-[0.14em] text-muted-foreground">
+                          {doc.change_kind?.replace(/_/g, " ")}
+                        </span>
+                      </div>
+
+                      {/* Rationale prose — the "what's the suggestion" sentence */}
+                      {doc.rationale && (
+                        <p className="text-[12.5px] leading-relaxed text-foreground/90">
+                          {doc.rationale.trim()}
+                        </p>
+                      )}
+
+                      {/* Evidence: patient count + span examples */}
+                      {doc.evidence && (
+                        <div className="text-[11.5px] text-muted-foreground space-y-1">
+                          <div>
+                            <strong className="text-foreground">Evidence:</strong>{" "}
+                            {doc.evidence.patient_ids?.length ?? 0} patient
+                            {(doc.evidence.patient_ids?.length ?? 0) === 1 ? "" : "s"}
+                            {doc.evidence.span_examples
+                              && doc.evidence.span_examples.length > 0
+                              && (
+                                <>, {doc.evidence.span_examples.length} span example
+                                  {doc.evidence.span_examples.length === 1 ? "" : "s"}</>
+                              )}
+                          </div>
+                          {doc.evidence.span_examples
+                            && doc.evidence.span_examples.length > 0 && (
+                              <ul className="list-disc pl-5 mt-1 space-y-0.5">
+                                {doc.evidence.span_examples.slice(0, 3).map((s, j) => (
+                                  <li key={j}>
+                                    <code className="text-[11px]">"{s.text}"</code>
+                                    {s.reviewer_action && <> — {s.reviewer_action}</>}
+                                    {s.reason && <> ({s.reason})</>}
+                                  </li>
+                                ))}
+                                {doc.evidence.span_examples.length > 3 && (
+                                  <li className="italic">
+                                    + {doc.evidence.span_examples.length - 3} more
+                                  </li>
+                                )}
+                              </ul>
+                            )}
+                        </div>
+                      )}
+
+                      {/* Apply target */}
+                      <div className="text-[11.5px] text-muted-foreground">
+                        <strong className="text-foreground">If accepted:</strong>{" "}
+                        appends to{" "}
+                        <code>{doc.entity_type}.yaml</code> →{" "}
+                        <code>{changeKindToTargetSection(doc.change_kind)}</code>
+                      </div>
+
+                      {/* Action buttons */}
+                      <div className="flex items-center gap-2 pt-1">
+                        <Button
+                          size="sm"
+                          onClick={() => applyProposal(id)}
+                          disabled={isApplying || isDismissing}
+                          className="gap-1.5"
+                        >
+                          <Check size={12} />
+                          {isApplying ? "Applying…" : "Accept and apply"}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => dismissProposal(id)}
+                          disabled={isApplying || isDismissing}
+                          className="gap-1.5"
+                        >
+                          <Trash2 size={12} />
+                          {isDismissing ? "Dismissing…" : "Dismiss"}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setShowYaml((m) => ({ ...m, [id]: !showRaw }))}
+                          className="gap-1.5 ml-auto text-muted-foreground"
+                        >
+                          <FileCode size={12} />
+                          {showRaw ? "Hide YAML" : "Show YAML"}
+                        </Button>
+                      </div>
+                      {err && (
+                        <div className="flex items-start gap-1 text-[11.5px] text-[hsl(var(--oxblood))]">
+                          <X size={12} className="mt-0.5 shrink-0" />
+                          <span>{err}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Loading / parse-fail / phenotype fallback */}
+                  {!isNer && (
+                    <div className="p-4 space-y-2 text-[12.5px]">
                       <div className="flex items-center gap-2">
                         {p.field_id && (
                           <code className="text-[11.5px] text-foreground font-mono">
@@ -191,30 +356,32 @@ export function ImprovementProposalsPanel({
                           </code>
                         )}
                         <span className="flex-1 truncate text-muted-foreground">
-                          {truncatedSummary}
+                          {p.nl_rule ?? p.path ?? id}
                         </span>
                       </div>
-                      <div className="mt-1 text-[10.5px] text-muted-foreground">
-                        #{id.slice(0, 8)} · by {author}
-                        {ts ? ` · ${ts.slice(0, 10)}` : ""}
+                      <div className="text-[10.5px] text-muted-foreground">
+                        {!doc && "Loading body…"}
+                        {doc === "yaml-error" && "Couldn't parse this proposal as a NER suggestion — open the YAML below."}
+                        {doc && doc !== "yaml-error" && !isNer && "Phenotype rule proposal — Accept is handled in the Lock → Drain rule queue."}
                       </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setShowYaml((m) => ({ ...m, [id]: !showRaw }))}
+                        className="gap-1.5 text-muted-foreground"
+                      >
+                        <FileCode size={12} />
+                        {showRaw ? "Hide YAML" : "Show YAML"}
+                      </Button>
                     </div>
-                  </button>
-                  {isOpen && (
+                  )}
+
+                  {/* Raw YAML, hidden by default */}
+                  {showRaw && yaml && (
                     <div className="border-t border-border/60 bg-muted/20 px-4 py-3">
-                      {body === null && (
-                        <div className="text-[11.5px] text-muted-foreground italic">
-                          Loading…
-                        </div>
-                      )}
-                      {err && (
-                        <div className="text-[11.5px] text-[hsl(var(--oxblood))]">
-                          Failed to load proposal: {err}
-                        </div>
-                      )}
-                      {body && body.length > 0 && (
-                        <pre className="whitespace-pre-wrap font-mono text-[11.5px] leading-relaxed text-foreground/90">{body}</pre>
-                      )}
+                      <pre className="whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-foreground/80">
+                        {yaml}
+                      </pre>
                     </div>
                   )}
                 </li>
@@ -226,8 +393,8 @@ export function ImprovementProposalsPanel({
 
       {proposals.length === 0 && analysisSummary == null && (
         <div className="text-[12.5px] text-muted-foreground">
-          No proposals yet. Run improvement to generate proposals from reviewer
-          overrides.
+          No suggestions yet. Run improvement to generate them from reviewer
+          edits.
         </div>
       )}
     </div>

@@ -46,7 +46,7 @@ import { runPreflight } from "./lib/adapters/http/preflight-routes.js";
 
 // Guideline imports
 import {
-  improveGuideline, improveNerTask,
+  improveGuideline, improveNerTask, applyNerProposal,
   listImprovementProposals, readImprovementProposal,
 } from "./lib/domain/proposal/index.js";
 import { loadCompiledTask } from "./lib/tasks.js";
@@ -268,6 +268,28 @@ export const guidelineRoutes: RouteEntry[] = [
       } catch (e) {
         throw httpErr(500, (e as Error).message);
       }
+    },
+  },
+
+  // POST /api/guideline-improvement/:taskId/proposals/:proposalId/apply
+  // Apply a NER proposal: read it, patch the matching entity_type_guidance
+  // YAML, archive the proposal under <proposals>/<task>/applied/. Returns
+  // 400 on unsupported change_kind or malformed proposal; the methodologist
+  // can still hand-apply by clicking the row's body view.
+  {
+    method: "POST", pattern: "/api/guideline-improvement/:taskId/proposals/:proposalId/apply",
+    handler: async (_b, _r, p) => {
+      const task = loadCompiledTask(p.taskId);
+      if (task?.task_kind !== "ner") {
+        throw httpErr(400, "apply currently only supported for NER tasks");
+      }
+      const result = applyNerProposal(p.taskId, p.proposalId);
+      if (!result.ok) {
+        const err = httpErr(400, result.error ?? "apply failed");
+        (err as Error & { payload?: unknown }).payload = result;
+        throw err;
+      }
+      return result;
     },
   },
 

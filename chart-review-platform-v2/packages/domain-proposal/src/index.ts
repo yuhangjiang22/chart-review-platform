@@ -48,3 +48,9 @@ export {
   type ImproveNerTaskOptions,
   type ImproveNerTaskResult,
 } from "./ner-improvement.js";
+
+// ner-proposal-apply: patch the entity_type_guidance YAML from a NER proposal
+export {
+  applyNerProposal,
+  type ApplyProposalResult,
+} from "./ner-proposal-apply.js";
