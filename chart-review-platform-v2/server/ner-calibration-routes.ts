@@ -25,6 +25,7 @@ import { pathFor } from "@chart-review/storage";
 import { listRuns, runDir } from "@chart-review/infra-batch-run";
 import { computeSpanIaa } from "@chart-review/eval-span-iaa";
 import { PLATFORM_ROOT } from "@chart-review/patients";
+import { transitionMaturity, getMaturity } from "@chart-review/maturity";
 import type { SpanLabel } from "@chart-review/platform-types";
 
 function httpErr(status: number, message: string): Error & { status: number } {
@@ -144,6 +145,17 @@ export const nerCalibrationRoutes: RouteEntry[] = [
           n_spans: spans.length,
         });
       }
+
+      // Auto-advance maturity piloted → calibrated once we've actually
+      // computed an F1 (any number, against any agent). Idempotent;
+      // failures swallowed.
+      try {
+        const cur = getMaturity(p.taskId);
+        const anyF1 = agents.some((a) => typeof a.macro_f1 === "number");
+        if (cur.state === "piloted" && anyF1) {
+          transitionMaturity(p.taskId, "calibrated", "auto-advance:f1-computed");
+        }
+      } catch { /* best-effort */ }
 
       return {
         ok: true,

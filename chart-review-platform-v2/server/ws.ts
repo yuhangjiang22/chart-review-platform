@@ -31,6 +31,27 @@ import {
 import {
   maybeAutoAdvancePilotOnRunStatus,
 } from "./lib/domain/iter/index.js";
+import { getRunManifest } from "./lib/infra/batch-run/index.js";
+import { transitionMaturity, getMaturity } from "@chart-review/maturity";
+
+/** When a run hits a terminal state, auto-advance the task's maturity
+ *  from "draft" to "piloted" — at least one pilot has now run. Idempotent
+ *  and best-effort; failures swallowed so they don't break the WS
+ *  broadcast. */
+function maybeAutoAdvanceMaturityOnRunComplete(status: RunStatus): void {
+  try {
+    const TERMINAL = new Set(["complete", "failed", "error", "cancelled"]);
+    if (!TERMINAL.has(status.state)) return;
+    const manifest = getRunManifest(status.run_id);
+    if (!manifest?.task_id) return;
+    const cur = getMaturity(manifest.task_id);
+    if (cur.state === "draft" && status.state === "complete") {
+      transitionMaturity(manifest.task_id, "piloted", "auto-advance:pilot-complete");
+    }
+  } catch {
+    // best-effort — never propagate
+  }
+}
 
 type WSClient = WebSocket & {
   reviewer_id?: string;
@@ -176,9 +197,11 @@ export function attachWebSocketServer(server: HttpServer): V2WebSocketServer {
   // ── broadcasters (consumed by REST handlers) ────────────────────────
 
   /** Run-status update — also fires the pilot auto-advance side-effect
-   *  that v1's broadcastRunUpdate did. */
+   *  that v1's broadcastRunUpdate did, plus a maturity auto-advance
+   *  (draft → piloted) when the run completes. */
   function broadcastRunUpdate(status: RunStatus): void {
     maybeAutoAdvancePilotOnRunStatus(status.run_id, status.state);
+    maybeAutoAdvanceMaturityOnRunComplete(status);
     const payload = JSON.stringify({
       type: "agent_run_update",
       run_id: status.run_id,
@@ -246,7 +269,10 @@ export function registerBroadcasters(reg: V2WebSocketServer): void {
 
 export function broadcastRunUpdate(status: RunStatus): void {
   if (registry) registry.broadcastRunUpdate(status);
-  else maybeAutoAdvancePilotOnRunStatus(status.run_id, status.state);
+  else {
+    maybeAutoAdvancePilotOnRunStatus(status.run_id, status.state);
+    maybeAutoAdvanceMaturityOnRunComplete(status);
+  }
 }
 export function broadcastJobUpdate(jobId: string): void {
   if (registry) registry.broadcastJobUpdate(jobId);

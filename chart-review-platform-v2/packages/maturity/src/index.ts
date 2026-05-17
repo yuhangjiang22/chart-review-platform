@@ -19,9 +19,24 @@
 
 import fs from "fs";
 import path from "path";
+import { parse as parseYaml } from "yaml";
 import { guidelineDir } from "@chart-review/rubric";
 import { listLockTests } from "@chart-review/lock-test";
 import { computeTaskSha } from "@chart-review/lock";
+
+/** Read task_kind from a task's meta.yaml. Returns undefined if not set
+ *  / unreadable; callers default to "phenotype" semantics. Used to skip
+ *  the phenotype-only lock-test guard on NER tasks. */
+function readTaskKind(taskId: string): string | undefined {
+  try {
+    const meta = parseYaml(
+      fs.readFileSync(path.join(guidelineDir(taskId), "meta.yaml"), "utf8"),
+    ) as { task_kind?: string };
+    return meta?.task_kind;
+  } catch {
+    return undefined;
+  }
+}
 
 export type MaturityState = "draft" | "piloted" | "calibrated" | "locked";
 
@@ -96,14 +111,20 @@ export function transitionMaturity(
   }
 
   if (cur.state === "calibrated" && to === "locked") {
-    const currentSha = computeTaskSha(guidelineDir(taskId));
-    const passed = listLockTests(taskId).some(
-      (lt) => lt.state === "passed" && lt.guideline_sha === currentSha,
-    );
-    if (!passed) {
-      throw new Error(
-        `Cannot transition to locked: no passed lock test exists for current guideline sha ${currentSha.slice(0, 8)}.`,
+    // Phenotype tasks require a passing lock test before allowing the
+    // freeze. NER tasks don't have phenotype-shaped lock tests; their
+    // gate is the F1 calibration (which is what advances state to
+    // "calibrated" in the first place), so skip the lock-test check.
+    if (readTaskKind(taskId) !== "ner") {
+      const currentSha = computeTaskSha(guidelineDir(taskId));
+      const passed = listLockTests(taskId).some(
+        (lt) => lt.state === "passed" && lt.guideline_sha === currentSha,
       );
+      if (!passed) {
+        throw new Error(
+          `Cannot transition to locked: no passed lock test exists for current guideline sha ${currentSha.slice(0, 8)}.`,
+        );
+      }
     }
   }
 

@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { CalibrationFigure, RulesFigure, MethodsFigure, BundlesFigure } from "../Studio";
 import { cn } from "@/lib/utils";
-import { CheckSquare, Square } from "lucide-react";
+import { CheckSquare, Square, Lock } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { authFetch } from "../../auth";
 import { CodifyButton } from "./CodifyButton";
 import { NerCalibrationFigure } from "./NerCalibrationFigure";
 
@@ -128,9 +130,76 @@ export function PhaseLock({ taskId, reviewerId, isMethodologist, taskKind }: Pha
       })}
       </div>
 
+      {isNer && (
+        <div className="border-t border-border/60 pt-4">
+          <LockVersionButton taskId={taskId} />
+        </div>
+      )}
+
       <div className="border-t border-border/60 pt-4">
         <CodifyButton taskId={taskId} />
       </div>
+    </div>
+  );
+}
+
+/** Explicit "Lock this version" trigger for NER tasks — POSTs the
+ *  calibrated → locked maturity transition. Pre-gate: shown only when
+ *  maturity is already "calibrated" (the F1 calibration auto-advances
+ *  to that state when the calibration card renders). */
+function LockVersionButton({ taskId }: { taskId: string }) {
+  const [locking, setLocking] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+  async function lockVersion() {
+    if (locking) return;
+    if (!confirm("Lock this version? Further edits will require an explicit unlock.")) return;
+    setLocking(true);
+    setErr(null);
+    try {
+      const r = await authFetch(
+        `/api/guidelines/${encodeURIComponent(taskId)}/maturity`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ state: "locked" }),
+        },
+      );
+      const body = await r.json().catch(() => ({} as { error?: string }));
+      if (!r.ok) {
+        setErr(body?.error ?? `HTTP ${r.status}`);
+        return;
+      }
+      setSuccess(true);
+      // Force a refresh so the pill colors flip to all-green.
+      setTimeout(() => window.location.reload(), 500);
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setLocking(false);
+    }
+  }
+  return (
+    <div className="space-y-2">
+      <Button
+        variant="default"
+        size="lg"
+        className="h-14 gap-2"
+        onClick={lockVersion}
+        disabled={locking || success}
+      >
+        <Lock size={14} />
+        {success ? "Locked ✓" : locking ? "Locking…" : "Lock this version"}
+      </Button>
+      <div className="text-[11px] text-muted-foreground">
+        Freezes the annotation guidance + ontology + accepted proposals at the current SHA.
+        No further edits accepted until an explicit unlock.
+      </div>
+      {err && (
+        <div className="text-[11.5px] text-[hsl(var(--oxblood))]">
+          Lock failed: {err}
+        </div>
+      )}
     </div>
   );
 }
