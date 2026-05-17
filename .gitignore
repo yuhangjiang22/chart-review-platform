@@ -11,6 +11,11 @@ claude-agent-sdk-benchmark/
 # methodologist drops in for local-only runs. Never commit.
 chart-review-platform-v2/corpus/patients/patient_sample_*/
 chart-review-platform-v2/corpus/patients/patient_private_*/
+# Inbound staging dirs for raw note imports — kept at repo root for
+# methodologist convenience but never part of the project's history.
+/notes_sample/
+/notes_private/
+/bso-ad_notes_sample/
 
 # Python
 .venv/
