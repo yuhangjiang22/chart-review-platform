@@ -166,7 +166,13 @@ export function exportBundle(opts: {
   // 1. guideline/  (includes pilots/ since that lives inside the guideline)
   copyDirRecursive(guidelinePath, path.join(bundleDir, "guideline"));
 
-  // 2. reviews/ — only locks at this SHA
+  // 2. reviews/ — every review_state.json for this task. Originally
+  //    gated on lock_task_sha === guidelineSha (post-lock-only artifact),
+  //    but NER tasks aren't lockable today and pre-lock bundles still
+  //    need the reviewer's ground truth to be reproducible. Include the
+  //    file regardless of lock state; collaborators can read the
+  //    review_status / lock_task_sha fields inside each file if they
+  //    care about the gate.
   let reviewCount = 0;
   const rRoot = reviewsRoot();
   if (fs.existsSync(rRoot)) {
@@ -175,8 +181,6 @@ export function exportBundle(opts: {
       const rsPath = path.join(rRoot, pid, taskId, "review_state.json");
       if (!fs.existsSync(rsPath)) continue;
       try {
-        const j = JSON.parse(fs.readFileSync(rsPath, "utf8")) as { lock_task_sha?: string };
-        if (j.lock_task_sha !== guidelineSha) continue;
         const dst = path.join(bundleDir, "reviews", pid);
         fs.mkdirSync(dst, { recursive: true });
         fs.copyFileSync(rsPath, path.join(dst, "review_state.json"));
@@ -215,7 +219,13 @@ export function exportBundle(opts: {
     }
   }
 
-  // 6. runs/<run_id>/{manifest,status}.json — drafts excluded (too heavy)
+  // 6. runs/<run_id>/{manifest,status}.json + per-agent drafts
+  //    Originally only manifest/status were copied; drafts were excluded
+  //    "too heavy." For NER reproducibility the per-agent span_labels[]
+  //    in agents/agent_*.json IS the actual produced artifact — without
+  //    it the bundle can't be replayed. Now copies every agents/*.json
+  //    under per_patient/<pid>/agents/ for each patient. Transcripts
+  //    and audit dirs are still skipped (they can be 100s of KB each).
   let runCount = 0;
   const runsDir = runsRootDir();
   if (fs.existsSync(runsDir)) {
@@ -231,6 +241,34 @@ export function exportBundle(opts: {
         fs.copyFileSync(mf, path.join(dst, "manifest.json"));
         const st = path.join(runsDir, rid, "status.json");
         if (fs.existsSync(st)) fs.copyFileSync(st, path.join(dst, "status.json"));
+        // Per-patient agent drafts. Walk per_patient/<pid>/agents/ and
+        // copy the *.json files (the actual produced span_labels[] or
+        // field_assessments[]). Skip *_transcript.jsonl and audit dirs.
+        const perPatientDir = path.join(runsDir, rid, "per_patient");
+        if (fs.existsSync(perPatientDir)) {
+          for (const pid of fs.readdirSync(perPatientDir)) {
+            if (pid.startsWith("_") || pid.startsWith(".")) continue;
+            const agentsDir = path.join(perPatientDir, pid, "agents");
+            if (!fs.existsSync(agentsDir)) continue;
+            const dstAgents = path.join(dst, "per_patient", pid, "agents");
+            fs.mkdirSync(dstAgents, { recursive: true });
+            for (const f of fs.readdirSync(agentsDir)) {
+              if (f.endsWith(".json")) {
+                fs.copyFileSync(
+                  path.join(agentsDir, f),
+                  path.join(dstAgents, f),
+                );
+              }
+            }
+            // Also the legacy single-agent path (per_patient/<pid>/agent_draft.json)
+            const legacy = path.join(perPatientDir, pid, "agent_draft.json");
+            if (fs.existsSync(legacy)) {
+              const dstPid = path.join(dst, "per_patient", pid);
+              fs.mkdirSync(dstPid, { recursive: true });
+              fs.copyFileSync(legacy, path.join(dstPid, "agent_draft.json"));
+            }
+          }
+        }
         runCount++;
       } catch {
         /* skip */
@@ -341,11 +379,11 @@ Exported at ${m.exported_at} by ${m.exported_by}.
 ## Contents
 
 - \`guideline/\` — full guideline package at the SHA above (incl. pilots/)
-- \`reviews/<patient_id>/review_state.json\` — locks at this SHA only (n=${c.reviews.count})
+- \`reviews/<patient_id>/review_state.json\` — every reviewer-validated patient state for this task (n=${c.reviews.count}; lock_task_sha field inside each file says whether it was locked)
 - \`cohort_feedback/\` — every Role C run for this task (n=${c.cohort_feedback.run_count})
 - \`methods/\` — Methods draft history (n=${c.methods.run_count})
 - \`rules/\` — every rule proposal across all statuses (n=${c.rules.count})
-- \`runs/<run_id>/{manifest,status}.json\` — agent batch runs scoped to this task (n=${c.runs.count}; per-patient drafts not included)
+- \`runs/<run_id>/{manifest,status}.json\` + \`per_patient/<pid>/agents/agent_*.json\` — agent batch runs scoped to this task with per-agent draft outputs (n=${c.runs.count}; transcripts and audit dirs excluded for size)
 - pilot iterations included via guideline/pilots/ (n=${c.pilots.count})
 - \`statistics.json\` + \`statistics.md\` — per-field κ, weighted κ, percent agreement, 95% bootstrap CI computed from the locked review_state files (${c.statistics.n_with_kappa}/${c.statistics.n_fields} fields with computable κ)
 - \`deployment_cohorts/<cohort_id>/\` — deployment-validation surface for blocks 5+6 of the methods section: cohort manifests (n=${c.deployment_cohorts.cohort_count}), stratified sample selections (n=${c.deployment_cohorts.sample_count}), reviewer validations (n=${c.deployment_cohorts.validation_count}), deployment-κ reports (n=${c.deployment_cohorts.report_count})
