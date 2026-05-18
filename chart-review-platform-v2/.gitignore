@@ -18,6 +18,7 @@ var/
 .codex/tmp/
 .codex/.tmp/
 .codex/skills/.system/
+.codex/sessions/
 
 # Per-machine env (paths + provider defaults). Check in .env.example
 # instead to document the contract.
