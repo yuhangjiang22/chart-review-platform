@@ -45,27 +45,16 @@ values from this set:
 
 (Use `list_entity_types()` at run time for the authoritative set + counts.)
 
-## Per-entity-type guidance files (REQUIRED PRE-READ)
+## Per-entity-type guidance files (lazy load)
 
-Before reading any note or calling any MCP tool, you MUST read **every**
-YAML file under `references/entity_type_guidance/` in this skill bundle
-— there is one per entity_type, 9 files total for BSO-AD:
-
-- `Demographic.yaml`
-- `Element_Relevant_to_Behavior_and_Lifestyle.yaml`
-- `Element_Relevant_to_Economic_Stability.yaml`
-- `Element_Relevant_to_Education_and_Literacy.yaml`
-- `Element_Relevant_to_Food.yaml`
-- `Element_Relevant_to_Health_Care.yaml`
-- `Element_Relevant_to_Neighborhood.yaml`
-- `Element_Relevant_to_Social_and_Community_Context.yaml`
-- `Dementia.yaml`
-
-Read all 9. Not just the ones you think apply to this chart. The
-`negative_examples` and `edge_cases` in the file for a "probably-absent"
-entity type are exactly what stops you from emitting a false positive
-when the chart turns out to mention it after all. Skipping is a
-recall-and-precision failure.
+Per-entity-type guidance lives at
+`references/entity_type_guidance/<entity_type>.yaml`. Read these
+**lazily** — when you've identified a candidate span and need to
+check the exemplars / negative_examples / edge_cases for that
+specific entity type before emitting or skipping. The
+"Annotation guidance (summary)" section below is usually enough
+for read-only reasoning; only open the YAML when you need the
+methodologist's specific exemplars or rules.
 
 Each YAML has four sections:
 
