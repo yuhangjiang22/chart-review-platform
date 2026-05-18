@@ -677,6 +677,13 @@ async function runOneAgent(
   // locate_in_source, …) plus a span-shaped batch prompt. Same runAgent
   // loop, same scratch + audit promotion logic afterwards.
   const isNerTask = task.task_kind === "ner";
+  const isAdherenceTask = task.task_kind === "adherence";
+  if (isAdherenceTask) {
+    throw new Error(
+      "task_kind=adherence is not yet implemented (Phase 1). "
+      + `See ADHERENCE-INTEGRATION.md. Task: ${taskId}`,
+    );
+  }
 
   const phenotypePrompt = [
     `You are running in batch mode. Activate the \`chart-review\` skill.`,

@@ -8,7 +8,7 @@ import { guidelineDir, guidelinesRoot, loadSkillBundle, isSkillBundleAt } from "
  * the two task families. Derived from meta.yaml's `task_type` field —
  * see `taskKindFromTaskType` for the normalization rules.
  */
-export type TaskKind = "phenotype" | "ner";
+export type TaskKind = "phenotype" | "ner" | "adherence";
 
 /**
  * A field on a compiled task. Mirrors the contract in
@@ -58,6 +58,7 @@ export interface CompiledTask {
  */
 export function taskKindFromTaskType(taskType: string | undefined): TaskKind {
   if (taskType === "ner") return "ner";
+  if (taskType === "adherence") return "adherence";
   return "phenotype";
 }
 

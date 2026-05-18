@@ -155,3 +155,66 @@ export interface SpanReview {
    *  Format: `<ontology-id>@<version>`. Locked alongside the task. */
   ontology_pin?: string;
 }
+
+// ── Adherence (task_kind="adherence") ──────────────────────────────
+// One patient × task produces a list of QuestionAnswers (the
+// extractor's structured answers to the guideline's question
+// framework) and a list of RuleVerdicts (the concordance engine's
+// verdict per guideline rule, computed from the QuestionAnswers).
+// See ADHERENCE-INTEGRATION.md for the full design.
+
+/** Standardized attribution categories for non-concordant verdicts.
+ *  Extensible per task via the skill's `references/attribution.yaml`
+ *  but the platform recognizes these out of the box. */
+export type AttributionCategory =
+  | "DOCUMENTATION_GAP"
+  | "GUIDELINE_DEVIATION"
+  | "PATIENT_REFUSAL"
+  | "CONTRAINDICATION"
+  | "PENDING_FOLLOWUP"
+  | "OTHER";
+
+/** One extractor answer to one question in the framework. */
+export interface QuestionAnswer {
+  /** Stable id from references/questions/*.yaml. */
+  question_id: string;
+  /** Tier (0=eligibility, 1=assessment, 2+=management). */
+  tier: number;
+  /** The extracted value. Shape depends on the question's answer_schema
+   *  (binary → bool, categorical → string, value → number, date → string). */
+  answer: string | number | boolean | null;
+  /** Extractor's calibrated confidence, 0..1. */
+  confidence?: number;
+  /** Evidence passages cited in support. */
+  evidence?: Array<{
+    note_id: string;
+    quote: string;
+    start?: number;
+    end?: number;
+  }>;
+  /** Short prose explaining the extraction. */
+  reasoning?: string;
+  /** Did a Verifier subagent or structured-data check confirm? */
+  verifier_status?: "confirmed" | "contradicted" | "no_check";
+  /** "agent" (extractor wrote it) or "reviewer" (human override). */
+  source?: "agent" | "reviewer";
+  /** When this answer was committed. */
+  ts?: string;
+}
+
+/** One concordance verdict from the rule engine. */
+export interface RuleVerdict {
+  /** Stable id from references/rules/*.yaml. */
+  rule_id: string;
+  verdict: "CONCORDANT" | "NON_CONCORDANT" | "EXCLUDED";
+  /** For NON_CONCORDANT; undefined otherwise. */
+  attribution?: AttributionCategory;
+  /** question_ids that fed this verdict (debug + reviewer drill-down). */
+  supporting_questions?: string[];
+  /** Short prose explaining the verdict — required when the rule used
+   *  the LLM-as-judge path (rule.nuanced=true). */
+  rationale?: string;
+  /** "rule_engine" (deterministic) or "llm_judge" (nuanced). */
+  source?: "rule_engine" | "llm_judge" | "reviewer";
+  ts?: string;
+}

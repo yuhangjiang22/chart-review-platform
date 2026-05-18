@@ -30,7 +30,9 @@ import { getReviewsRootOverride, withReviewsRoot as _withReviewsRoot } from "@ch
 import type { Evidence } from "@chart-review/faithfulness";
 import { verifyEvidence } from "@chart-review/faithfulness";
 import type { CompiledTask } from "@chart-review/tasks";
-import type { CrossCriterionAlert, SpanLabel } from "@chart-review/platform-types";
+import type {
+  CrossCriterionAlert, SpanLabel, QuestionAnswer, RuleVerdict,
+} from "@chart-review/platform-types";
 import { recomputeLiveAlerts } from "@chart-review/live-alerts";
 import { evalDerivation } from "@chart-review/contract-eval";
 import { checkDrift } from "@chart-review/drift-detector";
@@ -205,15 +207,30 @@ export interface ReviewState {
    *  span_labels in an NER review means "no spans committed yet". */
   span_labels?: SpanLabel[];
   /** Optional discriminator copy of the task's kind. Persisted by the
-   *  NER MCP write tools so downstream consumers can identify NER state
-   *  files without re-loading the task. Optional — phenotype state
-   *  files written before this field existed remain valid. */
-  task_kind?: "phenotype" | "ner";
+   *  task-kind-specific write paths so downstream consumers can identify
+   *  the review-state shape without re-loading the task. Optional —
+   *  phenotype state files written before this field existed remain valid. */
+  task_kind?: "phenotype" | "ner" | "adherence";
   /** NER-only: note IDs (without .txt suffix) the reviewer has marked
    *  as validated for this patient × task. Used for per-note progress
    *  in the SpanReview UI; empty / absent means nothing validated yet.
    *  Maintained via POST /api/reviews/:pid/:tid/notes/:nid/validation. */
   validated_notes?: string[];
+  /** Adherence (task_kind="adherence") extractor answers — one per
+   *  question in the guideline's question framework. Lives in the
+   *  union-shaped review_state.json alongside field_assessments and
+   *  span_labels. Phenotype/NER tasks leave this absent. */
+  question_answers?: QuestionAnswer[];
+  /** Adherence-only: per-rule concordance verdicts (CONCORDANT /
+   *  NON_CONCORDANT / EXCLUDED) computed from question_answers by the
+   *  rule engine. Empty / absent until the rule-eval pass runs. */
+  rule_verdicts?: RuleVerdict[];
+  /** Adherence-only: question_ids the reviewer has marked validated.
+   *  Drives per-question progress in the AdherenceReview UI; analogous
+   *  to validated_notes for NER. */
+  validated_questions?: string[];
+  /** Adherence-only: rule_ids the reviewer has marked adjudicated. */
+  validated_rules?: string[];
 }
 
 function reviewDir(patientId: string, taskId: string): string {
