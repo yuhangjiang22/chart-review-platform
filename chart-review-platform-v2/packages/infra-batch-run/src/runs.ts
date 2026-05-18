@@ -704,31 +704,28 @@ async function runOneAgent(
   // clinical content. The set_span_label MCP writes accumulate across
   // calls into the same review_state.json (same scratchRoot).
   function buildNerPromptForNote(noteId: string): string {
+    // The note path is unambiguous: agent's cwd is the patient dir
+    // (corpus/patients/<pid>/) and notes live in the `notes/` subdir.
+    // Pass an explicit relative path so the agent doesn't waste turns
+    // exploring cwd.
+    const notePath = `notes/${noteId}.txt`;
     return [
-      "You are running an NER (named-entity recognition) task in batch mode.",
-      "Activate the `chart-review-ner` universal skill.",
-      `If a skill named \`chart-review-${taskId}\` exists, activate it as well — it carries the ontology + annotation guidance for THIS task.`,
+      `Research cataloging task: index biomedical concepts from one IRB-approved de-identified clinical note for an annotation study.`,
       "",
-      `Active patient: ${patientId}`,
-      `Active task: ${taskId} (task_kind=ner)`,
-      `Active note for this turn: ${noteId}  (only process THIS note; ignore other .txt files in cwd)`,
+      `Note to index this turn: \`${notePath}\` (read this single file; do not enumerate the directory).`,
+      `Active ontology: BSO-AD (social determinants of Alzheimer's research).`,
+      `Skill bundle: chart-review-ner + chart-review-${taskId} (load via Skill tool if available).`,
       "",
-      `--- Role framing ---`,
-      rolePrompt,
-      `--- End role framing ---`,
+      "Steps:",
+      `1. Read \`${notePath}\`.`,
+      "2. Call `list_entity_types` to see the 9 BSO-AD root labels.",
+      "3. For each label-applicable phrase in the note, call:",
+      "   `normalize_to_ontology(entity_type, label)` → `locate_in_source(note_id, anchor, text)` → `set_span_label(...)`",
+      `   (use note_id="${noteId}" — without the .txt extension or notes/ prefix).`,
+      "4. Skip phrases that don't map to a BSO-AD entity_type. Empty output is acceptable.",
+      "5. Emit a one-line summary and stop.",
       "",
-      "Workflow (commit through the `chart_review_ner` MCP server):",
-      "1. Read the entity-type guidance YAMLs from the activated scope skill.",
-      `2. Read \`${noteId}.txt\` (the only note for this turn).`,
-      "3. Call `list_entity_types` to discover supported root labels.",
-      "4. For each candidate span in the note:",
-      "   a. `normalize_to_ontology(entity_type, label)` → concept_name + status",
-      "   b. Pick verbatim `anchor` (extend with context if short/ambiguous).",
-      "   c. `locate_in_source(note_id, anchor, text)` → authoritative offsets.",
-      "   d. `set_span_label(...)` — faithfulness-gated.",
-      "5. Emit a one-line summary and stop. Do NOT process other notes — the runner will invoke you again for the next note.",
-      "",
-      "Be exhaustive within this single note. Prefer the MOST SPECIFIC concept_name; don't default to the root.",
+      `This is structured indexing for downstream κ statistics — not narrative summarization or diagnosis. Use the most specific ontology concept where unambiguous; otherwise mark status="novel_candidate".`,
     ].join("\n");
   }
 
@@ -760,11 +757,15 @@ async function runOneAgent(
       PreToolUse: [{ hooks: [auditHooks.pre] }],
       PostToolUse: [{ hooks: [auditHooks.post] }],
     };
-    const extraSystem =
-      "You are running unattended in batch mode. There is no human in the " +
-      "loop for this patient — produce your draft and stop. Do not ask " +
-      "clarifying questions; pick the most defensible answer with the " +
-      "evidence available.";
+    const extraSystem = isNerTask
+      ? "Research annotation context: IRB-approved, de-identified clinical text for "
+        + "academic NLP study (inter-rater reliability of BSO-AD ontology mapping). "
+        + "Index the structured spans the ontology defines; skip what doesn't apply. "
+        + "Do not interpret diagnostically; do not produce narrative summaries."
+      : "You are running unattended in batch mode. There is no human in the "
+        + "loop for this patient — produce your draft and stop. Do not ask "
+        + "clarifying questions; pick the most defensible answer with the "
+        + "evidence available.";
 
     // For NER: one runAgent call per note. Smaller context per call =
     // Azure / OpenAI don't choke on aggregated clinical content; spans
