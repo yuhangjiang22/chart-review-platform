@@ -6,7 +6,7 @@
   "guideline_sha": "d66921efdbd87c54",
   "started_at": "2026-05-14T21:16:36.690Z",
   "started_by": "yj38",
-  "state": "ready_to_validate",
+  "state": "abandoned",
   "notes": "Two-agent run: default + skeptical",
   "agent_specs": [
     {
@@ -23,5 +23,6 @@
   "rerun_plan": {
     "carried_criteria": [],
     "rerun_criteria": []
-  }
+  },
+  "completed_at": "2026-05-17T22:52:37.164Z"
 }

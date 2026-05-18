@@ -1,0 +1,21 @@
+{
+  "task_id": "bso-ad-ner",
+  "iter_id": "iter_013",
+  "iter_num": 13,
+  "run_id": "2026-05-18T00-47-48-338Z",
+  "guideline_sha": "7bd3a39f49d385c6",
+  "started_at": "2026-05-18T00:47:48.339Z",
+  "started_by": "yj38",
+  "state": "ready_to_validate",
+  "agent_specs": [
+    {
+      "id": "agent_1",
+      "role_preset": "default",
+      "role_version": "v1"
+    }
+  ],
+  "rerun_plan": {
+    "carried_criteria": [],
+    "rerun_criteria": []
+  }
+}

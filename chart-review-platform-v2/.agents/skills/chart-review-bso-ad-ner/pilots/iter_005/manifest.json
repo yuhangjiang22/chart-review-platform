@@ -1,0 +1,29 @@
+{
+  "task_id": "bso-ad-ner",
+  "iter_id": "iter_005",
+  "iter_num": 5,
+  "run_id": "2026-05-17T22-54-03-143Z",
+  "guideline_sha": "ca85599e2f7cd848",
+  "started_at": "2026-05-17T22:54:03.146Z",
+  "started_by": "yuhang",
+  "state": "abandoned",
+  "agent_specs": [
+    {
+      "id": "agent_1",
+      "search_mode_preset": "smart-search",
+      "interpretation_preset": "default",
+      "model": "openai/gpt-5.2"
+    },
+    {
+      "id": "agent_2",
+      "search_mode_preset": "smart-search",
+      "interpretation_preset": "default",
+      "model": "anthropic/claude-haiku-4.5"
+    }
+  ],
+  "rerun_plan": {
+    "carried_criteria": [],
+    "rerun_criteria": []
+  },
+  "completed_at": "2026-05-17T22:54:05.563Z"
+}

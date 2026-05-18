@@ -20,6 +20,9 @@ import type {
 } from "@chart-review/pipeline-extract";
 import type { SpanLabel } from "@chart-review/platform-types";
 
+export { extractSpansDirect } from "./direct-llm-extract.js";
+export type { DirectExtractOpts, DirectExtractResult } from "./direct-llm-extract.js";
+
 /**
  * The NER profile. Stateless — same instance handles every run.
  * Replace `pipeline-extract`'s `defaultPhenotypeProfile` with this one

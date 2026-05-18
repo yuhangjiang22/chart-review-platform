@@ -6,7 +6,7 @@
   "guideline_sha": "90e5debe0ef9f584",
   "started_at": "2026-05-17T18:11:42.399Z",
   "started_by": "yj38",
-  "state": "ready_to_validate",
+  "state": "abandoned",
   "notes": "transcript-persistence smoke test",
   "agent_specs": [
     {
@@ -18,5 +18,6 @@
   "rerun_plan": {
     "carried_criteria": [],
     "rerun_criteria": []
-  }
+  },
+  "completed_at": "2026-05-17T22:49:26.048Z"
 }

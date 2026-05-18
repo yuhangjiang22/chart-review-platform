@@ -767,35 +767,82 @@ async function runOneAgent(
         + "clarifying questions; pick the most defensible answer with the "
         + "evidence available.";
 
-    // For NER: one runAgent call per note. Smaller context per call =
-    // Azure / OpenAI don't choke on aggregated clinical content; spans
-    // accumulate across calls via the shared scratchRoot review_state.
-    // For phenotype: single call as before (one patient = one assessment).
-    const callsToMake: Array<{ prompt: string; label: string }> = isNerTask
-      ? listNotes(patientId).map((n) => {
+    if (isNerTask) {
+      // NER: direct LLM call per note, no agent loop, no MCP tool calls.
+      // 1 round-trip per note instead of ~50 (one per span × 3 MCP tools
+      // for normalize/locate/set_span_label). ~95% cost reduction.
+      const { extractSpansDirect } = await import("@chart-review/pipeline-extract-ner");
+      const { resolveOntologyPath } = await import("@chart-review/mcp-server-ner-anthropic");
+      const ontologyPath = resolveOntologyPath(task);
+      const azureBaseUrl = process.env.AZURE_OPENAI_BASE_URL
+        ?? "https://iu-bhds-nlp-project.services.ai.azure.com/openai/v1";
+      const azureApiKey = process.env.AZURE_OPENAI_API_KEY ?? "";
+      const notes = listNotes(patientId);
+      const transcriptFp = agentTranscriptPath(runId, patientId, spec.id);
+      // Best-effort transcript header so the existing AgentLogPanel
+      // poll doesn't see an empty file.
+      try {
+        fs.mkdirSync(path.dirname(transcriptFp), { recursive: true });
+        fs.appendFileSync(transcriptFp, JSON.stringify({
+          ts: new Date().toISOString(), type: "text",
+          text: `direct-llm-ner: ${notes.length} note(s) for ${patientId}`,
+        }) + "\n");
+      } catch { /* ignore */ }
+      {
+        for (const n of notes) {
           const noteId = n.filename.replace(/\.txt$/, "");
-          return { prompt: buildNerPromptForNote(noteId), label: noteId };
-        })
-      : [{ prompt: userPrompt, label: "patient" }];
-
-    for (const call of callsToMake) {
-      for await (const event of runAgent({
-        prompt: call.prompt,
-        cwd: patientDir(patientId),
-        patientId,
-        taskId,
-        guidelinePath: guidelineDir(taskId),
-        mcpServers,
-        hooks: sdkHooks,
-        maxTurns: manifest.max_turns_per_patient,
-        permissionMode: "acceptEdits",
-        model: spec.model,
-        provider: manifest.provider,
-        transcriptPath: agentTranscriptPath(runId, patientId, spec.id),
-        extraSystemPrompt: extraSystem,
-      })) {
-        if (event.type === "result" && typeof event.cost_usd === "number") {
-          cost = (cost ?? 0) + event.cost_usd;
+          const r = await extractSpansDirect({
+            patientId,
+            task,
+            noteId,
+            ontologyPath,
+            reviewsRoot: scratchRoot,
+            sessionId,
+            azureBaseUrl,
+            azureApiKey,
+            model: spec.model,
+          });
+          try {
+            fs.appendFileSync(transcriptFp, JSON.stringify({
+              ts: new Date().toISOString(), type: "text",
+              text: `note ${noteId}: ${r.spans_written} spans written, ${r.candidates_rejected} rejected`
+                + (r.error ? ` — ERROR: ${r.error}` : ""),
+              usage: r.usage,
+            }) + "\n");
+          } catch { /* ignore */ }
+          // Translate usage tokens to a rough cost estimate (placeholder
+          // rates; the manifest's cost_cap_usd just gates total spend).
+          if (r.usage?.input_tokens) {
+            const inT = r.usage.input_tokens ?? 0;
+            const cachedT = r.usage.cached_input_tokens ?? 0;
+            const outT = r.usage.output_tokens ?? 0;
+            // $2/M input, $0.5/M cached, $10/M output — rough Azure tier.
+            const est = ((inT - cachedT) * 2 + cachedT * 0.5 + outT * 10) / 1e6;
+            cost = (cost ?? 0) + est;
+          }
+        }
+      }
+    } else {
+      // Phenotype: one agent loop per patient (one combined assessment).
+      {
+        for await (const event of runAgent({
+          prompt: userPrompt,
+          cwd: patientDir(patientId),
+          patientId,
+          taskId,
+          guidelinePath: guidelineDir(taskId),
+          mcpServers,
+          hooks: sdkHooks,
+          maxTurns: manifest.max_turns_per_patient,
+          permissionMode: "acceptEdits",
+          model: spec.model,
+          provider: manifest.provider,
+          transcriptPath: agentTranscriptPath(runId, patientId, spec.id),
+          extraSystemPrompt: extraSystem,
+        })) {
+          if (event.type === "result" && typeof event.cost_usd === "number") {
+            cost = (cost ?? 0) + event.cost_usd;
+          }
         }
       }
     }

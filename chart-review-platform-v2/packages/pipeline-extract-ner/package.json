@@ -16,6 +16,10 @@
     "@chart-review/mcp-server-ner-anthropic": "*",
     "@chart-review/patients": "*",
     "@chart-review/pipeline-extract": "*",
-    "@chart-review/platform-types": "*"
+    "@chart-review/platform-types": "*",
+    "@chart-review/tasks": "*",
+    "@chart-review/rubric": "*",
+    "@chart-review/ontology": "*",
+    "@chart-review/mcp-core-ner": "*"
   }
 }
