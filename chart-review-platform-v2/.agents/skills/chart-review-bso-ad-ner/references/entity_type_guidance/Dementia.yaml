@@ -34,9 +34,3 @@ edge_cases:
     correct: tag as 'Early-Onset Alzheimer's' if that child exists; else
       'Alzheimer's disease'
     reason: the qualifier maps to a more-specific concept when present in the ontology
-  - pattern: isolated radiology protocol / laterality fragments (e.g., 'venous',
-      'right')
-    correct: do NOT tag as Dementia; ignore unless part of an explicit cognitive
-      diagnosis/symptom phrase
-    reason: common in imaging text and otherwise causes spurious Dementia
-      novel_candidates

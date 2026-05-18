@@ -26,11 +26,3 @@ edge_cases:
   - pattern: former smoker, quit 10 years ago
     correct: tag 'former smoker' as the status; don't tag 'quit' separately
     reason: one entity per fact, choose the most-specific concept
-  - pattern: <N> pack-year smoking history (e.g., '55 pack-year smoking history')
-    correct: split into (a) '<N> pack-year' as smoking quantity (map if a
-      pack-year/quantity concept exists; else novel_candidate) and (b) 'smoking
-      history' as Tobacco_Smoking (or a more-specific smoking status concept
-      when present)
-    reason: pack-year phrasing encodes both the behavior fact and an intensity
-      quantity; splitting matches reviewer-added spans and avoids dropping
-      intensity details
