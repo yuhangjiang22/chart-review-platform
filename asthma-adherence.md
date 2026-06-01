@@ -146,6 +146,333 @@ plan documentation is missing (a real gap). The agent should detect:
 
 ---
 
+## Preparing data for a new patient
+
+To run the agent on your own patients, drop them under `corpus/patients/`
+in the same shape as `patient_demo_asthma_01`. Minimum required:
+`meta.json` + at least one `.txt` file under `notes/`. OMOP files are
+optional but strongly recommended — without them the verifier can't
+cross-check answers and the agent falls back to notes-only retrieval.
+
+### Folder layout
+
+```
+corpus/patients/<patient_id>/
+├── meta.json              ← required
+├── notes/
+│   └── YYYY-MM-DD__doctype.txt     ← at least one
+└── omop/                  ← optional (recommended for adherence)
+    ├── conditions.json
+    ├── drugs.json
+    ├── measurements.json
+    ├── observations.json
+    ├── procedures.json
+    └── encounters.json
+```
+
+`<patient_id>` follows the convention `patient_<snake_case>` (e.g.
+`patient_jdoe_2024_001`). The ID is what the API expects in
+`patient_ids[]` requests. Anything matching `patient_sample_*/` or
+`patient_private_*/` is gitignored — use those prefixes for real
+patient data you should never push.
+
+### `meta.json`
+
+```json
+{
+  "patient_id": "patient_jdoe_2024_001",
+  "category": "asthma_adherence",
+  "demographics": { "age": 42, "sex": "F", "region": "Midwest" },
+  "smoking": "never",
+  "index_date": "2026-04-12",
+  "doc_types": ["pcp_followup", "pulmonology_consult", "pcp_progress"],
+  "phi": false,
+  "generated_by": "hand_authored",
+  "generation_run_id": "manual"
+}
+```
+
+| Field | Required | Purpose |
+|---|---|---|
+| `patient_id` | yes | Must match the folder name |
+| `index_date` | yes for adherence | Anchor for all 12-month-lookback questions (`T1-ACTScore`, `T1-ExacerbationsCount`, `T1-SABAOveruse`, …). Verifier uses this to filter OMOP rows by date. ISO `YYYY-MM-DD`. |
+| `demographics.age` | yes | Drives `T0-AgeOk` (≥12 cutoff) |
+| `phi` | yes when true | When `true`, the platform routes inference to `CHART_REVIEW_PHI_MODEL` instead of the default model |
+| `category` / `headline` / `doc_types` | no | Cosmetic; surfaced in the patient list UI |
+
+### Notes
+
+Filenames follow `YYYY-MM-DD__doctype.txt`. The date is the encounter
+date; `doctype` is free-form snake_case (`pcp_progress`,
+`pulmonology_consult`, `ed_note`, `discharge_summary`, etc.). The
+parser surfaces the date + doctype as a UI badge; non-matching
+filenames still get read but lose the structured badge.
+
+Content is plain text — paste from your EHR's note view. No formatting
+required, but realistic prose helps the agent (section headers,
+"ASSESSMENT:", "PLAN:", med lists, ACT scores written like `ACT 19/25`,
+etc.). For a runnable example, look at the demo patient's three notes
+under [`corpus/patients/patient_demo_asthma_01/notes/`](corpus/patients/patient_demo_asthma_01/notes/).
+
+### OMOP rows
+
+The platform reads six JSON files; each one is a top-level array of
+plain-object rows. Schema is loose — what matters is the field names
+the verifier checks. Below is the **minimum useful shape per table**
+for asthma-adherence (the verifier's checks are in
+[`packages/pipeline-extract-adherence/src/verifier.ts`](packages/pipeline-extract-adherence/src/verifier.ts);
+extra fields are passed through to the agent unchanged).
+
+**`conditions.json`** — drives `T0-AsthmaDx`
+```json
+[
+  {
+    "row_id": 8101,
+    "concept_name": "Moderate persistent asthma",
+    "icd10cm": "J45.40",
+    "status": "active",
+    "date": "2023-09-12"
+  }
+]
+```
+Verifier matches `icd10cm =~ /^J45/` AND `status == "active"`.
+
+**`drugs.json`** — drives `T1-ControllerPrescribed`, `T1-ControllerAdherenceProxy`, `T1-SABAOveruse`, `T1-ExacerbationsCount` (via OCS bursts)
+```json
+[
+  {
+    "row_id": 9101,
+    "concept_name": "Fluticasone propionate 110 MCG inhalant powder",
+    "drug_class": "ICS",
+    "is_controller": true,
+    "active": true,
+    "start_date": "2023-09-12",
+    "fills": [
+      { "fill_date": "2025-12-08", "days_supply": 60, "quantity": 1 },
+      { "fill_date": "2026-02-14", "days_supply": 60, "quantity": 1 }
+    ],
+    "refill_pdc_12mo": 0.72
+  },
+  {
+    "row_id": 9102, "concept_name": "Albuterol 90 MCG MDI",
+    "drug_class": "SABA", "is_controller": false, "active": true,
+    "saba_canisters_12mo": 3,
+    "fills": [{ "fill_date": "2026-03-08", "days_supply": 30 }]
+  },
+  {
+    "row_id": 9103, "concept_name": "Prednisone 20 MG tablet",
+    "drug_class": "OCS", "is_controller": false, "active": false,
+    "start_date": "2025-11-15", "end_date": "2025-11-19",
+    "fills": [{ "fill_date": "2025-11-15", "days_supply": 5 }],
+    "indication": "asthma exacerbation burst"
+  }
+]
+```
+Key fields per row: `drug_class` (`ICS` / `ICS-LABA` / `LTRA` /
+`biologic` / `SABA` / `OCS`), `is_controller`, `active`,
+`refill_pdc_12mo`, `saba_canisters_12mo`, and `fills[]` for cadence.
+
+**`measurements.json`** — drives `T1-ACTScore`, `T1-SpirometryDate`
+```json
+[
+  {
+    "row_id": 11101, "concept_name": "ACT total score",
+    "loinc": "75827-3", "value": 19, "unit": "{score}",
+    "date": "2026-04-12"
+  },
+  {
+    "row_id": 11201, "concept_name": "FEV1/FVC",
+    "loinc": "19926-5", "value": 0.71, "unit": "ratio",
+    "date": "2025-12-16"
+  }
+]
+```
+LOINC codes the verifier recognizes: `75827-3` (ACT score), `19926-5`
+(FEV1/FVC), `33452-4` (FEV1 % predicted). Pick the row with the most
+recent `date` per LOINC.
+
+**`encounters.json`** — drives `T1-ExacerbationsCount` (ED), `T2-FollowupScheduled`
+```json
+[
+  {
+    "row_id": 12201, "encounter_id": "enc_e8201",
+    "type": "Emergency", "department": "Emergency",
+    "start_date": "2025-11-15", "end_date": "2025-11-15",
+    "chief_complaint": "wheezing, shortness of breath",
+    "asthma_related": true
+  }
+]
+```
+`type` values the verifier recognizes: `Outpatient`, `Emergency`,
+`Inpatient`. Future-dated encounters (`start_date > index_date`)
+satisfy `T2-FollowupScheduled`.
+
+**`procedures.json`** — drives `T1-SpirometryDate`
+```json
+[
+  {
+    "row_id": 13101, "concept_name": "Spirometry pre/post bronchodilator",
+    "cpt": "94060", "procedure_date": "2025-12-16",
+    "provider_specialty": "Pulmonology"
+  }
+]
+```
+CPT codes recognized: `94060` (pre/post bronchodilator), `94010`
+(simple spirometry).
+
+**`observations.json`** — drives `T2-WrittenActionPlan`
+```json
+[
+  {
+    "row_id": 14103,
+    "concept_name": "Asthma written action plan given",
+    "value_as_string": "no",
+    "date": "2026-04-12"
+  }
+]
+```
+Verifier matches `concept_name =~ /action plan/i`; expects
+`value_as_string` to be `"yes"` or `"no"` (case-insensitive).
+
+### Registering a patient in the corpus
+
+Two options:
+
+**(a) Auto-discovery** (easiest). Just drop the folder. The platform
+scans `corpus/patients/` on every patient-list request, so any new
+`patient_<id>/` directory shows up in the UI on the next page load.
+
+**(b) Explicit index entry** for ordering / metadata. Edit
+[`corpus/index.json`](corpus/index.json):
+```json
+[
+  { "patient_id": "patient_jdoe_2024_001",
+    "category": "asthma_adherence",
+    "difficulty": "moderate",
+    "headline": "42 F, moderate persistent asthma, 1 ED visit Nov 2025" }
+]
+```
+The headline shows in the patient list and is the only place to
+override the default "<category> [<difficulty>]" label.
+
+### Quick sanity check that the data loads
+
+After adding a patient, verify the platform sees it before kicking off
+an agent run:
+
+```sh
+TOKEN=$(curl -s -X POST http://localhost:3002/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"reviewer_id":"yuhang"}' | python3 -c "import sys,json;print(json.load(sys.stdin)['token'])")
+
+# Patient appears in the list?
+curl -s -H "Authorization: Bearer $TOKEN" http://localhost:3002/api/patients \
+  | python3 -c "import sys,json;ids=[p['patient_id'] for p in json.load(sys.stdin)];print('patient_jdoe_2024_001' in ids)"
+# → True
+
+# Notes parse correctly?
+curl -s -H "Authorization: Bearer $TOKEN" \
+  http://localhost:3002/api/patients/patient_jdoe_2024_001/notes | python3 -m json.tool
+
+# OMOP rows load? (every table that has a JSON file should appear)
+curl -s -H "Authorization: Bearer $TOKEN" \
+  http://localhost:3002/api/patients/patient_jdoe_2024_001/structured \
+  | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+for k, v in d.items():
+    n = len(v) if isinstance(v, list) else (1 if v is not None else 0)
+    print(f'  {k}: {n} rows')
+"
+```
+
+If any of these fail, the agent will silently fall back to whatever
+the platform can find — most likely empty drafts. Fix the data before
+spending tokens.
+
+---
+
+## Running the agent on a custom patient
+
+Once the data is in place, you can run the adherence agent two ways.
+
+### From the Studio UI
+
+1. Open `http://localhost:5174/#/studio/asthma-adherence/try`
+2. Sign in (any reviewer id; methodologist privilege required by default)
+3. Tick the patient(s) in the picker
+4. Adjust **agent specs** if you want (default is two agents:
+   `default` + `skeptical`); leaving as-is is fine for a first run
+5. Click **Start run**
+6. Watch the **Agent log** panel — you should see `list_questions` →
+   `list_structured_data` → `read_structured_data` (×6) → `read_notes`
+   → 13× `set_question_answer` → `set_review_status`
+
+A two-agent run on a single patient typically completes in 1–3 min on
+Haiku 4.5 and costs ~$0.005-0.02.
+
+### From the API (for scripting)
+
+```sh
+TOKEN=$(curl -s -X POST http://localhost:3002/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"reviewer_id":"yuhang"}' | python3 -c "import sys,json;print(json.load(sys.stdin)['token'])")
+
+# Start the iter
+RESP=$(curl -s -X POST http://localhost:3002/api/pilots/asthma-adherence \
+  -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "patient_ids":["patient_jdoe_2024_001"],
+    "agent_specs":[
+      {"id":"agent_1","interpretation_preset":"default"},
+      {"id":"agent_2","interpretation_preset":"skeptical"}
+    ],
+    "max_concurrency":2,
+    "max_turns_per_patient":60,
+    "cost_cap_usd":3.0
+  }')
+RUN_ID=$(echo "$RESP" | python3 -c "import sys,json;print(json.load(sys.stdin)['pilot']['run_id'])")
+echo "run_id: $RUN_ID"
+
+# Poll until done
+until [ "$(curl -s http://localhost:3002/api/runs/$RUN_ID/status \
+  | python3 -c 'import sys,json;print(json.load(sys.stdin)["state"])')" = "complete" ]; do
+  sleep 10
+done
+
+# Inspect agent_1's answers + verifier verdicts
+python3 -c "
+import json
+p = f'var/runs/$RUN_ID/per_patient/patient_jdoe_2024_001/agents/agent_1.json'
+d = json.load(open(p))
+for qa in d.get('question_answers', []):
+    st = qa.get('verifier_status', 'unset')
+    mark = {'confirmed':'✓','contradicted':'✗','no_check':'—'}.get(st, '?')
+    print(f'  {mark} {qa[\"question_id\"]:30s} answer={str(qa[\"answer\"])[:20]:20s}  {(qa.get(\"verifier_note\") or \"\")[:60]}')
+"
+```
+
+### What to expect / spot-check
+
+- **Tool sequence** — agent should call `list_structured_data` once,
+  then `read_structured_data` for each non-empty OMOP table you
+  provided, before committing answers. If you see only `list_notes` +
+  `read_notes` followed by `set_question_answer`, the agent isn't
+  consulting OMOP — check the audit log for an `OMOP CONTRADICTS`
+  warning and confirm your `meta.json.index_date` is set.
+- **Re-commits on contradictions** — when `set_question_answer`
+  responds with `verifier_status: "contradicted"`, the agent should
+  re-read the named table and re-commit. Expect 1–3 re-commits per
+  patient on first-pass runs; zero re-commits means either the agent
+  ignored the warning OR every answer was right on first try.
+- **Verifier verdicts** — every committed answer gets stamped with
+  `verifier_status`. After the run, ≥80% of answers should land
+  `confirmed`. Anything that stays `contradicted` after the agent's
+  re-commit attempts is a real prose-vs-structured conflict worth
+  reviewer attention.
+
+---
+
 ## Workflow
 
 The standard platform workflow applies; see the parent
