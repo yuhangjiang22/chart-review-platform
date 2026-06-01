@@ -1,167 +1,296 @@
-# chart-review-platform-v2 (MVP scaffold)
+# chart-review-platform
 
-Pluggable 6-module pipeline shared between the chart-review and
-lit-extract workflows. **This is a scaffold, not a port.** Module
-contracts are real and typed; implementations are deliberately minimal
-(stub extractors, fixture-backed discovery) so the structure is
-exercisable end-to-end without spending tokens or wiring real LLM
-calls yet.
+Agentic chart-review platform — a methodologist drafts a rubric, two LLM
+agents review each patient's chart, a human reviewer adjudicates
+disagreements, the rubric iterates until inter-rater agreement
+stabilizes, and the version locks at a git SHA for citation.
 
-The end-state goal: replace the chart-review-platform v1 server with
-v2 *and* fold lit-extract into the same pipeline, with the shared
-mechanics (faithfulness gate, dual-extractor + judge, append-only
-audit) living in one place.
+The platform supports **three task kinds**, all sharing the same
+authoring → run → validate → lock workflow:
 
-See [`docs/workflow-comparison.md`](../docs/workflow-comparison.md) for
-the analysis that motivated this split.
+| Kind | What it produces per patient | Example |
+|---|---|---|
+| **phenotype** | One `FieldAssessment` per criterion (`confirmed`/`probable`/`absent` + evidence) | Lung-cancer phenotype, CHA₂DS₂-VASc |
+| **ner** | A list of `SpanLabel`s mapped to an ontology (BSO-AD, AD-CDE) | Span extraction against an ontology |
+| **adherence** | One `QuestionAnswer` per question + derived `RuleVerdict`s | Asthma adherence (NAEPP-based), statin adherence |
 
-## The 6 modules
+Lineage: this is v2 of the platform, vendored out of an
+IU-Agentic-Framework monorepo. Architecture mirrors the
+*Agentic Clinical Chart Review (ACCR) Framework: System Design*
+(March 2026) — tier-stratified question framework, dual-track
+concordance (deterministic rules + LLM-as-judge), capability subagents,
+and a unified data abstraction over notes + OMOP structured data.
 
-```
-TaskSpec → FormSpec → Corpus → ExtractorOutput[] → ReconciledDraft → FinalizedAssessment
-   ↓          ↓         ↓             ↓                  ↓                   ↓
-1. clarify  2. form   3. discover  4. extract        5. validate         6. correct + log
-                                  (×N parallel)     (reconcile + judge)  (human override + audit)
-```
+---
 
-| # | Module | Chart-review adapter | Lit-extract adapter | Reused from v1? |
-|---|---|---|---|---|
-| 1 | `clarify` | phenotype scope (minimal) | PICO scope (minimal) | No — v1's `builder/` is to-be-replaced |
-| 2 | `form-gen` | **loads v1's compiled task via `loadCompiledTask`** | hard-coded extraction form | **Yes** — `CompiledField` shape + task store |
-| 3 | `discover` | patient-cwd note reader | DB / fixture fetcher | Partial — same file layout as v1's corpus |
-| 4 | `extract` | stub + `makeV1AgentExtract` adapter that **wraps v1's `runAgent`** | stub | **Yes** — Claude/Codex provider, MCP, per-run dropdown |
-| 5 | `validate` | — | — | **Yes** — wraps v1's `compareDrafts` (hard/soft kinds, fingerprint) |
-| 6 | `correct-log` | — | — | Partial — replicates override semantics + edit_reason taxonomy |
-| — | DSL evaluator | (used by 5 when applicability/derivation present) | (same) | **Yes** — re-exports v1's `safeEval`, `evalDerivation`, `fieldApplicability` from `contract-eval.ts` |
+## The workflow
 
-What's v1-imported via cross-project relative paths from `../chart-review-platform/app/server/`:
-
-```ts
-// types
-import { EvidenceRef, FieldAssessment, AgentDraft, ... } from ".../disagreements.js";
-import { CompiledField, CompiledTask } from ".../tasks.js";
-import { ProviderName, AgentRunInput, ... } from ".../agent-provider.js";
-
-// behavior
-import { compareDrafts } from ".../disagreements.js";
-import { loadCompiledTask } from ".../tasks.js";
-import { runAgent } from ".../agent-provider.js";
-import { safeEval, evalDerivation, fieldApplicability } from ".../contract-eval.js";
-```
-
-v2's `node_modules` is a symlink to v1's so transitive deps (Anthropic
-SDK, MCP SDK, etc.) resolve at runtime.
-
-Three things still NOT reused that should be (port-when-ready):
-
-- v1's `audit-trail.ts` `appendAuditEntry` — module 6 has its own JSONL writer; could thin to a re-export, but `audit-trail.ts` pulls in PLATFORM_ROOT side effects we kept module 6 isolated from.
-- v1's `find-quote-offsets-impl.ts` — whitespace-tolerant offset matcher; module 4's faithfulness gate is currently strict-byte-match only.
-- v1's `judge.ts` / `judge-batch.ts` — the LLM judge implementation; module 5 has the interface (`Judge`) but no built-in implementation yet.
-
-## Layout
+Every task moves through the same seven phases. The Studio UI surfaces
+them as a pill bar; each phase has a dedicated pane.
 
 ```
-chart-review-platform-v2/
-├── README.md
-├── package.json
-├── tsconfig.json
-├── shared/
-│   ├── types.ts             ← all 6 module contracts
-│   └── logger.ts            ← append-only JSONL writer
-├── modules/
-│   ├── 1-clarify/{index, chart-review, lit-extract}.ts
-│   ├── 2-form-gen/{index, chart-review, lit-extract}.ts
-│   ├── 3-discover/{index, chart-review, lit-extract}.ts
-│   ├── 4-extract/{index, faithfulness, stub}.ts
-│   ├── 5-validate/{index, reconcile}.ts
-│   └── 6-correct-log/{index, jsonl}.ts
-├── workflows/
-│   ├── chart-review.ts      ← wires the 6 modules with chart-review adapters
-│   └── lit-extract.ts       ← wires the 6 modules with lit-extract adapters
-└── examples/
-    └── smoke-test.ts        ← runs both workflows end-to-end
+AUTHOR ── TRY ── [JUDGE] ── VALIDATE ── DECIDE ── LOCK ── DEPLOY
+   ↑                                       │
+   └───────────── iterate ─────────────────┘
 ```
 
-## Try it
+| Phase | What happens | Output |
+|---|---|---|
+| **AUTHOR** | Methodologist edits the rubric (criteria for phenotype, entity-type guidance for NER, questions + rules for adherence) | Skill bundle on disk |
+| **TRY** | N agents run on M patients in parallel; produces per-agent drafts | `runs/<run_id>/per_patient/<pid>/agents/<agent>.json` |
+| **JUDGE** (optional) | A stronger model pre-screens disagreement cells, suggests pre-fills | `judge_analyses.json` |
+| **VALIDATE** | Human reviewer accepts/overrides agent answers per (patient × criterion) | `reviews/<pid>/<task>/review_state.json` |
+| **DECIDE** | Per-agent leaderboard + clustered improvement proposals; one-click re-run on same cohort | Improvement proposal YAMLs |
+| **LOCK** | Calibration + reproducibility bundle + locked SHA | `var/exports/<task>/<bundle_id>/` |
+| **DEPLOY** | Run the locked task on a folder of new patient notes | New `runs/` outputs |
+
+Phases can be enabled/disabled per task via `meta.yaml`.
+
+---
+
+## Quick start
 
 ```sh
-cd chart-review-platform-v2
+git clone git@github.com:yuhangjiang22/chart-review-platform.git
+cd chart-review-platform
 npm install
-npm run typecheck            # confirm contracts compile
-npm run smoke                # end-to-end on a real patient via v1's runAgent + chart-review-judge
-npm run server               # boot HTTP server (PORT=3002) exposing 6 modules as REST
+
+cp .env.example .env
+# Edit .env: set CHART_REVIEW_PLATFORM_ROOT to absolute path of this clone
+# Fill in API keys (ANTHROPIC_API_KEY or AZURE_OPENAI_API_KEY)
+
+npm run dev    # server on :3002, client on :5174
 ```
 
-`npm run smoke` spends real tokens (~$0.01/patient with Haiku, more with
-Codex/Azure). Set `AGENT_PROVIDER=codex` or `=claude` to pick; default is
-whatever `chart-review-platform/app/.env`'s `AGENT_PROVIDER` says.
+Open `http://localhost:5174` and sign in with any reviewer ID. The
+tabbed task list shows the three kinds; pick a task to enter its
+workspace.
 
-### Server endpoints
+To smoke-test an end-to-end run on the demo asthma patient:
 
-The HTTP server is the integration point for non-TypeScript clients
-(Python notebooks, the existing v1 Studio, etc.). One endpoint per
-module + a `run` shortcut + healthz:
-
-```
-POST /api/v2/clarify    { prompt, domain }                                  → TaskSpec
-POST /api/v2/form       { task_spec }                                       → FormSpec
-POST /api/v2/discover   { task_spec, subject }                              → EvidenceUnit[]
-POST /api/v2/extract    { form, subject, corpus, extractor_id, mode, provider } → ExtractorOutput
-POST /api/v2/reconcile  { outputs, run_judge, judge_provider }              → ReconciledDraft
-POST /api/v2/correct    { task_id, subject_id, field_id, decision }         → FinalizedAssessment
-POST /api/v2/run        { prompt, subject, domain, mode, run_judge }        → FinalizedAssessment
-GET  /api/v2/healthz
+```sh
+# In the UI:
+#   #/studio/asthma-adherence/try → select patient_demo_asthma_01 → Start run
+# Watch the agent log; ~2 minutes per patient on haiku-4.5.
 ```
 
-The smoke test:
+---
 
-1. Builds a 1-patient corpus + 1-paper fixture in a temp dir.
-2. Runs `makeChartReviewPipeline.runOne()` end-to-end → emits a
-   `FinalizedAssessment`.
-3. Runs `makeLitExtractPipeline.runOne()` end-to-end → emits a
-   `FinalizedAssessment`.
-4. Records a human `confirm` + an `override` on each → audit log JSONL.
-5. Asserts both audit logs exist with the right number of entries.
+## Architecture
 
-If the smoke test passes, the 6 module contracts are consistent enough
-to drive both workflows.
+```
+                     SKILLS (.agents/skills/<name>/)
+                     ↑ loaded by task_kind discriminator
+┌────────────┬───────────────────────────────────────────────────┐
+│ React UI   │ Server (Node + TypeScript)                        │
+│ Studio +   │ ├─ Routes per phase (TRY / JUDGE / VALIDATE / …)  │
+│ Workspace  │ ├─ MCP servers (one per task_kind, anthropic +    │
+│ panes      │ │  stdio transports)                              │
+│            │ ├─ Agent providers (Claude SDK / Codex CLI)       │
+│            │ └─ Pipelines (extract-phenotype / -ner /          │
+│            │                -adherence)                        │
+└────────────┴───────────────────────────────────────────────────┘
+        ↕ HTTP / WebSocket          ↕ filesystem-as-state
+                              (review_state.json, runs/,
+                               proposals/, judge_analyses.json,
+                               cohorts/, exports/)
+```
 
-## What's intentionally absent (MVP scope)
+Key abstractions:
 
-- **Real LLM calls.** Module 4 uses a deterministic stub extractor.
-  The real implementation lives in v1's `agent-provider-{claude,codex}.ts`;
-  port it behind the `ExtractModule` interface when ready.
-- **Real discovery sources.** Module 3's lit-extract adapter falls back
-  to a fixture file; PubMed/Europe PMC/arXiv adapters go behind the
-  same `DiscoverModule` interface.
-- **Real form-gen.** Module 2 emits a small hard-coded rubric per
-  domain. The chart-review side should later compile from existing
-  `.claude/skills/chart-review-<task>/criteria/*.yaml`; lit-extract
-  should drive the Phase-5 interview.
-- **HTTP / UI / WebSocket.** v1's React Studio sits on top; v2 starts
-  as a Node library. Building a UI on the same module contracts is a
-  later step.
-- **The applicability + derivation DSL.** Reserved in `Criterion`
-  but not evaluated yet — port v1's `contract-eval.ts` behind the
-  reconciler/form-gen interface when porting in real criteria.
+- **`task_kind` discriminator** (`phenotype` | `ner` | `adherence`) on
+  every task's `meta.yaml`. The runtime routes to the matching MCP
+  server + pipeline + UI pane based on this single field.
 
-## Implementation order (the smallest first-useful-version path)
+- **Agent provider abstraction** (`AGENT_PROVIDER=claude|codex`). Same
+  `runAgent()` call site, different backend. Claude uses an in-process
+  MCP server; Codex spawns the CLI as a subprocess with a project-local
+  `.codex/config.toml`.
 
-1. ✅ Types-only commit — the 6 contracts in `shared/types.ts`.
-2. ✅ Logger module — the append-only JSONL writer both workflows share.
-3. ✅ Discovery adapters — patient-notes + (fixture for now, PubMed later).
-4. **Next**: real `ExtractModule` adapters — port `agent-provider-{claude,codex}.ts` behind the interface, drop the stub.
-5. **Next**: real `Judge` (optional pre-screen) — port v1's `judge.ts`.
-6. **Next**: real form-gen — port v1's task compiler; add the
-   applicability + derivation DSL evaluator behind module 5's
-   `reconcile()` so derived cells flow through the same pipeline.
-7. **Later**: an HTTP server + UI on top, replacing v1's Studio.
+- **Unified data abstraction** — notes + OMOP rows accessed via the same
+  MCP tool set (`list_notes`, `read_notes`, `search_notes`,
+  `list_structured_data`, `read_structured_data`). Backends behind this
+  interface can be flat-file (today), FHIR, OMOP CDM, Epic Clarity, etc.
 
-## What to delete from v1 once v2 covers the same ground
+- **Dual-track concordance** — every adherence/phenotype rule fires a
+  deterministic engine first; rules marked `nuanced: true` then get
+  an LLM-as-judge pass that can reason over attribution. Both produce
+  the same verdict + attribution schema.
 
-(Pointers, not actions — wait until v2 actually replaces them.)
+- **Verifier post-pass** (adherence-only today) — for every
+  `set_question_answer`, deterministically cross-checks against OMOP
+  rows and stamps `verifier_status: confirmed|contradicted|no_check`
+  on the answer. Surfaces `OMOP ✗` chips in the reviewer UI on
+  contradictions.
 
-- `chart-review-platform/app/server/skills/keyword-search/` — predecessor of smart-search.
-- `chart-review-platform/builder/` chat builder — replaced by a Phase-1-style structured clarify module.
-- Lit-search's free-form correction reasons — replaced by the structured `edit_reason` enum.
-- Lit-search's "Google Scholar / general web" sources — low signal; lit-extract adapter doesn't include them.
+---
+
+## Repo layout
+
+```
+chart-review-platform/
+├── .env.example              ← document required env vars
+├── .agents/skills/           ← task definitions (phenotype/NER/adherence)
+│   └── chart-review-asthma-adherence/  ← reference adherence task
+│       ├── SKILL.md          ← agent procedure (retrieval order, etc.)
+│       ├── meta.yaml         ← task_kind, enabled phases, version
+│       └── references/
+│           ├── questions/T{0,1,2}_*.yaml
+│           ├── rules/*.yaml
+│           └── attribution.yaml
+├── .codex/config.toml        ← Codex CLI routing (Azure / OpenRouter / vLLM)
+├── client/                   ← React + Tailwind + Radix Studio UI
+├── server/                   ← Node HTTP + WebSocket + MCP servers
+├── packages/                 ← ~50 typed packages (npm workspace)
+│   ├── agent-provider*/      ← Claude SDK + Codex CLI providers
+│   ├── mcp-core*/            ← MCP tool handlers per task_kind
+│   ├── mcp-server-*-anthropic/  ← in-process MCP for Claude
+│   ├── mcp-server-*-stdio/   ← JSON-RPC MCP for Codex
+│   ├── pipeline-extract-*/   ← per-kind extractor + verifier
+│   ├── domain-{review,iter,proposal,…}/  ← business logic
+│   ├── infra-batch-run/      ← run-N-patients orchestration
+│   ├── eval-{kappa,adherence-iaa,span-iaa}/  ← IAA metrics
+│   ├── platform-types/       ← shared TypeScript shapes
+│   └── …
+├── corpus/                   ← patients
+│   ├── index.json
+│   └── patients/<pid>/{meta.json, notes/, omop/}
+├── var/                      ← runtime state (gitignored)
+│   ├── runs/, reviews/, proposals/, exports/, cohorts/
+├── examples/
+├── shared/
+└── modules/
+```
+
+The skill bundle layout is the single key thing to know — adding a new
+task = creating a new `.agents/skills/chart-review-<name>/` directory.
+
+---
+
+## Task kinds
+
+### Phenotype (lung-cancer-phenotype, cha2ds2-vasc, …)
+
+Per-criterion adjudication. Reviewer marks each `(patient × criterion)`
+cell as `confirmed`/`probable`/`absent`. Inter-rater κ drives the lock
+decision. Original kind — most mature, has cohort manager + deployment-κ
+validation + Methods drafter.
+
+### NER (bso-ad-ner, ad-cde-ner)
+
+Span extraction against an ontology. Two-pass agent (find spans → map
+each span to a concept via list of ontology concepts). Reviewer
+validates spans note-by-note. Per-entity-type F1 + tuple κ drives the
+lock decision.
+
+### Adherence (asthma-adherence)
+
+Question-and-rule chart review. Built from the ACCR design PDF:
+tier-stratified questions (T0 eligibility → T1 control assessment →
+T2 management), rule engine + LLM-judge dual-track, 9-category
+attribution taxonomy. Now includes:
+
+- **OMOP read tools** — `list_structured_data` + `read_structured_data`
+  give the agent access to conditions/drugs/measurements/observations/
+  procedures/encounters tables alongside notes.
+- **`search_notes` MCP tool** — keyword search across all patient notes,
+  returns filename + offset + ±120-char snippet per hit.
+- **Verifier post-pass** — every agent answer is deterministically
+  cross-checked against the matching OMOP table. Contradictions surface
+  in the reviewer UI as red `OMOP ✗` chips and in the agent's next tool
+  response as `OMOP CONTRADICTS YOUR ANSWER` warnings.
+- **Composite summary** — cohort-level concordance rate with 95% Wilson
+  CI, attribution histogram, per-patient roster.
+- **Per-agent IAA leaderboard** on DECIDE — match rate + κ against
+  reviewer-validated answers, per agent.
+- **DEPLOY folder-pick** — `POST /api/deploy/:taskId/run` symlinks a
+  server-side folder of patient notes into the corpus and starts a
+  batch run against the locked rubric.
+
+Demo patient `patient_demo_asthma_01` ships with realistic OMOP fixtures
+(3 conditions, 3 drugs including a controller + SABA + OCS burst, 8
+measurements including 3 ACT scores + spirometry, 5 encounters
+including 1 ED visit, 1 spirometry procedure, 4 observations).
+
+---
+
+## Configuration
+
+All configuration is via env vars (`.env`) and `.codex/config.toml`.
+There's a read-only diagnostics page (🔧 wrench → API providers in the
+Studio) that shows what's currently active without exposing secrets.
+
+| Variable | Purpose |
+|---|---|
+| `CHART_REVIEW_PLATFORM_ROOT` | Absolute path of this checkout (required) |
+| `AGENT_PROVIDER` | `claude` (default) or `codex` |
+| `CHART_REVIEW_MODEL` | Default model for the active provider |
+| `CHART_REVIEW_JUDGE_MODEL` | Optional override for the LLM-as-judge |
+| `CHART_REVIEW_JUDGE_PROVIDER` | Pin the judge to one provider regardless of run provider |
+| `ANTHROPIC_API_KEY` / `ANTHROPIC_AUTH_TOKEN` | Claude provider auth |
+| `ANTHROPIC_BASE_URL` | Optional — point at OpenRouter / Bedrock / proxy |
+| `AZURE_OPENAI_API_KEY` | Codex provider auth when `.codex/config.toml` routes to Azure |
+| `REVIEWER_AUTH` | `optional` (dev) or `required` (production) |
+| `REVIEWERS` / `METHODOLOGISTS` | Comma-separated allowlists |
+
+See [`.env.example`](.env.example) for the full list.
+
+For Codex routing (Azure / OpenAI direct / vLLM / OpenRouter), edit
+[`.codex/config.toml`](.codex/config.toml). An [example vLLM
+config](.codex/config.toml.vllm) is included with comments on the
+MCP-tool-survival risk on chat-completions endpoints.
+
+---
+
+## How it ships
+
+This is a research platform. Every chart-review session logs structured
+reasoning traces (tool calls, evidence retrieved, intermediate
+reasoning, final answers, confidence scores) at
+`var/runs/<run>/per_patient/<pid>/{audit.jsonl,agents/<id>_transcript.jsonl}`.
+That trace stream is the substrate for the design's training-data
+flywheel — frontier model → traces → preference judgments → fine-tuned
+smaller models (deferred; not implemented yet).
+
+Locked tasks can be exported as a single `.tar.gz` reproducibility
+bundle containing the skill, every reviewer-validated `review_state`,
+every agent batch run, per-field κ statistics, the Methods draft, and
+post-lock deployment-validation cohorts.
+
+---
+
+## Status / what's mature
+
+- ✅ Phenotype task kind — full lifecycle (AUTHOR → DEPLOY), N tasks shipping
+- ✅ NER task kind — full lifecycle, 2 ontologies (BSO-AD, AD-CDE)
+- ✅ Adherence task kind — full lifecycle for `asthma-adherence`, OMOP read tools, verifier, composite summary, folder-pick deploy
+- ✅ Agent provider abstraction (Claude SDK + Codex CLI)
+- ✅ Unified data abstraction (notes + OMOP) with task-kind-aware MCP tools
+- ✅ Dual-track concordance (deterministic + LLM judge)
+- ✅ Per-task phase enablement (`meta.yaml.phases`)
+- ✅ Reproducibility bundle export
+
+Less mature / known gaps:
+
+- ⚠ Guideline ingestion mode (auto-generate questions from a guideline PDF) — manual authoring only
+- ⚠ Capability subagents (Retriever / Extractor / Verifier as separate spawnable agents) — currently one monolithic agent per patient
+- ⚠ Confidence calibration (Platt scaling) — raw model confidence, no calibration pass
+- ⚠ Training pipeline (distillation / RLAIF / RLHF) — traces captured, no training loop yet
+- ⚠ Multi-site adapters (FHIR / Epic Clarity / OMOP CDM proper) — only flat-file backend today
+
+---
+
+## Workflow conventions
+
+- Feature branches (`feat/...`, `fix/...`, `refactor/...`, `docs/...`)
+- Conventional commits (`<type>(<scope>): <summary>`)
+- Don't skip hooks (`--no-verify` is off)
+- Don't commit secrets — `.env` is gitignored; check in `.env.example` if you add a new variable
+
+---
+
+## License
+
+Private / unlicensed pending decision. Do not redistribute notes,
+OMOP fixtures, or reviewer-validated `review_state.json` files outside
+the team.
