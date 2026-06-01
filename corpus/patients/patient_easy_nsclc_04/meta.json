@@ -1,0 +1,10 @@
+{
+  "patient_id": "patient_easy_nsclc_04",
+  "category": "confirmed_nsclc",
+  "demographics": { "age": 82, "sex": "M", "region": "Southeast" },
+  "smoking": "45 pack-years, quit 2002",
+  "index_date": "2025-02-11",
+  "doc_types": ["ct_chest", "surgical_pathology", "oncology_progress", "pcp_followup"],
+  "generated_by": "claude_api",
+  "generation_run_id": "claude-subagent-2026-04-29"
+}

@@ -1,0 +1,23 @@
+INDIANA UNIVERSITY HEALTH — PRIMARY CARE
+PROGRESS NOTE
+Date: 2025-11-04
+Patient: Janet R. Ellis  DOB: 1983-09-22  MRN: 740219
+Provider: Dr. Aaron K. Whitman, MD (Internal Medicine)
+
+SUBJECTIVE:
+Ms. Ellis is a 42-year-old woman with persistent asthma (diagnosed 2008, J45.40) here for asthma follow-up. She reports daytime symptoms 3-4x/week — typically tightness on stairs and at the gym — and nighttime awakenings approximately twice in the past month. She has refilled albuterol 3 times since June. She admits inconsistent use of her controller "maybe half the days, I forget in the morning." No ED visits this year, but one short course of oral prednisone in March 2025 for a worsening lower respiratory infection that "felt like an asthma flare."
+
+OBJECTIVE:
+Vitals: BP 118/72, HR 78, SpO2 97% on room air, Weight 68.4 kg
+Lung exam: end-expiratory wheezing bilaterally, no accessory muscle use.
+ACT score administered today: 16/25.
+
+ASSESSMENT:
+Persistent asthma, moderate, suboptimal control on current step 2 therapy. ICD-10 J45.40. Adherence to controller suboptimal by patient report; SABA overuse pattern.
+
+PLAN:
+1. Step up controller to ICS-LABA: budesonide-formoterol 160/4.5, 2 inhalations BID. Reviewed inhaler technique.
+2. Counseled on importance of daily controller use. Discussed habit-stacking with morning coffee.
+3. Spirometry ordered for next visit.
+4. Follow-up in 6 weeks to reassess.
+5. Asthma action plan provided in writing and reviewed in person.

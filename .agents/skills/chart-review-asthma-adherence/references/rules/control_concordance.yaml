@@ -1,0 +1,51 @@
+rules:
+  - rule_id: R-T1-ControllerForPersistent
+    description: >-
+      Persistent asthma (recent ACT < 20 OR >= 2 exacerbations) must
+      have an active controller prescribed.
+    verdict_if: "T1-ControllerPrescribed == true"
+    excluded_if: "T1-ACTScore is missing and T1-ExacerbationsCount is missing"
+    attribution_when:
+      - when: "T1-ControllerPrescribed != true and T1-ControllerAdherenceProxy == \"patient_refusal\""
+        category: PATIENT_REFUSAL
+      - when: "T1-ControllerPrescribed != true"
+        category: DOCUMENTATION_GAP
+    # LLM judge weighs in on attribution — distinguishing documentation
+    # gap from genuine deviation often needs clinical reasoning that the
+    # deterministic mapping above can't capture.
+    nuanced: true
+    judge_can_override: false
+    supporting_questions: [T1-ACTScore, T1-ExacerbationsCount, T1-ControllerPrescribed, T1-ControllerAdherenceProxy]
+
+  - rule_id: R-T1-NoSABAOveruse
+    description: >-
+      No SABA overuse (>= 3 canisters/year). SABA overuse signals
+      poorly-controlled disease that wasn't escalated.
+    verdict_if: "T1-SABAOveruse == false"
+    attribution: GUIDELINE_DEVIATION
+    supporting_questions: [T1-SABAOveruse]
+
+  - rule_id: R-T1-AdherenceAssessed
+    description: >-
+      For patients on a controller, adherence is either adequate
+      OR was at least assessed. Silent non-assessment is a
+      documentation gap.
+    verdict_if: "T1-ControllerAdherenceProxy in [\"adequate\", \"inadequate\"]"
+    excluded_if: "T1-ControllerPrescribed != true"
+    attribution: DOCUMENTATION_GAP
+    # LLM judge — confirms whether the non-assessment is a true
+    # documentation gap vs an in-visit conversation the note doesn't
+    # capture explicitly.
+    nuanced: true
+    judge_can_override: false
+    supporting_questions: [T1-ControllerPrescribed, T1-ControllerAdherenceProxy]
+
+  - rule_id: R-T1-SpirometryWithin12mo
+    description: >-
+      Spirometry within the past 12 months (NHLBI 2020 update).
+      Whether T1-SpirometryDate falls within 12 months is checked
+      indirectly via "present" — the extractor is instructed to only
+      record dates from the lookback window.
+    verdict_if: "T1-SpirometryDate is present"
+    attribution: DOCUMENTATION_GAP
+    supporting_questions: [T1-SpirometryDate]

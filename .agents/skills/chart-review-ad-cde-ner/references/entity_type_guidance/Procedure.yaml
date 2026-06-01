@@ -1,0 +1,22 @@
+entity_type: Procedure
+guidance: |
+  Tag surgical or interventional procedures that have happened or are
+  scheduled. Tag the procedure regardless of timing — past, present,
+  scheduled — but encode the timing in the anchor when relevant
+  ("appendectomy 2019" not just "appendectomy" when context matters).
+  Don't tag a procedure that the note merely describes as a possibility
+  ("we considered surgical resection but deferred").
+exemplars:
+  - "appendectomy"
+  - "bariatric surgery"
+  - "cardiac catheterization"
+  - "core needle biopsy"
+negative_examples:
+  - phrase: "considered surgical resection"
+    reason: "considered but not done; not a Procedure concept presence"
+  - phrase: "surgical pathology"
+    reason: "this is a diagnostic test report, not a Procedure"
+edge_cases:
+  - pattern: "post-<procedure>"
+    correct: "tag the procedure"
+    reason: "post-X explicitly tells us X happened"

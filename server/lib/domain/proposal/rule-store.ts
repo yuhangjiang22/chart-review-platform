@@ -1,0 +1,2 @@
+// Re-export shim. Source moved to packages/domain-proposal/src/rule-store.ts in O9.
+export * from "@chart-review/domain-proposal/rule-store";

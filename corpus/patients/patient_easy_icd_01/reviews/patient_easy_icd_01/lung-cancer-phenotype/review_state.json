@@ -1,0 +1,234 @@
+{
+  "schema_version": "1",
+  "patient_id": "patient_easy_icd_01",
+  "task_id": "lung-cancer-phenotype",
+  "task_version": "2026-04-28",
+  "task_document_sha": "sha256:9ed4d2d4218d6771fe8cbf9cb9a58b722643ab4eedb1dc9e21410ff066831dcc",
+  "review_status": "agent_complete",
+  "version": 1,
+  "updated_at": "2026-05-10T20:19:57.111214+00:00",
+  "updated_by": "agent",
+  "field_assessments": [
+    {
+      "field_id": "pathology_report_present",
+      "answer": false,
+      "confidence": "high",
+      "evidence": [
+        {
+          "source": "note",
+          "note_id": "2025-03-12__pcp_visit",
+          "span_offsets": [
+            389,
+            451
+          ],
+          "verbatim_quote": "Denies chest pain, dyspnea, cough, hemoptysis, or weight loss."
+        },
+        {
+          "source": "note",
+          "note_id": "2025-03-30__er_visit",
+          "span_offsets": [
+            149,
+            193
+          ],
+          "verbatim_quote": "CHIEF COMPLAINT: Left ankle pain after fall."
+        },
+        {
+          "source": "note",
+          "note_id": "2025-04-08__pcp_followup",
+          "span_offsets": [
+            154,
+            201
+          ],
+          "verbatim_quote": "Follow-up after ED visit for left ankle sprain."
+        }
+      ],
+      "rationale": "No pathology report (surgical/biopsy) is present in the available chart documents in the 24-month lookback window; the notes are PCP wellness/follow-up and an ED ankle-sprain visit without any pathology documentation."
+    },
+    {
+      "field_id": "pathology_lung_primary",
+      "answer": "not_applicable",
+      "confidence": "high",
+      "evidence": [
+        {
+          "source": "note",
+          "note_id": "2025-03-12__pcp_visit",
+          "span_offsets": [
+            389,
+            451
+          ],
+          "verbatim_quote": "Denies chest pain, dyspnea, cough, hemoptysis, or weight loss."
+        },
+        {
+          "source": "note",
+          "note_id": "2025-04-08__pcp_followup",
+          "span_offsets": [
+            154,
+            201
+          ],
+          "verbatim_quote": "Follow-up after ED visit for left ankle sprain."
+        }
+      ],
+      "rationale": "Not applicable because no qualifying pathology report is present (pathology_report_present = false)."
+    },
+    {
+      "field_id": "cytology_supports_lung_primary",
+      "answer": false,
+      "confidence": "high",
+      "evidence": [
+        {
+          "source": "note",
+          "note_id": "2025-03-12__pcp_visit",
+          "span_offsets": [
+            389,
+            451
+          ],
+          "verbatim_quote": "Denies chest pain, dyspnea, cough, hemoptysis, or weight loss."
+        },
+        {
+          "source": "note",
+          "note_id": "2025-03-30__er_visit",
+          "span_offsets": [
+            149,
+            193
+          ],
+          "verbatim_quote": "CHIEF COMPLAINT: Left ankle pain after fall."
+        },
+        {
+          "source": "note",
+          "note_id": "2025-04-08__pcp_followup",
+          "span_offsets": [
+            154,
+            201
+          ],
+          "verbatim_quote": "Follow-up after ED visit for left ankle sprain."
+        }
+      ],
+      "rationale": "No cytology report (FNA, sputum cytology, pleural fluid cytology) is documented in the available notes in the lookback window."
+    },
+    {
+      "field_id": "imaging_lung_lesion",
+      "answer": false,
+      "confidence": "medium",
+      "evidence": [
+        {
+          "source": "note",
+          "note_id": "2025-03-30__er_visit",
+          "span_offsets": [
+            846,
+            954
+          ],
+          "verbatim_quote": "RESULTS: Left ankle X-ray (3-view) — no fracture. Soft-tissue swelling consistent with lateral ankle sprain."
+        },
+        {
+          "source": "note",
+          "note_id": "2025-03-12__pcp_visit",
+          "span_offsets": [
+            1076,
+            1121
+          ],
+          "verbatim_quote": "Pulmonary: Clear to auscultation bilaterally."
+        }
+      ],
+      "rationale": "No chest imaging describing a suspicious lung lesion is present in the chart; the only imaging documented is a left ankle X-ray, and PCP exam documents clear lungs."
+    },
+    {
+      "field_id": "oncologist_lung_cancer_diagnosis_in_note",
+      "answer": false,
+      "confidence": "high",
+      "evidence": [
+        {
+          "source": "note",
+          "note_id": "2025-03-12__pcp_visit",
+          "span_offsets": [
+            64,
+            112
+          ],
+          "verbatim_quote": "Provider: Dr. A. Morales, MD — Internal Medicine"
+        },
+        {
+          "source": "note",
+          "note_id": "2025-03-30__er_visit",
+          "span_offsets": [
+            67,
+            115
+          ],
+          "verbatim_quote": "Provider: Dr. K. Nguyen, MD — Emergency Medicine"
+        }
+      ],
+      "rationale": "No oncologist or pulmonologist-authored note is present; the available notes are Internal Medicine and Emergency Medicine."
+    },
+    {
+      "field_id": "icd_lung_cancer_present",
+      "answer": true,
+      "confidence": "medium",
+      "evidence": [
+        {
+          "source": "omop",
+          "table": "condition_occurrence",
+          "row_id": "410001",
+          "concept_id": null,
+          "concept_name": "Malignant neoplasm of upper lobe, bronchus or lung, unspecified side",
+          "value": "C34.10",
+          "condition_status": "active",
+          "condition_start_date": "2019-11-04",
+          "condition_type": "problem_list"
+        },
+        {
+          "source": "note",
+          "note_id": "2025-03-12__pcp_visit",
+          "span_offsets": [
+            674,
+            750
+          ],
+          "verbatim_quote": "- C34.10 — carried forward on problem list from prior hospitalization record"
+        },
+        {
+          "source": "note",
+          "note_id": "2025-03-30__er_visit",
+          "span_offsets": [
+            1376,
+            1460
+          ],
+          "verbatim_quote": "- C34.10 Bronchus/lung upper lobe, unspecified (chronic, problem list carry-forward)"
+        }
+      ],
+      "rationale": "An ICD-10 C34.* code (C34.10) appears as an active problem-list condition and is carried into 2025 encounters/notes. The underlying problem-list entry originated in 2019, but it is still present during the lookback window."
+    },
+    {
+      "field_id": "lowest_hemoglobin_in_window",
+      "answer": null,
+      "confidence": "high",
+      "evidence": [
+        {
+          "source": "omop",
+          "table": "measurements",
+          "row_id": "410023",
+          "concept_id": null,
+          "concept_name": "Hemoglobin A1c/Hemoglobin.total in Blood",
+          "value": 6.9,
+          "unit": "%"
+        },
+        {
+          "source": "omop",
+          "table": "measurements",
+          "row_id": "410024",
+          "concept_id": null,
+          "concept_name": "Cholesterol in LDL [Mass/volume] in Serum or Plasma",
+          "value": 82,
+          "unit": "mg/dL"
+        },
+        {
+          "source": "note",
+          "note_id": "2025-04-08__pcp_followup",
+          "span_offsets": [
+            1722,
+            1801
+          ],
+          "verbatim_quote": "Routine wellness labs pending from 03/12 visit; results communicated by portal."
+        }
+      ],
+      "rationale": "No hemoglobin (Hgb/Hb) measurement is present in the available OMOP measurements for the lookback window; only other labs/vitals are recorded."
+    }
+  ],
+  "selected_evidence": []
+}

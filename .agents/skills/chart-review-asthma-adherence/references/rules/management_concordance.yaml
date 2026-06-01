@@ -1,0 +1,35 @@
+rules:
+  - rule_id: R-T2-StepTherapyMatches
+    description: >-
+      The patient's controller regimen matches guideline step therapy
+      for their control level.
+    verdict_if: "T2-StepTherapyMatch == \"matches\""
+    attribution_when:
+      - when: "T2-ContraindicationDocumented == \"contraindication\""
+        category: CONTRAINDICATION
+      - when: "T2-ContraindicationDocumented == \"patient_refusal\""
+        category: PATIENT_REFUSAL
+      - when: "T2-ContraindicationDocumented == \"pending_followup\""
+        category: PENDING_FOLLOWUP
+      - when: "T2-ContraindicationDocumented == \"not_documented\""
+        category: DOCUMENTATION_GAP
+    attribution: GUIDELINE_DEVIATION
+    nuanced: true
+    judge_can_override: false
+    supporting_questions:
+      [T2-StepTherapyMatch, T2-ContraindicationDocumented, T1-ControllerPrescribed]
+
+  - rule_id: R-T2-WrittenActionPlan
+    description: >-
+      Patient has a written asthma action plan documented.
+    verdict_if: "T2-WrittenActionPlan == true"
+    attribution: DOCUMENTATION_GAP
+    supporting_questions: [T2-WrittenActionPlan]
+
+  - rule_id: R-T2-FollowupScheduled
+    description: >-
+      Follow-up scheduled within 3 months for non-controlled patients.
+    verdict_if: "T2-FollowupScheduled == true"
+    excluded_if: "T1-ACTScore >= 20 and T1-ExacerbationsCount == 0"
+    attribution: DOCUMENTATION_GAP
+    supporting_questions: [T2-FollowupScheduled, T1-ACTScore, T1-ExacerbationsCount]

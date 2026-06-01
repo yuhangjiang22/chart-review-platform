@@ -1,0 +1,42 @@
+questions:
+  - question_id: T0-AsthmaDx
+    text: Does the chart document an active diagnosis of asthma (ICD-10 J45.x or
+      equivalent prose) at any point in the lookback window?
+    tier: 0
+    answer_schema:
+      type: boolean
+      description: true iff an asthma diagnosis is documented; null if unknowable from
+        the chart.
+    retrieval_hints: "STRUCTURED FIRST → read_structured_data(table=\"conditions\").
+      Any row with icd10cm matching J45.* (J45.0-J45.99) and status=\"active\"
+      is a match. If conditions is empty, fall back to notes: problem list,
+      encounter diagnoses, assessment lines. Accept \"asthma\", \"reactive
+      airway disease\" only when paired with an asthma ICD code. Don't infer
+      from inhaler use alone."
+  - question_id: T0-AgeOk
+    text: Is the patient age at the index date >= 12 years? (Adolescent / adult
+      asthma scope; pediatric <12y uses a different framework.)
+    tier: 0
+    answer_schema:
+      type: boolean
+    retrieval_hints: Demographic header or notes. If age is unclear, return null.
+  - question_id: T0-LookbackHasNotes
+    text: Are there at least 2 outpatient or specialty notes in the lookback window
+      (so adherence has chart evidence to measure against)?
+    tier: 0
+    answer_schema:
+      type: boolean
+    retrieval_hints: >-
+      Use the encounter list + note titles to COUNT qualifying notes in the
+      lookback window. Qualifying notes are outpatient clinic progress notes and
+      specialty consult/follow-up notes (in-person, video, or telehealth visits
+      that generate a clinician note).
+
+      Do NOT count ED/hospitalization documentation (ED provider notes, H&P,
+      discharge summaries), procedures-only reports (PFT/spirometry reports
+      without a clinic note), imaging/lab result documents, telephone
+      encounters, refill requests, portal messages, administrative
+      documentation, or scheduling communications.
+
+      If fewer than 2 qualifying outpatient/specialty notes are present, answer
+      false.

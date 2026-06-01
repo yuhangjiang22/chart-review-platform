@@ -1,0 +1,26 @@
+task_type: adherence
+task_kind: adherence
+manual_version: 0.1
+source_document_sha: sha256:asthma-adherence-pdf-2026-03
+status: draft
+review_unit: patient
+overview_prose: >-
+  Asthma management guideline-concordance task. Extract per-patient
+  structured answers to a tier-stratified question framework
+  (eligibility / control assessment / management) and evaluate
+  concordance with a small ruleset. Output per patient is a
+  QuestionAnswer[] + RuleVerdict[] pair persisted in the union-shaped
+  review_state.json.
+
+  Reference: 2026-03-Agentic-Asthma-Adherence-Design.pdf. Phase 2
+  manually authors the questions + rules from the PDF examples; the
+  guideline-ingestion mode is deferred (see ADHERENCE-INTEGRATION.md
+  Phase 4).
+final_output: rule_verdicts
+phases:
+  - author
+  - try
+  - validate
+  - decide
+  - lock
+  - deploy

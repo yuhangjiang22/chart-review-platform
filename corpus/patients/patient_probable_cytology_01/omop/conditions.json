@@ -1,0 +1,4 @@
+[
+  { "row_id": 5301, "concept_id": 255573, "concept_name": "COPD", "icd10cm": "J44.9", "status": "active", "date": "2014-02-19" },
+  { "row_id": 5302, "concept_id": 4115276, "concept_name": "Malignant neoplasm of upper lobe, right bronchus or lung", "icd10cm": "C34.11", "status": "active", "date": "2025-05-22" }
+]

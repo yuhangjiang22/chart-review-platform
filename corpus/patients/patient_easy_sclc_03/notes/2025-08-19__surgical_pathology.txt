@@ -1,0 +1,30 @@
+VANDERBILT UNIVERSITY MEDICAL CENTER – SURGICAL PATHOLOGY
+Date: 2025-08-19
+Patient: [REDACTED], 65M  MRN: [REDACTED]
+Specimen: EBUS-TBNA, right paratracheal lymph node station 4R; bronchial washing, right upper lobe
+
+GROSS DESCRIPTION:
+(A) EBUS-TBNA cores: three fragmented cores, tan-gray, 0.5–0.9 cm. Marked crush artifact.
+(B) Bronchial washing cell block: pinkish pellet, entirely submitted.
+
+MICROSCOPIC DESCRIPTION:
+(A) Core biopsy: Sheets of small cells with scant cytoplasm and oval nuclei showing finely stippled "salt-and-pepper" chromatin. Prominent nuclear molding. Nucleoli absent. Mitotic rate markedly elevated (>20/10 HPF). Karyorrhectic debris and geographic necrosis present. Crush artifact in ~40% of tissue, consistent with neuroendocrine small-cell morphology.
+(B) Bronchial washing cell block: Clusters of malignant cells with identical morphology to (A); supports bronchogenic origin.
+
+Immunohistochemistry (block A2):
+- Synaptophysin: POSITIVE (diffuse strong)
+- Chromogranin A: POSITIVE (moderate)
+- CD56: POSITIVE (diffuse strong)
+- TTF-1: POSITIVE (~65% of tumor nuclei)
+- Ki-67: ~88%
+- p40: NEGATIVE
+- CK7: POSITIVE (focal)
+- ALK: NEGATIVE
+
+DIAGNOSIS:
+(A) Small-cell lung carcinoma (SCLC), right paratracheal lymph node. Neuroendocrine IHC profile confirms diagnosis.
+(B) Bronchial washing: Positive for malignant cells; morphology consistent with small-cell carcinoma.
+
+Pathologist: Dr. C. Yates, MD, Surgical Pathology
+Vanderbilt University Medical Center
+Electronically signed: 2025-08-19 17:55

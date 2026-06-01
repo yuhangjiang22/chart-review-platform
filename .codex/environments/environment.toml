@@ -1,0 +1,32 @@
+# Codex environment for chart-review-platform-v2.
+#
+# Project-local environment hints for codex-as-agent when working on
+# this codebase (NOT the platform's runtime agent provider — that lives
+# in .codex/config.toml). Mirrors openai/codex's .codex/environments/
+# pattern.
+
+name = "chart-review-platform-v2"
+description = """
+TypeScript npm-workspace monorepo. 76 packages under packages/, plus a
+React UI (client/) and skill bundles (.agents/skills/). v2 ships
+independently of v1 (chart-review-platform/ exists for reference only).
+"""
+
+# Setup steps codex should run before working on this repo.
+[setup]
+commands = [
+  "cd chart-review-platform-v2",
+  "PATH=/Users/yj38/.local/node-runtime/bin:$PATH npm install",
+]
+
+# Sanity checks codex should run after making changes.
+[verify]
+typecheck = "cd chart-review-platform-v2 && npm run typecheck"
+dev = "cd chart-review-platform-v2 && PATH=/Users/yj38/.local/node-runtime/bin:$PATH AGENT_PROVIDER=claude npm run dev"
+
+# Conventions codex should follow.
+[conventions]
+package_naming = "@chart-review/<name>"
+shim_pattern = "lib/<name>.ts → export * from '@chart-review/<name>';"
+new_package = "Each concern = one package. Add packages/<name>/{src/index.ts,package.json}; add to workspaces glob if needed; npm install; typecheck."
+test_path = "examples/smoke.ts is the canonical end-to-end test"

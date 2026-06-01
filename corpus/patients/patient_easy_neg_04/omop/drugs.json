@@ -1,0 +1,47 @@
+[
+  {
+    "row_id": "540001",
+    "drug_exposure_id": 540001,
+    "person_id": "patient_easy_neg_04",
+    "drug_concept_name": "Apixaban 5 MG Oral Tablet",
+    "drug_start_date": "2025-08-06",
+    "rxnorm_code": "1364435",
+    "route_concept_name": "Oral"
+  },
+  {
+    "row_id": "540002",
+    "drug_exposure_id": 540002,
+    "person_id": "patient_easy_neg_04",
+    "drug_concept_name": "Metoprolol succinate 50 MG Extended Release Oral Tablet",
+    "drug_start_date": "2025-08-06",
+    "rxnorm_code": "866519",
+    "route_concept_name": "Oral"
+  },
+  {
+    "row_id": "540003",
+    "drug_exposure_id": 540003,
+    "person_id": "patient_easy_neg_04",
+    "drug_concept_name": "Lisinopril 5 MG Oral Tablet",
+    "drug_start_date": "2025-08-06",
+    "rxnorm_code": "314076",
+    "route_concept_name": "Oral"
+  },
+  {
+    "row_id": "540004",
+    "drug_exposure_id": 540004,
+    "person_id": "patient_easy_neg_04",
+    "drug_concept_name": "Atorvastatin 40 MG Oral Tablet",
+    "drug_start_date": "2025-08-06",
+    "rxnorm_code": "617310",
+    "route_concept_name": "Oral"
+  },
+  {
+    "row_id": "540005",
+    "drug_exposure_id": 540005,
+    "person_id": "patient_easy_neg_04",
+    "drug_concept_name": "Furosemide 20 MG Oral Tablet",
+    "drug_start_date": "2025-08-29",
+    "rxnorm_code": "310429",
+    "route_concept_name": "Oral"
+  }
+]

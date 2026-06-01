@@ -1,0 +1,63 @@
+questions:
+  - question_id: T2-StepTherapyMatch
+    text: Does the current controller regimen match guideline step therapy for the
+      patient's control level? (Severe-persistent asthma should have ICS-LABA or
+      biologic; mild should have ICS monotherapy.)
+    tier: 2
+    answer_schema:
+      type: string
+      enum:
+        - matches
+        - under_treated
+        - over_treated
+        - unknown
+    depends_on:
+      - T1-ControllerPrescribed
+      - T1-ACTScore
+    retrieval_hints: Compare T1 control signals to the regimen captured in
+      T1-ControllerPrescribed. Use "unknown" when control level cannot be
+      determined.
+  - question_id: T2-WrittenActionPlan
+    text: Is an asthma written action plan documented as given to the patient in the
+      lookback window? Answer true only when the chart explicitly documents an
+      action plan being given or reviewed. If there is no documentation of an
+      action plan in the lookback window, answer false (do not return null for
+      "not found").
+    tier: 2
+    answer_schema:
+      type: boolean
+    retrieval_hints: >-
+      STRUCTURED FIRST → read_structured_data(table="observations"). Look
+      for concept_name="Asthma written action plan given" — value
+      "yes"/"no" is the answer. Most recent row wins. Fallback to notes
+      when observations is empty: "AAP provided", "asthma action plan
+      reviewed", patient education sections of visit notes.
+  - question_id: T2-FollowupScheduled
+    text: Is a follow-up visit (in person or telehealth) scheduled within 3 months
+      of the most recent encounter?
+    tier: 2
+    answer_schema:
+      type: boolean
+    retrieval_hints: >-
+      STRUCTURED FIRST → read_structured_data(table="encounters"). If
+      any encounter has start_date AFTER the index_date (or within the
+      next 3 months from the most recent encounter), that's a scheduled
+      follow-up → true. Fallback to notes: plan/disposition sections.
+      Treat "RTC PRN" as false.
+  - question_id: T2-ContraindicationDocumented
+    text: If the patient is NOT on a controller that matches step therapy, is a
+      contraindication or patient-refusal explicitly documented (so the gap is
+      attributable, not an undocumented omission)?
+    tier: 2
+    answer_schema:
+      type: string
+      enum:
+        - contraindication
+        - patient_refusal
+        - pending_followup
+        - not_documented
+        - not_applicable
+    depends_on:
+      - T2-StepTherapyMatch
+    retrieval_hints: Allergy section, "patient declined inhaled steroid", insurance
+      barriers, planned but not yet started.

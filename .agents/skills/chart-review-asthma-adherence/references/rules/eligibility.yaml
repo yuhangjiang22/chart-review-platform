@@ -1,0 +1,8 @@
+rules:
+  - rule_id: R-T0-Eligible
+    description: >-
+      Patient is in scope for the adherence audit: asthma documented,
+      age >= 12, sufficient chart history.
+    verdict_if: "T0-AsthmaDx == true and T0-AgeOk == true and T0-LookbackHasNotes == true"
+    excluded_if: "T0-AsthmaDx != true or T0-AgeOk != true or T0-LookbackHasNotes != true"
+    supporting_questions: [T0-AsthmaDx, T0-AgeOk, T0-LookbackHasNotes]

@@ -1,0 +1,35 @@
+task_type: phenotype_validation
+review_unit: patient
+manual_version: '2026-05-07-draft'
+index_anchor: ed_triage_time
+time_windows:
+  - id: peri_index_24h
+    anchor: index_anchor
+    start_offset: -P1D
+    end_offset: P1D
+    label: ±24h around ED triage (Sepsis-3 infection-suspicion window)
+  - id: pre_index_baseline
+    anchor: index_anchor
+    start_offset: -P12M
+    end_offset: -P1D
+    label: 12 months prior to index (SOFA baseline lookback)
+  - id: post_index_48h
+    anchor: index_anchor
+    start_offset: P0D
+    end_offset: P2D
+    label: First 48h after triage (SOFA acute window)
+final_output: sepsis_present
+overview_prose: |
+  Sepsis-3 phenotype validation per Singer 2016. Identifies hospitalized
+  adults with documented infection suspicion AND an acute SOFA score
+  increase ≥2 from baseline within 48h of ED triage.
+
+  Population: hospitalized adults ≥18 with an ED triage event.
+  Index date: ED triage timestamp.
+
+  Output: sepsis_present (confirmed / probable / absent / cannot_determine);
+  ards_subtype gated on sepsis being confirmed or probable.
+
+  Note: ARDS subtype lives as a separate criterion gated via
+  is_applicable_when, not as a nested field of sepsis_present, to preserve
+  per-criterion κ.

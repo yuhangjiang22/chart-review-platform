@@ -1,0 +1,57 @@
+[
+  {
+    "row_id": "410001",
+    "patient_id": "patient_easy_icd_01",
+    "condition_source_value": "C34.10",
+    "condition_source_concept_name": "Malignant neoplasm of upper lobe, bronchus or lung, unspecified side",
+    "condition_start_date": "2019-11-04",
+    "condition_status": "active",
+    "condition_type": "problem_list",
+    "comment": "Added during inpatient hospitalization 2019, carried forward as problem list entry; no active evaluation."
+  },
+  {
+    "row_id": "410002",
+    "patient_id": "patient_easy_icd_01",
+    "condition_source_value": "I10",
+    "condition_source_concept_name": "Essential (primary) hypertension",
+    "condition_start_date": "2014-06-20",
+    "condition_status": "active",
+    "condition_type": "problem_list"
+  },
+  {
+    "row_id": "410003",
+    "patient_id": "patient_easy_icd_01",
+    "condition_source_value": "E78.5",
+    "condition_source_concept_name": "Hyperlipidemia, unspecified",
+    "condition_start_date": "2015-03-10",
+    "condition_status": "active",
+    "condition_type": "problem_list"
+  },
+  {
+    "row_id": "410004",
+    "patient_id": "patient_easy_icd_01",
+    "condition_source_value": "E11.9",
+    "condition_source_concept_name": "Type 2 diabetes mellitus without complications",
+    "condition_start_date": "2017-08-15",
+    "condition_status": "active",
+    "condition_type": "problem_list"
+  },
+  {
+    "row_id": "410005",
+    "patient_id": "patient_easy_icd_01",
+    "condition_source_value": "N40.0",
+    "condition_source_concept_name": "Benign prostatic hyperplasia without lower urinary tract symptoms",
+    "condition_start_date": "2020-02-03",
+    "condition_status": "active",
+    "condition_type": "problem_list"
+  },
+  {
+    "row_id": "410006",
+    "patient_id": "patient_easy_icd_01",
+    "condition_source_value": "S93.402A",
+    "condition_source_concept_name": "Sprain of unspecified ligament of left ankle, initial encounter",
+    "condition_start_date": "2025-03-30",
+    "condition_status": "resolved",
+    "condition_type": "encounter_diagnosis"
+  }
+]

@@ -1,0 +1,24 @@
+entity_type: Social_Determinant_Of_Health
+guidance: |
+  Tag social-determinant facts about the patient — housing,
+  employment, education, social support, transportation barriers,
+  food insecurity. AD-CDE's SDoH subtree overlaps with the BSO-AD
+  ontology's lifestyle/economic/neighborhood subtrees; this version
+  is the AD-CDE flavor focused on clinically actionable SDoH.
+  Don't double-tag overlapping concepts — if a phrase is more naturally
+  Demographic (sex, race, age), it should NOT be tagged here.
+exemplars:
+  - "lives alone"
+  - "retired schoolteacher"
+  - "lacks reliable transportation"
+  - "food insecurity"
+  - "married, lives with spouse"
+negative_examples:
+  - phrase: "African American"
+    reason: "race is Demographic, not SDoH per AD-CDE"
+  - phrase: "68-year-old"
+    reason: "age is Demographic, not SDoH"
+edge_cases:
+  - pattern: "<occupation>, retired"
+    correct: "tag the occupation phrase; retirement status is implicit"
+    reason: "occupation is a SDoH determinant; retirement is its temporal qualifier"

@@ -1,0 +1,32 @@
+INDIANA UNIVERSITY HEALTH — DEPARTMENT OF PATHOLOGY
+SURGICAL PATHOLOGY REPORT
+Accession: SP-2024-118843
+Patient: Margaret L. Hoover  DOB: 1956-03-14  MRN: 881042
+Date Received: 2024-11-25  Date Reported: 2024-11-26
+Procedure: CT-guided core needle biopsy, right upper lobe mass
+Ordering: Dr. James A. Forde, MD (Interventional Radiology)
+
+GROSS DESCRIPTION:
+Received in formalin: four tan-white core needle biopsy fragments, each 1.2–1.5 cm in length and 0.1 cm in diameter. All fragments submitted entirely in one cassette.
+
+MICROSCOPIC DESCRIPTION:
+Sections demonstrate a moderately cellular malignant neoplasm arranged in acinar and lepidic growth patterns with focal papillary architecture. Tumor cells are cuboidal to columnar with enlarged vesicular nuclei, prominent nucleoli, and moderate pale eosinophilic cytoplasm. Mucin production is focally present. No squamous or small-cell differentiation is identified. Mitotic figures approximately 4 per 10 high-power fields.
+
+Immunohistochemistry (performed in-house):
+  TTF-1 (8G7G3/1 clone): Diffuse strong nuclear positivity
+  Napsin A: Diffuse cytoplasmic positivity
+  p40: Negative
+  CK7: Positive
+  CK20: Negative
+  Synaptophysin: Negative
+
+DIAGNOSIS:
+RIGHT UPPER LOBE MASS, CT-GUIDED CORE NEEDLE BIOPSY:
+— ADENOCARCINOMA, moderately differentiated
+— Acinar-predominant with lepidic component
+— IHC profile consistent with primary pulmonary origin (TTF-1+, Napsin A+)
+
+NOTE: Clinical and radiologic correlation is recommended. PD-L1 and molecular profiling (EGFR, ALK, ROS1, KRAS) are recommended to guide treatment planning.
+
+Electronically signed: Dr. Olivia R. Marchetti, MD (Thoracic Pathology)
+Date/Time: 2024-11-26  14:05

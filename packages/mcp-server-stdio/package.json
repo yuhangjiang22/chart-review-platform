@@ -1,0 +1,21 @@
+{
+  "name": "@chart-review/mcp-server-stdio",
+  "version": "0.1.0",
+  "private": true,
+  "description": "@modelcontextprotocol/sdk stdio transport adapter for the chart_review_state MCP server. Used by non-Anthropic agent runtimes (Codex CLI, etc.). Wraps the same @chart-review/mcp-core handlers as the Anthropic adapter.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "dependencies": {
+    "@chart-review/mcp-core": "*",
+    "@chart-review/tasks": "*",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^3.23.0"
+  }
+}

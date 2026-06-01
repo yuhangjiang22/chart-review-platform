@@ -1,0 +1,26 @@
+[
+  {
+    "row_id": "410011",
+    "patient_id": "patient_easy_icd_01",
+    "procedure_source_value": "90686",
+    "procedure_source_concept_name": "Influenza vaccine, quadrivalent, intradermal, 0.1 mL",
+    "procedure_date": "2025-03-12",
+    "visit_occurrence_id": "410031"
+  },
+  {
+    "row_id": "410012",
+    "patient_id": "patient_easy_icd_01",
+    "procedure_source_value": "90670",
+    "procedure_source_concept_name": "Pneumococcal conjugate vaccine, 13 valent, intramuscular",
+    "procedure_date": "2025-03-12",
+    "visit_occurrence_id": "410031"
+  },
+  {
+    "row_id": "410013",
+    "patient_id": "patient_easy_icd_01",
+    "procedure_source_value": "73600",
+    "procedure_source_concept_name": "Radiologic examination, ankle; 2 views",
+    "procedure_date": "2025-03-30",
+    "visit_occurrence_id": "410032"
+  }
+]

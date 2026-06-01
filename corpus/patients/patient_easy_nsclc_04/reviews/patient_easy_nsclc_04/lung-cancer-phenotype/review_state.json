@@ -1,0 +1,132 @@
+{
+  "schema_version": "1",
+  "patient_id": "patient_easy_nsclc_04",
+  "task_id": "lung-cancer-phenotype",
+  "task_version": "2026-04-28",
+  "task_document_sha": "sha256:9ed4d2d4218d6771fe8cbf9cb9a58b722643ab4eedb1dc9e21410ff066831dcc",
+  "review_status": "agent_complete",
+  "version": 1,
+  "updated_at": "2026-05-10T19:49:53.427614+00:00Z",
+  "updated_by": "agent",
+  "field_assessments": [
+    {
+      "field_id": "pathology_report_present",
+      "answer": true,
+      "confidence": "high",
+      "evidence": [
+        {
+          "source": "note",
+          "note_id": "2025-01-22__surgical_pathology",
+          "span_offsets": [
+            53,
+            78
+          ],
+          "verbatim_quote": "SURGICAL PATHOLOGY REPORT"
+        }
+      ],
+      "rationale": "Surgical pathology report SHS-SP-2025-00872 is present from 2025-01-22 documenting the left lower lobectomy specimen."
+    },
+    {
+      "field_id": "pathology_lung_primary",
+      "answer": "nsclc",
+      "confidence": "high",
+      "evidence": [
+        {
+          "source": "note",
+          "note_id": "2025-01-22__surgical_pathology",
+          "span_offsets": [
+            1511,
+            1557
+          ],
+          "verbatim_quote": "SQUAMOUS CELL CARCINOMA, poorly differentiated"
+        }
+      ],
+      "rationale": "Pathology definitively identifies squamous cell carcinoma, which maps to NSCLC category."
+    },
+    {
+      "field_id": "cytology_supports_lung_primary",
+      "answer": "not_applicable",
+      "confidence": "high",
+      "evidence": [
+        {
+          "source": "note",
+          "note_id": "2025-01-22__surgical_pathology",
+          "span_offsets": [
+            1511,
+            1557
+          ],
+          "verbatim_quote": "SQUAMOUS CELL CARCINOMA, poorly differentiated"
+        }
+      ],
+      "rationale": "Not applicable; surgical pathology report is present, so cytology criterion does not apply."
+    },
+    {
+      "field_id": "imaging_lung_lesion",
+      "answer": true,
+      "confidence": "high",
+      "evidence": [
+        {
+          "source": "note",
+          "note_id": "2025-01-08__ct_chest",
+          "span_offsets": [
+            516,
+            607
+          ],
+          "verbatim_quote": "3.3 x 2.9 cm irregular spiculated mass occupies the left lower lobe posterior basal segment"
+        }
+      ],
+      "rationale": "CT chest documents a 3.3 cm spiculated mass suspicious for primary lung malignancy."
+    },
+    {
+      "field_id": "oncologist_lung_cancer_diagnosis_in_note",
+      "answer": true,
+      "confidence": "high",
+      "evidence": [
+        {
+          "source": "note",
+          "note_id": "2025-02-11__oncology_progress",
+          "span_offsets": [
+            991,
+            1077
+          ],
+          "verbatim_quote": "Stage IIB non-small cell lung cancer, squamous cell carcinoma subtype, left lower lobe"
+        }
+      ],
+      "rationale": "Treating oncologist (Dr. Dupont) documents NSCLC diagnosis in assessment."
+    },
+    {
+      "field_id": "icd_lung_cancer_present",
+      "answer": true,
+      "confidence": "high",
+      "evidence": [
+        {
+          "source": "omop",
+          "table": "condition_occurrence",
+          "row_id": 140001,
+          "concept_id": 4300375,
+          "concept_name": "Malignant neoplasm of lower lobe, left bronchus or lung",
+          "value": "C34.32"
+        }
+      ],
+      "rationale": "Active C34.32 (malignant neoplasm of lower lobe, left bronchus or lung) on 2025-01-22."
+    },
+    {
+      "field_id": "lowest_hemoglobin_in_window",
+      "answer": 11.8,
+      "confidence": "high",
+      "evidence": [
+        {
+          "source": "omop",
+          "table": "measurements",
+          "row_id": 140021,
+          "concept_id": 3000963,
+          "concept_name": "Hemoglobin [Mass/volume] in Blood",
+          "value": 11.8,
+          "unit": "g/dL"
+        }
+      ],
+      "rationale": "Hemoglobin 11.8 g/dL documented on 2025-03-04 (lowest in window)."
+    }
+  ],
+  "selected_evidence": []
+}

@@ -1,0 +1,43 @@
+node_modules
+node_modules/
+dist/
+*.log
+
+# Runtime data: finalized assessments + audit logs land here.
+var/
+
+# Codex CLI runtime state — sqlite logs, install id, memories, etc.
+# Tracked content under .codex/ (config.toml, skills/, environments/)
+# is checked in; everything else is per-machine state.
+.codex/*.sqlite
+.codex/*.sqlite-shm
+.codex/*.sqlite-wal
+.codex/installation_id
+.codex/memories/
+.codex/shell_snapshots/
+.codex/tmp/
+.codex/.tmp/
+.codex/skills/.system/
+.codex/sessions/
+
+# Per-machine env (paths + provider defaults). Check in .env.example
+# instead to document the contract.
+.env
+.env.local
+.env.backup-*
+
+# Real-patient note directories — never push to a public/shared repo.
+# These patterns were previously enforced by the parent repo's .gitignore;
+# repeated here so they remain enforced if v2 is split out as its own
+# top-level git repo.
+corpus/patients/patient_sample_*/
+corpus/patients/patient_private_*/
+
+# Per-iter pilot manifests + applied/in-flight proposals are per-machine
+# runtime state. The skill bundle itself (questions/rules/SKILL.md) IS
+# pushed; pilots/ and var/proposals/ get rebuilt by use.
+.agents/skills/*/pilots/
+
+# Codex agent rollouts captured as JSONL traces — can contain note
+# content. Treat as per-machine artifacts, not source.
+.codex/sessions/

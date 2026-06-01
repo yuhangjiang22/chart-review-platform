@@ -1,0 +1,28 @@
+DATE: 2025-08-29
+PATIENT: Male, 80 yo | PROVIDER: Dr. L. Osei, MD — Cardiology
+VISIT: New patient cardiology consult — AF / heart failure evaluation
+
+REFERRAL: Persistent AF with new exertional dyspnea; evaluate for decompensated HF.
+
+INTERVAL HX: Mr. [W.] reports modest improvement since PCP visit with sodium and fluid restriction; ankle swelling decreased. Mild exertional dyspnea persists at moderate activity. No rest dyspnea, no orthopnea. No chest pain, no fevers. Former smoker (quit 1990). No malignancy history.
+
+PERTINENT RESULTS:
+- BNP: 310 pg/mL (H, ref <100)
+- CMP: Cr 1.4 (CKD 3a stable), K 4.2, Na 138. CBC normal.
+- ECG: AF 88 bpm, no ST changes.
+- Echo (2025-08-20): LVEF 50-55%, LA moderately enlarged, mild MR, no wall motion abnormality, no effusion.
+
+EXAM:
+VS: BP 128/76, HR 82 (irreg), SpO2 96%
+CV: Irregularly irregular. Mild S4. No rub. Lungs: mild bibasilar crackles improving. Extremities: 1+ ankle edema.
+
+A/P:
+1. Persistent AF with HFpEF, NYHA Class II.
+   - Add furosemide 20 mg PO daily. Monitor weight and potassium.
+   - Continue metoprolol 50 mg daily (rate control; HR target <100).
+   - Continue apixaban.
+2. Rate control adequate (HR 82). No change to metoprolol.
+3. Rhythm control (cardioversion) deferred per patient preference.
+4. Sodium restriction <2 g/day. Daily weights; return if gain >3 lbs/2 days.
+
+F/U cardiology 8 weeks. Continue PCP follow-up.

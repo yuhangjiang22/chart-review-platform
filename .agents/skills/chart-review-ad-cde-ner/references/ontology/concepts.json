@@ -1,0 +1,2039 @@
+{
+  "Disease": {
+    "root_id": "Disease",
+    "root_iri": "http://www.semanticweb.org/sun/ontologies/AD-CDE#Disease",
+    "n_concepts": 70,
+    "concepts": [
+      {
+        "id": "Disease",
+        "label": "Disease",
+        "parent_id": null,
+        "parent_label": null,
+        "depth": 0
+      },
+      {
+        "id": "Disease_By_Infectious_Agent",
+        "label": "Disease By Infectious Agent",
+        "parent_id": "Disease",
+        "parent_label": "Disease",
+        "depth": 1
+      },
+      {
+        "id": "Disease_Of_Anatomical_Entity",
+        "label": "Disease Of Anatomical Entity",
+        "parent_id": "Disease",
+        "parent_label": "Disease",
+        "depth": 1
+      },
+      {
+        "id": "Disease_Of_Cellular_Proliferation",
+        "label": "Disease Of Cellular Proliferation",
+        "parent_id": "Disease",
+        "parent_label": "Disease",
+        "depth": 1
+      },
+      {
+        "id": "Disease_Of_Mental_Health",
+        "label": "Disease Of Mental Health",
+        "parent_id": "Disease",
+        "parent_label": "Disease",
+        "depth": 1
+      },
+      {
+        "id": "Disease_Of_Metabolism",
+        "label": "Disease Of Metabolism",
+        "parent_id": "Disease",
+        "parent_label": "Disease",
+        "depth": 1
+      },
+      {
+        "id": "Human_Immunodeficiency_Virus_Infection",
+        "label": "Human Immunodeficiency Virus Infection",
+        "parent_id": "Disease_By_Infectious_Agent",
+        "parent_label": "Disease By Infectious Agent",
+        "depth": 2
+      },
+      {
+        "id": "Cardiovascular_System_Disease",
+        "label": "Cardiovascular System Disease",
+        "parent_id": "Disease_Of_Anatomical_Entity",
+        "parent_label": "Disease Of Anatomical Entity",
+        "depth": 2
+      },
+      {
+        "id": "Endocrine_System_Disease",
+        "label": "Endocrine System Disease",
+        "parent_id": "Disease_Of_Anatomical_Entity",
+        "parent_label": "Disease Of Anatomical Entity",
+        "depth": 2
+      },
+      {
+        "id": "Gastrointestinal_System_Disease",
+        "label": "Gastrointestinal System Disease",
+        "parent_id": "Disease_Of_Anatomical_Entity",
+        "parent_label": "Disease Of Anatomical Entity",
+        "depth": 2
+      },
+      {
+        "id": "Hematopoietic_System_Disease",
+        "label": "Hematopoietic System Disease",
+        "parent_id": "Disease_Of_Anatomical_Entity",
+        "parent_label": "Disease Of Anatomical Entity",
+        "depth": 2
+      },
+      {
+        "id": "Immune_System_Disease",
+        "label": "Immune System Disease",
+        "parent_id": "Disease_Of_Anatomical_Entity",
+        "parent_label": "Disease Of Anatomical Entity",
+        "depth": 2
+      },
+      {
+        "id": "Nervous_System_Disorder",
+        "label": "Nervous System Disorder",
+        "parent_id": "Disease_Of_Anatomical_Entity",
+        "parent_label": "Disease Of Anatomical Entity",
+        "depth": 2
+      },
+      {
+        "id": "Reproductive_System_Disease",
+        "label": "Reproductive System Disease",
+        "parent_id": "Disease_Of_Anatomical_Entity",
+        "parent_label": "Disease Of Anatomical Entity",
+        "depth": 2
+      },
+      {
+        "id": "Respiratory_System_Disease",
+        "label": "Respiratory System Disease",
+        "parent_id": "Disease_Of_Anatomical_Entity",
+        "parent_label": "Disease Of Anatomical Entity",
+        "depth": 2
+      },
+      {
+        "id": "Thoracic_Disease",
+        "label": "Thoracic Disease",
+        "parent_id": "Disease_Of_Anatomical_Entity",
+        "parent_label": "Disease Of Anatomical Entity",
+        "depth": 2
+      },
+      {
+        "id": "Urinary_System_Disease",
+        "label": "Urinary System Disease",
+        "parent_id": "Disease_Of_Anatomical_Entity",
+        "parent_label": "Disease Of Anatomical Entity",
+        "depth": 2
+      },
+      {
+        "id": "Malignant_Neoplasm",
+        "label": "Malignant Neoplasm",
+        "parent_id": "Disease_Of_Cellular_Proliferation",
+        "parent_label": "Disease Of Cellular Proliferation",
+        "depth": 2
+      },
+      {
+        "id": "Cognitive_Disorder",
+        "label": "Cognitive Disorder",
+        "parent_id": "Disease_Of_Mental_Health",
+        "parent_label": "Disease Of Mental Health",
+        "depth": 2
+      },
+      {
+        "id": "Intellectual_Disability",
+        "label": "Intellectual Disability",
+        "parent_id": "Disease_Of_Mental_Health",
+        "parent_label": "Disease Of Mental Health",
+        "depth": 2
+      },
+      {
+        "id": "Inherited_Metabolic_Disorder",
+        "label": "Inherited Metabolic Disorder",
+        "parent_id": "Disease_Of_Metabolism",
+        "parent_label": "Disease Of Metabolism",
+        "depth": 2
+      },
+      {
+        "id": "Angina_Pectoris",
+        "label": "Angina Pectoris",
+        "parent_id": "Cardiovascular_System_Disease",
+        "parent_label": "Cardiovascular System Disease",
+        "depth": 3
+      },
+      {
+        "id": "Cardiac_Arrhythmia",
+        "label": "Cardiac Arrhythmia",
+        "parent_id": "Cardiovascular_System_Disease",
+        "parent_label": "Cardiovascular System Disease",
+        "depth": 3
+      },
+      {
+        "id": "Cerebrovascular_Disease",
+        "label": "Cerebrovascular Disease",
+        "parent_id": "Cardiovascular_System_Disease",
+        "parent_label": "Cardiovascular System Disease",
+        "depth": 3
+      },
+      {
+        "id": "Congestive_Heart_Failure",
+        "label": "Congestive Heart Failure",
+        "parent_id": "Cardiovascular_System_Disease",
+        "parent_label": "Cardiovascular System Disease",
+        "depth": 3
+      },
+      {
+        "id": "Heart_Diseases",
+        "label": "Heart Diseases",
+        "parent_id": "Cardiovascular_System_Disease",
+        "parent_label": "Cardiovascular System Disease",
+        "depth": 3
+      },
+      {
+        "id": "Hypertensive_Disease",
+        "label": "Hypertensive Disease",
+        "parent_id": "Cardiovascular_System_Disease",
+        "parent_label": "Cardiovascular System Disease",
+        "depth": 3
+      },
+      {
+        "id": "Lacunar_Infarction",
+        "label": "Lacunar Infarction",
+        "parent_id": "Cardiovascular_System_Disease",
+        "parent_label": "Cardiovascular System Disease",
+        "depth": 3
+      },
+      {
+        "id": "Myocardial_Infarction",
+        "label": "Myocardial Infarction",
+        "parent_id": "Cardiovascular_System_Disease",
+        "parent_label": "Cardiovascular System Disease",
+        "depth": 3
+      },
+      {
+        "id": "Transient_Cerebral_Ischemia",
+        "label": "Transient Cerebral Ischemia",
+        "parent_id": "Cardiovascular_System_Disease",
+        "parent_label": "Cardiovascular System Disease",
+        "depth": 3
+      },
+      {
+        "id": "Hypothyroidism",
+        "label": "Hypothyroidism",
+        "parent_id": "Endocrine_System_Disease",
+        "parent_label": "Endocrine System Disease",
+        "depth": 3
+      },
+      {
+        "id": "Duodenal_Ulcer",
+        "label": "Duodenal Ulcer",
+        "parent_id": "Gastrointestinal_System_Disease",
+        "parent_label": "Gastrointestinal System Disease",
+        "depth": 3
+      },
+      {
+        "id": "Fecal_Incontinence",
+        "label": "Fecal Incontinence",
+        "parent_id": "Gastrointestinal_System_Disease",
+        "parent_label": "Gastrointestinal System Disease",
+        "depth": 3
+      },
+      {
+        "id": "Gastric_Ulcer",
+        "label": "Gastric Ulcer",
+        "parent_id": "Gastrointestinal_System_Disease",
+        "parent_label": "Gastrointestinal System Disease",
+        "depth": 3
+      },
+      {
+        "id": "Inflammatory_Bowel_Diseases",
+        "label": "Inflammatory Bowel Diseases",
+        "parent_id": "Gastrointestinal_System_Disease",
+        "parent_label": "Gastrointestinal System Disease",
+        "depth": 3
+      },
+      {
+        "id": "Liver_Diseases",
+        "label": "Liver Diseases",
+        "parent_id": "Gastrointestinal_System_Disease",
+        "parent_label": "Gastrointestinal System Disease",
+        "depth": 3
+      },
+      {
+        "id": "Blood_Coagulation_Disorder",
+        "label": "Blood Coagulation Disorder",
+        "parent_id": "Hematopoietic_System_Disease",
+        "parent_label": "Hematopoietic System Disease",
+        "depth": 3
+      },
+      {
+        "id": "Allergy_Specialty",
+        "label": "Allergy Specialty",
+        "parent_id": "Immune_System_Disease",
+        "parent_label": "Immune System Disease",
+        "depth": 3
+      },
+      {
+        "id": "Hypersensitivity",
+        "label": "Hypersensitivity",
+        "parent_id": "Immune_System_Disease",
+        "parent_label": "Immune System Disease",
+        "depth": 3
+      },
+      {
+        "id": "Multiple_Sclerosis",
+        "label": "Multiple Sclerosis",
+        "parent_id": "Immune_System_Disease",
+        "parent_label": "Immune System Disease",
+        "depth": 3
+      },
+      {
+        "id": "Cerebrovascular_Accident",
+        "label": "Cerebrovascular Accident",
+        "parent_id": "Nervous_System_Disorder",
+        "parent_label": "Nervous System Disorder",
+        "depth": 3
+      },
+      {
+        "id": "Craniocerebral_Trauma",
+        "label": "Craniocerebral Trauma",
+        "parent_id": "Nervous_System_Disorder",
+        "parent_label": "Nervous System Disorder",
+        "depth": 3
+      },
+      {
+        "id": "Degenerative_Disease_Of_The_Central_Nervous_System",
+        "label": "Degenerative Disease Of The Central Nervous System",
+        "parent_id": "Nervous_System_Disorder",
+        "parent_label": "Nervous System Disorder",
+        "depth": 3
+      },
+      {
+        "id": "Epilepsy",
+        "label": "Epilepsy",
+        "parent_id": "Nervous_System_Disorder",
+        "parent_label": "Nervous System Disorder",
+        "depth": 3
+      },
+      {
+        "id": "Hydrocephalus",
+        "label": "Hydrocephalus",
+        "parent_id": "Nervous_System_Disorder",
+        "parent_label": "Nervous System Disorder",
+        "depth": 3
+      },
+      {
+        "id": "Neoplasm_Of_Brain",
+        "label": "Neoplasm Of Brain",
+        "parent_id": "Nervous_System_Disorder",
+        "parent_label": "Nervous System Disorder",
+        "depth": 3
+      },
+      {
+        "id": "Parkinson_Disease",
+        "label": "Parkinson Disease",
+        "parent_id": "Nervous_System_Disorder",
+        "parent_label": "Nervous System Disorder",
+        "depth": 3
+      },
+      {
+        "id": "Seizure",
+        "label": "Seizure",
+        "parent_id": "Nervous_System_Disorder",
+        "parent_label": "Nervous System Disorder",
+        "depth": 3
+      },
+      {
+        "id": "Traumatic_Brain_Injury",
+        "label": "Traumatic Brain Injury",
+        "parent_id": "Nervous_System_Disorder",
+        "parent_label": "Nervous System Disorder",
+        "depth": 3
+      },
+      {
+        "id": "Alzheimer&apos;s_Disease",
+        "label": "Alzheimer&apos;s Disease",
+        "parent_id": "Nervous_System_Disorder",
+        "parent_label": "Nervous System Disorder",
+        "depth": 3
+      },
+      {
+        "id": "Huntington&apos;s_Chorea",
+        "label": "Huntington&apos;s Chorea",
+        "parent_id": "Nervous_System_Disorder",
+        "parent_label": "Nervous System Disorder",
+        "depth": 3
+      },
+      {
+        "id": "Malignant_Tumor_Of_Prostate",
+        "label": "Malignant Tumor Of Prostate",
+        "parent_id": "Reproductive_System_Disease",
+        "parent_label": "Reproductive System Disease",
+        "depth": 3
+      },
+      {
+        "id": "Chronic_Obstructive_Airway_Disease",
+        "label": "Chronic Obstructive Airway Disease",
+        "parent_id": "Respiratory_System_Disease",
+        "parent_label": "Respiratory System Disease",
+        "depth": 3
+      },
+      {
+        "id": "Kidney_Diseases",
+        "label": "Kidney Diseases",
+        "parent_id": "Urinary_System_Disease",
+        "parent_label": "Urinary System Disease",
+        "depth": 3
+      },
+      {
+        "id": "Urinary_Incontinence",
+        "label": "Urinary Incontinence",
+        "parent_id": "Urinary_System_Disease",
+        "parent_label": "Urinary System Disease",
+        "depth": 3
+      },
+      {
+        "id": "Bipolar_Disorder",
+        "label": "Bipolar Disorder",
+        "parent_id": "Cognitive_Disorder",
+        "parent_label": "Cognitive Disorder",
+        "depth": 3
+      },
+      {
+        "id": "Dementia",
+        "label": "Dementia",
+        "parent_id": "Cognitive_Disorder",
+        "parent_label": "Cognitive Disorder",
+        "depth": 3
+      },
+      {
+        "id": "Impaired_Cognition",
+        "label": "Impaired Cognition",
+        "parent_id": "Cognitive_Disorder",
+        "parent_label": "Cognitive Disorder",
+        "depth": 3
+      },
+      {
+        "id": "Mental_Depression",
+        "label": "Mental Depression",
+        "parent_id": "Cognitive_Disorder",
+        "parent_label": "Cognitive Disorder",
+        "depth": 3
+      },
+      {
+        "id": "Mild_Cognitive_Disorder",
+        "label": "Mild Cognitive Disorder",
+        "parent_id": "Cognitive_Disorder",
+        "parent_label": "Cognitive Disorder",
+        "depth": 3
+      },
+      {
+        "id": "Phobic_Anxiety_Disorder",
+        "label": "Phobic Anxiety Disorder",
+        "parent_id": "Cognitive_Disorder",
+        "parent_label": "Cognitive Disorder",
+        "depth": 3
+      },
+      {
+        "id": "Psychotic_Disorder",
+        "label": "Psychotic Disorder",
+        "parent_id": "Cognitive_Disorder",
+        "parent_label": "Cognitive Disorder",
+        "depth": 3
+      },
+      {
+        "id": "Schizophrenia",
+        "label": "Schizophrenia",
+        "parent_id": "Cognitive_Disorder",
+        "parent_label": "Cognitive Disorder",
+        "depth": 3
+      },
+      {
+        "id": "Diabetes_Mellitus",
+        "label": "Diabetes Mellitus",
+        "parent_id": "Inherited_Metabolic_Disorder",
+        "parent_label": "Inherited Metabolic Disorder",
+        "depth": 3
+      },
+      {
+        "id": "Lactose_Intolerance",
+        "label": "Lactose Intolerance",
+        "parent_id": "Inherited_Metabolic_Disorder",
+        "parent_label": "Inherited Metabolic Disorder",
+        "depth": 3
+      },
+      {
+        "id": "Renal_Insufficiency",
+        "label": "Renal Insufficiency",
+        "parent_id": "Kidney_Diseases",
+        "parent_label": "Kidney Diseases",
+        "depth": 4
+      },
+      {
+        "id": "Diffuse_Lewy_Body_Disease",
+        "label": "Diffuse Lewy Body Disease",
+        "parent_id": "Dementia",
+        "parent_label": "Dementia",
+        "depth": 4
+      },
+      {
+        "id": "Frontotemporal_Dementia",
+        "label": "Frontotemporal Dementia",
+        "parent_id": "Dementia",
+        "parent_label": "Dementia",
+        "depth": 4
+      },
+      {
+        "id": "Vascular_Dementia",
+        "label": "Vascular Dementia",
+        "parent_id": "Dementia",
+        "parent_label": "Dementia",
+        "depth": 4
+      },
+      {
+        "id": "Major_Depressive_Disorder",
+        "label": "Major Depressive Disorder",
+        "parent_id": "Mental_Depression",
+        "parent_label": "Mental Depression",
+        "depth": 4
+      }
+    ]
+  },
+  "Procedure": {
+    "root_id": "Procedure",
+    "root_iri": "#Procedure",
+    "n_concepts": 69,
+    "concepts": [
+      {
+        "id": "Procedure",
+        "label": "Procedure",
+        "parent_id": null,
+        "parent_label": null,
+        "depth": 0
+      },
+      {
+        "id": "Administration_Of_Drug_Or_Medicament",
+        "label": "Administration Of Drug Or Medicament",
+        "parent_id": "Procedure",
+        "parent_label": "Procedure",
+        "depth": 1
+      },
+      {
+        "id": "Evaluation_Procedure",
+        "label": "Evaluation Procedure",
+        "parent_id": "Procedure",
+        "parent_label": "Procedure",
+        "depth": 1
+      },
+      {
+        "id": "Implantation_Procedure",
+        "label": "Implantation Procedure",
+        "parent_id": "Procedure",
+        "parent_label": "Procedure",
+        "depth": 1
+      },
+      {
+        "id": "Insertion_Procedure",
+        "label": "Insertion Procedure",
+        "parent_id": "Procedure",
+        "parent_label": "Procedure",
+        "depth": 1
+      },
+      {
+        "id": "Introduction_Procedure",
+        "label": "Introduction Procedure",
+        "parent_id": "Procedure",
+        "parent_label": "Procedure",
+        "depth": 1
+      },
+      {
+        "id": "Puncture_Procedure",
+        "label": "Puncture Procedure",
+        "parent_id": "Procedure",
+        "parent_label": "Procedure",
+        "depth": 1
+      },
+      {
+        "id": "Regimes_And_Therapies",
+        "label": "Regimes And Therapies",
+        "parent_id": "Procedure",
+        "parent_label": "Procedure",
+        "depth": 1
+      },
+      {
+        "id": "Surgical_Procedure",
+        "label": "Surgical Procedure",
+        "parent_id": "Procedure",
+        "parent_label": "Procedure",
+        "depth": 1
+      },
+      {
+        "id": "Undefined_Procedures",
+        "label": "Undefined Procedures",
+        "parent_id": "Procedure",
+        "parent_label": "Procedure",
+        "depth": 1
+      },
+      {
+        "id": "OR_Service",
+        "label": "OR Service",
+        "parent_id": "Procedure",
+        "parent_label": "Procedure",
+        "depth": 1
+      },
+      {
+        "id": "Chemotherapy",
+        "label": "Chemotherapy",
+        "parent_id": "Administration_Of_Drug_Or_Medicament",
+        "parent_label": "Administration Of Drug Or Medicament",
+        "depth": 2
+      },
+      {
+        "id": "General_Anesthesia",
+        "label": "General Anesthesia",
+        "parent_id": "Administration_Of_Drug_Or_Medicament",
+        "parent_label": "Administration Of Drug Or Medicament",
+        "depth": 2
+      },
+      {
+        "id": "Imaging",
+        "label": "Imaging",
+        "parent_id": "Evaluation_Procedure",
+        "parent_label": "Evaluation Procedure",
+        "depth": 2
+      },
+      {
+        "id": "Implantation_Of_Cardiac_Pacemaker",
+        "label": "Implantation Of Cardiac Pacemaker",
+        "parent_id": "Implantation_Procedure",
+        "parent_label": "Implantation Procedure",
+        "depth": 2
+      },
+      {
+        "id": "Implantation_Of_Cochlear_Prosthetic_Device",
+        "label": "Implantation Of Cochlear Prosthetic Device",
+        "parent_id": "Implantation_Procedure",
+        "parent_label": "Implantation Procedure",
+        "depth": 2
+      },
+      {
+        "id": "Implantation_Of_Heart_Valve_Prosthesis_Or_Synthetic_Device",
+        "label": "Implantation Of Heart Valve Prosthesis Or Synthetic Device",
+        "parent_id": "Implantation_Procedure",
+        "parent_label": "Implantation Procedure",
+        "depth": 2
+      },
+      {
+        "id": "Acupuncture_Therapy",
+        "label": "Acupuncture Therapy",
+        "parent_id": "Insertion_Procedure",
+        "parent_label": "Insertion Procedure",
+        "depth": 2
+      },
+      {
+        "id": "Attachment_Of_Auricular_Prosthesis",
+        "label": "Attachment Of Auricular Prosthesis",
+        "parent_id": "Insertion_Procedure",
+        "parent_label": "Insertion Procedure",
+        "depth": 2
+      },
+      {
+        "id": "Insertion_Of_Insulin_Pump",
+        "label": "Insertion Of Insulin Pump",
+        "parent_id": "Insertion_Procedure",
+        "parent_label": "Insertion Procedure",
+        "depth": 2
+      },
+      {
+        "id": "Radiation_Therapy",
+        "label": "Radiation Therapy",
+        "parent_id": "Introduction_Procedure",
+        "parent_label": "Introduction Procedure",
+        "depth": 2
+      },
+      {
+        "id": "Spinal_Puncture",
+        "label": "Spinal Puncture",
+        "parent_id": "Puncture_Procedure",
+        "parent_label": "Puncture Procedure",
+        "depth": 2
+      },
+      {
+        "id": "Acupressure_Therapy",
+        "label": "Acupressure Therapy",
+        "parent_id": "Regimes_And_Therapies",
+        "parent_label": "Regimes And Therapies",
+        "depth": 2
+      },
+      {
+        "id": "Hospital_Care",
+        "label": "Hospital Care",
+        "parent_id": "Regimes_And_Therapies",
+        "parent_label": "Regimes And Therapies",
+        "depth": 2
+      },
+      {
+        "id": "Aneurysm_Clipping",
+        "label": "Aneurysm Clipping",
+        "parent_id": "Surgical_Procedure",
+        "parent_label": "Surgical Procedure",
+        "depth": 2
+      },
+      {
+        "id": "Bilateral_Oophorectomy",
+        "label": "Bilateral Oophorectomy",
+        "parent_id": "Surgical_Procedure",
+        "parent_label": "Surgical Procedure",
+        "depth": 2
+      },
+      {
+        "id": "Gastrointestinal_Surgical_Procedure",
+        "label": "Gastrointestinal Surgical Procedure",
+        "parent_id": "Surgical_Procedure",
+        "parent_label": "Surgical Procedure",
+        "depth": 2
+      },
+      {
+        "id": "Hysterectomy",
+        "label": "Hysterectomy",
+        "parent_id": "Surgical_Procedure",
+        "parent_label": "Surgical Procedure",
+        "depth": 2
+      },
+      {
+        "id": "Ligation_Of_Bilateral_Fallopian_Tubes",
+        "label": "Ligation Of Bilateral Fallopian Tubes",
+        "parent_id": "Surgical_Procedure",
+        "parent_label": "Surgical Procedure",
+        "depth": 2
+      },
+      {
+        "id": "Operation_On_Nervous_System",
+        "label": "Operation On Nervous System",
+        "parent_id": "Surgical_Procedure",
+        "parent_label": "Surgical Procedure",
+        "depth": 2
+      },
+      {
+        "id": "Tubal_Ligation",
+        "label": "Tubal Ligation",
+        "parent_id": "Surgical_Procedure",
+        "parent_label": "Surgical Procedure",
+        "depth": 2
+      },
+      {
+        "id": "Estrogen_Replacement_Therapy",
+        "label": "Estrogen Replacement Therapy",
+        "parent_id": "Undefined_Procedures",
+        "parent_label": "Undefined Procedures",
+        "depth": 2
+      },
+      {
+        "id": "Hormone_Replacement_Therapy",
+        "label": "Hormone Replacement Therapy",
+        "parent_id": "Undefined_Procedures",
+        "parent_label": "Undefined Procedures",
+        "depth": 2
+      },
+      {
+        "id": "New_Added_Procedure",
+        "label": "New Added Procedure",
+        "parent_id": "Undefined_Procedures",
+        "parent_label": "Undefined Procedures",
+        "depth": 2
+      },
+      {
+        "id": "On_Anti-Coagulants",
+        "label": "On Anti-Coagulants",
+        "parent_id": "Undefined_Procedures",
+        "parent_label": "Undefined Procedures",
+        "depth": 2
+      },
+      {
+        "id": "Actigraph",
+        "label": "Actigraph",
+        "parent_id": "Undefined_Procedures",
+        "parent_label": "Undefined Procedures",
+        "depth": 2
+      },
+      {
+        "id": "Implant_Material",
+        "label": "Implant Material",
+        "parent_id": "Undefined_Procedures",
+        "parent_label": "Undefined Procedures",
+        "depth": 2
+      },
+      {
+        "id": "Surgical_Clips",
+        "label": "Surgical Clips",
+        "parent_id": "Undefined_Procedures",
+        "parent_label": "Undefined Procedures",
+        "depth": 2
+      },
+      {
+        "id": "Neuropsychological_Testing",
+        "label": "Neuropsychological Testing",
+        "parent_id": "OR_Service",
+        "parent_label": "OR Service",
+        "depth": 2
+      },
+      {
+        "id": "Magnetic_Resonance_Imaging_Test",
+        "label": "Magnetic Resonance Imaging Test",
+        "parent_id": "Imaging",
+        "parent_label": "Imaging",
+        "depth": 3
+      },
+      {
+        "id": "Positron-Emission_Tomography",
+        "label": "Positron-Emission Tomography",
+        "parent_id": "Imaging",
+        "parent_label": "Imaging",
+        "depth": 3
+      },
+      {
+        "id": "X-Ray_Computed_Tomography",
+        "label": "X-Ray Computed Tomography",
+        "parent_id": "Imaging",
+        "parent_label": "Imaging",
+        "depth": 3
+      },
+      {
+        "id": "Operation_On_Brain",
+        "label": "Operation On Brain",
+        "parent_id": "Operation_On_Nervous_System",
+        "parent_label": "Operation On Nervous System",
+        "depth": 3
+      },
+      {
+        "id": "Appendectomy",
+        "label": "Appendectomy",
+        "parent_id": "New_Added_Procedure",
+        "parent_label": "New Added Procedure",
+        "depth": 3
+      },
+      {
+        "id": "Bariatric_Surgery",
+        "label": "Bariatric Surgery",
+        "parent_id": "New_Added_Procedure",
+        "parent_label": "New Added Procedure",
+        "depth": 3
+      },
+      {
+        "id": "Bilateral_Salpingectomy",
+        "label": "Bilateral Salpingectomy",
+        "parent_id": "New_Added_Procedure",
+        "parent_label": "New Added Procedure",
+        "depth": 3
+      },
+      {
+        "id": "Cardiac_Surgery_Procedures",
+        "label": "Cardiac Surgery Procedures",
+        "parent_id": "New_Added_Procedure",
+        "parent_label": "New Added Procedure",
+        "depth": 3
+      },
+      {
+        "id": "Coronary_Artery_Bypass_Surgery",
+        "label": "Coronary Artery Bypass Surgery",
+        "parent_id": "New_Added_Procedure",
+        "parent_label": "New Added Procedure",
+        "depth": 3
+      },
+      {
+        "id": "Creation_of_Cerebrospinal_Fluid_Shunt",
+        "label": "Creation of Cerebrospinal Fluid Shunt",
+        "parent_id": "New_Added_Procedure",
+        "parent_label": "New Added Procedure",
+        "depth": 3
+      },
+      {
+        "id": "Deep_Brain_Stimulation",
+        "label": "Deep Brain Stimulation",
+        "parent_id": "New_Added_Procedure",
+        "parent_label": "New Added Procedure",
+        "depth": 3
+      },
+      {
+        "id": "Defibrillators",
+        "label": "Defibrillators",
+        "parent_id": "New_Added_Procedure",
+        "parent_label": "New Added Procedure",
+        "depth": 3
+      },
+      {
+        "id": "Drug_Infusion_Pumps",
+        "label": "Drug Infusion Pumps",
+        "parent_id": "New_Added_Procedure",
+        "parent_label": "New Added Procedure",
+        "depth": 3
+      },
+      {
+        "id": "Gastric_Bypass",
+        "label": "Gastric Bypass",
+        "parent_id": "New_Added_Procedure",
+        "parent_label": "New Added Procedure",
+        "depth": 3
+      },
+      {
+        "id": "Immunization",
+        "label": "Immunization",
+        "parent_id": "New_Added_Procedure",
+        "parent_label": "New Added Procedure",
+        "depth": 3
+      },
+      {
+        "id": "Implantable_Defibrillator",
+        "label": "Implantable Defibrillator",
+        "parent_id": "New_Added_Procedure",
+        "parent_label": "New Added Procedure",
+        "depth": 3
+      },
+      {
+        "id": "Implantable_Neurostimulators",
+        "label": "Implantable Neurostimulators",
+        "parent_id": "New_Added_Procedure",
+        "parent_label": "New Added Procedure",
+        "depth": 3
+      },
+      {
+        "id": "Intrauterine_Contraceptive_Device_Procedure",
+        "label": "Intrauterine Contraceptive Device Procedure",
+        "parent_id": "New_Added_Procedure",
+        "parent_label": "New Added Procedure",
+        "depth": 3
+      },
+      {
+        "id": "Magnetic_metal",
+        "label": "Magnetic metal",
+        "parent_id": "New_Added_Procedure",
+        "parent_label": "New Added Procedure",
+        "depth": 3
+      },
+      {
+        "id": "Organ_Transplantation",
+        "label": "Organ Transplantation",
+        "parent_id": "New_Added_Procedure",
+        "parent_label": "New Added Procedure",
+        "depth": 3
+      },
+      {
+        "id": "Ovariectomy",
+        "label": "Ovariectomy",
+        "parent_id": "New_Added_Procedure",
+        "parent_label": "New Added Procedure",
+        "depth": 3
+      },
+      {
+        "id": "Percutaneous_Coronary_Intervention",
+        "label": "Percutaneous Coronary Intervention",
+        "parent_id": "New_Added_Procedure",
+        "parent_label": "New Added Procedure",
+        "depth": 3
+      },
+      {
+        "id": "Radiotherapeutic",
+        "label": "Radiotherapeutic",
+        "parent_id": "New_Added_Procedure",
+        "parent_label": "New Added Procedure",
+        "depth": 3
+      },
+      {
+        "id": "Stimulator",
+        "label": "Stimulator",
+        "parent_id": "New_Added_Procedure",
+        "parent_label": "New Added Procedure",
+        "depth": 3
+      },
+      {
+        "id": "Surgical_Procedure_On_Lumbar_Spine",
+        "label": "Surgical Procedure On Lumbar Spine",
+        "parent_id": "New_Added_Procedure",
+        "parent_label": "New Added Procedure",
+        "depth": 3
+      },
+      {
+        "id": "Transcranial_Magnetic_Stimulation",
+        "label": "Transcranial Magnetic Stimulation",
+        "parent_id": "New_Added_Procedure",
+        "parent_label": "New Added Procedure",
+        "depth": 3
+      },
+      {
+        "id": "Vascular_Surgical_Procedures",
+        "label": "Vascular Surgical Procedures",
+        "parent_id": "New_Added_Procedure",
+        "parent_label": "New Added Procedure",
+        "depth": 3
+      },
+      {
+        "id": "Neurostimulator,_Device_(physical_object)",
+        "label": "Neurostimulator, Device (physical object)",
+        "parent_id": "New_Added_Procedure",
+        "parent_label": "New Added Procedure",
+        "depth": 3
+      },
+      {
+        "id": "Phlebotomy,_Therapeutic_(Separate_Procedure)",
+        "label": "Phlebotomy, Therapeutic (Separate Procedure)",
+        "parent_id": "New_Added_Procedure",
+        "parent_label": "New Added Procedure",
+        "depth": 3
+      },
+      {
+        "id": "FDG-Positron_Emission_Tomography",
+        "label": "FDG-Positron Emission Tomography",
+        "parent_id": "Positron-Emission_Tomography",
+        "parent_label": "Positron-Emission Tomography",
+        "depth": 4
+      }
+    ]
+  },
+  "Medication": {
+    "root_id": "Medication",
+    "root_iri": "http://www.semanticweb.org/sun/ontologies/AD-CDE#Medication",
+    "n_concepts": 56,
+    "concepts": [
+      {
+        "id": "Medication",
+        "label": "Medication",
+        "parent_id": null,
+        "parent_label": null,
+        "depth": 0
+      },
+      {
+        "id": "New_Added_Medication",
+        "label": "New Added Medication",
+        "parent_id": "Medication",
+        "parent_label": "Medication",
+        "depth": 1
+      },
+      {
+        "id": "Bronchodilator_Agent",
+        "label": "Bronchodilator Agent",
+        "parent_id": "Medication",
+        "parent_label": "Medication",
+        "depth": 1
+      },
+      {
+        "id": "Cardiovascular_Agent",
+        "label": "Cardiovascular Agent",
+        "parent_id": "Medication",
+        "parent_label": "Medication",
+        "depth": 1
+      },
+      {
+        "id": "Central_Nervous_System_Agent",
+        "label": "Central Nervous System Agent",
+        "parent_id": "Medication",
+        "parent_label": "Medication",
+        "depth": 1
+      },
+      {
+        "id": "Endocrine_and_Metabolic_Agent",
+        "label": "Endocrine and Metabolic Agent",
+        "parent_id": "Medication",
+        "parent_label": "Medication",
+        "depth": 1
+      },
+      {
+        "id": "Immunologic_Agent",
+        "label": "Immunologic Agent",
+        "parent_id": "Medication",
+        "parent_label": "Medication",
+        "depth": 1
+      },
+      {
+        "id": "Pain_Management",
+        "label": "Pain Management",
+        "parent_id": "Medication",
+        "parent_label": "Medication",
+        "depth": 1
+      },
+      {
+        "id": "Acheta",
+        "label": "Acheta",
+        "parent_id": "New_Added_Medication",
+        "parent_label": "New Added Medication",
+        "depth": 2
+      },
+      {
+        "id": "Adrenergic_Beta-Antagonists",
+        "label": "Adrenergic Beta-Antagonists",
+        "parent_id": "New_Added_Medication",
+        "parent_label": "New Added Medication",
+        "depth": 2
+      },
+      {
+        "id": "Amyloid_Fibril-Directed_Therapy",
+        "label": "Amyloid Fibril-Directed Therapy",
+        "parent_id": "New_Added_Medication",
+        "parent_label": "New Added Medication",
+        "depth": 2
+      },
+      {
+        "id": "Anti-Inflammatory_Agents_Non-Steroidal",
+        "label": "Anti-Inflammatory Agents Non-Steroidal",
+        "parent_id": "New_Added_Medication",
+        "parent_label": "New Added Medication",
+        "depth": 2
+      },
+      {
+        "id": "Anticholinergic_Agents",
+        "label": "Anticholinergic Agents",
+        "parent_id": "New_Added_Medication",
+        "parent_label": "New Added Medication",
+        "depth": 2
+      },
+      {
+        "id": "Anticonvulsants",
+        "label": "Anticonvulsants",
+        "parent_id": "New_Added_Medication",
+        "parent_label": "New Added Medication",
+        "depth": 2
+      },
+      {
+        "id": "Antihypertensive_Agents",
+        "label": "Antihypertensive Agents",
+        "parent_id": "New_Added_Medication",
+        "parent_label": "New Added Medication",
+        "depth": 2
+      },
+      {
+        "id": "Antiparkinson_Agents",
+        "label": "Antiparkinson Agents",
+        "parent_id": "New_Added_Medication",
+        "parent_label": "New Added Medication",
+        "depth": 2
+      },
+      {
+        "id": "Barbiturates",
+        "label": "Barbiturates",
+        "parent_id": "New_Added_Medication",
+        "parent_label": "New Added Medication",
+        "depth": 2
+      },
+      {
+        "id": "Clonidine",
+        "label": "Clonidine",
+        "parent_id": "New_Added_Medication",
+        "parent_label": "New Added Medication",
+        "depth": 2
+      },
+      {
+        "id": "Convulsants",
+        "label": "Convulsants",
+        "parent_id": "New_Added_Medication",
+        "parent_label": "New Added Medication",
+        "depth": 2
+      },
+      {
+        "id": "Coumadin",
+        "label": "Coumadin",
+        "parent_id": "New_Added_Medication",
+        "parent_label": "New Added Medication",
+        "depth": 2
+      },
+      {
+        "id": "Ginkgo_Biloba",
+        "label": "Ginkgo Biloba",
+        "parent_id": "New_Added_Medication",
+        "parent_label": "New Added Medication",
+        "depth": 2
+      },
+      {
+        "id": "Histamine_Antagonists",
+        "label": "Histamine Antagonists",
+        "parent_id": "New_Added_Medication",
+        "parent_label": "New Added Medication",
+        "depth": 2
+      },
+      {
+        "id": "Hydroxymethylglutaryl-CoA_Reductase_Inhibitors",
+        "label": "Hydroxymethylglutaryl-CoA Reductase Inhibitors",
+        "parent_id": "New_Added_Medication",
+        "parent_label": "New Added Medication",
+        "depth": 2
+      },
+      {
+        "id": "Hypnotics",
+        "label": "Hypnotics",
+        "parent_id": "New_Added_Medication",
+        "parent_label": "New Added Medication",
+        "depth": 2
+      },
+      {
+        "id": "Immunosuppressive_Agents",
+        "label": "Immunosuppressive Agents",
+        "parent_id": "New_Added_Medication",
+        "parent_label": "New Added Medication",
+        "depth": 2
+      },
+      {
+        "id": "Lithium",
+        "label": "Lithium",
+        "parent_id": "New_Added_Medication",
+        "parent_label": "New Added Medication",
+        "depth": 2
+      },
+      {
+        "id": "Monoamine_Oxidase_Inhibitors",
+        "label": "Monoamine Oxidase Inhibitors",
+        "parent_id": "New_Added_Medication",
+        "parent_label": "New Added Medication",
+        "depth": 2
+      },
+      {
+        "id": "Monoclonal_Antibodies",
+        "label": "Monoclonal Antibodies",
+        "parent_id": "New_Added_Medication",
+        "parent_label": "New Added Medication",
+        "depth": 2
+      },
+      {
+        "id": "Multivitamin_Preparation",
+        "label": "Multivitamin Preparation",
+        "parent_id": "New_Added_Medication",
+        "parent_label": "New Added Medication",
+        "depth": 2
+      },
+      {
+        "id": "Namenda",
+        "label": "Namenda",
+        "parent_id": "New_Added_Medication",
+        "parent_label": "New Added Medication",
+        "depth": 2
+      },
+      {
+        "id": "Narcotic_Analgesics",
+        "label": "Narcotic Analgesics",
+        "parent_id": "New_Added_Medication",
+        "parent_label": "New Added Medication",
+        "depth": 2
+      },
+      {
+        "id": "Nootropic_Agents",
+        "label": "Nootropic Agents",
+        "parent_id": "New_Added_Medication",
+        "parent_label": "New Added Medication",
+        "depth": 2
+      },
+      {
+        "id": "Sedatives",
+        "label": "Sedatives",
+        "parent_id": "New_Added_Medication",
+        "parent_label": "New Added Medication",
+        "depth": 2
+      },
+      {
+        "id": "Selective_Serotonin_Reuptake_Inhibitors",
+        "label": "Selective Serotonin Reuptake Inhibitors",
+        "parent_id": "New_Added_Medication",
+        "parent_label": "New Added Medication",
+        "depth": 2
+      },
+      {
+        "id": "Tacrine",
+        "label": "Tacrine",
+        "parent_id": "New_Added_Medication",
+        "parent_label": "New Added Medication",
+        "depth": 2
+      },
+      {
+        "id": "Vitamin_E",
+        "label": "Vitamin E",
+        "parent_id": "New_Added_Medication",
+        "parent_label": "New Added Medication",
+        "depth": 2
+      },
+      {
+        "id": "Anticoagulants",
+        "label": "Anticoagulants",
+        "parent_id": "Cardiovascular_Agent",
+        "parent_label": "Cardiovascular Agent",
+        "depth": 2
+      },
+      {
+        "id": "Aspirin",
+        "label": "Aspirin",
+        "parent_id": "Cardiovascular_Agent",
+        "parent_label": "Cardiovascular Agent",
+        "depth": 2
+      },
+      {
+        "id": "Anti-Anxiety_Agents",
+        "label": "Anti-Anxiety Agents",
+        "parent_id": "Central_Nervous_System_Agent",
+        "parent_label": "Central Nervous System Agent",
+        "depth": 2
+      },
+      {
+        "id": "Antidepressive_Agents",
+        "label": "Antidepressive Agents",
+        "parent_id": "Central_Nervous_System_Agent",
+        "parent_label": "Central Nervous System Agent",
+        "depth": 2
+      },
+      {
+        "id": "Antipsychotic_Agents",
+        "label": "Antipsychotic Agents",
+        "parent_id": "Central_Nervous_System_Agent",
+        "parent_label": "Central Nervous System Agent",
+        "depth": 2
+      },
+      {
+        "id": "Cholinesterase_Inhibitors",
+        "label": "Cholinesterase Inhibitors",
+        "parent_id": "Central_Nervous_System_Agent",
+        "parent_label": "Central Nervous System Agent",
+        "depth": 2
+      },
+      {
+        "id": "Hypnotics_And_Sedatives",
+        "label": "Hypnotics And Sedatives",
+        "parent_id": "Central_Nervous_System_Agent",
+        "parent_label": "Central Nervous System Agent",
+        "depth": 2
+      },
+      {
+        "id": "Memantine",
+        "label": "Memantine",
+        "parent_id": "Central_Nervous_System_Agent",
+        "parent_label": "Central Nervous System Agent",
+        "depth": 2
+      },
+      {
+        "id": "Psychotropic_Drugs",
+        "label": "Psychotropic Drugs",
+        "parent_id": "Central_Nervous_System_Agent",
+        "parent_label": "Central Nervous System Agent",
+        "depth": 2
+      },
+      {
+        "id": "Insulin",
+        "label": "Insulin",
+        "parent_id": "Endocrine_and_Metabolic_Agent",
+        "parent_label": "Endocrine and Metabolic Agent",
+        "depth": 2
+      },
+      {
+        "id": "Vitamins",
+        "label": "Vitamins",
+        "parent_id": "Endocrine_and_Metabolic_Agent",
+        "parent_label": "Endocrine and Metabolic Agent",
+        "depth": 2
+      },
+      {
+        "id": "Adrenal_Cortex_Hormones",
+        "label": "Adrenal Cortex Hormones",
+        "parent_id": "Immunologic_Agent",
+        "parent_label": "Immunologic Agent",
+        "depth": 2
+      },
+      {
+        "id": "Narcotics",
+        "label": "Narcotics",
+        "parent_id": "Pain_Management",
+        "parent_label": "Pain Management",
+        "depth": 2
+      },
+      {
+        "id": "Warfarin",
+        "label": "Warfarin",
+        "parent_id": "Anticoagulants",
+        "parent_label": "Anticoagulants",
+        "depth": 3
+      },
+      {
+        "id": "Benzodiazepines",
+        "label": "Benzodiazepines",
+        "parent_id": "Anti-Anxiety_Agents",
+        "parent_label": "Anti-Anxiety Agents",
+        "depth": 3
+      },
+      {
+        "id": "Tricyclic_Antidepressive_Agents",
+        "label": "Tricyclic Antidepressive Agents",
+        "parent_id": "Antidepressive_Agents",
+        "parent_label": "Antidepressive Agents",
+        "depth": 3
+      },
+      {
+        "id": "Acetylcholinesterase_Inhibitors",
+        "label": "Acetylcholinesterase Inhibitors",
+        "parent_id": "Cholinesterase_Inhibitors",
+        "parent_label": "Cholinesterase Inhibitors",
+        "depth": 3
+      },
+      {
+        "id": "Donepezil",
+        "label": "Donepezil",
+        "parent_id": "Acetylcholinesterase_Inhibitors",
+        "parent_label": "Acetylcholinesterase Inhibitors",
+        "depth": 4
+      },
+      {
+        "id": "Galantamine",
+        "label": "Galantamine",
+        "parent_id": "Acetylcholinesterase_Inhibitors",
+        "parent_label": "Acetylcholinesterase Inhibitors",
+        "depth": 4
+      },
+      {
+        "id": "Rivastigmine",
+        "label": "Rivastigmine",
+        "parent_id": "Acetylcholinesterase_Inhibitors",
+        "parent_label": "Acetylcholinesterase Inhibitors",
+        "depth": 4
+      }
+    ]
+  },
+  "Diagnostic_Test": {
+    "root_id": "Diagnostic_Test",
+    "root_iri": "http://www.semanticweb.org/sun/ontologies/AD-CDE#Diagnostic_Test",
+    "n_concepts": 44,
+    "concepts": [
+      {
+        "id": "Diagnostic_Test",
+        "label": "Diagnostic Test",
+        "parent_id": null,
+        "parent_label": null,
+        "depth": 0
+      },
+      {
+        "id": "Blood_Test",
+        "label": "Blood Test",
+        "parent_id": "Diagnostic_Test",
+        "parent_label": "Diagnostic Test",
+        "depth": 1
+      },
+      {
+        "id": "Cardiovascular_Test",
+        "label": "Cardiovascular Test",
+        "parent_id": "Diagnostic_Test",
+        "parent_label": "Diagnostic Test",
+        "depth": 1
+      },
+      {
+        "id": "Endocrine_Test",
+        "label": "Endocrine Test",
+        "parent_id": "Diagnostic_Test",
+        "parent_label": "Diagnostic Test",
+        "depth": 1
+      },
+      {
+        "id": "General_Health_and_Physical_Assessment",
+        "label": "General Health and Physical Assessment",
+        "parent_id": "Diagnostic_Test",
+        "parent_label": "Diagnostic Test",
+        "depth": 1
+      },
+      {
+        "id": "Genetic_Test",
+        "label": "Genetic Test",
+        "parent_id": "Diagnostic_Test",
+        "parent_label": "Diagnostic Test",
+        "depth": 1
+      },
+      {
+        "id": "Hepatic_Function_Test",
+        "label": "Hepatic Function Test",
+        "parent_id": "Diagnostic_Test",
+        "parent_label": "Diagnostic Test",
+        "depth": 1
+      },
+      {
+        "id": "Psychological_Test",
+        "label": "Psychological Test",
+        "parent_id": "Diagnostic_Test",
+        "parent_label": "Diagnostic Test",
+        "depth": 1
+      },
+      {
+        "id": "Renal_Function_Test",
+        "label": "Renal Function Test",
+        "parent_id": "Diagnostic_Test",
+        "parent_label": "Diagnostic Test",
+        "depth": 1
+      },
+      {
+        "id": "Reproductive_Health_Test",
+        "label": "Reproductive Health Test",
+        "parent_id": "Diagnostic_Test",
+        "parent_label": "Diagnostic Test",
+        "depth": 1
+      },
+      {
+        "id": "Thyroxine_Measurement",
+        "label": "Thyroxine Measurement",
+        "parent_id": "Diagnostic_Test",
+        "parent_label": "Diagnostic Test",
+        "depth": 1
+      },
+      {
+        "id": "Urinalysis",
+        "label": "Urinalysis",
+        "parent_id": "Diagnostic_Test",
+        "parent_label": "Diagnostic Test",
+        "depth": 1
+      },
+      {
+        "id": "Alanine_Transaminase_Blood_Test",
+        "label": "Alanine Transaminase Blood Test",
+        "parent_id": "Blood_Test",
+        "parent_label": "Blood Test",
+        "depth": 2
+      },
+      {
+        "id": "Aspartate_Transferase_Blood_Test",
+        "label": "Aspartate Transferase Blood Test",
+        "parent_id": "Blood_Test",
+        "parent_label": "Blood Test",
+        "depth": 2
+      },
+      {
+        "id": "Complete_Blood_Count",
+        "label": "Complete Blood Count",
+        "parent_id": "Blood_Test",
+        "parent_label": "Blood Test",
+        "depth": 2
+      },
+      {
+        "id": "Creatinine_Blood_Test",
+        "label": "Creatinine Blood Test",
+        "parent_id": "Blood_Test",
+        "parent_label": "Blood Test",
+        "depth": 2
+      },
+      {
+        "id": "Folic_Acid_Measurement",
+        "label": "Folic Acid Measurement",
+        "parent_id": "Blood_Test",
+        "parent_label": "Blood Test",
+        "depth": 2
+      },
+      {
+        "id": "Hematocrit_Determination",
+        "label": "Hematocrit Determination",
+        "parent_id": "Blood_Test",
+        "parent_label": "Blood Test",
+        "depth": 2
+      },
+      {
+        "id": "Hematology_Test",
+        "label": "Hematology Test",
+        "parent_id": "Blood_Test",
+        "parent_label": "Blood Test",
+        "depth": 2
+      },
+      {
+        "id": "Hemoglobin_A1C_Test",
+        "label": "Hemoglobin A1C Test",
+        "parent_id": "Blood_Test",
+        "parent_label": "Blood Test",
+        "depth": 2
+      },
+      {
+        "id": "Hemoglobin_Test",
+        "label": "Hemoglobin Test",
+        "parent_id": "Blood_Test",
+        "parent_label": "Blood Test",
+        "depth": 2
+      },
+      {
+        "id": "Hepatitis_C_Virus_Antibody",
+        "label": "Hepatitis C Virus Antibody",
+        "parent_id": "Blood_Test",
+        "parent_label": "Blood Test",
+        "depth": 2
+      },
+      {
+        "id": "Neutrophil_Count",
+        "label": "Neutrophil Count",
+        "parent_id": "Blood_Test",
+        "parent_label": "Blood Test",
+        "depth": 2
+      },
+      {
+        "id": "Platelet_Count_Lab_Test",
+        "label": "Platelet Count Lab Test",
+        "parent_id": "Blood_Test",
+        "parent_label": "Blood Test",
+        "depth": 2
+      },
+      {
+        "id": "Thyroid_Function_Test",
+        "label": "Thyroid Function Test",
+        "parent_id": "Blood_Test",
+        "parent_label": "Blood Test",
+        "depth": 2
+      },
+      {
+        "id": "Tissue_factor_induced_coagulation",
+        "label": "Tissue factor induced coagulation",
+        "parent_id": "Blood_Test",
+        "parent_label": "Blood Test",
+        "depth": 2
+      },
+      {
+        "id": "Triglycerides_Measurement",
+        "label": "Triglycerides Measurement",
+        "parent_id": "Blood_Test",
+        "parent_label": "Blood Test",
+        "depth": 2
+      },
+      {
+        "id": "Vitamin_B12_Test",
+        "label": "Vitamin B12 Test",
+        "parent_id": "Blood_Test",
+        "parent_label": "Blood Test",
+        "depth": 2
+      },
+      {
+        "id": "Electroencephalography",
+        "label": "Electroencephalography",
+        "parent_id": "Cardiovascular_Test",
+        "parent_label": "Cardiovascular Test",
+        "depth": 2
+      },
+      {
+        "id": "Electrocardiogram_Test",
+        "label": "Electrocardiogram Test",
+        "parent_id": "Cardiovascular_Test",
+        "parent_label": "Cardiovascular Test",
+        "depth": 2
+      },
+      {
+        "id": "Physical_Examination",
+        "label": "Physical Examination",
+        "parent_id": "General_Health_and_Physical_Assessment",
+        "parent_label": "General Health and Physical Assessment",
+        "depth": 2
+      },
+      {
+        "id": "Apolipoprotein_E_Genotype_Determination",
+        "label": "Apolipoprotein E Genotype Determination",
+        "parent_id": "Genetic_Test",
+        "parent_label": "Genetic Test",
+        "depth": 2
+      },
+      {
+        "id": "Alkaline_Phosphatase_Measurement",
+        "label": "Alkaline Phosphatase Measurement",
+        "parent_id": "Hepatic_Function_Test",
+        "parent_label": "Hepatic Function Test",
+        "depth": 2
+      },
+      {
+        "id": "Bilirubin_Lab_Test",
+        "label": "Bilirubin Lab Test",
+        "parent_id": "Hepatic_Function_Test",
+        "parent_label": "Hepatic Function Test",
+        "depth": 2
+      },
+      {
+        "id": "Psychometric_Testing",
+        "label": "Psychometric Testing",
+        "parent_id": "Psychological_Test",
+        "parent_label": "Psychological Test",
+        "depth": 2
+      },
+      {
+        "id": "Blood_Urea_Nitrogen_Measurement",
+        "label": "Blood Urea Nitrogen Measurement",
+        "parent_id": "Renal_Function_Test",
+        "parent_label": "Renal Function Test",
+        "depth": 2
+      },
+      {
+        "id": "Creatinine_Clearance_Test",
+        "label": "Creatinine Clearance Test",
+        "parent_id": "Renal_Function_Test",
+        "parent_label": "Renal Function Test",
+        "depth": 2
+      },
+      {
+        "id": "Glomerular_Filtration_Rate",
+        "label": "Glomerular Filtration Rate",
+        "parent_id": "Renal_Function_Test",
+        "parent_label": "Renal Function Test",
+        "depth": 2
+      },
+      {
+        "id": "Pregnancy_Test",
+        "label": "Pregnancy Test",
+        "parent_id": "Reproductive_Health_Test",
+        "parent_label": "Reproductive Health Test",
+        "depth": 2
+      },
+      {
+        "id": "Urine_Screening",
+        "label": "Urine Screening",
+        "parent_id": "Urinalysis",
+        "parent_label": "Urinalysis",
+        "depth": 2
+      },
+      {
+        "id": "Thyroid_Stimulating_Hormone_Test",
+        "label": "Thyroid Stimulating Hormone Test",
+        "parent_id": "Thyroid_Function_Test",
+        "parent_label": "Thyroid Function Test",
+        "depth": 3
+      },
+      {
+        "id": "12_lead_EKG_panel",
+        "label": "12 lead EKG panel",
+        "parent_id": "Electrocardiogram_Test",
+        "parent_label": "Electrocardiogram Test",
+        "depth": 3
+      },
+      {
+        "id": "Urine_Pregnancy_Test",
+        "label": "Urine Pregnancy Test",
+        "parent_id": "Urine_Screening",
+        "parent_label": "Urine Screening",
+        "depth": 3
+      },
+      {
+        "id": "Urine_Tricyclic_Drug_Screen",
+        "label": "Urine Tricyclic Drug Screen",
+        "parent_id": "Urine_Screening",
+        "parent_label": "Urine Screening",
+        "depth": 3
+      }
+    ]
+  },
+  "Social_Determinant_Of_Health": {
+    "root_id": "Social_Determinant_Of_Health",
+    "root_iri": "http://www.semanticweb.org/sun/ontologies/AD-CDE#Social_Determinant_Of_Health",
+    "n_concepts": 16,
+    "concepts": [
+      {
+        "id": "Social_Determinant_Of_Health",
+        "label": "Social Determinant Of Health",
+        "parent_id": null,
+        "parent_label": null,
+        "depth": 0
+      },
+      {
+        "id": "Alcohol_Abuse",
+        "label": "Alcohol Abuse",
+        "parent_id": "Social_Determinant_Of_Health",
+        "parent_label": "Social Determinant Of Health",
+        "depth": 1
+      },
+      {
+        "id": "Demographic",
+        "label": "Demographic",
+        "parent_id": "Social_Determinant_Of_Health",
+        "parent_label": "Social Determinant Of Health",
+        "depth": 1
+      },
+      {
+        "id": "Drug_Abuse",
+        "label": "Drug Abuse",
+        "parent_id": "Social_Determinant_Of_Health",
+        "parent_label": "Social Determinant Of Health",
+        "depth": 1
+      },
+      {
+        "id": "Smoking",
+        "label": "Smoking",
+        "parent_id": "Social_Determinant_Of_Health",
+        "parent_label": "Social Determinant Of Health",
+        "depth": 1
+      },
+      {
+        "id": "Substance_Abuse",
+        "label": "Substance Abuse",
+        "parent_id": "Social_Determinant_Of_Health",
+        "parent_label": "Social Determinant Of Health",
+        "depth": 1
+      },
+      {
+        "id": "Gender",
+        "label": "Gender",
+        "parent_id": "Demographic",
+        "parent_label": "Demographic",
+        "depth": 2
+      },
+      {
+        "id": "Adult",
+        "label": "Adult",
+        "parent_id": "Demographic",
+        "parent_label": "Demographic",
+        "depth": 2
+      },
+      {
+        "id": "Age",
+        "label": "Age",
+        "parent_id": "Demographic",
+        "parent_label": "Demographic",
+        "depth": 2
+      },
+      {
+        "id": "Knowledge_Acquisition",
+        "label": "Knowledge Acquisition",
+        "parent_id": "Demographic",
+        "parent_label": "Demographic",
+        "depth": 2
+      },
+      {
+        "id": "Females",
+        "label": "Females",
+        "parent_id": "Gender",
+        "parent_label": "Gender",
+        "depth": 3
+      },
+      {
+        "id": "Males",
+        "label": "Males",
+        "parent_id": "Gender",
+        "parent_label": "Gender",
+        "depth": 3
+      },
+      {
+        "id": "age_more_than_50_years",
+        "label": "age more than 50 years",
+        "parent_id": "Age",
+        "parent_label": "Age",
+        "depth": 3
+      },
+      {
+        "id": "55-59_years_old",
+        "label": "55-59 years old",
+        "parent_id": "Age",
+        "parent_label": "Age",
+        "depth": 3
+      },
+      {
+        "id": "55-64_years",
+        "label": "55-64 years",
+        "parent_id": "Age",
+        "parent_label": "Age",
+        "depth": 3
+      },
+      {
+        "id": "60_or_older",
+        "label": "60 or older",
+        "parent_id": "Age",
+        "parent_label": "Age",
+        "depth": 3
+      }
+    ]
+  },
+  "Rating_Criteria": {
+    "root_id": "Rating_Criteria",
+    "root_iri": "http://www.semanticweb.org/sun/ontologies/AD-CDE#Rating_Criteria",
+    "n_concepts": 16,
+    "concepts": [
+      {
+        "id": "Rating_Criteria",
+        "label": "Rating Criteria",
+        "parent_id": null,
+        "parent_label": null,
+        "depth": 0
+      },
+      {
+        "id": "Mental_Health_and_Cognitive_Function_Assessment",
+        "label": "Mental Health and Cognitive Function Assessment",
+        "parent_id": "Rating_Criteria",
+        "parent_label": "Rating Criteria",
+        "depth": 1
+      },
+      {
+        "id": "National_Institute_Of_Neurological_Disorders_And_Stroke",
+        "label": "National Institute Of Neurological Disorders And Stroke",
+        "parent_id": "Rating_Criteria",
+        "parent_label": "Rating Criteria",
+        "depth": 1
+      },
+      {
+        "id": "National_Institute_On_Alcohol_Abuse_And_Alcoholism",
+        "label": "National Institute On Alcohol Abuse And Alcoholism",
+        "parent_id": "Rating_Criteria",
+        "parent_label": "Rating Criteria",
+        "depth": 1
+      },
+      {
+        "id": "Physical_Health_and_Body_Metrics",
+        "label": "Physical Health and Body Metrics",
+        "parent_id": "Rating_Criteria",
+        "parent_label": "Rating Criteria",
+        "depth": 1
+      },
+      {
+        "id": "NPI_Total_Score",
+        "label": "NPI Total Score",
+        "parent_id": "Mental_Health_and_Cognitive_Function_Assessment",
+        "parent_label": "Mental Health and Cognitive Function Assessment",
+        "depth": 2
+      },
+      {
+        "id": "Clinical_Dementia_Rating_Scale",
+        "label": "Clinical Dementia Rating Scale",
+        "parent_id": "Mental_Health_and_Cognitive_Function_Assessment",
+        "parent_label": "Mental Health and Cognitive Function Assessment",
+        "depth": 2
+      },
+      {
+        "id": "Cognitive_Function_Clinical_Assessment",
+        "label": "Cognitive Function Clinical Assessment",
+        "parent_id": "Mental_Health_and_Cognitive_Function_Assessment",
+        "parent_label": "Mental Health and Cognitive Function Assessment",
+        "depth": 2
+      },
+      {
+        "id": "Cornell_Scale_For_Depression_In_Dementia",
+        "label": "Cornell Scale For Depression In Dementia",
+        "parent_id": "Mental_Health_and_Cognitive_Function_Assessment",
+        "parent_label": "Mental Health and Cognitive Function Assessment",
+        "depth": 2
+      },
+      {
+        "id": "Diagnostic_And_Statistical_Manual_Of_Mental_Disorders",
+        "label": "Diagnostic And Statistical Manual Of Mental Disorders",
+        "parent_id": "Mental_Health_and_Cognitive_Function_Assessment",
+        "parent_label": "Mental Health and Cognitive Function Assessment",
+        "depth": 2
+      },
+      {
+        "id": "Geriatric_Depression_Scale",
+        "label": "Geriatric Depression Scale",
+        "parent_id": "Mental_Health_and_Cognitive_Function_Assessment",
+        "parent_label": "Mental Health and Cognitive Function Assessment",
+        "depth": 2
+      },
+      {
+        "id": "Hachinski_Ischemia_Score",
+        "label": "Hachinski Ischemia Score",
+        "parent_id": "Mental_Health_and_Cognitive_Function_Assessment",
+        "parent_label": "Mental Health and Cognitive Function Assessment",
+        "depth": 2
+      },
+      {
+        "id": "Mini-Mental_State_Examination_Score",
+        "label": "Mini-Mental State Examination Score",
+        "parent_id": "Mental_Health_and_Cognitive_Function_Assessment",
+        "parent_label": "Mental Health and Cognitive Function Assessment",
+        "depth": 2
+      },
+      {
+        "id": "Montreal_Cognitive_Assessment_Score",
+        "label": "Montreal Cognitive Assessment Score",
+        "parent_id": "Mental_Health_and_Cognitive_Function_Assessment",
+        "parent_label": "Mental Health and Cognitive Function Assessment",
+        "depth": 2
+      },
+      {
+        "id": "Nincds-Adrda_Criteria_For_Alzheimer&apos;s_Disease",
+        "label": "Nincds-Adrda Criteria For Alzheimer&apos;s Disease",
+        "parent_id": "Mental_Health_and_Cognitive_Function_Assessment",
+        "parent_label": "Mental Health and Cognitive Function Assessment",
+        "depth": 2
+      },
+      {
+        "id": "Body_Mass_Index",
+        "label": "Body Mass Index",
+        "parent_id": "Physical_Health_and_Body_Metrics",
+        "parent_label": "Physical Health and Body Metrics",
+        "depth": 2
+      }
+    ]
+  },
+  "Fertility": {
+    "root_id": "Fertility",
+    "root_iri": "http://www.semanticweb.org/sun/ontologies/AD-CDE#Fertility",
+    "n_concepts": 13,
+    "concepts": [
+      {
+        "id": "Fertility",
+        "label": "Fertility",
+        "parent_id": null,
+        "parent_label": null,
+        "depth": 0
+      },
+      {
+        "id": "New_Added_Fertility",
+        "label": "New Added Fertility",
+        "parent_id": "Fertility",
+        "parent_label": "Fertility",
+        "depth": 1
+      },
+      {
+        "id": "Childbearing_Potential",
+        "label": "Childbearing Potential",
+        "parent_id": "Fertility",
+        "parent_label": "Fertility",
+        "depth": 1
+      },
+      {
+        "id": "Conceived",
+        "label": "Conceived",
+        "parent_id": "Fertility",
+        "parent_label": "Fertility",
+        "depth": 1
+      },
+      {
+        "id": "Infertility",
+        "label": "Infertility",
+        "parent_id": "Fertility",
+        "parent_label": "Fertility",
+        "depth": 1
+      },
+      {
+        "id": "Menopause",
+        "label": "Menopause",
+        "parent_id": "Fertility",
+        "parent_label": "Fertility",
+        "depth": 1
+      },
+      {
+        "id": "Menstruation",
+        "label": "Menstruation",
+        "parent_id": "Fertility",
+        "parent_label": "Fertility",
+        "depth": 1
+      },
+      {
+        "id": "Postmenopausal_State",
+        "label": "Postmenopausal State",
+        "parent_id": "Fertility",
+        "parent_label": "Fertility",
+        "depth": 1
+      },
+      {
+        "id": "Premenopause",
+        "label": "Premenopause",
+        "parent_id": "Fertility",
+        "parent_label": "Fertility",
+        "depth": 1
+      },
+      {
+        "id": "Primary_Physiologic_Amenorrhea",
+        "label": "Primary Physiologic Amenorrhea",
+        "parent_id": "Fertility",
+        "parent_label": "Fertility",
+        "depth": 1
+      },
+      {
+        "id": "Sterilization_For_Infection_Control",
+        "label": "Sterilization For Infection Control",
+        "parent_id": "Fertility",
+        "parent_label": "Fertility",
+        "depth": 1
+      },
+      {
+        "id": "Nonpersistence",
+        "label": "Nonpersistence",
+        "parent_id": "New_Added_Fertility",
+        "parent_label": "New Added Fertility",
+        "depth": 2
+      },
+      {
+        "id": "Postmenopause",
+        "label": "Postmenopause",
+        "parent_id": "New_Added_Fertility",
+        "parent_label": "New Added Fertility",
+        "depth": 2
+      }
+    ]
+  }
+}

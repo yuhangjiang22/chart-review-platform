@@ -1,0 +1,14 @@
+{
+  "task_id": "lung-cancer-phenotype",
+  "version": 2,
+  "created_at": "2026-05-02T15:00:00.000Z",
+  "created_by": "plan_executor",
+  "dev_patient_ids": [
+    "patient_easy_neg_01",
+    "patient_easy_nsclc_01",
+    "patient_easy_nsclc_02",
+    "patient_neg_hard_01",
+    "patient_probable_fhx_01"
+  ],
+  "lock_patient_ids": ["patient_easy_nsclc_02"]
+}

@@ -1,0 +1,57 @@
+[
+  {
+    "row_id": "420001",
+    "patient_id": "patient_easy_icd_02",
+    "condition_source_value": "C34.10",
+    "condition_source_concept_name": "Malignant neoplasm of upper lobe, bronchus or lung, unspecified side",
+    "condition_start_date": "2021-05-17",
+    "condition_status": "active",
+    "condition_type": "problem_list",
+    "comment": "Carried forward from prior facility records; included in discharge diagnoses per institutional billing problem-list pull-through practice; no active oncologic evaluation documented."
+  },
+  {
+    "row_id": "420002",
+    "patient_id": "patient_easy_icd_02",
+    "condition_source_value": "S72.141A",
+    "condition_source_concept_name": "Displaced intertrochanteric fracture of right femur, initial encounter for closed fracture",
+    "condition_start_date": "2024-10-22",
+    "condition_status": "resolved",
+    "condition_type": "encounter_diagnosis"
+  },
+  {
+    "row_id": "420003",
+    "patient_id": "patient_easy_icd_02",
+    "condition_source_value": "M81.0",
+    "condition_source_concept_name": "Age-related osteoporosis without current pathological fracture",
+    "condition_start_date": "2016-09-14",
+    "condition_status": "active",
+    "condition_type": "problem_list"
+  },
+  {
+    "row_id": "420004",
+    "patient_id": "patient_easy_icd_02",
+    "condition_source_value": "M16.11",
+    "condition_source_concept_name": "Primary osteoarthritis, right hip",
+    "condition_start_date": "2018-03-22",
+    "condition_status": "active",
+    "condition_type": "problem_list"
+  },
+  {
+    "row_id": "420005",
+    "patient_id": "patient_easy_icd_02",
+    "condition_source_value": "I10",
+    "condition_source_concept_name": "Essential (primary) hypertension",
+    "condition_start_date": "2013-11-05",
+    "condition_status": "active",
+    "condition_type": "problem_list"
+  },
+  {
+    "row_id": "420006",
+    "patient_id": "patient_easy_icd_02",
+    "condition_source_value": "E03.9",
+    "condition_source_concept_name": "Hypothyroidism, unspecified",
+    "condition_start_date": "2010-06-30",
+    "condition_status": "active",
+    "condition_type": "problem_list"
+  }
+]

@@ -1,0 +1,16 @@
+[
+  {
+    "row_id": 140030,
+    "concept_id": 1307046,
+    "concept_name": "Metoprolol Succinate 25 MG Extended Release Oral Tablet",
+    "drug_start_date": "2022-06-01",
+    "status": "active"
+  },
+  {
+    "row_id": 140031,
+    "concept_id": 1112807,
+    "concept_name": "Aspirin 81 MG Oral Tablet",
+    "drug_start_date": "2022-06-01",
+    "status": "active"
+  }
+]

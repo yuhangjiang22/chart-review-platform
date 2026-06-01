@@ -1,0 +1,19 @@
+{
+  "name": "@chart-review/live-alerts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cross-criterion alert recomputer: re-evaluates derived alerts (e.g. CHA2DS2-VASc score) when a single field changes. Pure function over field_assessments + task definition.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "dependencies": {
+    "@chart-review/contract-eval": "*",
+    "@chart-review/platform-types": "*"
+  }
+}

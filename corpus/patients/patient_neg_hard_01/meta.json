@@ -1,0 +1,9 @@
+{
+  "patient_id": "patient_neg_hard_01",
+  "category": "negative",
+  "demographics": { "age": 71, "sex": "M", "region": "Pacific Northwest" },
+  "smoking": "Former smoker, 25 pack-years, quit 1998",
+  "index_date": "2024-10-04",
+  "doc_types": ["pulmonology_consult", "ct_chest", "ed_visit", "pcp_followup"],
+  "generated_by": "hand"
+}
