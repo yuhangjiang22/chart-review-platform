@@ -7,7 +7,7 @@ deterministic rule engine + LLM-as-judge dual-track.
 
 This file is the human-facing README. The agent's own procedure
 (retrieval order, evidence citation rules, verifier feedback loop)
-lives in [SKILL.md](../.agents/skills/chart-review-asthma-adherence/SKILL.md).
+lives in [SKILL.md](./.agents/skills/chart-review-asthma-adherence/SKILL.md).
 
 ---
 
@@ -54,7 +54,7 @@ Tier dependencies short-circuit downstream rules:
 
 ### Rules
 
-8 deterministic rules under [`references/rules/`](../.agents/skills/chart-review-asthma-adherence/references/rules/),
+8 deterministic rules under [`references/rules/`](./.agents/skills/chart-review-asthma-adherence/references/rules/),
 two of which (`R-T1-ControllerForPersistent`, `R-T1-AdherenceAssessed`)
 carry `nuanced: true` so the LLM-as-judge weighs in on attribution
 where clinical reasoning is needed (distinguishing
@@ -66,7 +66,7 @@ Aligned with the ACCR design's 5 canonical categories
 (`DOCUMENTATION_GAP`, `GUIDELINE_DEVIATION`, `PATIENT_FACTOR`,
 `SYSTEM_FACTOR`, `INSUFFICIENT_DATA`) plus 4 task-specific refinements
 (`PATIENT_REFUSAL`, `CONTRAINDICATION`, `PENDING_FOLLOWUP`, `OTHER`).
-See [`references/attribution.yaml`](../.agents/skills/chart-review-asthma-adherence/references/attribution.yaml).
+See [`references/attribution.yaml`](./.agents/skills/chart-review-asthma-adherence/references/attribution.yaml).
 
 ---
 
@@ -149,7 +149,7 @@ plan documentation is missing (a real gap). The agent should detect:
 ## Workflow
 
 The standard platform workflow applies; see the parent
-[`README.md`](../README.md). Per-phase notes specific to this task:
+[`README.md`](./README.md). Per-phase notes specific to this task:
 
 ### AUTHOR
 The 13 questions + 8 rules are already drafted (this skill is in
@@ -174,8 +174,8 @@ curl -s -X POST http://localhost:3002/api/pilots/asthma-adherence \
 ```
 
 Two agents (default + skeptical role presets) run in parallel. The
-agent's procedure is in [SKILL.md](../.agents/skills/chart-review-asthma-adherence/SKILL.md); the per-run user prompt
-is composed by [`runs.ts`](../packages/infra-batch-run/src/runs.ts)
+agent's procedure is in [SKILL.md](./.agents/skills/chart-review-asthma-adherence/SKILL.md); the per-run user prompt
+is composed by [`runs.ts`](./packages/infra-batch-run/src/runs.ts)
 and gates the agent to 8 tools.
 
 ### VALIDATE
@@ -202,7 +202,7 @@ bundle export. Lock gate: macro reviewer↔agent κ ≥ 0.6.
 ### DEPLOY
 Folder-pick deploy — point at a server-side folder of patient
 subdirectories and run the locked rubric on each. See
-[server/deploy-routes.ts](../server/deploy-routes.ts).
+[server/deploy-routes.ts](./server/deploy-routes.ts).
 
 ---
 
@@ -214,7 +214,7 @@ The platform speaks to LLMs via two providers:
 
 vLLM is OpenAI-compatible (Chat Completions wire), so the natural fit
 is the **Codex provider**. A drop-in config example lives at
-[`.codex/config.toml.vllm`](../.codex/config.toml.vllm) — see
+[`.codex/config.toml.vllm`](./.codex/config.toml.vllm) — see
 that file for the complete annotated template.
 
 ### Quick setup
@@ -417,7 +417,7 @@ After a TRY run completes:
   before broad deployment.
 
 - **The Methods drafter doesn't exist for adherence yet** — phenotype
-  has [`packages/.../methods-drafter.ts`](../server/lib/methods-drafter.ts);
+  has [`packages/.../methods-drafter.ts`](./server/lib/methods-drafter.ts);
   the adherence variant would describe the question framework + dual-
   track concordance + composite-score interpretation. Manual writing
   for now.
@@ -436,7 +436,8 @@ After a TRY run completes:
 
 ## Files
 
-This document → [`docs/asthma-adherence.md`](.).
+This document → [`asthma-adherence.md`](asthma-adherence.md) at the
+platform root.
 
 The skill bundle (loaded by the runtime) lives at:
 
