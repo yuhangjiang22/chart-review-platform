@@ -185,6 +185,9 @@ lock decision.
 
 ### Adherence (asthma-adherence)
 
+See [`docs/asthma-adherence.md`](docs/asthma-adherence.md) for the
+detailed task guide including the vLLM setup walkthrough.
+
 Question-and-rule chart review. Built from the ACCR design PDF:
 tier-stratified questions (T0 eligibility → T1 control assessment →
 T2 management), rule engine + LLM-judge dual-track, 9-category
