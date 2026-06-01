@@ -1,5 +1,4 @@
-// v2's Vite config. v2 now owns the client outright (vendored from v1 in
-// M5; see PORTING_ROADMAP.md). Vite root is <v2>/client.
+// Vite config for the React Studio client. Root is <repo>/client.
 //
 // Proxy targets v2's own HTTP server (port 3002 by default). v2's server
 // then either serves the request (v2-native /api/...) or falls through
