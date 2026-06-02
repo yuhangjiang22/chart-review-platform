@@ -24,27 +24,35 @@ For each asthma patient, the platform produces:
 Output is persisted as a union-shaped `review_state.json` under
 `var/reviews/<patient>/<task>/review_state.json`.
 
-### Question framework (3 tiers, 13 questions)
+### Question framework (3 tiers, 16 questions — v0.2)
+
+Each question carries a `naepp_source` (page reference into EPR-3
+2007 or 2020 Focused Update) and an `evidence_grade` (A/B/C/D for
+EPR-3, Strong/Conditional for 2020 Update). See
+[`references/questions/`](./.agents/skills/chart-review-asthma-adherence/references/questions/).
 
 ```
 T0 Eligibility (3 questions)
-  T0-AsthmaDx            — active J45.* dx in the lookback window?
-  T0-AgeOk               — patient ≥ 12y at index date?
-  T0-LookbackHasNotes    — ≥ 2 qualifying outpatient/specialty notes?
+  T0-AsthmaDx            — active J45.* dx? — EPR-3 p.40-43 Box 3-1
+  T0-AgeOk               — patient ≥ 12y? — 2020 Update Recs 13-16 scope
+  T0-LookbackHasNotes    — ≥ 2 outpt/specialty notes? — methodology
 
-T1 Control assessment (6 questions)
-  T1-ACTScore                 — most recent ACT score (5–25, integer)
-  T1-ExacerbationsCount       — exacerbations in past 12 months (count)
-  T1-ControllerPrescribed     — daily controller (ICS/ICS-LABA/LTRA/biologic) active?
-  T1-ControllerAdherenceProxy — adequate / inadequate / not_assessed
-  T1-SABAOveruse              — ≥ 3 SABA canisters/year?
-  T1-SpirometryDate           — date of most recent spirometry
+T1 Control assessment (7 questions)
+  T1-ACTScore                 — most recent ACT (5–25) — EPR-3 p.38 (Nathan 2004)
+  T1-ExacerbationsCount       — exacerbations past 12mo — EPR-3 p.39 risk domain
+  T1-ControllerPrescribed     — ICS/ICS-LABA/LTRA/biologic active? — EPR-3 p.213 (Evidence A)
+  T1-ControllerAdherenceProxy — adequate/inadequate/not_assessed — EPR-3 p.220 (Evidence B)
+  T1-SABAOveruse              — ≥ 3 canisters/year? — EPR-3 Fig 3-5 / HEDIS AMR
+  T1-SpirometryDate           — most recent spirometry — EPR-3 p.43 (every 1-2y)
+  T1-ComorbidityAssessed      — rhinitis/GERD/obesity/OSA/depression/tobacco? — EPR-3 p.166
 
-T2 Management (4 questions)
-  T2-StepTherapyMatch          — regimen aligned with NAEPP step?
-  T2-WrittenActionPlan         — action plan documented as given?
-  T2-FollowupScheduled         — follow-up within 3mo of index?
-  T2-ContraindicationDocumented — refusal/contraindication/pending recorded?
+T2 Management (6 questions)
+  T2-StepTherapyMatch           — regimen aligned with step? — EPR-3 Fig 4-5 + 2020 SMART Rec 13
+  T2-WrittenActionPlan          — action plan given? — EPR-3 p.94 (Evidence B)
+  T2-FollowupScheduled          — follow-up within 3mo? — EPR-3 p.94 regular review (Evidence B)
+  T2-InhalerTechniqueChecked    — technique assessed/corrected? — EPR-3 p.94, p.220 (Evidence B)
+  T2-ComorbidityAddressed       — comorbidities addressed? — EPR-3 p.166 (Evidence B)
+  T2-ContraindicationDocumented — refusal/contraindication/pending? — methodological attribution
 ```
 
 Tier dependencies short-circuit downstream rules:
@@ -54,11 +62,13 @@ Tier dependencies short-circuit downstream rules:
 
 ### Rules
 
-8 deterministic rules under [`references/rules/`](./.agents/skills/chart-review-asthma-adherence/references/rules/),
-two of which (`R-T1-ControllerForPersistent`, `R-T1-AdherenceAssessed`)
-carry `nuanced: true` so the LLM-as-judge weighs in on attribution
-where clinical reasoning is needed (distinguishing
+11 deterministic rules under [`references/rules/`](./.agents/skills/chart-review-asthma-adherence/references/rules/) (v0.2),
+six of which carry `nuanced: true` so the LLM-as-judge weighs in on
+attribution where clinical reasoning is needed (distinguishing
 `DOCUMENTATION_GAP` from `GUIDELINE_DEVIATION` vs `PATIENT_FACTOR`).
+Each rule carries its own `naepp_source` and `evidence_grade`
+field tracing back to the EPR-3 page or 2020 Focused Update
+recommendation that grounds it.
 
 ### Attribution taxonomy (9 categories)
 
@@ -81,7 +91,7 @@ the source of truth, notes as fallback**. The agent has access to:
 | `read_structured_data(table=...)` | Read all rows from one OMOP table (conditions / drugs / measurements / observations / procedures / encounters) |
 | `search_notes(queries=[...])` | Keyword search across notes; returns filename + offset + ±120-char snippet per hit |
 | `list_notes` + `read_notes` | Catalog + bulk read of free-text notes |
-| `list_questions` + `read_question` | The 13-question framework |
+| `list_questions` + `read_question` | The 16-question framework |
 | `set_question_answer` | Commit one answer at a time (with verifier post-pass) |
 | `set_review_status` | Mark the patient complete |
 
@@ -479,7 +489,7 @@ The standard platform workflow applies; see the parent
 [`README.md`](./README.md). Per-phase notes specific to this task:
 
 ### AUTHOR
-The 13 questions + 8 rules are already drafted (this skill is in
+The 16 questions + 11 rules are already drafted (this skill is in
 `status: draft` per meta.yaml). To edit:
 - Question text / retrieval_hints / answer_schema → edit
   `references/questions/T{0,1,2}_*.yaml`

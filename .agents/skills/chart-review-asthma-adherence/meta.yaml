@@ -1,19 +1,28 @@
 task_type: adherence
 task_kind: adherence
-manual_version: 0.1
-source_document_sha: sha256:asthma-adherence-pdf-2026-03
+manual_version: 0.2
+source_document_sha: sha256:asthma-adherence-naepp-grounded-2026-06
 status: draft
 review_unit: patient
 overview_prose: >-
-  Asthma management guideline-concordance task. Extract per-patient structured
-  answers to a tier-stratified question framework (eligibility / control
-  assessment / management) and evaluate concordance with a small ruleset. Output
-  per patient is a QuestionAnswer[] + RuleVerdict[] pair persisted in the
-  union-shaped review_state.json.
+  Asthma management guideline-concordance task. Extracts per-patient
+  structured answers to a tier-stratified question framework (T0
+  eligibility / T1 control assessment / T2 management) and evaluates
+  concordance via a deterministic ruleset. Output per patient is a
+  QuestionAnswer[] + RuleVerdict[] pair persisted in the union-shaped
+  review_state.json.
 
-  Reference: 2026-03-Agentic-Asthma-Adherence-Design.pdf. Phase 2 manually
-  authors the questions + rules from the PDF examples; the guideline-ingestion
-  mode is deferred (see ADHERENCE-INTEGRATION.md Phase 4).
+  Source documents:
+    - NHLBI EPR-3 Full Report 2007 ("Expert Panel Report 3: Guidelines
+      for the Diagnosis and Management of Asthma")
+    - NHLBI 2020 Focused Updates to the Asthma Management Guidelines
+    - ACCR System Design (2026-03-Agentic-Asthma-Adherence-Design.pdf)
+
+  Each question and rule carries a `naepp_source` field with page
+  references and evidence grade (A/B/C/D for EPR-3; Strong/Conditional
+  for 2020 Update). v0.1 -> v0.2 added 3 questions (T1-ComorbidityAssessed,
+  T2-InhalerTechniqueChecked, T2-ComorbidityAddressed) and 3 rules
+  derived from EPR-3 Components 2 and 3.
 final_output: rule_verdicts
 phases:
   - author
@@ -22,3 +31,20 @@ phases:
   - decide
   - lock
   - deploy
+clinical_sources:
+  - id: NAEPP-EPR3-2007
+    title: "Expert Panel Report 3 (EPR-3): Guidelines for the Diagnosis and Management of Asthma — Full Report 2007"
+    publisher: NHLBI / National Asthma Education and Prevention Program
+    citation: "National Heart, Lung, and Blood Institute. Expert Panel Report 3: Guidelines for the Diagnosis and Management of Asthma. Full Report 2007. NIH Publication No. 07-4051."
+    local_path: docs/EPR-3_Asthma_Full_Report_2007.pdf
+    pages: 440
+  - id: NAEPP-2020-Focused-Update
+    title: "2020 Focused Updates to the Asthma Management Guidelines: A Report from the National Asthma Education and Prevention Program Coordinating Committee Expert Panel Working Group"
+    publisher: NHLBI / National Asthma Education and Prevention Program
+    citation: "Cloutier MM, et al. 2020 Focused Updates to the Asthma Management Guidelines. J Allergy Clin Immunol. 2020 Dec;146(6):1217-1270."
+    local_path: docs/AsthmaManagementGuidelinesReport-2-4-21.pdf
+    pages: 322
+  - id: ACCR-Design-2026
+    title: "Agentic Asthma Adherence — Combined Study Design + ACCR System Design"
+    publisher: Internal (ACCR project)
+    local_path: docs/2026-03-Agentic-Asthma-Adherence-Design.pdf

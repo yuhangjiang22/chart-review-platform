@@ -1,8 +1,21 @@
+# T2 — Management concordance. Each rule asks: did the management plan
+# document the EPR-3 / 2020 Focused Update recommended action, and if
+# not, is the deviation attributable?
+
 rules:
   - rule_id: R-T2-StepTherapyMatches
     description: >-
       The patient's controller regimen matches guideline step therapy
-      for their control level.
+      for their control level (per EPR-3 Figure 4-5 and 2020 Focused
+      Update SMART/LAMA updates for ages 12+).
+    naepp_source: >-
+      EPR-3 Section 4 Figure 4-5 (Stepwise Approach Youths ≥12 and
+      Adults, p.343); 2020 Focused Update Rec 12 (strong) and Rec 13
+      (conditional) p.80-86 — ICS-formoterol SMART for moderate-severe
+      persistent asthma 12+; Recs 14-16 p.90-95 — LAMA add-on as Step 4
+      alternative when LABA is contraindicated or unavailable
+      (conditional, moderate certainty).
+    evidence_grade: A_with_SMART_strong_LAMA_conditional
     verdict_if: "T2-StepTherapyMatch == \"matches\""
     attribution_when:
       - when: "T2-ContraindicationDocumented == \"contraindication\""
@@ -21,7 +34,18 @@ rules:
 
   - rule_id: R-T2-WrittenActionPlan
     description: >-
-      Patient has a written asthma action plan documented.
+      Patient has a written asthma action plan documented in the
+      lookback window.
+    naepp_source: >-
+      EPR-3 Component 2 p.94 (Key Points: Patient Education) — 'Provide
+      all patients with a written asthma action plan that includes (1)
+      daily management and (2) how to recognize and handle worsening
+      asthma. Written action plans are particularly recommended for
+      patients who have moderate or severe persistent asthma, a history
+      of severe exacerbations, or poorly controlled asthma
+      (Evidence B).' Reinforced at p.97 — 'Clinicians provide all
+      patients with a written asthma action plan' (Evidence B).
+    evidence_grade: B
     verdict_if: "T2-WrittenActionPlan == true"
     attribution: DOCUMENTATION_GAP
     supporting_questions: [T2-WrittenActionPlan]
@@ -29,7 +53,56 @@ rules:
   - rule_id: R-T2-FollowupScheduled
     description: >-
       Follow-up scheduled within 3 months for non-controlled patients.
+      Well-controlled patients (ACT >= 20 AND zero exacerbations) are
+      excluded — they can be reviewed at routine 6-month intervals.
+    naepp_source: >-
+      EPR-3 Component 2 p.94 (Key Points) — 'Regular review, by an
+      informed clinician, of the status of the patient's asthma
+      control is an essential part of asthma self-management education
+      (Evidence B).' EPR-3 Section 4 stepwise tables recommend follow-up
+      at 2-6 weeks when initiating/stepping up, then every 1-6 months
+      when controlled. 3 months is the cap for non-controlled patients.
+    evidence_grade: B
     verdict_if: "T2-FollowupScheduled == true"
     excluded_if: "T1-ACTScore >= 20 and T1-ExacerbationsCount == 0"
     attribution: DOCUMENTATION_GAP
     supporting_questions: [T2-FollowupScheduled, T1-ACTScore, T1-ExacerbationsCount]
+
+  - rule_id: R-T2-InhalerTechniqueChecked
+    description: >-
+      Inhaler technique was assessed (and corrected if needed) at
+      least once in the lookback window.
+    naepp_source: >-
+      EPR-3 Component 2 p.94 (Key Points) — 'Skills: e.g., inhaler
+      technique, use of a valved holding chamber (VHC) or spacer, and
+      self-monitoring' are required teaching items. EPR-3 Component 4
+      p.220 (Safety of ICS, Key Points) — 'Evaluate patient adherence
+      and inhaler technique [...] before increasing the dose of ICS
+      (Evidence B).' EPR-3 p.243 — 'Spacers or valved holding
+      chambers used with non-breath-activated MDIs reduce local side
+      effects (Evidence A).'
+    evidence_grade: B
+    verdict_if: "T2-InhalerTechniqueChecked in [\"assessed_correct\", \"assessed_corrected\"]"
+    attribution: DOCUMENTATION_GAP
+    nuanced: true
+    judge_can_override: false
+    supporting_questions: [T2-InhalerTechniqueChecked]
+
+  - rule_id: R-T2-ComorbidityAddressed
+    description: >-
+      For patients with documented asthma-relevant comorbidities, the
+      chart shows a management plan (referral, treatment, lifestyle
+      counseling). Identifying a comorbidity without addressing it is
+      itself a gap.
+    naepp_source: >-
+      EPR-3 Component 3 p.166 — 'Treating the conditions may improve
+      asthma management' (per-comorbidity evidence grades A-D). EPR-3
+      p.165 — allergen avoidance multifaceted (Evidence A); tobacco
+      smoke avoidance (Evidence C); influenza vaccination (Evidence A).
+    evidence_grade: B
+    verdict_if: "T2-ComorbidityAddressed == \"addressed\""
+    excluded_if: "T2-ComorbidityAddressed == \"not_applicable\""
+    attribution: DOCUMENTATION_GAP
+    nuanced: true
+    judge_can_override: false
+    supporting_questions: [T1-ComorbidityAssessed, T2-ComorbidityAddressed]
