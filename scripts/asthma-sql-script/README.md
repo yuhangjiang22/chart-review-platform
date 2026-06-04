@@ -9,7 +9,7 @@ comparable patient corpus from their own EHR data warehouses.
 
 | File | Purpose |
 |---|---|
-| `cohort.sql` | Identifies the study cohort. Pediatric (ages 2–17), active asthma diagnosis (SNOMED 317009 + descendants, which includes ICD-10 J45.x), ≥2 outpatient visits in the 365-day lookback, full observation-period coverage, alive at index. Returns one row per eligible patient with `(person_id, index_date, age_at_index, gender_concept_id, n_outpt)`. |
+| `cohort.sql` | Identifies the study cohort per the protocol's Cohort Definition. Pediatric (ages 2–17) at index_date, active asthma diagnosis (SNOMED 317009 + descendants, which includes ICD-10 J45.x), ≥2 asthma-related encounters anywhere in the study window, alive at index, no primary diagnosis of cystic fibrosis / bronchiectasis / bronchopulmonary dysplasia (chronic lung disease that would confound asthma management). Returns one row per eligible patient with `(person_id, index_date, age_at_index, gender_concept_id, n_asthma_encounters)`. |
 | `extracts.sql` | The six per-patient queries (`conditions`, `drug_regimens` + `drug_fills` + `drug_sig`, `measurements`, `observations`, `procedures`, `encounters`). Each section is delimited by a `-- ==NAME foo==` marker so `omop_etl.py` can load them by name. Result sets serialize 1:1 into the JSON shapes the platform's `read_structured_data` MCP tool consumes. |
 | `omop_etl.py` | Python wrapper. Reads the cohort CSV, runs the 6 extracts per patient, aggregates drug fills into the platform's nested shape, computes `refill_pdc_12mo` (HEDIS MAM-style) and `saba_canisters_12mo`, anonymizes `person_id` with a site-prefixed salted hash, and writes the full `corpus/patients/<anon_id>/` layout. |
 
@@ -18,7 +18,7 @@ comparable patient corpus from their own EHR data warehouses.
 ```bash
 # 1. Cohort identification — run cohort.sql against your CDM,
 #    export to CSV with columns:
-#    person_id, index_date, age_at_index, gender_concept_id, n_outpt
+#    person_id, index_date, age_at_index, gender_concept_id, n_asthma_encounters
 #
 #    Example (SQL Server):
 sqlcmd -S host -d omop_prod -i cohort.sql -o cohort.csv
