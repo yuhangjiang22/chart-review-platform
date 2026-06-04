@@ -156,10 +156,27 @@ export function applyNerProposal(
       return { ok: false, error: "edit_guidance needs a non-empty `after` field" };
     }
     const current = typeof target.guidance === "string" ? target.guidance : "";
-    if (before && current.includes(before)) {
+    if (before) {
+      // `before` was given — must match verbatim. Silently appending when
+      // it doesn't match was the bug that corrupted guidance YAMLs in
+      // iter_005 (truncated `before:` left the original text intact and
+      // duplicated the intro). Refuse the apply so the methodologist
+      // can fix the proposal rather than silently corrupting the file.
+      if (!current.includes(before)) {
+        const beforePreview = before.length > 80 ? `${before.slice(0, 77)}...` : before;
+        return {
+          ok: false,
+          error:
+            `edit_guidance \`before\` text not found in current guidance — refusing to apply. `
+            + `Either fix the proposal's \`before:\` to match the existing prose verbatim, `
+            + `or omit \`before:\` entirely to append \`after:\` as a new paragraph. `
+            + `Preview of \`before\`: "${beforePreview}"`,
+        };
+      }
       target.guidance = current.replace(before, after);
     } else {
-      // Fallback: append the new text on its own paragraph.
+      // No `before` → intentional append-mode. Land `after` as a new
+      // paragraph at the end of the existing guidance.
       target.guidance = (current ? `${current.trimEnd()}\n\n` : "") + after;
     }
   } else {

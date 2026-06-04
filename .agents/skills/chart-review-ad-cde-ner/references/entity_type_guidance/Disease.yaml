@@ -7,16 +7,17 @@ guidance: |
   symptom unless it has been formally diagnosed (e.g. tag "Hypertension"
   when assessment says so, not when a single BP reading appears).
 exemplars:
-  - "Stage III non-small cell lung cancer"
-  - "Hypertension"
-  - "Type 2 diabetes mellitus"
-  - "Alzheimer's disease"
+  - Stage III non-small cell lung cancer
+  - Hypertension
+  - Type 2 diabetes mellitus
+  - Alzheimer's disease
+  - Stage IIIA non-small cell lung cancer
 negative_examples:
-  - phrase: "shortness of breath"
-    reason: "symptom; not a Disease concept unless paired with a diagnosis"
-  - phrase: "rule out pneumonia"
-    reason: "differential consideration, not a confirmed Disease"
+  - phrase: shortness of breath
+    reason: symptom; not a Disease concept unless paired with a diagnosis
+  - phrase: rule out pneumonia
+    reason: differential consideration, not a confirmed Disease
 edge_cases:
-  - pattern: "history of <disease>"
-    correct: "tag the disease and note the temporal qualifier in anchor"
-    reason: "history-of mentions still represent a Disease concept presence"
+  - pattern: history of <disease>
+    correct: tag the disease and note the temporal qualifier in anchor
+    reason: history-of mentions still represent a Disease concept presence
