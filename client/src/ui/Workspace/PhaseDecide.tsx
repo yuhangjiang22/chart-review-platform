@@ -172,12 +172,14 @@ export function PhaseDecide({
         </div>
       )}
 
-      {/* Adherence "Run again" CTA — re-runs the agents on the SAME
-       *  cohort with whatever's currently in the skill bundle. The
-       *  reviewer's persisted answers carry over as the gold standard,
-       *  so the next iter's score is computed automatically. This is
-       *  the inner loop: improve skill → run again → see new score. */}
-      {taskKind === "adherence" && onRunAgain && (
+      {/* "Run again" CTA — re-runs the agents on the SAME cohort with
+       *  whatever's currently in the skill bundle. The reviewer's
+       *  validated state (adherence: persisted answers; NER: validated
+       *  span_labels) carries over as the gold standard, so the next
+       *  iter's score is computed automatically. This is the inner
+       *  loop: improve skill (or accept proposals) → run again → see
+       *  the new score on the LOCK/DECIDE calibration panel. */}
+      {(taskKind === "adherence" || taskKind === "ner") && onRunAgain && (
         <div className="pt-2">
           <Button
             variant="default"
@@ -189,7 +191,9 @@ export function PhaseDecide({
             <Sparkles size={16} />
             <span>{isRunningAgain ? "Starting a new iter…" : "Run agents again on this cohort"}</span>
             <span className="text-[10px] font-normal opacity-80">
-              uses the current questions / rules · reviewer answers carry over
+              {taskKind === "ner"
+                ? "uses the current entity_type_guidance · validated spans carry over"
+                : "uses the current questions / rules · reviewer answers carry over"}
             </span>
           </Button>
         </div>
