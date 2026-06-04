@@ -63,15 +63,6 @@ export {
   type ApplyProposalResult,
 } from "./ner-proposal-apply.js";
 
-// ner-performance: per-iter precision/recall/F1 against reviewer-validated spans
-export {
-  computeNerPerformance,
-  type PerformanceReport,
-  type AgentReport,
-  type AgentMetrics,
-  type EntityTypeMetrics,
-} from "./ner-performance.js";
-
 // adherence-proposal-apply: patch the questions / rules YAML from an
 // adherence proposal
 export {

@@ -3,7 +3,7 @@ import { Lock, Pencil, Sparkles } from "lucide-react";
 import type { CellCounts } from "./phase-logic";
 import { ImprovementProposalsPanel } from "./ImprovementProposalsPanel";
 import { AdherenceDecideSummary } from "./AdherenceDecideSummary";
-import { NerDecideSummary } from "./NerDecideSummary";
+import { NerCalibrationFigure } from "./NerCalibrationFigure";
 
 interface PhaseDecideProps {
   taskId: string;
@@ -122,11 +122,15 @@ export function PhaseDecide({
         <AdherenceDecideSummary taskId={taskId} iterId={iterId} />
       )}
 
-      {/* NER — per-agent precision / recall / F1 against reviewer's
-       *  validated span_labels. Same role as AdherenceDecideSummary
-       *  above for the adherence path. */}
-      {taskKind === "ner" && iterId && (
-        <NerDecideSummary taskId={taskId} iterId={iterId} />
+      {/* NER — per-agent precision / recall / F1 + tuple-κ against the
+       *  reviewer-validated spans. Reuses the same NerCalibrationFigure
+       *  component the LOCK page renders so the scores on DECIDE and
+       *  LOCK match exactly (sophisticated tuple+IoU matching, not just
+       *  exact-span_id). The figure is task-scoped, not iter-scoped —
+       *  the cumulative validated review_state is the single source
+       *  of truth. */}
+      {taskKind === "ner" && (
+        <NerCalibrationFigure taskId={taskId} />
       )}
 
       {/* Suggestions panel — one compact Improve trigger above; the

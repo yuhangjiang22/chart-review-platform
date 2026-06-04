@@ -53,7 +53,6 @@ import {
 import {
   computeRevisitsForIter, bulkKeepRevisits,
 } from "./lib/derived-adjudications/revisits.js";
-import { computeNerPerformance } from "@chart-review/domain-proposal";
 
 /** Throw a methodologist-only 403 (or 401 in required-auth mode) when
  *  the caller can't run this endpoint. Inline because the parameterized
@@ -232,30 +231,6 @@ export const pilotReadRoutes: RouteEntry[] = [
   {
     method: "GET", pattern: "/api/pilots/:taskId/:iterId/critique",
     handler: async (_b, _r, p) => getPilotCritique(p.taskId, p.iterId),
-  },
-
-  // Per-iter NER performance — precision / recall / F1 per agent + per
-  // entity_type, computed against reviewer-validated review_state.json.
-  // Used by the DECIDE phase UI to show how well each agent did.
-  // Returns 404 if the iter doesn't exist; returns an empty agents array
-  // (with patients_with_validation=0) if no patient has been validated yet.
-  {
-    method: "GET", pattern: "/api/pilots/:taskId/:iterId/performance",
-    handler: async (_b, _r, p) => {
-      const { taskId, iterId } = p;
-      const m = getPilotManifest(taskId, iterId);
-      if (!m) {
-        const err = new Error("pilot iteration not found") as Error & { status: number };
-        err.status = 404;
-        throw err;
-      }
-      const runManifest = getRunManifest(m.run_id);
-      const patientIds: string[] =
-        runManifest?.patient_ids
-        ?? readCohortSampling(taskId)?.dev_patient_ids
-        ?? [];
-      return computeNerPerformance(taskId, iterId, m.run_id, patientIds);
-    },
   },
 
   {
