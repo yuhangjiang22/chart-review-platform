@@ -26,6 +26,8 @@ interface PatientStatus {
   agent_done: boolean;
   oracle_done: boolean;
   in_progress: boolean;
+  errored?: boolean;
+  error_message?: string | null;
 }
 
 interface DisagreementSummary {
@@ -131,6 +133,7 @@ export function PhaseValidate({
       <div className="grid grid-cols-5 gap-2 mb-6">
         {patients.map((ps) => {
           const draftReady = ps.agent_done;
+          const errored = ps.errored === true;
           const hasDisagreements = patientsWithDisagreements.has(ps.patient_id);
           return (
             <button
@@ -138,30 +141,35 @@ export function PhaseValidate({
               type="button"
               disabled={!draftReady}
               onClick={() => onOpenPatient(ps.patient_id)}
+              title={errored ? (ps.error_message ?? "agent run errored") : undefined}
               className={cn(
                 "rounded-md border px-3 py-2 text-left text-[11px] transition-colors",
                 ps.oracle_done
                   ? "border-[hsl(var(--sage))]/50 bg-[hsl(var(--sage))]/10 text-[hsl(var(--sage))]"
-                  : draftReady && hasDisagreements
-                    ? "border-[hsl(var(--oxblood))]/40 bg-[hsl(var(--oxblood))]/5 text-foreground hover:bg-[hsl(var(--oxblood))]/10 cursor-pointer"
-                    : draftReady
-                      ? "border-[hsl(var(--sage))]/30 bg-[hsl(var(--sage))]/5 text-foreground hover:bg-[hsl(var(--sage))]/10 cursor-pointer"
-                      : "border-border bg-paper/30 text-muted-foreground cursor-not-allowed opacity-70",
+                  : errored
+                    ? "border-[hsl(var(--oxblood))]/50 bg-[hsl(var(--oxblood))]/5 text-[hsl(var(--oxblood))] cursor-not-allowed"
+                    : draftReady && hasDisagreements
+                      ? "border-[hsl(var(--oxblood))]/40 bg-[hsl(var(--oxblood))]/5 text-foreground hover:bg-[hsl(var(--oxblood))]/10 cursor-pointer"
+                      : draftReady
+                        ? "border-[hsl(var(--sage))]/30 bg-[hsl(var(--sage))]/5 text-foreground hover:bg-[hsl(var(--sage))]/10 cursor-pointer"
+                        : "border-border bg-paper/30 text-muted-foreground cursor-not-allowed opacity-70",
               )}
             >
               <div className="truncate font-mono text-[10px]">{ps.patient_id}</div>
               <div className="mt-0.5 text-[10px] text-muted-foreground">
                 {ps.oracle_done
                   ? "validated"
-                  : draftReady
-                    ? isAdherence
-                      ? "answers ready"
-                      : isNer
-                        ? "spans ready"
-                        : hasDisagreements
-                          ? "disagreements"
-                          : "all agreed"
-                    : "running…"}
+                  : errored
+                    ? "errored"
+                    : draftReady
+                      ? isAdherence
+                        ? "answers ready"
+                        : isNer
+                          ? "spans ready"
+                          : hasDisagreements
+                            ? "disagreements"
+                            : "all agreed"
+                      : "running…"}
               </div>
             </button>
           );

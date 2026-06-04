@@ -201,6 +201,8 @@ export const pilotReadRoutes: RouteEntry[] = [
       const patient_status = patientIds.map((pid) => {
         const perPatient = runStatus?.per_patient?.[pid];
         const agentDone = perPatient?.state === "complete";
+        const errored = perPatient?.state === "error";
+        const errorMessage = errored ? (perPatient?.error ?? null) : null;
         const reviewPath = path.join(reviewsRootDir, pid, taskId, "review_state.json");
         let validated = false;
         let reviewerTouched = false;
@@ -219,6 +221,7 @@ export const pilotReadRoutes: RouteEntry[] = [
         return {
           patient_id: pid, agent_done: agentDone, oracle_done: validated,
           in_progress: reviewerTouched && !validated,
+          errored, error_message: errorMessage,
         };
       });
       return { manifest: m, critique, patient_status };
