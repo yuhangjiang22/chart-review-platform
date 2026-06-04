@@ -32,7 +32,7 @@ interface AgentConfigPanelProps {
 const QUICK_PICK_MODELS = [
   "anthropic/claude-haiku-4.5",
   "anthropic/claude-sonnet-4-6",
-  "openai/gpt-5.2",
+  "gpt-5.2",
   "gpt-4o",
   "deepseek/deepseek-v4-pro",
   "deepseek/deepseek-v4-flash",
