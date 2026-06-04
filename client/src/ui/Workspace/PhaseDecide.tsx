@@ -3,6 +3,7 @@ import { Lock, Pencil, Sparkles } from "lucide-react";
 import type { CellCounts } from "./phase-logic";
 import { ImprovementProposalsPanel } from "./ImprovementProposalsPanel";
 import { AdherenceDecideSummary } from "./AdherenceDecideSummary";
+import { NerDecideSummary } from "./NerDecideSummary";
 
 interface PhaseDecideProps {
   taskId: string;
@@ -119,6 +120,13 @@ export function PhaseDecide({
        *  primary signal for whether the skill is ready to lock. */}
       {taskKind === "adherence" && iterId && (
         <AdherenceDecideSummary taskId={taskId} iterId={iterId} />
+      )}
+
+      {/* NER — per-agent precision / recall / F1 against reviewer's
+       *  validated span_labels. Same role as AdherenceDecideSummary
+       *  above for the adherence path. */}
+      {taskKind === "ner" && iterId && (
+        <NerDecideSummary taskId={taskId} iterId={iterId} />
       )}
 
       {/* Suggestions panel — one compact Improve trigger above; the
