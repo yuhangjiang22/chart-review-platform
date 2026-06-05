@@ -58,12 +58,36 @@ interface PhaseTryProps {
 export function PhaseTry({
   taskId, onAdvanceToValidate, activeSessionId, onOpenNewSession,
 }: PhaseTryProps) {
+  // Session manifest — source of truth for cohort + agent_specs.
+  // Loaded fresh whenever activeSessionId changes.
+  const [sessionCohort, setSessionCohort] = useState<string[]>([]);
+  const [sessionAgentSpecs, setSessionAgentSpecs] = useState<AgentSpecForm[]>([]);
+  const [sessionName, setSessionName] = useState<string>("");
   const [patients, setPatients] = useState<Patient[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [agentSpecs, setAgentSpecs] = useState<AgentSpecForm[]>([
     { id: "agent_1", search_mode_preset: "smart-search", interpretation_preset: "default" },
     { id: "agent_2", search_mode_preset: "smart-search", interpretation_preset: "skeptical" },
   ]);
+
+  // Load session manifest when activeSessionId changes.
+  useEffect(() => {
+    if (!activeSessionId) {
+      setSessionCohort([]); setSessionAgentSpecs([]); setSessionName("");
+      return;
+    }
+    let cancelled = false;
+    authFetch(`/api/sessions/${encodeURIComponent(taskId)}/${encodeURIComponent(activeSessionId)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (cancelled || !d?.session) return;
+        setSessionCohort(d.session.cohort?.patient_ids ?? []);
+        setSessionAgentSpecs(d.session.default_agent_specs ?? []);
+        setSessionName(d.session.name ?? "");
+      })
+      .catch(() => { /* swallow; UI shows empty boxes */ });
+    return () => { cancelled = true; };
+  }, [taskId, activeSessionId]);
   const [activeIter, setActiveIter] = useState<IterListing | null>(null);
   const [activeIterPatients, setActiveIterPatients] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
@@ -284,15 +308,14 @@ export function PhaseTry({
     );
   }
 
-  // Branch B: no live run inside this session — render a session readout
-  // (cohort + agents) and a single "Start iter" CTA. The cohort and
-  // agent_specs are LOCKED at session creation — the user can't edit them
-  // here. This is what makes iter-to-iter F1 comparison meaningful.
+  // Branch B: no live run inside this session — render the session's
+  // LOCKED cohort + agents (read from the session manifest, NOT from
+  // workspace state) and a "Start iter" CTA.
   return (
     <div className="mx-auto max-w-[640px] space-y-6 py-6">
       <div>
         <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-          Session-locked configuration
+          Session-locked configuration {sessionName && `· ${sessionName}`}
         </div>
         <p className="mt-1 text-[12.5px] text-muted-foreground">
           Cohort and agents are fixed for this session. To change them,
@@ -302,27 +325,46 @@ export function PhaseTry({
 
       <div className="rounded-md border border-border bg-paper/40 px-4 py-3">
         <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-1">
-          Cohort ({activeIterPatients.length || patients.length} patient{(activeIterPatients.length || patients.length) === 1 ? "" : "s"})
+          Cohort ({sessionCohort.length} patient{sessionCohort.length === 1 ? "" : "s"})
         </div>
-        <div className="max-h-[140px] overflow-y-auto font-mono text-[11.5px] text-ink space-y-0.5">
-          {(activeIterPatients.length > 0 ? activeIterPatients : patients.map((p) => p.patient_id)).map((pid) => (
-            <div key={pid} className="truncate">{pid}</div>
-          ))}
-        </div>
+        {sessionCohort.length === 0 ? (
+          <div className="text-[12px] text-muted-foreground italic">
+            (loading session…)
+          </div>
+        ) : (
+          <div className="max-h-[140px] overflow-y-auto font-mono text-[11.5px] text-ink space-y-0.5">
+            {sessionCohort.map((pid) => (
+              <div key={pid} className="truncate">{pid}</div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="rounded-md border border-border bg-paper/40 px-4 py-3">
         <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-1">
-          Agents ({agentSpecs.length})
+          Agents ({sessionAgentSpecs.length})
         </div>
-        <div className="text-[12px] font-mono text-ink space-y-1">
-          {agentSpecs.map((s) => (
-            <div key={s.id} className="truncate">
-              <span className="text-muted-foreground">{s.id}:</span>{" "}
-              {[s.search_mode_preset, s.interpretation_preset, s.model].filter(Boolean).join(" · ") || "(defaults)"}
-            </div>
-          ))}
-        </div>
+        {sessionAgentSpecs.length === 0 ? (
+          <div className="text-[12px] text-muted-foreground italic">
+            (loading session…)
+          </div>
+        ) : (
+          <div className="text-[12px] font-mono text-ink space-y-1">
+            {sessionAgentSpecs.map((s) => {
+              const parts = [
+                s.search_mode_preset,
+                s.interpretation_preset,
+                s.model || "(server default model)",
+              ].filter(Boolean);
+              return (
+                <div key={s.id} className="truncate">
+                  <span className="text-muted-foreground">{s.id}:</span>{" "}
+                  {parts.join(" · ")}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {error && <div className="text-[12px] text-[hsl(var(--oxblood))]">{error}</div>}
@@ -331,7 +373,7 @@ export function PhaseTry({
         <Button
           size="sm"
           className="gap-1.5"
-          disabled={busy}
+          disabled={busy || sessionCohort.length === 0}
           onClick={() => startRun()}
         >
           <Play size={12} strokeWidth={1.75} />
