@@ -9,9 +9,9 @@
 // Collapses to a thin (32px) right gutter via a toggle. Open state
 // persisted to localStorage keyed by taskId.
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { cn } from "@/lib/utils";
-import { ChevronRight, ChevronLeft, FileText } from "lucide-react";
+import { ChevronRight, ChevronLeft, FileText, ChevronDown } from "lucide-react";
 import { authFetch } from "../../auth";
 
 interface AgentSpecLite {
@@ -146,31 +146,19 @@ export function SessionSidebar({
             </div>
           </div>
 
-          {/* Cohort */}
+          {/* Cohort — expandable per-patient file tree */}
           <div>
             <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground mb-1">
               Cohort ({session.cohort.patient_ids.length})
             </div>
-            <div className="space-y-0.5 max-h-[180px] overflow-y-auto">
-              {session.cohort.patient_ids.map((pid) => {
-                const st = patientStatus[pid];
-                const tone = st?.errored
-                  ? "text-[hsl(var(--oxblood))]"
-                  : st?.oracle_done
-                    ? "text-[hsl(var(--sage))]"
-                    : "text-muted-foreground";
-                const dot = st?.errored
-                  ? "bg-[hsl(var(--oxblood))]"
-                  : st?.oracle_done
-                    ? "bg-[hsl(var(--sage))]"
-                    : "bg-muted-foreground/30";
-                return (
-                  <div key={pid} className="flex items-center gap-1.5">
-                    <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", dot)} />
-                    <span className={cn("font-mono text-[11px] truncate", tone)}>{pid}</span>
-                  </div>
-                );
-              })}
+            <div className="space-y-0.5 max-h-[280px] overflow-y-auto">
+              {session.cohort.patient_ids.map((pid) => (
+                <PatientRow
+                  key={pid}
+                  patientId={pid}
+                  status={patientStatus[pid]}
+                />
+              ))}
             </div>
           </div>
 
@@ -245,5 +233,116 @@ export function SessionSidebar({
         </div>
       )}
     </aside>
+  );
+}
+
+interface NoteListing { filename: string; date?: string; doctype?: string }
+
+function PatientRow({
+  patientId, status,
+}: { patientId: string; status?: { oracle_done: boolean; errored?: boolean } }) {
+  const [expanded, setExpanded] = useState(false);
+  const [notes, setNotes] = useState<NoteListing[] | null>(null);
+  const [omopTables, setOmopTables] = useState<Array<{ name: string; rows: number }> | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const load = useCallback(async () => {
+    if (notes !== null && omopTables !== null) return;
+    setLoading(true);
+    try {
+      const [notesR, structR] = await Promise.all([
+        authFetch(`/api/patients/${encodeURIComponent(patientId)}/notes`)
+          .then((r) => (r.ok ? r.json() : [])),
+        authFetch(`/api/patients/${encodeURIComponent(patientId)}/structured`)
+          .then((r) => (r.ok ? r.json() : null)),
+      ]);
+      setNotes(Array.isArray(notesR) ? notesR : []);
+      if (structR && typeof structR === "object") {
+        const tables: Array<{ name: string; rows: number }> = [];
+        for (const [k, v] of Object.entries(structR)) {
+          if (Array.isArray(v)) tables.push({ name: k, rows: v.length });
+        }
+        tables.sort((a, b) => a.name.localeCompare(b.name));
+        setOmopTables(tables);
+      } else {
+        setOmopTables([]);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [patientId, notes, omopTables]);
+
+  const tone = status?.errored
+    ? "text-[hsl(var(--oxblood))]"
+    : status?.oracle_done
+      ? "text-[hsl(var(--sage))]"
+      : "text-muted-foreground";
+  const dot = status?.errored
+    ? "bg-[hsl(var(--oxblood))]"
+    : status?.oracle_done
+      ? "bg-[hsl(var(--sage))]"
+      : "bg-muted-foreground/30";
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => {
+          const next = !expanded;
+          setExpanded(next);
+          if (next) void load();
+        }}
+        className="w-full flex items-center gap-1.5 py-0.5 hover:bg-paper/60 rounded"
+      >
+        {expanded
+          ? <ChevronDown size={10} strokeWidth={1.75} className="text-muted-foreground shrink-0" />
+          : <ChevronRight size={10} strokeWidth={1.75} className="text-muted-foreground shrink-0" />}
+        <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", dot)} />
+        <span className={cn("font-mono text-[11px] truncate text-left", tone)}>{patientId}</span>
+      </button>
+      {expanded && (
+        <div className="ml-4 mt-0.5 mb-1 space-y-1">
+          {loading && (
+            <div className="text-[10px] text-muted-foreground italic">loading…</div>
+          )}
+          {!loading && notes && (
+            <div>
+              <div className="text-[9.5px] uppercase tracking-[0.1em] text-muted-foreground/80">
+                notes ({notes.length})
+              </div>
+              {notes.length === 0 ? (
+                <div className="text-[10px] text-muted-foreground/70 italic ml-1">no notes</div>
+              ) : (
+                <div className="ml-1 space-y-px">
+                  {notes.map((n) => (
+                    <div key={n.filename} className="font-mono text-[10px] text-muted-foreground truncate">
+                      {n.filename}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          {!loading && omopTables && (
+            <div>
+              <div className="text-[9.5px] uppercase tracking-[0.1em] text-muted-foreground/80">
+                omop ({omopTables.length})
+              </div>
+              {omopTables.length === 0 ? (
+                <div className="text-[10px] text-muted-foreground/70 italic ml-1">no structured data</div>
+              ) : (
+                <div className="ml-1 space-y-px">
+                  {omopTables.map((t) => (
+                    <div key={t.name} className="font-mono text-[10px] text-muted-foreground">
+                      {t.name} <span className="text-muted-foreground/60">({t.rows})</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
