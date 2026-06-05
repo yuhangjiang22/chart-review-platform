@@ -108,13 +108,12 @@ export function NewSessionDialog({
       const sessionBody = await r1.json() as { session: { session_id: string } };
       const sessionId = sessionBody.session.session_id;
 
-      // 2. Kick off the first iter for this session.
+      // 2. Kick off the first iter for this session. Cohort + agents come
+      // from the session (strict lock); we only pass session_id + notes.
       const r2 = await authFetch(`/api/pilots/${encodeURIComponent(taskId)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          patient_ids: patientIds,
-          agent_specs: apiSpecs,
           session_id: sessionId,
           notes: notes.trim() || undefined,
         }),

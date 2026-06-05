@@ -179,23 +179,18 @@ export function PhaseTry({
 
   // ── Actions ───────────────────────────────────────────────────────────────
 
-  async function startRun(patientIds: string[]) {
-    if (patientIds.length === 0) {
-      setError("Select at least one patient.");
-      return;
-    }
+  async function startRun() {
     if (!activeSessionId) {
       setError("No active session. Start a session first (top bar → Start new session).");
       return;
     }
     setBusy(true);
     setError(null);
+    // Cohort + agents come from the session (strict lock); we only pass session_id.
     const r = await authFetch(`/api/pilots/${encodeURIComponent(taskId)}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        patient_ids: patientIds,
-        agent_specs: agentSpecs,
         session_id: activeSessionId,
       }),
     });
@@ -289,39 +284,58 @@ export function PhaseTry({
     );
   }
 
+  // Branch B: no live run inside this session — render a session readout
+  // (cohort + agents) and a single "Start iter" CTA. The cohort and
+  // agent_specs are LOCKED at session creation — the user can't edit them
+  // here. This is what makes iter-to-iter F1 comparison meaningful.
   return (
-    <div className="space-y-8">
-      <PatientPicker
-        patients={patients}
-        selected={selected}
-        onChange={setSelected}
-      />
+    <div className="mx-auto max-w-[640px] space-y-6 py-6">
+      <div>
+        <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+          Session-locked configuration
+        </div>
+        <p className="mt-1 text-[12.5px] text-muted-foreground">
+          Cohort and agents are fixed for this session. To change them,
+          start a new session.
+        </p>
+      </div>
 
-      <Separator />
+      <div className="rounded-md border border-border bg-paper/40 px-4 py-3">
+        <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-1">
+          Cohort ({activeIterPatients.length || patients.length} patient{(activeIterPatients.length || patients.length) === 1 ? "" : "s"})
+        </div>
+        <div className="max-h-[140px] overflow-y-auto font-mono text-[11.5px] text-ink space-y-0.5">
+          {(activeIterPatients.length > 0 ? activeIterPatients : patients.map((p) => p.patient_id)).map((pid) => (
+            <div key={pid} className="truncate">{pid}</div>
+          ))}
+        </div>
+      </div>
 
-      <AgentConfigPanel value={agentSpecs} onChange={setAgentSpecs} />
+      <div className="rounded-md border border-border bg-paper/40 px-4 py-3">
+        <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-1">
+          Agents ({agentSpecs.length})
+        </div>
+        <div className="text-[12px] font-mono text-ink space-y-1">
+          {agentSpecs.map((s) => (
+            <div key={s.id} className="truncate">
+              <span className="text-muted-foreground">{s.id}:</span>{" "}
+              {[s.search_mode_preset, s.interpretation_preset, s.model].filter(Boolean).join(" · ") || "(defaults)"}
+            </div>
+          ))}
+        </div>
+      </div>
 
       {error && <div className="text-[12px] text-[hsl(var(--oxblood))]">{error}</div>}
 
-      <div className="flex items-center justify-end gap-3">
-        <span className="text-[12px] text-muted-foreground">
-          {selected.length} patient{selected.length === 1 ? "" : "s"} selected
-        </span>
+      <div className="flex justify-end">
         <Button
           size="sm"
           className="gap-1.5"
-          disabled={busy || selected.length === 0}
-          onClick={() => startRun(selected)}
+          disabled={busy}
+          onClick={() => startRun()}
         >
           <Play size={12} strokeWidth={1.75} />
-          {busy
-            ? "Starting…"
-            : (() => {
-                const nA = agentSpecs.length;
-                const nP = selected.length;
-                const totalRuns = nA * nP;
-                return `Run ${nA} agent${nA === 1 ? "" : "s"} on ${nP} patient${nP === 1 ? "" : "s"} (${totalRuns} run${totalRuns === 1 ? "" : "s"})`;
-              })()}
+          {busy ? "Starting…" : "Start iter"}
         </Button>
       </div>
     </div>

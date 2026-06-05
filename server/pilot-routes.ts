@@ -290,19 +290,15 @@ export const pilotWriteRoutes: RouteEntry[] = [
     handler: async (body, req, p) => {
       const reviewerId = gateMethodologist(req, "starting a pilot");
       const {
-        patient_ids, notes, max_concurrency, max_turns_per_patient,
-        cost_cap_usd, agent_specs, provider, model, session_id,
+        notes, max_concurrency, max_turns_per_patient,
+        cost_cap_usd, provider, model, session_id,
       } = (body ?? {}) as {
-        patient_ids?: string[]; notes?: string;
+        notes?: string;
         max_concurrency?: number; max_turns_per_patient?: number;
-        cost_cap_usd?: number; agent_specs?: unknown;
+        cost_cap_usd?: number;
         provider?: string; model?: string; session_id?: string;
       };
-      if (!Array.isArray(patient_ids) || patient_ids.length === 0) {
-        const err = new Error("non-empty patient_ids required") as Error & { status: number };
-        err.status = 400;
-        throw err;
-      }
+
       // Validate provider when set; "default" / undefined → let server
       // fall back to AGENT_PROVIDER env var.
       let resolvedProvider: "claude" | "codex" | undefined;
@@ -313,11 +309,10 @@ export const pilotWriteRoutes: RouteEntry[] = [
         }
         resolvedProvider = provider;
       }
+
       // session_id is REQUIRED. Every iter must belong to a session — this
       // enforces "session is necessary to run on a patient" at the data
-      // layer so no future UI path can silently bypass it. Note: run-again
-      // is a separate route that carries session_id forward from the source
-      // iter; legacy ungrouped iters can be re-run there without a session.
+      // layer so no future UI path can silently bypass it.
       if (!session_id) {
         const err = new Error(
           "session_id is required — start a session first (POST /api/sessions/:taskId), "
@@ -334,19 +329,35 @@ export const pilotWriteRoutes: RouteEntry[] = [
         const err = new Error(`session ${session_id} is archived; start a new session`) as Error & { status: number };
         err.status = 400; throw err;
       }
-      const resolvedSessionId = session_id;
+
+      // STRICT LOCK: cohort + agent_specs come from the SESSION, not the
+      // request body. This is the invariant that makes iter-to-iter F1
+      // comparison meaningful: between iter_001 and iter_002 of the same
+      // session, the ONLY variable that changed is the rubric the
+      // methodologist edited. If we let the request override cohort or
+      // agents, that signal is gone and the score delta could be from
+      // anywhere.
+      //
+      // Want a different cohort or different models? Start a new session.
+      const lockedPatientIds = session.cohort.patient_ids;
+      if (lockedPatientIds.length === 0) {
+        const err = new Error(`session ${session_id} has an empty cohort`) as Error & { status: number };
+        err.status = 400; throw err;
+      }
+      const lockedAgentSpecs = session.default_agent_specs;
+
       return startPilotIteration({
         task_id: p.taskId,
-        patient_ids,
+        patient_ids: lockedPatientIds,
         started_by: reviewerId,
         notes,
         max_concurrency,
         max_turns_per_patient,
         cost_cap_usd,
-        agent_specs: agent_specs as Parameters<typeof startPilotIteration>[0]["agent_specs"],
+        agent_specs: lockedAgentSpecs,
         provider: resolvedProvider,
         model: typeof model === "string" && model.trim().length > 0 ? model.trim() : undefined,
-        session_id: resolvedSessionId,
+        session_id,
         onRunStatus: onPilotRunStatus,
       });
     },
@@ -374,15 +385,39 @@ export const pilotWriteRoutes: RouteEntry[] = [
         throw err;
       }
       const { notes } = (body ?? {}) as { notes?: string };
+
+      // STRICT LOCK: when the source iter belongs to a session, the
+      // re-run uses the session's locked cohort + agent_specs (NOT the
+      // source iter's stored values, which could drift if the session
+      // was edited — they shouldn't be, but defense in depth). For
+      // legacy ungrouped iters, fall back to the source iter's values.
+      let lockedPatientIds: string[];
+      let lockedAgentSpecs: typeof run.agent_specs;
+      if (m.session_id) {
+        const session = getSessionManifest(p.taskId, m.session_id);
+        if (!session) {
+          const err = new Error(`source iter's session ${m.session_id} not found`) as Error & { status: number };
+          err.status = 400; throw err;
+        }
+        if (session.state !== "active") {
+          const err = new Error(`session ${m.session_id} is archived; start a new session`) as Error & { status: number };
+          err.status = 400; throw err;
+        }
+        lockedPatientIds = session.cohort.patient_ids;
+        lockedAgentSpecs = session.default_agent_specs;
+      } else {
+        lockedPatientIds = run.patient_ids;
+        lockedAgentSpecs = run.agent_specs;
+      }
+
       return startPilotIteration({
         task_id: p.taskId,
-        patient_ids: run.patient_ids,
+        patient_ids: lockedPatientIds,
         started_by: reviewerId,
         notes: notes ?? `Run again on cohort from ${p.iterId}`,
-        agent_specs: run.agent_specs,
+        agent_specs: lockedAgentSpecs,
         // Carry the session_id forward so the new iter stays inside the
-        // same session as its source. Without this, "Run again" from an
-        // in-session iter would silently create a legacy ungrouped iter.
+        // same session as its source.
         session_id: m.session_id,
         onRunStatus: onPilotRunStatus,
       });
