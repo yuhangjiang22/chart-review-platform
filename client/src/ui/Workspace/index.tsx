@@ -22,6 +22,8 @@ import { PhaseValidate } from "./PhaseValidate";
 import { PhaseDecide } from "./PhaseDecide";
 import { PhaseLock } from "./PhaseLock";
 import { PhaseDeploy } from "./PhaseDeploy";
+import { SessionSwitcher, type SessionListItem } from "./SessionSwitcher";
+import { NewSessionDialog } from "./NewSessionDialog";
 
 // Legacy-tabs secondary nav — only shown in "Show all tools" mode.
 // These are the tabs that do not have a dedicated phase home in the new shell.
@@ -183,6 +185,42 @@ export function Workspace({
   // active iter. Reviewer's persisted answers carry forward as the gold
   // standard, so the next iter scores automatically.
   const [isRunningAgain, setIsRunningAgain] = useState(false);
+
+  // ── Sessions (fixed-cohort grouping above iters) ──────────────────────────
+  const [sessions, setSessions] = useState<SessionListItem[]>([]);
+  const sessionStorageKey = `chart-review:active-session:${taskId}`;
+  const [activeSessionId, setActiveSessionIdState] = useState<string | null>(() => {
+    try { return localStorage.getItem(sessionStorageKey); } catch { return null; }
+  });
+  const [newSessionOpen, setNewSessionOpen] = useState(false);
+
+  function setActiveSessionId(sid: string | null) {
+    setActiveSessionIdState(sid);
+    try {
+      if (sid) localStorage.setItem(sessionStorageKey, sid);
+      else localStorage.removeItem(sessionStorageKey);
+    } catch { /* ignore quota errors */ }
+  }
+
+  const refreshSessions = useCallback(async () => {
+    const r = await authFetch(`/api/sessions/${encodeURIComponent(taskId)}`);
+    if (!r.ok) return;
+    const body = await r.json() as { sessions: SessionListItem[] };
+    setSessions(body.sessions);
+    // If active session no longer exists, fall back to the newest active.
+    if (activeSessionId
+        && !body.sessions.some((s) => s.session.session_id === activeSessionId)) {
+      const firstActive = body.sessions.find((s) => s.session.state === "active");
+      setActiveSessionId(firstActive?.session.session_id ?? null);
+    }
+  // activeSessionId intentionally excluded — refresh should not loop on its
+  // own setState. Including it would re-run refresh after every session
+  // switch and possibly clobber the user's manual selection mid-fetch.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taskId]);
+
+  useEffect(() => { void refreshSessions(); }, [refreshSessions]);
+
   async function runImprovement() {
     if (isImproving) return;
     // Cohort selection differs by task_kind:
@@ -503,7 +541,7 @@ export function Workspace({
 
   return (
     <div className="mx-auto max-w-[1240px] animate-rise-in space-y-0">
-      {/* Top bar: pill bar + toggle */}
+      {/* Top bar: pill bar + session switcher + toggle */}
       <div className="flex items-center justify-between gap-4 border-b border-border/60 pb-2">
         <PhasePillBar
           activePhase={activePhase}
@@ -512,8 +550,27 @@ export function Workspace({
           onPhaseClick={(phase) => setPhase(phase)}
           enabledPhases={enabledPhases ?? undefined}
         />
-        <WorkspaceSettings taskId={taskId} onShowAllToolsChange={setShowAllTools} />
+        <div className="flex items-center gap-3">
+          <SessionSwitcher
+            sessions={sessions}
+            activeSessionId={activeSessionId}
+            onSelect={setActiveSessionId}
+            onNewSession={() => setNewSessionOpen(true)}
+          />
+          <WorkspaceSettings taskId={taskId} onShowAllToolsChange={setShowAllTools} />
+        </div>
       </div>
+
+      <NewSessionDialog
+        open={newSessionOpen}
+        onClose={() => setNewSessionOpen(false)}
+        taskId={taskId}
+        availablePatientIds={iterDetail?.patient_status.map((p) => p.patient_id) ?? []}
+        onCreated={async (sid) => {
+          await refreshSessions();
+          setActiveSessionId(sid);
+        }}
+      />
 
       {/* Phase headline */}
       <div className="pt-3 pb-1">
