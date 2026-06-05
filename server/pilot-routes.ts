@@ -344,7 +344,7 @@ export const pilotWriteRoutes: RouteEntry[] = [
         const err = new Error(`session ${session_id} has an empty cohort`) as Error & { status: number };
         err.status = 400; throw err;
       }
-      const lockedAgentSpecs = session.default_agent_specs;
+      const lockedAgentSpecs = session.agent_specs;
 
       return startPilotIteration({
         task_id: p.taskId,
@@ -404,7 +404,7 @@ export const pilotWriteRoutes: RouteEntry[] = [
           err.status = 400; throw err;
         }
         lockedPatientIds = session.cohort.patient_ids;
-        lockedAgentSpecs = session.default_agent_specs;
+        lockedAgentSpecs = session.agent_specs;
       } else {
         lockedPatientIds = run.patient_ids;
         lockedAgentSpecs = run.agent_specs;

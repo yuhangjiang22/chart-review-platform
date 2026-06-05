@@ -140,12 +140,17 @@ export const sessionRoutes: RouteEntry[] = [
         err.status = 400;
         throw err;
       }
-      const { name, patient_ids, notes, default_agent_specs } = (body ?? {}) as {
+      // Accept either `agent_specs` (canonical) or `default_agent_specs`
+      // (legacy alias from the pre-strict-lock era). Drop the alias once
+      // all callers update.
+      const { name, patient_ids, notes, agent_specs, default_agent_specs } = (body ?? {}) as {
         name?: string;
         patient_ids?: string[];
         notes?: string;
+        agent_specs?: AgentSpec[];
         default_agent_specs?: AgentSpec[];
       };
+      const specs = agent_specs ?? default_agent_specs;
       if (!name || typeof name !== "string" || name.trim().length === 0) {
         const err = new Error("name is required") as Error & { status: number };
         err.status = 400;
@@ -163,7 +168,7 @@ export const sessionRoutes: RouteEntry[] = [
           started_by: reviewerId,
           patient_ids,
           notes,
-          default_agent_specs,
+          agent_specs: specs,
         });
         return { session: m };
       } catch (e) {

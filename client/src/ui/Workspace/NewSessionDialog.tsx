@@ -137,7 +137,7 @@ export function NewSessionDialog({
           name: name.trim(),
           patient_ids: patientIds,
           notes: notes.trim() || undefined,
-          default_agent_specs: apiSpecs,
+          agent_specs: apiSpecs,
         }),
       });
       if (!r1.ok) {

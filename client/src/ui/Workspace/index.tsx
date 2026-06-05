@@ -754,17 +754,18 @@ export function Workspace({
 
 function pickActiveIter(
   pilots: PilotIterListing[],
-  activeSessionId?: string | null,
+  activeSessionId: string | null,
 ): PilotIterListing | null {
-  let candidates = pilots.filter((p) => p.state !== "abandoned");
-  // When a session filter is provided, ONLY iters belonging to that
-  // session count. activeSessionId=null/undefined means "no session
-  // selected" → return null so no iter from any session leaks into
-  // the current view.
-  if (arguments.length >= 2) {
-    if (!activeSessionId) return null;
-    candidates = candidates.filter((p) => p.session_id === activeSessionId);
-  }
+  // activeSessionId is REQUIRED — callers must pass null explicitly when
+  // no session is selected, so they think about session scoping rather
+  // than silently returning a cross-session iter. Previously this used
+  // `arguments.length` to distinguish "no filter" from "null filter",
+  // which was both ugly and exactly the trap that surfaced as the
+  // "session 1 shows iter_010 from session_001" bug.
+  if (!activeSessionId) return null;
+  const candidates = pilots.filter(
+    (p) => p.state !== "abandoned" && p.session_id === activeSessionId,
+  );
   if (candidates.length === 0) return null;
   return [...candidates].sort((a, b) => b.iter_num - a.iter_num)[0];
 }

@@ -82,7 +82,9 @@ export function PhaseTry({
       .then((d) => {
         if (cancelled || !d?.session) return;
         setSessionCohort(d.session.cohort?.patient_ids ?? []);
-        setSessionAgentSpecs(d.session.default_agent_specs ?? []);
+        // Accept either field name — old manifests on disk still have
+        // `default_agent_specs`; new ones use `agent_specs`.
+        setSessionAgentSpecs(d.session.agent_specs ?? d.session.default_agent_specs ?? []);
         setSessionName(d.session.name ?? "");
       })
       .catch(() => { /* swallow; UI shows empty boxes */ });

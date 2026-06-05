@@ -48,11 +48,20 @@ export interface SessionManifest {
   state: SessionState;
   ended_at?: string;
   cohort: { patient_ids: string[] };
-  /** Default agent_specs for iters started under this session. Iters may
-   *  override per-spec but inherit this as their starting point. */
+  /** Agent_specs locked at session creation. Iters started under this
+   *  session use these verbatim — no per-iter overrides allowed. */
+  agent_specs?: AgentSpec[];
+  /**
+   * @deprecated v0.x — renamed to `agent_specs` after the strict lock.
+   * Old manifests on disk may still carry this field; the reader
+   * accepts either name. Will be dropped after one migration window.
+   */
   default_agent_specs?: AgentSpec[];
-  /** Git SHA (or content hash) of the skill at session start. Lets you
-   *  see how the skill drifted across the session's lifetime. */
+  /** Skill content-hash at session start. Captured for the audit trail
+   *  ("this session began on rubric X"); NOT used to gate iters —
+   *  rubric edits during the session are intentional (that's the inner
+   *  loop). The current rubric SHA is recorded per-iter as
+   *  PilotManifest.guideline_sha. */
   skill_snapshot_sha: string;
 }
 
@@ -89,7 +98,15 @@ export function getSessionManifest(
   const p = sessionManifestPath(taskId, sessionId);
   if (!fs.existsSync(p)) return null;
   try {
-    return JSON.parse(fs.readFileSync(p, "utf8")) as SessionManifest;
+    const m = JSON.parse(fs.readFileSync(p, "utf8")) as SessionManifest;
+    // Back-compat: manifests written before the agent_specs rename used
+    // `default_agent_specs`. Promote the legacy field if the new one is
+    // absent. Don't write back — let the next archive/update touch
+    // migrate naturally.
+    if (!m.agent_specs && m.default_agent_specs) {
+      m.agent_specs = m.default_agent_specs;
+    }
+    return m;
   } catch {
     return null;
   }
@@ -138,7 +155,7 @@ export interface CreateSessionInput {
   started_by: string;
   patient_ids: string[];
   notes?: string;
-  default_agent_specs?: AgentSpec[];
+  agent_specs?: AgentSpec[];
 }
 
 export function createSession(input: CreateSessionInput): SessionManifest {
@@ -159,7 +176,7 @@ export function createSession(input: CreateSessionInput): SessionManifest {
     started_by: input.started_by,
     state: "active",
     cohort: { patient_ids: [...input.patient_ids] },
-    default_agent_specs: input.default_agent_specs,
+    agent_specs: input.agent_specs,
     skill_snapshot_sha: computeTaskSha(guidelineDir(input.task_id)),
   };
   writeManifestAtomic(input.task_id, manifest);
