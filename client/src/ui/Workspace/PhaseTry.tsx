@@ -19,6 +19,8 @@ interface Patient {
 interface IterListing {
   iter_id: string;
   iter_num: number;
+  /** Session this iter belongs to. Absent on legacy/pre-session iters. */
+  session_id?: string;
   state: "running" | "ready_to_validate" | "complete" | "abandoned" | string;
   run_status: "running" | "complete" | "complete_with_errors" | "failed" | string | null;
   n_complete?: number;
@@ -70,13 +72,24 @@ export function PhaseTry({
   // ── Loaders ───────────────────────────────────────────────────────────────
 
   const loadActiveIter = useCallback(async () => {
+    // No active session → no run is "current" for this view. The gate
+    // below renders instead of any iter status.
+    if (!activeSessionId) {
+      setActiveIter(null);
+      setActiveIterPatients([]);
+      return;
+    }
     const r = await authFetch(`/api/pilots/${encodeURIComponent(taskId)}`);
     if (!r.ok) {
       setActiveIter(null);
       return;
     }
     const iters: IterListing[] = await r.json();
-    const live = iters.find((i) => i.state !== "abandoned") ?? null;
+    // Only iters that belong to the active session count. Legacy iters
+    // (no session_id) and iters from other sessions are filtered out so
+    // they don't bleed into the current view.
+    const sessionIters = iters.filter((i) => i.session_id === activeSessionId);
+    const live = sessionIters.find((i) => i.state !== "abandoned") ?? null;
     setActiveIter(live);
     if (live) {
       const d = await authFetch(
@@ -89,7 +102,7 @@ export function PhaseTry({
     } else {
       setActiveIterPatients([]);
     }
-  }, [taskId]);
+  }, [taskId, activeSessionId]);
 
   // Load corpus + initial selection. Default chain (first hit wins):
   //   1. live iter's patients (handled by the activeIter sync effect below)
@@ -232,25 +245,10 @@ export function PhaseTry({
 
   // ── Render ────────────────────────────────────────────────────────────────
 
-  // Branch A: a run is in flight or just completed
-  if (activeIter && activeIter.state !== "abandoned") {
-    return (
-      <RunStatusCard
-        iter={activeIter}
-        patientIds={activeIterPatients}
-        agentSpecs={agentSpecs}
-        onStop={stopRun}
-        onOverride={overrideRun}
-        onValidate={onAdvanceToValidate}
-        busy={busy}
-        error={error}
-      />
-    );
-  }
-
-  // Branch B: no live run — show the form, gated on having an active session.
-  // Every iter must belong to a session; without one, the start button is
-  // disabled and we show a CTA pointing to "Start new session" in the top bar.
+  // Gate first: no active session → no run visible, no form. The user
+  // must start a session before anything in TRY renders. This is the
+  // "no session, no run" invariant the methodologist asked for —
+  // including hiding any legacy in-flight runs from other sessions.
   if (!activeSessionId) {
     return (
       <div className="mx-auto max-w-[520px] py-12 space-y-4 text-center">
@@ -272,6 +270,22 @@ export function PhaseTry({
           </Button>
         )}
       </div>
+    );
+  }
+
+  // Branch A: a run is in flight or just completed (within this session).
+  if (activeIter && activeIter.state !== "abandoned") {
+    return (
+      <RunStatusCard
+        iter={activeIter}
+        patientIds={activeIterPatients}
+        agentSpecs={agentSpecs}
+        onStop={stopRun}
+        onOverride={overrideRun}
+        onValidate={onAdvanceToValidate}
+        busy={busy}
+        error={error}
+      />
     );
   }
 
