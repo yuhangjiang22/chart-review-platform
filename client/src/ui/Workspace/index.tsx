@@ -24,6 +24,7 @@ import { PhaseLock } from "./PhaseLock";
 import { PhaseDeploy } from "./PhaseDeploy";
 import { SessionSwitcher, type SessionListItem } from "./SessionSwitcher";
 import { NewSessionDialog } from "./NewSessionDialog";
+import { SessionSidebar } from "./SessionSidebar";
 
 // Legacy-tabs secondary nav — only shown in "Show all tools" mode.
 // These are the tabs that do not have a dedicated phase home in the new shell.
@@ -202,6 +203,21 @@ export function Workspace({
       if (sid) localStorage.setItem(sessionStorageKey, sid);
       else localStorage.removeItem(sessionStorageKey);
     } catch { /* ignore quota errors */ }
+  }
+
+  // Sidebar open/closed — persisted per session (so closing on a small
+  // viewport doesn't blow it away on the next page load).
+  const sidebarStorageKey = `chart-review:sidebar-open:${taskId}`;
+  const [sidebarOpen, setSidebarOpenState] = useState<boolean>(() => {
+    try {
+      const v = localStorage.getItem(sidebarStorageKey);
+      return v === null ? true : v === "1";
+    } catch { return true; }
+  });
+  function setSidebarOpen(open: boolean) {
+    setSidebarOpenState(open);
+    try { localStorage.setItem(sidebarStorageKey, open ? "1" : "0"); }
+    catch { /* ignore */ }
   }
 
   const refreshSessions = useCallback(async () => {
@@ -541,8 +557,28 @@ export function Workspace({
 
   // ── Render ────────────────────────────────────────────────────────────────
 
+  // Per-patient status keyed map for the sidebar — derived from
+  // iterDetail's patient_status array (already loaded by refresh()).
+  const sidebarPatientStatus: Record<string, { oracle_done: boolean; errored?: boolean }> = {};
+  for (const ps of iterDetail?.patient_status ?? []) {
+    sidebarPatientStatus[ps.patient_id] = {
+      oracle_done: ps.oracle_done,
+      errored: (ps as { errored?: boolean }).errored,
+    };
+  }
+  const sessionIters = Array.isArray(pilots)
+    ? pilots
+        .filter((p) => activeSessionId && p.session_id === activeSessionId)
+        .sort((a, b) => b.iter_num - a.iter_num)
+        .map((p) => ({
+          iter_id: p.iter_id, iter_num: p.iter_num, state: p.state,
+          started_at: (p as { started_at?: string }).started_at ?? "",
+        }))
+    : [];
+
   return (
-    <div className="mx-auto max-w-[1240px] animate-rise-in space-y-0">
+    <div className="flex gap-2 animate-rise-in">
+      <div className="flex-1 min-w-0 max-w-[1240px] mx-auto space-y-0">
       {/* Top bar: pill bar + session switcher + toggle */}
       <div className="flex items-center justify-between gap-4 border-b border-border/60 pb-2">
         <PhasePillBar
@@ -747,6 +783,17 @@ export function Workspace({
           </Button>
         </footer>
       ) : null}
+      </div>
+
+      <SessionSidebar
+        taskId={taskId}
+        activeSessionId={activeSessionId}
+        sessionIters={sessionIters}
+        patientStatus={sidebarPatientStatus}
+        isOpen={sidebarOpen}
+        onToggle={() => setSidebarOpen(!sidebarOpen)}
+        onJumpToAuthor={() => setPhase("AUTHOR")}
+      />
     </div>
   );
 }
