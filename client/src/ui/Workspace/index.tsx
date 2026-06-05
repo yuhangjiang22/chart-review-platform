@@ -567,7 +567,6 @@ export function Workspace({
         open={newSessionOpen}
         onClose={() => setNewSessionOpen(false)}
         taskId={taskId}
-        availablePatientIds={iterDetail?.patient_status.map((p) => p.patient_id) ?? []}
         onCreated={async (sid) => {
           await refreshSessions();
           setActiveSessionId(sid);

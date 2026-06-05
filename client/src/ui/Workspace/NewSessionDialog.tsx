@@ -26,8 +26,6 @@ interface NewSessionDialogProps {
   open: boolean;
   onClose: () => void;
   taskId: string;
-  /** Patient IDs available for selection (cohort sampling output). */
-  availablePatientIds: string[];
   /** Called after a successful session+iter creation. Parent should refetch
    *  the session list and switch the active session to the new id. */
   onCreated: (sessionId: string) => void;
@@ -50,10 +48,17 @@ function specsToApi(specs: AgentSpecForm[]): Array<Record<string, unknown>> {
 }
 
 export function NewSessionDialog({
-  open, onClose, taskId, availablePatientIds, onCreated,
+  open, onClose, taskId, onCreated,
 }: NewSessionDialogProps) {
   const [name, setName] = useState("");
   const [notes, setNotes] = useState("");
+  // Patient list loaded INDEPENDENTLY of any active session — the previous
+  // implementation chained through iterDetail.patient_status which was
+  // circular ("need a session to start a session"). Source of truth:
+  //   1. cohort-sampling.dev_patient_ids if the task has a curated cohort
+  //   2. /api/patients (the workspace-wide corpus) as fallback
+  const [availablePatientIds, setAvailablePatientIds] = useState<string[]>([]);
+  const [patientsLoading, setPatientsLoading] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [agentSpecs, setAgentSpecs] = useState<AgentSpecForm[]>(DEFAULT_AGENT_SPECS);
   const [submitting, setSubmitting] = useState(false);
@@ -66,6 +71,41 @@ export function NewSessionDialog({
       setSubmitting(false); setError(null);
     }
   }, [open]);
+
+  // Load the patient list on dialog open. Prefer the task's curated dev
+  // cohort (cohort-sampling.dev_patient_ids); fall back to the whole
+  // corpus if no sampling has been configured.
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    setPatientsLoading(true);
+    (async () => {
+      let ids: string[] = [];
+      try {
+        const r = await authFetch(`/api/cohort-sampling/${encodeURIComponent(taskId)}`);
+        if (r.ok) {
+          const sampling = await r.json() as { dev_patient_ids?: string[] };
+          if (Array.isArray(sampling?.dev_patient_ids) && sampling.dev_patient_ids.length > 0) {
+            ids = sampling.dev_patient_ids;
+          }
+        }
+      } catch { /* fall through */ }
+      if (ids.length === 0) {
+        try {
+          const r = await authFetch("/api/patients");
+          if (r.ok) {
+            const list = await r.json() as Array<{ patient_id: string }>;
+            ids = Array.isArray(list) ? list.map((p) => p.patient_id) : [];
+          }
+        } catch { /* leave empty */ }
+      }
+      if (!cancelled) {
+        setAvailablePatientIds(ids);
+        setPatientsLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [open, taskId]);
 
   function togglePatient(pid: string) {
     setSelected((prev) => {
@@ -181,9 +221,13 @@ export function NewSessionDialog({
               </div>
             </div>
             <div className="mt-1 max-h-[200px] overflow-y-auto rounded-md border border-border bg-paper/40 p-1">
-              {availablePatientIds.length === 0 ? (
+              {patientsLoading ? (
+                <div className="px-2 py-3 text-[11.5px] text-muted-foreground text-center italic">
+                  Loading patient list…
+                </div>
+              ) : availablePatientIds.length === 0 ? (
                 <div className="px-2 py-3 text-[11.5px] text-muted-foreground text-center">
-                  No patients available — load a cohort sample first.
+                  No patients found in the corpus.
                 </div>
               ) : availablePatientIds.map((pid) => (
                 <button
