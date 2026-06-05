@@ -4,6 +4,7 @@ import type { CellCounts } from "./phase-logic";
 import { ImprovementProposalsPanel } from "./ImprovementProposalsPanel";
 import { AdherenceDecideSummary } from "./AdherenceDecideSummary";
 import { NerCalibrationFigure } from "./NerCalibrationFigure";
+import { PackagesPanel } from "./PackagesPanel";
 
 interface PhaseDecideProps {
   taskId: string;
@@ -41,6 +42,10 @@ interface PhaseDecideProps {
   onRunAgain?: () => void;
   /** True while a new iter is being started. */
   isRunningAgain?: boolean;
+  /** Active session id for the packages panel — packages are tagged
+   *  with their source session, so this lets the user generate a
+   *  snapshot of "what this session's rubric looks like right now." */
+  activeSessionId?: string | null;
 }
 
 /**
@@ -66,6 +71,7 @@ export function PhaseDecide({
   improveRefreshKey,
   onRunAgain,
   isRunningAgain,
+  activeSessionId,
   taskKind,
 }: PhaseDecideProps) {
   const staleCount = cells.stale;
@@ -196,6 +202,14 @@ export function PhaseDecide({
                 : "uses the current questions / rules · reviewer answers carry over"}
             </span>
           </Button>
+        </div>
+      )}
+
+      {/* Packages — snapshot the rubric for reuse. Only meaningful with
+       *  an active session, since each package records its source. */}
+      {activeSessionId && (
+        <div className="border-t border-border/60 pt-6">
+          <PackagesPanel taskId={taskId} activeSessionId={activeSessionId} />
         </div>
       )}
 

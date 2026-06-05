@@ -730,6 +730,7 @@ export function Workspace({
             improveRefreshKey={improveRefreshKey}
             onRunAgain={isMethodologist ? runAgain : undefined}
             isRunningAgain={isRunningAgain}
+            activeSessionId={activeSessionId}
           />
         )}
         {activePhase === "LOCK" && activeSessionId && (

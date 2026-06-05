@@ -47,6 +47,13 @@ function specsToApi(specs: AgentSpecForm[]): Array<Record<string, unknown>> {
   });
 }
 
+interface PackageItem {
+  package_id: string;
+  name: string;
+  description?: string;
+  agent_specs?: AgentSpecForm[];
+}
+
 export function NewSessionDialog({
   open, onClose, taskId, onCreated,
 }: NewSessionDialogProps) {
@@ -59,6 +66,11 @@ export function NewSessionDialog({
   //   2. /api/patients (the workspace-wide corpus) as fallback
   const [availablePatientIds, setAvailablePatientIds] = useState<string[]>([]);
   const [patientsLoading, setPatientsLoading] = useState(false);
+  // Optional "start from package" — when selected, the package's
+  // agent_specs pre-fill the agent config and the package gets
+  // applied to the live rubric BEFORE the session is created.
+  const [availablePackages, setAvailablePackages] = useState<PackageItem[]>([]);
+  const [selectedPackageId, setSelectedPackageId] = useState<string>("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [agentSpecs, setAgentSpecs] = useState<AgentSpecForm[]>(DEFAULT_AGENT_SPECS);
   const [submitting, setSubmitting] = useState(false);
@@ -68,9 +80,35 @@ export function NewSessionDialog({
     if (!open) {
       setName(""); setNotes(""); setSelected(new Set());
       setAgentSpecs(DEFAULT_AGENT_SPECS);
+      setSelectedPackageId("");
       setSubmitting(false); setError(null);
     }
   }, [open]);
+
+  // Load available packages when the dialog opens so the user can
+  // choose to start from one.
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    authFetch(`/api/packages/${encodeURIComponent(taskId)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { packages?: PackageItem[] } | null) => {
+        if (cancelled || !d?.packages) return;
+        setAvailablePackages(d.packages);
+      })
+      .catch(() => { /* swallow */ });
+    return () => { cancelled = true; };
+  }, [open, taskId]);
+
+  // When the user picks a package, pre-fill the agent_specs from it.
+  // They can still edit; the package is "starting point," not a lock.
+  useEffect(() => {
+    if (!selectedPackageId) return;
+    const pkg = availablePackages.find((p) => p.package_id === selectedPackageId);
+    if (pkg?.agent_specs && pkg.agent_specs.length > 0) {
+      setAgentSpecs(pkg.agent_specs);
+    }
+  }, [selectedPackageId, availablePackages]);
 
   // Load the patient list on dialog open. Prefer the task's curated dev
   // cohort (cohort-sampling.dev_patient_ids); fall back to the whole
@@ -129,6 +167,21 @@ export function NewSessionDialog({
     const apiSpecs = specsToApi(agentSpecs);
 
     try {
+      // 0. If starting from a package, apply it to the live rubric FIRST.
+      // The session manifest created next will then snapshot the post-apply
+      // skill SHA, and the first iter will run on the package's rubric.
+      if (selectedPackageId) {
+        const ra = await authFetch(
+          `/api/packages/${encodeURIComponent(taskId)}/${encodeURIComponent(selectedPackageId)}/apply`,
+          { method: "POST" },
+        );
+        if (!ra.ok) {
+          const body = await ra.json().catch(() => ({}));
+          setError(`apply package failed: ${body?.error ?? `HTTP ${ra.status}`}`);
+          return;
+        }
+      }
+
       // 1. Create session manifest.
       const r1 = await authFetch(`/api/sessions/${encodeURIComponent(taskId)}`, {
         method: "POST",
@@ -192,6 +245,35 @@ export function NewSessionDialog({
         </DialogHeader>
 
         <div className="space-y-5 pt-2">
+          {/* Optional: start from a package — pre-fills agent_specs and
+              applies the package's rubric to the live skill before the
+              session is created. */}
+          {availablePackages.length > 0 && (
+            <div>
+              <label className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                Start from package (optional)
+              </label>
+              <select
+                value={selectedPackageId}
+                onChange={(e) => setSelectedPackageId(e.target.value)}
+                className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-[12.5px] focus:outline-none focus:ring-1 focus:ring-ring"
+              >
+                <option value="">— start from current live rubric —</option>
+                {availablePackages.map((pkg) => (
+                  <option key={pkg.package_id} value={pkg.package_id}>
+                    {pkg.name}
+                  </option>
+                ))}
+              </select>
+              {selectedPackageId && (
+                <p className="mt-1 text-[10.5px] text-muted-foreground">
+                  The selected package will REPLACE the live references/ before
+                  this session's first iter runs.
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Step 1 — name */}
           <div>
             <label className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">1 · Name</label>

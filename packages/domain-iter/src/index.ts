@@ -87,3 +87,16 @@ export {
   iterSessionId,
   legacySessionPlaceholder,
 } from "./sessions.js";
+
+export {
+  // Packages — named, immutable rubric snapshots from a session
+  type PackageManifest,
+  type CreatePackageInput,
+  packagesDir,
+  slugifyPackageId,
+  getPackageManifest,
+  listPackages,
+  createPackage,
+  deletePackage,
+  applyPackage,
+} from "./packages.js";
