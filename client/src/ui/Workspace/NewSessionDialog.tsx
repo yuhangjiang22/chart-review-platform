@@ -52,6 +52,28 @@ interface PackageItem {
   name: string;
   description?: string;
   agent_specs?: AgentSpecForm[];
+  calibration_summary?: {
+    macro_f1?: number;
+    tuple_kappa?: number;
+    overall_match_rate?: number;
+    [k: string]: unknown;
+  } | null;
+}
+
+/** Compose a one-line "(F1 0.78 · 2 agents)" annotation for the
+ *  package picker dropdown, when calibration evidence is available. */
+function packageDropdownAnnotation(pkg: PackageItem): string {
+  const parts: string[] = [];
+  const cs = pkg.calibration_summary;
+  if (typeof cs?.macro_f1 === "number") {
+    parts.push(`F1 ${cs.macro_f1.toFixed(2)}`);
+  } else if (typeof cs?.overall_match_rate === "number") {
+    parts.push(`match ${(cs.overall_match_rate * 100).toFixed(0)}%`);
+  }
+  if (pkg.agent_specs && pkg.agent_specs.length > 0) {
+    parts.push(`${pkg.agent_specs.length} agent${pkg.agent_specs.length === 1 ? "" : "s"}`);
+  }
+  return parts.length > 0 ? ` (${parts.join(" · ")})` : "";
 }
 
 export function NewSessionDialog({
@@ -261,7 +283,7 @@ export function NewSessionDialog({
                 <option value="">— start from current live rubric —</option>
                 {availablePackages.map((pkg) => (
                   <option key={pkg.package_id} value={pkg.package_id}>
-                    {pkg.name}
+                    {pkg.name}{packageDropdownAnnotation(pkg)}
                   </option>
                 ))}
               </select>

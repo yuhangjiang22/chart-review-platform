@@ -45,6 +45,9 @@ interface SessionSidebarProps {
   activeSessionId: string | null;
   /** Iters that belong to the active session (filtered upstream). */
   sessionIters: IterShape[];
+  /** Which iter the workspace currently considers "active" (drives
+   *  the visual highlight in the iter list). */
+  activeIterId?: string | null;
   /** Per-patient validation status (oracle_done flag). Drives the
    *  cohort row badges. Keyed by patient_id. */
   patientStatus: Record<string, { oracle_done: boolean; errored?: boolean }>;
@@ -64,7 +67,8 @@ function fmtDate(iso: string): string {
 }
 
 export function SessionSidebar({
-  taskId, activeSessionId, sessionIters, patientStatus, isOpen, onToggle, onJumpToAuthor,
+  taskId, activeSessionId, sessionIters, activeIterId,
+  patientStatus, isOpen, onToggle, onJumpToAuthor,
 }: SessionSidebarProps) {
   const [session, setSession] = useState<SessionShape | null>(null);
 
@@ -193,25 +197,40 @@ export function SessionSidebar({
               <div className="text-[10.5px] text-muted-foreground italic">No iters yet.</div>
             ) : (
               <div className="space-y-0.5">
-                {sessionIters.map((it) => (
-                  <div key={it.iter_id} className="flex items-baseline justify-between gap-2">
-                    <span className="font-mono text-[11px] text-ink">{it.iter_id}</span>
-                    <span
+                {sessionIters.map((it) => {
+                  const isActive = it.iter_id === activeIterId;
+                  return (
+                    <div
+                      key={it.iter_id}
                       className={cn(
-                        "text-[10px] uppercase tracking-[0.1em]",
-                        it.state === "ready_to_validate"
-                          ? "text-[hsl(var(--sage))]"
-                          : it.state === "running"
-                            ? "text-[hsl(var(--ochre))]"
-                            : it.state === "abandoned"
-                              ? "text-muted-foreground"
-                              : "text-ink",
+                        "flex items-baseline justify-between gap-2 px-1.5 py-0.5 rounded",
+                        isActive && "bg-[hsl(var(--sage))]/10 border-l-2 border-[hsl(var(--sage))] pl-1",
                       )}
                     >
-                      {it.state}
-                    </span>
-                  </div>
-                ))}
+                      <span className={cn(
+                        "font-mono text-[11px]",
+                        isActive ? "text-ink font-medium" : "text-ink",
+                      )}>
+                        {it.iter_id}
+                        {isActive && <span className="ml-1 text-[9px] text-[hsl(var(--sage))] uppercase tracking-[0.1em]">· active</span>}
+                      </span>
+                      <span
+                        className={cn(
+                          "text-[10px] uppercase tracking-[0.1em]",
+                          it.state === "ready_to_validate"
+                            ? "text-[hsl(var(--sage))]"
+                            : it.state === "running"
+                              ? "text-[hsl(var(--ochre))]"
+                              : it.state === "abandoned"
+                                ? "text-muted-foreground"
+                                : "text-ink",
+                        )}
+                      >
+                        {it.state}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
