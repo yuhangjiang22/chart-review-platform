@@ -83,6 +83,7 @@ export {
   listSessions,
   createSession,
   archiveSession,
+  assertSessionImmutable,
   iterSessionId,
   legacySessionPlaceholder,
 } from "./sessions.js";

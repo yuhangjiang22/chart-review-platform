@@ -199,6 +199,61 @@ export function archiveSession(
   return updated;
 }
 
+/**
+ * Validate that a session manifest's comparison-critical fields
+ * (cohort.patient_ids, agent_specs) match the first iter that ran
+ * under it. Defense against on-disk manifest edits that would
+ * silently corrupt cross-iter comparison.
+ *
+ * Called by the server on every iter-start. Throws a clear error if
+ * the session's locked values don't match what historical iters
+ * actually used.
+ */
+export function assertSessionImmutable(
+  session: SessionManifest,
+  iterPatientIds: string[],
+  iterAgentSpecs: AgentSpec[] | undefined,
+): void {
+  // Cohort drift check.
+  const sessionPids = [...session.cohort.patient_ids].sort();
+  const iterPids = [...iterPatientIds].sort();
+  if (sessionPids.length !== iterPids.length
+      || sessionPids.some((pid, i) => pid !== iterPids[i])) {
+    throw new Error(
+      `session ${session.session_id} cohort drift detected — `
+      + `manifest says [${sessionPids.join(", ")}] but a prior iter ran on `
+      + `[${iterPids.join(", ")}]. Cross-iter comparison is no longer valid; `
+      + `start a new session.`,
+    );
+  }
+  // Agent_specs drift check — order matters because agent_id (agent_1,
+  // agent_2) ties the labels to the role presets.
+  const sessionSpecs = session.agent_specs ?? [];
+  const iterSpecs = iterAgentSpecs ?? [];
+  if (sessionSpecs.length !== iterSpecs.length) {
+    throw new Error(
+      `session ${session.session_id} agent_specs count drift — `
+      + `manifest has ${sessionSpecs.length}, prior iter had ${iterSpecs.length}.`,
+    );
+  }
+  for (let i = 0; i < sessionSpecs.length; i++) {
+    const s = sessionSpecs[i]!;
+    const it = iterSpecs[i]!;
+    if (s.id !== it.id
+        || s.model !== it.model
+        || s.search_mode_preset !== it.search_mode_preset
+        || s.interpretation_preset !== it.interpretation_preset
+        || s.role_preset !== it.role_preset
+        || s.role_prompt !== it.role_prompt) {
+      throw new Error(
+        `session ${session.session_id} agent_specs[${i}] drift — `
+        + `manifest=${JSON.stringify(s)} but prior iter used ${JSON.stringify(it)}. `
+        + `Cross-iter comparison is no longer valid; start a new session.`,
+      );
+    }
+  }
+}
+
 /** Return the session_id stamped on an iter manifest, or LEGACY_SESSION_ID
  *  when absent. Helper to unify legacy and modern iters at query time. */
 export function iterSessionId(iterManifest: { session_id?: string }): string {

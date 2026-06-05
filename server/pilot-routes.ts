@@ -29,6 +29,7 @@ import {
   readPrimaryCriterionIds,
   maybeAutoAdvancePilotOnRunStatus,
   getSessionManifest,
+  assertSessionImmutable,
   type PilotState,
 } from "./lib/domain/iter/index.js";
 import type { RunStatus } from "./lib/infra/batch-run/index.js";
@@ -345,6 +346,27 @@ export const pilotWriteRoutes: RouteEntry[] = [
         err.status = 400; throw err;
       }
       const lockedAgentSpecs = session.agent_specs;
+
+      // Drift check: if the session already has iters, the session
+      // manifest's cohort + agent_specs MUST match what the prior iter
+      // ran on. Catches the case where someone edited sessions/
+      // <session_id>/manifest.json on disk between iters, which would
+      // silently break cross-iter comparability.
+      const priorIters = listPilotIterations(p.taskId)
+        .filter((it) => it.session_id === session_id);
+      if (priorIters.length > 0) {
+        const earliest = priorIters[priorIters.length - 1]!; // listPilotIterations is newest-first
+        const priorRun = getRunManifest(earliest.run_id);
+        if (priorRun) {
+          try {
+            assertSessionImmutable(session, priorRun.patient_ids, priorRun.agent_specs);
+          } catch (e) {
+            const err = new Error((e as Error).message) as Error & { status: number };
+            err.status = 409; // Conflict — manifest no longer matches history
+            throw err;
+          }
+        }
+      }
 
       return startPilotIteration({
         task_id: p.taskId,
