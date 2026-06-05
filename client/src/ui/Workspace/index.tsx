@@ -40,6 +40,8 @@ interface PilotIterListing {
   iter_id: string;
   iter_num: number;
   state: "running" | "ready_to_validate" | "complete" | "abandoned";
+  /** Session this iter belongs to. Absent on legacy/pre-session iters. */
+  session_id?: string;
 }
 
 // Three-state load tracker for the pilots fetch. Distinguishes "still
@@ -316,7 +318,7 @@ export function Workspace({
       alert("No prior iter to re-run.");
       return;
     }
-    const active = pickActiveIter(pilots);
+    const active = pickActiveIter(pilots, activeSessionId);
     if (!active) {
       alert("No prior iter to re-run.");
       return;
@@ -360,7 +362,7 @@ export function Workspace({
     setPilots(pilotsResult);
 
     const pilotList = Array.isArray(pilotsResult) ? pilotsResult : [];
-    const activeIter = pickActiveIter(pilotList);
+    const activeIter = pickActiveIter(pilotList, activeSessionId);
     if (!activeIter) {
       setIterDetail(null);
       setRevisitsTotal(0);
@@ -403,7 +405,7 @@ export function Workspace({
   const taskKind = taskKindFromTaskType(task?.task_type);
   const isAdherenceTask = taskKind === "adherence";
   const activeIterId = Array.isArray(pilots)
-    ? pickActiveIter(pilots)?.iter_id ?? null
+    ? pickActiveIter(pilots, activeSessionId)?.iter_id ?? null
     : null;
   useEffect(() => {
     if (!isNerTask || !activeIterId) { setSpanStats(null); return; }
@@ -443,8 +445,8 @@ export function Workspace({
   // ── Phase derivation ──────────────────────────────────────────────────────
 
   const activeIter = useMemo(
-    () => (Array.isArray(pilots) ? pickActiveIter(pilots) : null),
-    [pilots],
+    () => (Array.isArray(pilots) ? pickActiveIter(pilots, activeSessionId) : null),
+    [pilots, activeSessionId],
   );
 
   const cells = useMemo((): CellCounts => {
@@ -751,8 +753,19 @@ export function Workspace({
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function pickActiveIter(pilots: PilotIterListing[]): PilotIterListing | null {
-  const candidates = pilots.filter((p) => p.state !== "abandoned");
+function pickActiveIter(
+  pilots: PilotIterListing[],
+  activeSessionId?: string | null,
+): PilotIterListing | null {
+  let candidates = pilots.filter((p) => p.state !== "abandoned");
+  // When a session filter is provided, ONLY iters belonging to that
+  // session count. activeSessionId=null/undefined means "no session
+  // selected" → return null so no iter from any session leaks into
+  // the current view.
+  if (arguments.length >= 2) {
+    if (!activeSessionId) return null;
+    candidates = candidates.filter((p) => p.session_id === activeSessionId);
+  }
   if (candidates.length === 0) return null;
   return [...candidates].sort((a, b) => b.iter_num - a.iter_num)[0];
 }
