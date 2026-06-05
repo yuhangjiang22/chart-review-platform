@@ -58,6 +58,7 @@ import {
 } from "./auth.js";
 import { makeRouter } from "./router.js";
 import { pilotReadRoutes, pilotWriteRoutes, versionsRoutes } from "./pilot-routes.js";
+import { sessionRoutes } from "./session-routes.js";
 import { proposalRoutes } from "./proposal-routes.js";
 import { issueRoutes } from "./issue-routes.js";
 import { lockTestRoutes } from "./lock-test-routes.js";
@@ -214,6 +215,7 @@ const paramRouter = makeRouter([
   ...pilotReadRoutes,
   ...pilotWriteRoutes,
   ...versionsRoutes,
+  ...sessionRoutes,
   ...proposalRoutes,
   ...issueRoutes,
   ...lockTestRoutes,

@@ -70,3 +70,19 @@ export {
   persistIterAccuracy,
   writeIterReport,
 } from "./iter-accuracy.js";
+
+export {
+  // Sessions — fixed-cohort grouping above iters
+  type SessionState,
+  type SessionManifest,
+  type SessionListing,
+  type CreateSessionInput,
+  LEGACY_SESSION_ID,
+  sessionsDir,
+  getSessionManifest,
+  listSessions,
+  createSession,
+  archiveSession,
+  iterSessionId,
+  legacySessionPlaceholder,
+} from "./sessions.js";

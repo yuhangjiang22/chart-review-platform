@@ -185,6 +185,10 @@ export interface PilotManifest {
   task_id: string;
   iter_id: string;        // "iter_001", "iter_002", ...
   iter_num: number;       // 1, 2, ... (parsed from iter_id)
+  /** Session this iter belongs to. Absent on pre-session iters; the
+   *  reader treats absent as the synthetic LEGACY_SESSION_ID so legacy
+   *  iters keep showing up under a stable header. */
+  session_id?: string;
   run_id: string;         // the batch-run that produced the drafts
   guideline_sha: string;  // SHA of the guideline at iteration start
   started_at: string;
@@ -427,6 +431,11 @@ export interface StartPilotOptions {
   /** Per-run model override — wins over CHART_REVIEW_MODEL env var.
    *  Stamped onto every agent_spec that doesn't carry its own model. */
   model?: string;
+  /** Session this iter is being started under. When set, the iter's
+   *  manifest carries this session_id and the platform's session-aware
+   *  views (sidebar, switcher, scoped phase panes) will associate the
+   *  iter with the session. Absent = legacy ungrouped iter. */
+  session_id?: string;
 }
 
 export interface StartPilotResult {
@@ -505,6 +514,7 @@ export function startPilotIteration(opts: StartPilotOptions): StartPilotResult {
     task_id: opts.task_id,
     iter_id,
     iter_num,
+    session_id: opts.session_id,
     run_id,
     guideline_sha: guidelineSha,
     started_at: new Date().toISOString(),

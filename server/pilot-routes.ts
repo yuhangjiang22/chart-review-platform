@@ -28,6 +28,7 @@ import {
   writeIterReport,
   readPrimaryCriterionIds,
   maybeAutoAdvancePilotOnRunStatus,
+  getSessionManifest,
   type PilotState,
 } from "./lib/domain/iter/index.js";
 import type { RunStatus } from "./lib/infra/batch-run/index.js";
@@ -290,12 +291,12 @@ export const pilotWriteRoutes: RouteEntry[] = [
       const reviewerId = gateMethodologist(req, "starting a pilot");
       const {
         patient_ids, notes, max_concurrency, max_turns_per_patient,
-        cost_cap_usd, agent_specs, provider, model,
+        cost_cap_usd, agent_specs, provider, model, session_id,
       } = (body ?? {}) as {
         patient_ids?: string[]; notes?: string;
         max_concurrency?: number; max_turns_per_patient?: number;
         cost_cap_usd?: number; agent_specs?: unknown;
-        provider?: string; model?: string;
+        provider?: string; model?: string; session_id?: string;
       };
       if (!Array.isArray(patient_ids) || patient_ids.length === 0) {
         const err = new Error("non-empty patient_ids required") as Error & { status: number };
@@ -312,6 +313,21 @@ export const pilotWriteRoutes: RouteEntry[] = [
         }
         resolvedProvider = provider;
       }
+      // When a session_id is passed, validate it exists + is active.
+      // Iters started without a session_id remain legacy/ungrouped.
+      let resolvedSessionId: string | undefined;
+      if (session_id) {
+        const session = getSessionManifest(p.taskId, session_id);
+        if (!session) {
+          const err = new Error(`session not found: ${session_id}`) as Error & { status: number };
+          err.status = 400; throw err;
+        }
+        if (session.state !== "active") {
+          const err = new Error(`session ${session_id} is archived; start a new session`) as Error & { status: number };
+          err.status = 400; throw err;
+        }
+        resolvedSessionId = session_id;
+      }
       return startPilotIteration({
         task_id: p.taskId,
         patient_ids,
@@ -323,6 +339,7 @@ export const pilotWriteRoutes: RouteEntry[] = [
         agent_specs: agent_specs as Parameters<typeof startPilotIteration>[0]["agent_specs"],
         provider: resolvedProvider,
         model: typeof model === "string" && model.trim().length > 0 ? model.trim() : undefined,
+        session_id: resolvedSessionId,
         onRunStatus: onPilotRunStatus,
       });
     },
