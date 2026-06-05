@@ -373,6 +373,10 @@ export const pilotWriteRoutes: RouteEntry[] = [
         started_by: reviewerId,
         notes: notes ?? `Run again on cohort from ${p.iterId}`,
         agent_specs: run.agent_specs,
+        // Carry the session_id forward so the new iter stays inside the
+        // same session as its source. Without this, "Run again" from an
+        // in-session iter would silently create a legacy ungrouped iter.
+        session_id: m.session_id,
         onRunStatus: onPilotRunStatus,
       });
     },

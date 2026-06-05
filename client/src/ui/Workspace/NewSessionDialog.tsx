@@ -1,11 +1,15 @@
 // NewSessionDialog — modal for starting a new session.
 //
-// Inputs: name, patient_ids (multi-select from available cohort
-// patients), optional notes.
+// Single end-to-end flow: name → cohort → agent config → submit.
+// Submit is atomic from the user's perspective: it creates the session
+// manifest AND kicks off the first iter (POST /api/pilots/:taskId with
+// session_id) so the methodologist lands in a usable workspace
+// immediately.
 //
-// Calls POST /api/sessions/:taskId on submit. The parent (Workspace)
-// triggers a session-list refresh and switches the active session to
-// the new one on success.
+// If the iter-start fails after session creation succeeds, the session
+// is left in place (no iters) and the dialog shows an error; the user
+// can retry the iter via "Run again" later without re-creating the
+// session.
 
 import { useState, useEffect } from "react";
 import { Plus } from "lucide-react";
@@ -16,6 +20,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { authFetch } from "../../auth";
 import { cn } from "@/lib/utils";
+import { AgentConfigPanel, type AgentSpecForm } from "../PilotsTab/AgentConfigPanel";
 
 interface NewSessionDialogProps {
   open: boolean;
@@ -23,8 +28,25 @@ interface NewSessionDialogProps {
   taskId: string;
   /** Patient IDs available for selection (cohort sampling output). */
   availablePatientIds: string[];
-  /** Called after a successful POST. Parent should refetch + switch active. */
+  /** Called after a successful session+iter creation. Parent should refetch
+   *  the session list and switch the active session to the new id. */
   onCreated: (sessionId: string) => void;
+}
+
+const DEFAULT_AGENT_SPECS: AgentSpecForm[] = [
+  { id: "agent_1", search_mode_preset: "smart-search", interpretation_preset: "default" },
+  { id: "agent_2", search_mode_preset: "smart-search", interpretation_preset: "skeptical" },
+];
+
+function specsToApi(specs: AgentSpecForm[]): Array<Record<string, unknown>> {
+  return specs.map((s) => {
+    const out: Record<string, unknown> = { id: s.id };
+    if (s.search_mode_preset) out.search_mode_preset = s.search_mode_preset;
+    if (s.interpretation_preset) out.interpretation_preset = s.interpretation_preset;
+    if (s.role_prompt) out.role_prompt = s.role_prompt;
+    if (s.model) out.model = s.model;
+    return out;
+  });
 }
 
 export function NewSessionDialog({
@@ -33,12 +55,14 @@ export function NewSessionDialog({
   const [name, setName] = useState("");
   const [notes, setNotes] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [agentSpecs, setAgentSpecs] = useState<AgentSpecForm[]>(DEFAULT_AGENT_SPECS);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) {
       setName(""); setNotes(""); setSelected(new Set());
+      setAgentSpecs(DEFAULT_AGENT_SPECS);
       setSubmitting(false); setError(null);
     }
   }, [open]);
@@ -51,7 +75,6 @@ export function NewSessionDialog({
       return next;
     });
   }
-
   function selectAll() { setSelected(new Set(availablePatientIds)); }
   function selectNone() { setSelected(new Set()); }
 
@@ -59,24 +82,57 @@ export function NewSessionDialog({
     if (submitting) return;
     if (!name.trim()) { setError("name is required"); return; }
     if (selected.size === 0) { setError("pick at least one patient"); return; }
+    if (agentSpecs.length === 0) { setError("at least one agent is required"); return; }
+
     setSubmitting(true); setError(null);
+    const patientIds = [...selected];
+    const apiSpecs = specsToApi(agentSpecs);
+
     try {
-      const r = await authFetch(`/api/sessions/${encodeURIComponent(taskId)}`, {
+      // 1. Create session manifest.
+      const r1 = await authFetch(`/api/sessions/${encodeURIComponent(taskId)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: name.trim(),
-          patient_ids: [...selected],
+          patient_ids: patientIds,
+          notes: notes.trim() || undefined,
+          default_agent_specs: apiSpecs,
+        }),
+      });
+      if (!r1.ok) {
+        const body = await r1.json().catch(() => ({}));
+        setError(body?.error ?? `session create failed: HTTP ${r1.status}`);
+        return;
+      }
+      const sessionBody = await r1.json() as { session: { session_id: string } };
+      const sessionId = sessionBody.session.session_id;
+
+      // 2. Kick off the first iter for this session.
+      const r2 = await authFetch(`/api/pilots/${encodeURIComponent(taskId)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          patient_ids: patientIds,
+          agent_specs: apiSpecs,
+          session_id: sessionId,
           notes: notes.trim() || undefined,
         }),
       });
-      if (!r.ok) {
-        const body = await r.json().catch(() => ({}));
-        setError(body?.error ?? `HTTP ${r.status}`);
+      if (!r2.ok) {
+        const body = await r2.json().catch(() => ({}));
+        // Session is created but first iter failed. Surface the error;
+        // the methodologist can manually start an iter later.
+        setError(
+          `Session created (id ${sessionId}) but starting the first iter failed: `
+          + (body?.error ?? `HTTP ${r2.status}`)
+          + ". The session is usable; click 'Run again' on DECIDE to retry.",
+        );
+        // Still call onCreated so the parent switches to this session.
+        onCreated(sessionId);
         return;
       }
-      const body = await r.json() as { session: { session_id: string } };
-      onCreated(body.session.session_id);
+      onCreated(sessionId);
       onClose();
     } catch (e) {
       setError((e as Error).message);
@@ -87,18 +143,19 @@ export function NewSessionDialog({
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent className="max-w-[600px]">
+      <DialogContent className="max-w-[760px] max-h-[88vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Start a new session</DialogTitle>
           <DialogDescription>
-            A session locks a cohort + agent config. All iters started inside this session run
-            on the selected patients.
+            A session locks a cohort + agent config. The first iter starts automatically once
+            you submit; subsequent iters in this session reuse the same cohort.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 pt-2">
+        <div className="space-y-5 pt-2">
+          {/* Step 1 — name */}
           <div>
-            <label className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Name</label>
+            <label className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">1 · Name</label>
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -108,10 +165,11 @@ export function NewSessionDialog({
             />
           </div>
 
+          {/* Step 2 — cohort */}
           <div>
             <div className="flex items-baseline justify-between">
               <label className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-                Cohort ({selected.size}/{availablePatientIds.length} selected)
+                2 · Cohort ({selected.size}/{availablePatientIds.length} selected)
               </label>
               <div className="flex gap-2 text-[10px]">
                 <button type="button" onClick={selectAll} className="text-muted-foreground hover:text-ink underline-offset-2 hover:underline">
@@ -147,13 +205,24 @@ export function NewSessionDialog({
             </div>
           </div>
 
+          {/* Step 3 — agent config */}
+          <div>
+            <label className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+              3 · Agents ({agentSpecs.length})
+            </label>
+            <div className="mt-1">
+              <AgentConfigPanel value={agentSpecs} onChange={setAgentSpecs} />
+            </div>
+          </div>
+
+          {/* Optional notes */}
           <div>
             <label className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Notes (optional)</label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="What's this session exploring? Hypothesis, baseline, etc."
-              rows={3}
+              rows={2}
               className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-[12.5px] focus:outline-none focus:ring-1 focus:ring-ring"
             />
           </div>
@@ -170,7 +239,7 @@ export function NewSessionDialog({
             </Button>
             <Button size="sm" className="gap-1.5" onClick={submit} disabled={submitting}>
               <Plus size={12} />
-              {submitting ? "Creating…" : "Start session"}
+              {submitting ? "Creating session + starting iter…" : "Start session"}
             </Button>
           </div>
         </div>
