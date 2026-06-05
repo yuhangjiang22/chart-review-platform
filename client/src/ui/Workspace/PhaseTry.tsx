@@ -38,6 +38,13 @@ interface PhaseTryProps {
   /** Called when the user clicks "Validate run" on the in-flight/completed
    *  run card. Parent moves the workspace into the VALIDATE phase. */
   onAdvanceToValidate?: () => void;
+  /** Active session id (null when no session is selected). Every iter
+   *  started from this pane is bound to the active session; without one,
+   *  the start UI shows a "Start new session first" gate. */
+  activeSessionId?: string | null;
+  /** Open the new-session dialog (parent owns dialog state). Used by the
+   *  no-session gate to give the user a one-click path to fix the issue. */
+  onOpenNewSession?: () => void;
 }
 
 /**
@@ -46,7 +53,9 @@ interface PhaseTryProps {
  * are bookkeeping; the user only sees the active one. To override an active
  * run, the user abandons it and starts a fresh one with new selections.
  */
-export function PhaseTry({ taskId, onAdvanceToValidate }: PhaseTryProps) {
+export function PhaseTry({
+  taskId, onAdvanceToValidate, activeSessionId, onOpenNewSession,
+}: PhaseTryProps) {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [agentSpecs, setAgentSpecs] = useState<AgentSpecForm[]>([
@@ -162,12 +171,20 @@ export function PhaseTry({ taskId, onAdvanceToValidate }: PhaseTryProps) {
       setError("Select at least one patient.");
       return;
     }
+    if (!activeSessionId) {
+      setError("No active session. Start a session first (top bar → Start new session).");
+      return;
+    }
     setBusy(true);
     setError(null);
     const r = await authFetch(`/api/pilots/${encodeURIComponent(taskId)}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ patient_ids: patientIds, agent_specs: agentSpecs }),
+      body: JSON.stringify({
+        patient_ids: patientIds,
+        agent_specs: agentSpecs,
+        session_id: activeSessionId,
+      }),
     });
     setBusy(false);
     if (!r.ok) {
@@ -231,7 +248,33 @@ export function PhaseTry({ taskId, onAdvanceToValidate }: PhaseTryProps) {
     );
   }
 
-  // Branch B: no live run — show the form
+  // Branch B: no live run — show the form, gated on having an active session.
+  // Every iter must belong to a session; without one, the start button is
+  // disabled and we show a CTA pointing to "Start new session" in the top bar.
+  if (!activeSessionId) {
+    return (
+      <div className="mx-auto max-w-[520px] py-12 space-y-4 text-center">
+        <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+          No active session
+        </div>
+        <h3 className="font-display text-[22px] tracking-tight" style={{ fontVariationSettings: '"opsz" 22, "SOFT" 50' }}>
+          Sessions are required to run agents on patients
+        </h3>
+        <p className="text-[13px] text-muted-foreground">
+          A session locks the cohort + agent config so every iter inside it stays
+          comparable. Start a session to pick patients, configure agents, and kick
+          off the first iter — all in one place.
+        </p>
+        {onOpenNewSession && (
+          <Button onClick={onOpenNewSession} className="gap-1.5">
+            <Play size={12} strokeWidth={1.75} />
+            Start new session
+          </Button>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
       <PatientPicker

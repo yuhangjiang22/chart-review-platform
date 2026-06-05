@@ -618,6 +618,8 @@ export function Workspace({
           <PhaseTry
             taskId={taskId}
             onAdvanceToValidate={() => setPhase("JUDGE")}
+            activeSessionId={activeSessionId}
+            onOpenNewSession={() => setNewSessionOpen(true)}
           />
         )}
         {activePhase === "JUDGE" && activeIter && (

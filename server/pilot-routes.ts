@@ -313,21 +313,28 @@ export const pilotWriteRoutes: RouteEntry[] = [
         }
         resolvedProvider = provider;
       }
-      // When a session_id is passed, validate it exists + is active.
-      // Iters started without a session_id remain legacy/ungrouped.
-      let resolvedSessionId: string | undefined;
-      if (session_id) {
-        const session = getSessionManifest(p.taskId, session_id);
-        if (!session) {
-          const err = new Error(`session not found: ${session_id}`) as Error & { status: number };
-          err.status = 400; throw err;
-        }
-        if (session.state !== "active") {
-          const err = new Error(`session ${session_id} is archived; start a new session`) as Error & { status: number };
-          err.status = 400; throw err;
-        }
-        resolvedSessionId = session_id;
+      // session_id is REQUIRED. Every iter must belong to a session — this
+      // enforces "session is necessary to run on a patient" at the data
+      // layer so no future UI path can silently bypass it. Note: run-again
+      // is a separate route that carries session_id forward from the source
+      // iter; legacy ungrouped iters can be re-run there without a session.
+      if (!session_id) {
+        const err = new Error(
+          "session_id is required — start a session first (POST /api/sessions/:taskId), "
+          + "then pass its session_id when starting iters",
+        ) as Error & { status: number };
+        err.status = 400; throw err;
       }
+      const session = getSessionManifest(p.taskId, session_id);
+      if (!session) {
+        const err = new Error(`session not found: ${session_id}`) as Error & { status: number };
+        err.status = 400; throw err;
+      }
+      if (session.state !== "active") {
+        const err = new Error(`session ${session_id} is archived; start a new session`) as Error & { status: number };
+        err.status = 400; throw err;
+      }
+      const resolvedSessionId = session_id;
       return startPilotIteration({
         task_id: p.taskId,
         patient_ids,
