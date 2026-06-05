@@ -614,7 +614,34 @@ export function Workspace({
             />
           );
         })()}
-        {activePhase === "TRY" && (
+
+        {/* No-session gate — every non-AUTHOR phase requires an active
+            session. AUTHOR is exempt because the methodologist can edit
+            the rubric without running anything. The gate hides the
+            phase pane entirely until the user picks or starts a session. */}
+        {activePhase !== "AUTHOR" && !activeSessionId && (
+          <div className="mx-auto max-w-[520px] py-12 space-y-4 text-center">
+            <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+              No active session
+            </div>
+            <h3
+              className="font-display text-[22px] tracking-tight"
+              style={{ fontVariationSettings: '"opsz" 22, "SOFT" 50' }}
+            >
+              Pick or start a session to see this phase
+            </h3>
+            <p className="text-[13px] text-muted-foreground">
+              Every iter — and the validation, judging, scoring, and locking
+              that follow — lives inside a session. Without one, there's nothing
+              to show here.
+            </p>
+            <Button onClick={() => setNewSessionOpen(true)} className="gap-1.5">
+              Start new session
+            </Button>
+          </div>
+        )}
+
+        {activePhase === "TRY" && activeSessionId && (
           <PhaseTry
             taskId={taskId}
             onAdvanceToValidate={() => setPhase("JUDGE")}
@@ -622,7 +649,7 @@ export function Workspace({
             onOpenNewSession={() => setNewSessionOpen(true)}
           />
         )}
-        {activePhase === "JUDGE" && activeIter && (
+        {activePhase === "JUDGE" && activeSessionId && activeIter && (
           <PhaseJudge
             taskId={taskId}
             iterId={activeIter.iter_id}
@@ -631,10 +658,10 @@ export function Workspace({
             onOpenSpan={(pid) => onOpenPatient?.(pid)}
           />
         )}
-        {activePhase === "JUDGE" && !activeIter && (
+        {activePhase === "JUDGE" && activeSessionId && !activeIter && (
           <PilotsEmptyState pilots={pilots} verb="judge" onRetry={refresh} />
         )}
-        {activePhase === "VALIDATE" && activeIter && (
+        {activePhase === "VALIDATE" && activeSessionId && activeIter && (
           <PhaseValidate
             taskId={taskId}
             iterId={activeIter.iter_id}
@@ -642,10 +669,10 @@ export function Workspace({
             taskKind={taskKind}
           />
         )}
-        {activePhase === "VALIDATE" && !activeIter && (
+        {activePhase === "VALIDATE" && activeSessionId && !activeIter && (
           <PilotsEmptyState pilots={pilots} verb="validate" onRetry={refresh} />
         )}
-        {activePhase === "DECIDE" && (
+        {activePhase === "DECIDE" && activeSessionId && (
           <PhaseDecide
             taskId={taskId}
             iterId={activeIterId ?? undefined}
@@ -667,7 +694,7 @@ export function Workspace({
             isRunningAgain={isRunningAgain}
           />
         )}
-        {activePhase === "LOCK" && (
+        {activePhase === "LOCK" && activeSessionId && (
           <PhaseLock
             taskId={taskId}
             reviewerId={reviewerId}
@@ -675,7 +702,9 @@ export function Workspace({
             taskKind={taskKind}
           />
         )}
-        {activePhase === "DEPLOY" && <PhaseDeploy taskId={taskId} taskKind={taskKind} />}
+        {activePhase === "DEPLOY" && activeSessionId && (
+          <PhaseDeploy taskId={taskId} taskKind={taskKind} />
+        )}
       </main>
 
       {/* CTA footer — AUTHOR has dual CTAs ("Edit guideline" + "Try on
