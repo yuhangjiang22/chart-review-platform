@@ -27,6 +27,7 @@ import {
   listCompiledTasks, loadCompiledTask,
 } from "./lib/tasks.js";
 import { modelFor } from "./lib/model-config.js";
+import { defaultProviderName } from "@chart-review/agent-provider";
 import { pathFor as storagePathFor } from "@chart-review/storage";
 
 function reviewStatePath(patientId: string, taskId: string): string {
@@ -83,6 +84,10 @@ export const coreRoutes: RouteEntry[] = [
       default_task_id: DEFAULT_TASK_ID,
       auth_mode: authMode(),
       reviewers: process.env.REVIEWERS?.split(",").map((s) => s.trim()).filter(Boolean) ?? [],
+      // Which agent runtime backs iters that use an agent loop
+      // (phenotype, adherence). NER bypasses this — it calls Azure
+      // /responses directly with no agent runtime.
+      agent_provider: defaultProviderName(),
     }),
   },
 

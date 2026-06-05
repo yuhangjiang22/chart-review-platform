@@ -47,6 +47,10 @@ interface PhaseTryProps {
   /** Open the new-session dialog (parent owns dialog state). Used by the
    *  no-session gate to give the user a one-click path to fix the issue. */
   onOpenNewSession?: () => void;
+  /** Task kind — drives the runtime indicator in the agent readout.
+   *  ner = direct LLM call (no agent runtime); phenotype/adherence
+   *  use Claude SDK or Codex CLI based on AGENT_PROVIDER. */
+  taskKind?: "phenotype" | "ner" | "adherence";
 }
 
 /**
@@ -56,13 +60,36 @@ interface PhaseTryProps {
  * run, the user abandons it and starts a fresh one with new selections.
  */
 export function PhaseTry({
-  taskId, onAdvanceToValidate, activeSessionId, onOpenNewSession,
+  taskId, onAdvanceToValidate, activeSessionId, onOpenNewSession, taskKind,
 }: PhaseTryProps) {
   // Session manifest — source of truth for cohort + agent_specs.
   // Loaded fresh whenever activeSessionId changes.
   const [sessionCohort, setSessionCohort] = useState<string[]>([]);
   const [sessionAgentSpecs, setSessionAgentSpecs] = useState<AgentSpecForm[]>([]);
   const [sessionName, setSessionName] = useState<string>("");
+  // Agent runtime — derived from /api/runtime when task_kind needs an
+  // agent loop (phenotype/adherence). NER skips this — direct LLM.
+  const [agentProvider, setAgentProvider] = useState<string | null>(null);
+  useEffect(() => {
+    if (taskKind === "ner") { setAgentProvider(null); return; }
+    let cancelled = false;
+    authFetch("/api/runtime")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { agent_provider?: string } | null) => {
+        if (cancelled || !d) return;
+        setAgentProvider(d.agent_provider ?? null);
+      })
+      .catch(() => { /* swallow */ });
+    return () => { cancelled = true; };
+  }, [taskKind]);
+
+  const runtimeLabel = taskKind === "ner"
+    ? "direct LLM call to Azure /responses (no agent runtime)"
+    : agentProvider === "claude"
+      ? "Claude Agent SDK (tool-using agent loop)"
+      : agentProvider === "codex"
+        ? "Codex CLI (tool-using agent loop)"
+        : "agent runtime: (loading…)";
   const [patients, setPatients] = useState<Patient[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [agentSpecs, setAgentSpecs] = useState<AgentSpecForm[]>([
@@ -343,8 +370,13 @@ export function PhaseTry({
       </div>
 
       <div className="rounded-md border border-border bg-paper/40 px-4 py-3">
-        <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-1">
-          Agents ({sessionAgentSpecs.length})
+        <div className="flex items-baseline justify-between mb-1">
+          <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+            {taskKind === "ner" ? "Reviewers" : "Agents"} ({sessionAgentSpecs.length})
+          </div>
+          <div className="text-[10px] text-muted-foreground/80 italic">
+            {runtimeLabel}
+          </div>
         </div>
         {sessionAgentSpecs.length === 0 ? (
           <div className="text-[12px] text-muted-foreground italic">

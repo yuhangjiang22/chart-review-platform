@@ -648,6 +648,7 @@ export function Workspace({
             onAdvanceToValidate={() => setPhase("JUDGE")}
             activeSessionId={activeSessionId}
             onOpenNewSession={() => setNewSessionOpen(true)}
+            taskKind={taskKind}
           />
         )}
         {activePhase === "JUDGE" && activeSessionId && activeIter && (
