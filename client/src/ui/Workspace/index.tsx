@@ -795,6 +795,7 @@ export function Workspace({
         isOpen={sidebarOpen}
         onToggle={() => setSidebarOpen(!sidebarOpen)}
         onJumpToAuthor={() => setPhase("AUTHOR")}
+        taskKind={taskKind}
       />
     </div>
   );

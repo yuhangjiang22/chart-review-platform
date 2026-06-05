@@ -11,7 +11,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { cn } from "@/lib/utils";
-import { ChevronRight, ChevronLeft, FileText, ChevronDown } from "lucide-react";
+import { ChevronRight, ChevronLeft, FileText, ChevronDown, PanelRightClose } from "lucide-react";
 import { authFetch } from "../../auth";
 
 interface AgentSpecLite {
@@ -55,6 +55,10 @@ interface SessionSidebarProps {
   onToggle: () => void;
   /** Navigate to AUTHOR phase (skill snapshot link). */
   onJumpToAuthor: () => void;
+  /** task_kind drives agent-vs-reviewer terminology, matching the
+   *  PhaseTry pane. NER = reviewers (direct LLM); pheno/adh = agents
+   *  (agent loop). */
+  taskKind?: "phenotype" | "ner" | "adherence";
 }
 
 function fmtDate(iso: string): string {
@@ -68,8 +72,9 @@ function fmtDate(iso: string): string {
 
 export function SessionSidebar({
   taskId, activeSessionId, sessionIters, activeIterId,
-  patientStatus, isOpen, onToggle, onJumpToAuthor,
+  patientStatus, isOpen, onToggle, onJumpToAuthor, taskKind,
 }: SessionSidebarProps) {
+  const agentSectionLabel = taskKind === "ner" ? "Reviewers" : "Agents";
   const [session, setSession] = useState<SessionShape | null>(null);
 
   useEffect(() => {
@@ -108,18 +113,18 @@ export function SessionSidebar({
         "border-l border-border bg-paper/30",
       )}
     >
-      <div className="flex items-center justify-between px-3 pt-3 pb-2 border-b border-border/60">
-        <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-          Session
-        </div>
+      {/* Minimal top gutter — just the collapse affordance. The session
+          name + state below carry the identification; an additional
+          "SESSION" label would just duplicate the top-bar switcher. */}
+      <div className="flex items-center justify-end px-2 pt-2 pb-1">
         <button
           type="button"
           onClick={onToggle}
           className="p-1 rounded hover:bg-paper/80 text-muted-foreground hover:text-ink"
           aria-label="Collapse session sidebar"
-          title="Collapse"
+          title="Collapse sidebar"
         >
-          <ChevronRight size={14} strokeWidth={1.75} />
+          <PanelRightClose size={14} strokeWidth={1.75} />
         </button>
       </div>
 
@@ -166,24 +171,26 @@ export function SessionSidebar({
             </div>
           </div>
 
-          {/* Agents */}
+          {/* Agents / Reviewers — label tracks task_kind (parity with TRY pane) */}
           <div>
             <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground mb-1">
-              Agents ({specs.length})
+              {agentSectionLabel} ({specs.length})
             </div>
             {specs.length === 0 ? (
-              <div className="text-[10.5px] text-muted-foreground italic">No agent_specs locked.</div>
+              <div className="text-[10.5px] text-muted-foreground italic">
+                No {agentSectionLabel.toLowerCase()} locked.
+              </div>
             ) : (
-              <div className="space-y-0.5 text-[11px] font-mono">
-                {specs.map((s) => {
-                  const parts = [s.search_mode_preset, s.interpretation_preset, s.model || "(env default)"]
-                    .filter(Boolean);
-                  return (
-                    <div key={s.id} className="truncate">
-                      <span className="text-muted-foreground">{s.id}:</span> {parts.join(" · ")}
-                    </div>
-                  );
-                })}
+              <div className="space-y-1 text-[11px] font-mono">
+                {specs.map((s) => (
+                  <div key={s.id} className="leading-[1.35]">
+                    <span className="text-muted-foreground">{s.id}:</span>{" "}
+                    <span className="break-words">
+                      {[s.search_mode_preset, s.interpretation_preset, s.model || "(env default)"]
+                        .filter(Boolean).join(" · ")}
+                    </span>
+                  </div>
+                ))}
               </div>
             )}
           </div>
