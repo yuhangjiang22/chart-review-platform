@@ -1,0 +1,12 @@
+[
+  {
+    "row_id": "420051",
+    "patient_id": "patient_easy_icd_02",
+    "observation_source_value": "LOINC:72166-2",
+    "observation_source_concept_name": "Tobacco smoking status",
+    "observation_date": "2024-10-22",
+    "value_as_string": "Former smoker",
+    "observation_type": "social_history",
+    "note": "30 pack-year history, quit 2008"
+  }
+]

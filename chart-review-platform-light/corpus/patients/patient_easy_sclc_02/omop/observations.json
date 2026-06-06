@@ -1,0 +1,14 @@
+[
+  {
+    "row_id": "220009",
+    "observation_id": 220009,
+    "person_id": "sclc_02",
+    "observation_concept_id": 4275495,
+    "observation_concept_name": "Tobacco smoking status",
+    "observation_date": "2025-05-20",
+    "value_as_string": "Former smoker",
+    "observation_source_value": "former_smoker",
+    "observation_type_concept_id": 32817,
+    "qualifier_source_value": "40 pack-years, quit 2014"
+  }
+]

@@ -1,0 +1,31 @@
+VANDERBILT UNIVERSITY MEDICAL CENTER – RADIOLOGY
+CT CHEST WITH CONTRAST
+Date: 2025-08-04
+Patient: [REDACTED], 65M  MRN: [REDACTED]
+Ordering provider: Dr. T. Franklin, Endocrinology
+
+CLINICAL INDICATION: Hyponatremia workup (serum Na 118 mEq/L) with SIADH pattern. Evaluate for intrathoracic malignancy as paraneoplastic etiology.
+
+TECHNIQUE:
+Standard CT chest with IV contrast, portal venous phase. 1.25 mm axial slices; coronal/sagittal reconstructions.
+
+FINDINGS:
+LUNG PARENCHYMA: A 3.8 x 3.1 cm centrally located mass is identified at the right hilum, abutting the right upper lobe bronchus. Mild associated post-obstructive atelectasis in right upper lobe. No satellite nodules. Left lung clear.
+
+MEDIASTINUM/LYMPH NODES: Right paratracheal lymphadenopathy (station 4R, largest node 2.1 cm short-axis). Ipsilateral hilar adenopathy. No contralateral mediastinal involvement.
+
+PLEURA: Trace right pleural effusion. No pneumothorax.
+
+CARDIOVASCULAR: Normal cardiac size. No pericardial effusion.
+
+ADRENAL GLANDS: Normal in size and appearance bilaterally.
+
+BONES: No lytic or sclerotic lesions.
+
+IMPRESSION:
+1. Right hilar mass (3.8 cm) with ipsilateral mediastinal and hilar lymphadenopathy. Findings are highly concerning for a primary lung malignancy; central location and clinical context of SIADH raise high suspicion for small-cell lung carcinoma.
+2. Paraneoplastic SIADH secondary to lung malignancy is the most likely etiology of this patient's severe hyponatremia.
+3. Urgent tissue biopsy recommended. PET/CT and MRI brain advised for complete staging.
+
+Electronically signed: Dr. B. Osei, MD, Thoracic Radiology
+2025-08-04 14:22

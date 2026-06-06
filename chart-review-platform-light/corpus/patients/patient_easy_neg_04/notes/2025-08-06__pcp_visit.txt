@@ -1,0 +1,27 @@
+DATE: 2025-08-06
+PATIENT: Male, 80 yo | PROVIDER: Dr. J. Tran, MD — Primary Care
+VISIT: Routine follow-up — chronic atrial fibrillation
+
+CC: Routine AF follow-up; new fatigue and mild exertional dyspnea.
+
+HPI: Mr. [W.] has long-standing persistent AF. Over 6 weeks he notes increasing fatigue and mild exertional dyspnea (2-block walk previously tolerated). No orthopnea, no PND. Trace ankle swelling. No chest pain at rest. No palpitations beyond baseline irregular HR. No syncope. No fevers, night sweats, unintentional weight loss. No cough or hemoptysis. Former smoker (35 pack-years, quit 1990). No malignancy history.
+
+ROS: Constitutional: fatigue only. CV: exertional dyspnea. Resp: mild exertional dyspnea, no cough, no wheezing.
+
+PMH: Persistent AF (since 2014), HTN, CKD 3a, hyperlipidemia. CHA2DS2-VASc 5.
+MEDS: Apixaban 5 mg BID, metoprolol succinate 50 mg daily, lisinopril 5 mg daily, atorvastatin 40 mg nightly.
+ALLERGIES: Aspirin (GI intolerance). SOC HX: Former smoker, quit 1990. Nashville, TN.
+
+EXAM:
+VS: BP 134/80, HR 88 (irregular), RR 18, T 98.3°F, SpO2 95%, BMI 26.8
+CV: Irregularly irregular. No murmurs. JVP mildly elevated ~8 cm.
+Lungs: Mild bibasilar crackles. No wheezes.
+Extremities: Trace bilateral ankle edema.
+
+ECG (in office): AF with ventricular rate 88 bpm, no ST changes, no acute ischemic pattern.
+
+A/P:
+1. AF with possible early decompensated HF — order BNP, echo, CMP, CBC. Urgent cardiology referral.
+2. Anticoagulation — continue apixaban (CrCl 42 mL/min, standard dose appropriate).
+3. HTN — slightly elevated. Hold adjustments pending cardiology.
+4. CKD 3a — avoid NSAIDs. Continue renal-protective medications.

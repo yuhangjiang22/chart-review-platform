@@ -1,0 +1,13 @@
+{
+  "schema_version": "1",
+  "patient_id": "patient_easy_neg_04",
+  "task_id": "lung-cancer-phenotype",
+  "task_version": "2026-04-28",
+  "task_document_sha": "sha256:9ed4d2d4218d6771fe8cbf9cb9a58b722643ab4eedb1dc9e21410ff066831dcc",
+  "review_status": "agent_complete",
+  "version": 9,
+  "updated_at": "2026-05-10T15:22:52.662948Z",
+  "updated_by": "agent",
+  "field_assessments": [],
+  "selected_evidence": []
+}

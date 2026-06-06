@@ -1,0 +1,15 @@
+{
+  "name": "@chart-review/ontology",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Concept ontology for NER tasks. Loads a concepts.json (BSO-AD shape) and exposes typed listEntityTypes / getConceptTree / normalizeToOntology / locateInSource utilities. Pure logic; no I/O beyond loading. Consumed by mcp-server-ner-* and pipeline-extract-ner.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  }
+}

@@ -1,0 +1,98 @@
+id: previous_hepatotoxicity_info
+title: "Previous Information on Hepatotoxicity of the Drug"
+description: |
+  Assesses whether hepatotoxicity from the suspect MS-DMT is already known and documented
+  in the medical literature, regulatory filings, or product labeling. Pre-existing knowledge
+  of a drug's hepatotoxic potential strengthens the causal inference.
+
+instructions: |
+  1. Determine the hepatotoxicity status of the suspect MS-DMT:
+
+     Score +2 (Reaction labeled in product characteristics):
+     - The liver injury pattern is already listed in the FDA/EMA product label or prescribing information
+     - Examples:
+       * Fingolimod: Known to cause hepatic impairment; frequent LFT monitoring required
+       * Natalizumab: Associated with hepatotoxicity; LFT monitoring recommended
+       * Dimethyl fumarate: GI and hepatic adverse effects documented
+     - Evidence: FDA label, package insert, black box warning, or regulatory document explicitly mentioning hepatotoxicity
+
+     Score +1 (Reaction published but unlabeled):
+     - Hepatotoxicity has been reported in peer-reviewed literature but is NOT yet in official product labeling
+     - Examples: Case reports, pharmacovigilance data, published case series showing DILI with the drug
+     - Evidence: PubMed search results, pharmacovigilance databases (VigiBase, FAERS), conference presentations
+
+     Score 0 (Reaction unknown):
+     - No published evidence of hepatotoxicity from the drug
+     - Drug is thought to be hepatically safe or neutral
+     - No case reports or regulatory signals available
+
+  2. MS-DMT-Specific Hepatotoxicity Profile (Reference):
+     Use this guide to inform scoring:
+
+     BLACK BOX / HIGH RISK:
+     - Fingolimod (Gilenya): Hepatic impairment (hepatitis, elevated transaminases, cirrhosis rare)
+     - Natalizumab (Tysabri): Hepatotoxicity reported; progressive multifocal leukoencephalopathy may cofactor
+     - Dimethyl fumarate (Tecfidera): GI/hepatic toxicity, elevated LFTs, rare autoimmune hepatitis
+
+     MODERATE RISK:
+     - Teriflunomide (Aubagio): Hepatotoxicity (elevated transaminases, rare cirrhosis or hepatic necrosis)
+     - Glatiramer acetate (Copaxone): Uncommon hepatotoxicity
+     - Interferon-beta (Avonex, Betaseron): Elevated LFTs, hepatitis rare
+
+     LOW/UNCOMMON RISK:
+     - Siponimod, ozanimod (other S1P modulators): Similar to fingolimod but less studied
+     - Cladribine (Mavenclad): Limited experience; potential for hepatotoxicity
+
+     UNCERTAIN RISK:
+     - Newer agents with limited safety data
+
+  3. Document the evidence source:
+     - Source type (FDA label, published literature, case report, pharmacovigilance data)
+     - Date of knowledge (when was hepatotoxicity first recognized?)
+     - Strength of evidence (robust data vs. isolated reports)
+
+  4. Clinical interpretation:
+     - Score +2 indicates pre-existing knowledge strongly supports causality
+     - Score +1 indicates published concern but not yet official recognition
+     - Score 0 does NOT negate causality; it just means hepatotoxicity is not yet documented
+     - This criterion should NOT prevent scoring an injury as "probable" even if score is 0
+
+evidence_sources: |
+  - FDA/EMA prescribing information and product labeling for the suspect MS-DMT
+  - Black box warnings or significant safety alerts
+  - PubMed literature search for "[drug name] hepatotoxicity" or "[drug name] liver injury"
+  - Pharmacovigilance databases:
+    * FDA Adverse Event Reporting System (FAERS)
+    * WHO VigiBase (Uppsala Monitoring Centre)
+    * EMA EudraVigilance
+  - International drug safety databases and summary of product characteristics (SmPC)
+  - Case reports and published cohort studies on DILI with the specific DMT
+
+assessment_options:
+  - label: "+2 (Labeled hepatotoxicity)"
+    value: 2
+    description: "Hepatotoxicity documented in FDA/EMA prescribing information"
+  - label: "+1 (Published but unlabeled)"
+    value: 1
+    description: "Hepatotoxicity reported in peer-reviewed literature but not in official label"
+  - label: "0 (Unknown)"
+    value: 0
+    description: "No documented hepatotoxicity from this MS-DMT"
+
+ms_dmt_hepatotoxicity_reference: |
+  HIGH RISK (usually labeled):
+  - Fingolimod (Gilenya): +2
+  - Natalizumab (Tysabri): +2
+  - Dimethyl fumarate (Tecfidera): +2
+  - Teriflunomide (Aubagio): +2
+
+  MODERATE RISK (variable labeling):
+  - Glatiramer acetate (Copaxone): +1 to +2
+  - Interferon-beta (Avonex, Betaseron, Rebif): +1 to +2
+
+  LOWER RISK (or limited data):
+  - Siponimod (Mayzent): +1
+  - Ozanimod (Zeposia): +1
+  - Cladribine (Mavenclad): +0 to +1
+
+output_format: "Previous Hepatotoxicity Score: {value}"

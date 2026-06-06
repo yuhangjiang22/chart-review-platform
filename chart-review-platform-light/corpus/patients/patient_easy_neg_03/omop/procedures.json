@@ -1,0 +1,20 @@
+[
+  {
+    "row_id": "530001",
+    "procedure_occurrence_id": 530001,
+    "person_id": "patient_easy_neg_03",
+    "procedure_concept_name": "Thyroid ultrasound",
+    "procedure_date": "2025-10-08",
+    "cpt_code": "76536",
+    "note": "Diffusely heterogeneous, no nodule, consistent with Hashimoto's thyroiditis"
+  },
+  {
+    "row_id": "530002",
+    "procedure_occurrence_id": 530002,
+    "person_id": "patient_easy_neg_03",
+    "procedure_concept_name": "Endocrinology new patient consultation",
+    "procedure_date": "2025-10-14",
+    "cpt_code": "99245",
+    "note": "Evaluation and management of hypothyroidism / Hashimoto's thyroiditis"
+  }
+]

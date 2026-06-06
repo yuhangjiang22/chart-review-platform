@@ -1,0 +1,7 @@
+{
+  "name": "@chart-review/skill-chart-review-pe-on-cta-p4",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Phenotype skill bundle: criteria + keyword_sets + code_sets + edge_cases for the chart-review-pe-on-cta-p4 task.",
+  "files": ["SKILL.md", "meta.yaml", "references", "README.md"]
+}

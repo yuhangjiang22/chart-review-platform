@@ -1,0 +1,36 @@
+SOUTHEASTERN HEALTH SYSTEM — DEPARTMENT OF PATHOLOGY
+SURGICAL PATHOLOGY REPORT
+Accession: SHS-SP-2025-00872
+Patient: William D. Tanner  DOB: 1942-09-03  MRN: 993084
+Date Received: 2025-01-20  Date Reported: 2025-01-22
+Procedure: Left lower lobectomy (open thoracotomy) with mediastinal lymph node dissection
+Surgeon: Dr. Barbara J. Holloway, MD (Thoracic Surgery)
+
+GROSS DESCRIPTION:
+Left lower lobe lobectomy specimen. Sectioning reveals a 3.5 x 3.0 cm firm, gray-white, centrally necrotic mass in the posterior basal segment, 1.8 cm from the bronchial margin. Lymph node stations 10, 11, 12, 4L, and 7 submitted in labeled containers.
+
+MICROSCOPIC DESCRIPTION:
+The tumor shows sheets and irregular nests of polygonal cells with abundant glassy eosinophilic cytoplasm and distinct intercellular bridges. Prominent keratin pearls are present. Large, irregular nuclei with coarse chromatin and macronucleoli. Extensive central necrosis. Lymphovascular invasion identified (one focus). Visceral pleural invasion: present (PL1). Bronchial margin: negative (1.8 cm clear).
+
+Lymph nodes (8 nodes sampled):
+  Station 10 (3 nodes): 2 of 3 positive for metastatic carcinoma
+  Station 11 (2 nodes): 0 of 2 positive
+  Station 7 (2 nodes): 0 of 2 positive
+  Station 4L (1 node): 0 of 1 positive
+
+Immunohistochemistry:
+  p40: Diffuse strong nuclear positivity
+  p63: Positive
+  CK5/6: Positive
+  TTF-1: Negative; Napsin A: Negative
+  Synaptophysin: Negative; Chromogranin: Negative
+
+DIAGNOSIS:
+LEFT LOWER LOBE LOBECTOMY:
+— SQUAMOUS CELL CARCINOMA, poorly differentiated
+— Size: 3.5 cm; visceral pleural invasion (PL1); lymphovascular invasion present
+— pT2aN1M0 (AJCC 8th ed.) based on surgical specimen; 2/3 N1 nodes positive
+— Bronchial margin: negative
+
+Electronically signed: Dr. Lawrence E. Stubbs, MD (Thoracic Pathology)
+Date/Time: 2025-01-22  11:14

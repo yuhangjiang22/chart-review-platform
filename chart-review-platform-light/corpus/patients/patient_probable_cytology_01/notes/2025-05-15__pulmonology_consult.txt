@@ -1,0 +1,25 @@
+PULMONOLOGY CONSULTATION
+Provider: F. Iqbal, MD — Pulmonary and Critical Care
+Encounter date: 2025-05-15
+
+REASON FOR CONSULTATION
+3.1 cm right upper lobe mass on CT in an 81-year-old with severe COPD
+on home oxygen. Tissue diagnosis requested.
+
+ASSESSMENT
+The patient's pulmonary reserve is severely limited (FEV1 32% predicted
+on most recent PFTs). Core biopsy of a right upper lobe mass in this
+setting carries substantial risk of pneumothorax that we judge
+prohibitive. After multidisciplinary discussion with thoracic surgery
+and interventional radiology, we will proceed with the lower-risk
+endobronchial transbronchial fine-needle aspiration (FNA) cytology and
+defer surgical or core biopsy.
+
+PLAN
+1. EBUS with FNA cytology of the right upper lobe mass.
+2. If cytology supports primary lung malignancy and clinical context
+   confirms, proceed to oncology referral.
+3. No core biopsy or surgical pathology will be obtained given pulmonary
+   risk profile.
+
+F. Iqbal, MD — electronically signed 2025-05-15

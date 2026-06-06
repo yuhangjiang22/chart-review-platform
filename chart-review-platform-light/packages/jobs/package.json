@@ -1,0 +1,16 @@
+{
+  "name": "@chart-review/jobs",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Async job queue (manifest + status + JSONL transcript). Used by authoring drafter, methods drafter, and cohort feedback agent.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": { "types": "./src/index.ts", "default": "./src/index.ts" }
+  },
+  "dependencies": {
+    "@chart-review/storage": "*",
+    "@chart-review/patients": "*"
+  }
+}

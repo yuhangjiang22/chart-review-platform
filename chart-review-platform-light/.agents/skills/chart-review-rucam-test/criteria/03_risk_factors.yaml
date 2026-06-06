@@ -1,0 +1,92 @@
+id: risk_factors
+title: "Risk Factors"
+description: |
+  Assesses standard RUCAM risk factors (alcohol, pregnancy, age) plus MS-specific risk factors
+  that may increase susceptibility to drug-induced liver injury.
+
+instructions: |
+  STANDARD RUCAM RISK FACTORS:
+
+  1. Alcohol use (Hepatocellular type):
+     - Score +1 if documented chronic ethanol use or AST/ALT ≥2
+     - Score 0 if no evidence of significant alcohol use
+
+  2. Pregnancy or Ethanol (Cholestatic or Mixed type):
+     - Score +1 if patient is pregnant OR has documented chronic ethanol use
+     - Score 0 if neither present
+
+  3. Age ≥55 years (All types):
+     - Score +1 if age ≥55 at time of injury
+     - Score 0 if age <55
+
+  MS-SPECIFIC RISK FACTORS:
+  Assess each of the following and note presence/absence in the chart.
+  Each positive factor strengthens the risk profile but does not change the numeric score
+  (these are documented as context, not as additional point values).
+
+  4. Pre-existing liver disease or cirrhosis:
+     - Evidence: ICD-10 codes (K70–K77), imaging reports (ultrasound/CT), biopsy pathology,
+       or documented diagnosis in problem list
+     - If present: Note as significant risk factor for fulminant hepatotoxicity
+
+  5. Concurrent hepatotoxic medications:
+     - Evidence: Active medication list reviewed for known hepatotoxins (acetaminophen >3g/day,
+       NSAIDs, statins, antiepileptics, antibiotics, etc.)
+     - Timeline: Assess if other hepatotoxic drugs were started around time of liver injury
+     - Note: These are scored separately in Criterion 4 (Concomitant Drugs); this is contextual
+
+  6. History of autoimmune hepatitis:
+     - Evidence: ICD-10 code K75.4, serology (ANA, anti-smooth muscle antibody, anti-LKM),
+       liver biopsy showing lymphocytic infiltration, or documented diagnosis
+     - If present: Autoimmune reactivation may confound causality assessment
+
+  7. Immunosuppression status or concomitant immunosuppressive therapy:
+     - Evidence: Current immunosuppressive agents (corticosteroids, azathioprine, mycophenolate, etc.),
+       CD4 count if HIV+, documented immunocompromised state in problem list
+     - If present: May increase susceptibility to idiosyncratic DILI
+
+  8. Prior drug-induced liver injury (DILI) or drug hypersensitivity reactions:
+     - Evidence: Documented adverse drug reactions in allergy/ADR section, prior hospitalization
+       or ER visit for drug reaction, historical notes mentioning past DILI
+     - If present: Suggests genetic predisposition to drug hypersensitivity and idiosyncratic DILI
+
+  9. Pre-existing autoimmune disease (beyond MS):
+     - Evidence: ICD-10 codes or documented diagnoses (lupus, rheumatoid arthritis, Sjögren's,
+       primary biliary cirrhosis, primary sclerosing cholangitis, etc.)
+     - If present: Autoimmune conditions increase risk of autoimmune-mediated liver injury
+
+  SCORING SUMMARY:
+  - Standard risk factors (alcohol, pregnancy, age) are scored as +1 or 0 each (per RUCAM)
+  - MS-specific risk factors are documented as present/absent (context for final assessment, not direct points)
+  - Reviewer must note which MS-specific factors are present to inform clinical judgment
+
+evidence_sources: |
+  - Patient age at time of liver injury onset
+  - Alcohol use history (documented in social history, addiction notes, or lab markers like AST/ALT ratio)
+  - Pregnancy status (from problem list, medication list, imaging, or clinical note)
+  - Problem list and past medical history (ICD codes, diagnoses)
+  - Prior liver biopsies or imaging reports
+  - Current medication list (immunosuppressants, hepatotoxic agents)
+  - Allergy/adverse drug reaction documentation
+  - Serology and autoimmune marker results
+  - Immunosuppression status (CD4 count if HIV+)
+
+assessment_options:
+  - label: "Standard Factors: +1 for alcohol/pregnancy/age ≥55"
+    value: 1
+    description: "One or more standard RUCAM risk factors present"
+  - label: "Standard Factors: 0"
+    value: 0
+    description: "No standard RUCAM risk factors identified"
+
+ms_specific_risk_factors:
+  - Pre-existing liver disease or cirrhosis
+  - Concurrent hepatotoxic medications
+  - History of autoimmune hepatitis
+  - Immunosuppression or concomitant immunosuppressive therapy
+  - Prior DILI or drug hypersensitivity reaction
+  - Pre-existing autoimmune disease
+
+output_format: |
+  Standard RUCAM Score: {value}
+  MS-Specific Risk Factors Present: [list of applicable factors]

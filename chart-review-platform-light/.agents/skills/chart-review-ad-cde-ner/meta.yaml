@@ -1,0 +1,26 @@
+task_type: ner
+task_kind: ner
+manual_version: 0.1
+source_document_sha: sha256:ad-cde-converted-from-owl-2026-05-19
+status: draft
+review_unit: patient
+overview_prose: >-
+  AD-CDE (Alzheimer's Disease Common Data Elements) NER task. Extract
+  entity spans from patient notes and normalize each to a canonical
+  concept_name from the AD-CDE ontology — 7 entity-type subtrees
+  (Disease, Procedure, Medication, Diagnostic_Test, Rating_Criteria,
+  Social_Determinant_Of_Health, Fertility), 284 concepts total.
+
+  Derived from /AD-ontology/AD_CDE_w_constraint.owl by
+  scripts/convert-ad-cde-to-concepts.mjs. The ontology is vendored at
+  references/ontology/concepts.json — this skill is
+  lock-self-contained. Sister task to chart-review-bso-ad-ner (same
+  pipeline, different scope).
+final_output: span_labels
+phases:
+  - author
+  - try
+  - validate
+  - decide
+  - lock
+ontology_pin: ad-cde@0.1

@@ -1,0 +1,29 @@
+[
+  {
+    "row_id": "420031",
+    "patient_id": "patient_easy_icd_02",
+    "encounter_date": "2024-10-22",
+    "encounter_type": "emergency",
+    "department": "Emergency Department",
+    "visit_reason": "Right hip fracture after mechanical fall",
+    "discharge_date": "2024-10-22"
+  },
+  {
+    "row_id": "420032",
+    "patient_id": "patient_easy_icd_02",
+    "encounter_date": "2024-10-22",
+    "encounter_type": "inpatient",
+    "department": "Orthopedic Surgery",
+    "visit_reason": "Inpatient admission for right intertrochanteric femur fracture ORIF",
+    "discharge_date": "2024-10-26"
+  },
+  {
+    "row_id": "420033",
+    "patient_id": "patient_easy_icd_02",
+    "encounter_date": "2024-11-04",
+    "encounter_type": "outpatient",
+    "department": "Internal Medicine / Primary Care",
+    "visit_reason": "Post-hospitalization follow-up after hip fracture surgery",
+    "discharge_date": "2024-11-04"
+  }
+]

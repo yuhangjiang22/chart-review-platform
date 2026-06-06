@@ -1,0 +1,10 @@
+{
+  "patient_id": "patient_demo_asthma_01",
+  "category": "asthma_adherence_demo",
+  "demographics": { "age": 42, "sex": "F", "region": "Midwest" },
+  "smoking": "never",
+  "index_date": "2026-04-12",
+  "doc_types": ["pcp_followup", "pulmonology_consult", "pcp_progress"],
+  "generated_by": "hand_authored_demo",
+  "generation_run_id": "asthma-adherence-demo-2026-05"
+}

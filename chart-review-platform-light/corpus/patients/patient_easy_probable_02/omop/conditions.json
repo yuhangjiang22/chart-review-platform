@@ -1,0 +1,48 @@
+[
+  {
+    "row_id": "320001",
+    "condition_occurrence_id": "320001",
+    "condition_concept_id": "255573",
+    "condition_concept_name": "Chronic obstructive lung disease",
+    "condition_source_value": "J44.1",
+    "condition_start_date": "2015-08-14",
+    "condition_type_concept_id": "32817",
+    "condition_type_concept_name": "EHR encounter diagnosis",
+    "condition_status_concept_name": "Primary",
+    "note": "COPD GOLD Stage II — no C34.* code entered; icd_lung_cancer_present=no"
+  },
+  {
+    "row_id": "320002",
+    "condition_occurrence_id": "320002",
+    "condition_concept_id": "320128",
+    "condition_concept_name": "Essential hypertension",
+    "condition_source_value": "I10",
+    "condition_start_date": "2010-04-22",
+    "condition_type_concept_id": "32817",
+    "condition_type_concept_name": "EHR encounter diagnosis",
+    "condition_status_concept_name": "Primary"
+  },
+  {
+    "row_id": "320003",
+    "condition_occurrence_id": "320003",
+    "condition_concept_id": "201826",
+    "condition_concept_name": "Type 2 diabetes mellitus",
+    "condition_source_value": "E11.9",
+    "condition_start_date": "2012-09-07",
+    "condition_type_concept_id": "32817",
+    "condition_type_concept_name": "EHR encounter diagnosis",
+    "condition_status_concept_name": "Primary"
+  },
+  {
+    "row_id": "320004",
+    "condition_occurrence_id": "320004",
+    "condition_concept_id": "4048201",
+    "condition_concept_name": "Malignant tumor of prostate in remission",
+    "condition_source_value": "Z85.46",
+    "condition_start_date": "2008-01-01",
+    "condition_type_concept_id": "32817",
+    "condition_type_concept_name": "EHR encounter diagnosis",
+    "condition_status_concept_name": "Primary",
+    "note": "Remote prostate cancer — treated and in remission; not a lung primary"
+  }
+]

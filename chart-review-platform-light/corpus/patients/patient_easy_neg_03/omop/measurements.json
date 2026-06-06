@@ -1,0 +1,51 @@
+[
+  {
+    "row_id": "530001",
+    "measurement_id": 530001,
+    "person_id": "patient_easy_neg_03",
+    "measurement_concept_name": "Thyroid stimulating hormone (TSH)",
+    "measurement_date": "2025-10-01",
+    "value_as_number": 9.8,
+    "unit_concept_name": "mIU/L",
+    "reference_range": "0.4-4.0"
+  },
+  {
+    "row_id": "530002",
+    "measurement_id": 530002,
+    "person_id": "patient_easy_neg_03",
+    "measurement_concept_name": "Free T4 (thyroxine)",
+    "measurement_date": "2025-10-01",
+    "value_as_number": 0.7,
+    "unit_concept_name": "ng/dL",
+    "reference_range": "0.8-1.8"
+  },
+  {
+    "row_id": "530003",
+    "measurement_id": 530003,
+    "person_id": "patient_easy_neg_03",
+    "measurement_concept_name": "Anti-thyroid peroxidase antibody (anti-TPO)",
+    "measurement_date": "2025-10-01",
+    "value_as_number": 842,
+    "unit_concept_name": "IU/mL",
+    "reference_range": "<35"
+  },
+  {
+    "row_id": "530004",
+    "measurement_id": 530004,
+    "person_id": "patient_easy_neg_03",
+    "measurement_concept_name": "Anti-thyroglobulin antibody",
+    "measurement_date": "2025-10-01",
+    "value_as_number": 210,
+    "unit_concept_name": "IU/mL",
+    "reference_range": "<20"
+  },
+  {
+    "row_id": "530005",
+    "measurement_id": 530005,
+    "person_id": "patient_easy_neg_03",
+    "measurement_concept_name": "Heart rate",
+    "measurement_date": "2025-09-22",
+    "value_as_number": 58,
+    "unit_concept_name": "bpm"
+  }
+]

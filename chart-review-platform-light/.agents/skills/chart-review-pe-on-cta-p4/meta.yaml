@@ -1,0 +1,31 @@
+task_type: phenotype_validation
+review_unit: patient
+manual_version: '2026-05-07-draft'
+index_anchor: cta_chest_encounter
+time_windows:
+  - id: pre_cta_24h
+    anchor: index_anchor
+    start_offset: -P1D
+    end_offset: P0D
+    label: 24h before CTA (workup-indication evidence window)
+final_output: pe_present
+overview_prose: |
+  Identify pulmonary embolism cases ascertained on CT pulmonary
+  angiography (CTPA). Population is restricted to CTPAs performed for
+  documented PE workup — i.e., the CTA was ordered because PE was
+  clinically suspected (Wells score documented, D-dimer ordered in the
+  preceding 24h, or "suspected PE" in the order indication).
+
+  Population: adults who underwent CTPA AND for whom PE workup
+  indication is documented at index.
+  Index date: the CTPA encounter timestamp.
+
+  Output: pe_present (yes / no / cannot_determine). v0 uses strict
+  reading: any PE documented on the CTA report = "yes," including
+  subsegmental PE.
+
+  Note: This rubric went through three Phase-3 reversions during the
+  build interview (CTA only → CTA+V/Q → CTA only → CTA + indication
+  filter). Final scope reflects the researcher's intent after
+  iteration; v1 may revisit if calibration shows reviewers struggling
+  to identify "documented PE workup."

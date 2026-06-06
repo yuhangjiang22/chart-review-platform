@@ -1,0 +1,44 @@
+{
+  "session_id": "session_003",
+  "session_num": 3,
+  "task_id": "ad-cde-ner",
+  "name": "session 2",
+  "started_at": "2026-06-05T02:25:11.243Z",
+  "started_by": "yuhang",
+  "state": "archived",
+  "cohort": {
+    "patient_ids": [
+      "patient_easy_nsclc_01"
+    ]
+  },
+  "default_agent_specs": [
+    {
+      "id": "agent_1",
+      "search_mode_preset": "smart-search",
+      "interpretation_preset": "default",
+      "model": "gpt-5.2"
+    },
+    {
+      "id": "agent_2",
+      "search_mode_preset": "smart-search",
+      "interpretation_preset": "skeptical",
+      "model": "gpt-4o"
+    }
+  ],
+  "skill_snapshot_sha": "a1a7cd57b20032f6",
+  "agent_specs": [
+    {
+      "id": "agent_1",
+      "search_mode_preset": "smart-search",
+      "interpretation_preset": "default",
+      "model": "gpt-5.2"
+    },
+    {
+      "id": "agent_2",
+      "search_mode_preset": "smart-search",
+      "interpretation_preset": "skeptical",
+      "model": "gpt-4o"
+    }
+  ],
+  "ended_at": "2026-06-06T15:14:48.338Z"
+}

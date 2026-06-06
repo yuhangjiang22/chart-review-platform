@@ -1,0 +1,28 @@
+DATE: 2025-10-14
+PATIENT: Female, 55 yo | PROVIDER: Dr. S. Kapoor, MD — Endocrinology
+VISIT: New patient endocrinology consult — hypothyroidism / Hashimoto's
+
+REFERRAL: Evaluation of newly diagnosed hypothyroidism with suspected Hashimoto's thyroiditis.
+
+INTERVAL HX: Ms. [P.] started levothyroxine 50 mcg on 2025-09-22. Mild improvement in energy and cold intolerance. Constipation improved. Hair thinning ongoing. No palpitations, tremor, or heat intolerance. No fevers, cough, or respiratory complaints. Weight stable. No malignancy history.
+
+LABS (2025-10-01):
+- TSH: 9.8 mIU/L (H, ref 0.4–4.0)
+- Free T4: 0.7 ng/dL (L, ref 0.8–1.8)
+- Anti-TPO: 842 IU/mL (H, ref <35)
+- Anti-Tg: 210 IU/mL (H, ref <20)
+- CBC/CMP: Normal
+
+THYROID US (2025-10-08): Diffusely heterogeneous, hypoechoic parenchyma consistent with autoimmune thyroiditis (Hashimoto's pattern). Both lobes mildly enlarged. No discrete nodule. No suspicious cervical lymphadenopathy.
+
+EXAM:
+VS: BP 114/72, HR 62, BMI 27.9
+Thyroid: Mildly enlarged bilaterally, firm, non-tender, no palpable nodule. Neck: No LAD.
+Lungs: CTA bilaterally. Reflexes: mildly delayed but improved.
+
+A/P:
+1. Hashimoto's thyroiditis, overt hypothyroidism. Uptitrate levothyroxine to 75 mcg daily. Recheck TSH/free T4 in 6 weeks. Adjust calcium supplement timing.
+2. Thyroid US: No nodular disease. Repeat in 2-3 years.
+3. Bone health: Adequate calcium/vitamin D. DEXA at age 60.
+
+F/U endocrinology 8 weeks. Continue PCP follow-up.

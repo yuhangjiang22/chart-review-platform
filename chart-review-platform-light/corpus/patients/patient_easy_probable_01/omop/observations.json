@@ -1,0 +1,20 @@
+[
+  {
+    "row_id": "310041",
+    "observation_concept_id": "4275495",
+    "observation_concept_name": "Former smoker",
+    "observation_source_value": "SNOMED:8517006",
+    "observation_date": "2025-01-12",
+    "value_as_string": "Former smoker. 25 pack-years. Quit 2005.",
+    "provider": "Dr. A. Torres, Thoracic Oncology"
+  },
+  {
+    "row_id": "310042",
+    "observation_concept_id": "40766362",
+    "observation_concept_name": "ECOG performance status",
+    "observation_source_value": "ECOG:1",
+    "observation_date": "2025-01-12",
+    "value_as_number": 1,
+    "value_as_string": "ECOG 1 — restricted in strenuous activity but ambulatory and able to carry out light work"
+  }
+]

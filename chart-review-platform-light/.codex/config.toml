@@ -1,0 +1,135 @@
+# Codex configuration for chart-review-platform — checked into the repo.
+#
+# CodexAgentProvider sets CODEX_HOME to this directory before spawning
+# `codex exec`, so teammates only need to clone the repo + set
+# AZURE_OPENAI_API_KEY (and a few other secrets) in app/.env. No
+# manual `mkdir ~/.codex` or `codex login` required.
+#
+# This registers the platform's MCP server (chart_review_state) so
+# Codex can call set_field_assessment, find_quote_offsets, etc. when
+# the agent is invoked via `AGENT_PROVIDER=codex` from the platform.
+#
+# The env_vars list below are the ones the MCP subprocess reads at
+# startup. The platform sets them when spawning Codex (via
+# CodexAgentProvider in app/server/agent-provider-codex.ts), so they
+# carry the per-(patient, task, sessionId) context across the
+# subprocess boundary.
+
+# Auth/routing:
+#   Active path: Azure OpenAI via the IU BHDS NLP Foundry resource.
+#   This is OpenAI's native Responses API (not a compat layer), so the
+#   `mcp_call` tool type survives end-to-end and our chart_review_state
+#   MCP tools work correctly. AZURE_OPENAI_API_KEY is set in
+#   chart-review-platform/app/.env and inherited by the dev server.
+#
+# Failed alternatives we tried (kept here so we don't repeat them):
+#   - OpenRouter (model_provider = "openrouter"): chat-completions
+#     compat layer drops `mcp_call`; agent saw zero MCP tools and
+#     produced empty drafts.
+#   - ChatGPT-account auth (default codex login): works for MCP but
+#     capped by the subscription's monthly Codex quota.
+#
+# Other options if Azure ever fails:
+#   - direct OpenAI API key:  `codex logout`, set OPENAI_API_KEY,
+#                             remove `model_provider` below.
+#   - ChatGPT-account auth:   `codex login`, remove `model_provider`.
+
+model = "gpt-5.2"
+model_provider = "azure"
+# Azure's Responses API speaks the full reasoning-summary protocol
+# correctly, so we don't need the "no" flags we added for OpenRouter.
+#
+# History: `medium` was needed when our MCP server only exposed WRITE
+# tools (set_field_assessment etc.) — the agent had to reason "I should
+# read the note, but no read-tool exists, so I'll shell out". With
+# `low` it lazily called list_mcp_resources instead.
+#
+# Now that we expose read-side tools (list_notes / read_note /
+# list_structured_data / read_structured_data / list_criteria /
+# read_criterion), the catalog itself tells the agent what to do —
+# less reasoning needed. `low` cuts hidden-COT tokens roughly in half.
+# If accuracy regresses on a real cohort, revert to `medium`.
+model_reasoning_effort = "low"
+
+[model_providers.azure]
+name = "Azure OpenAI"
+# /openai/v1 is the v1 Responses path (no api-version query param).
+# The resource URL ends in `services.ai.azure.com` rather than the
+# classic `openai.azure.com` because this is a Foundry-style resource
+# — the same `/openai/v1` suffix applies.
+base_url = "https://iu-bhds-nlp-project.services.ai.azure.com/openai/v1"
+env_key = "AZURE_OPENAI_API_KEY"
+wire_api = "responses"
+
+# MCP server path is resolved via $CHART_REVIEW_PLATFORM_ROOT so this
+# config is portable across machines / checkouts. CodexAgentProvider
+# injects that env var (pointing at the cloned repo root) into the
+# codex CLI's env before spawn.
+[mcp_servers.chart_review_state]
+command = "bash"
+args = [
+  "-lc",
+  "exec npx tsx \"${CHART_REVIEW_PLATFORM_ROOT}/server/lib/mcp-stdio-server.ts\"",
+]
+env_vars = [
+  "CHART_REVIEW_MCP_PATIENT_ID",
+  "CHART_REVIEW_MCP_TASK_ID",
+  "CHART_REVIEW_MCP_SESSION_ID",
+  "CHART_REVIEW_REVIEWS_ROOT",
+  "CHART_REVIEW_PLATFORM_ROOT",
+  "PATH",
+]
+
+# NER MCP server — chart_review_ner. Active when the agent runs an
+# NER-kind task. Same transport pattern as chart_review_state; the
+# Codex provider forwards CHART_REVIEW_NER_* env vars into Codex's
+# spawn context so this subprocess gets the per-(patient, task,
+# session) context.
+[mcp_servers.chart_review_ner]
+command = "bash"
+args = [
+  "-lc",
+  "exec npx tsx \"${CHART_REVIEW_PLATFORM_ROOT}/packages/mcp-server-ner-stdio/src/index.ts\"",
+]
+env_vars = [
+  "CHART_REVIEW_NER_PATIENT_ID",
+  "CHART_REVIEW_NER_TASK_ID",
+  "CHART_REVIEW_NER_SESSION_ID",
+  "CHART_REVIEW_NER_ONTOLOGY_PATH",
+  "CHART_REVIEW_REVIEWS_ROOT",
+  "CHART_REVIEW_PLATFORM_ROOT",
+  "PATH",
+]
+
+# Adherence MCP server — chart_review_adherence. Active when the agent
+# runs an adherence-kind task. Exposes list_questions / read_question /
+# set_question_answer / get_adherence_state / set_review_status plus
+# read-side note tools. Rule engine + nuanced LLM judge run server-side
+# after the agent loop completes.
+[mcp_servers.chart_review_adherence]
+command = "bash"
+args = [
+  "-lc",
+  "exec npx tsx \"${CHART_REVIEW_PLATFORM_ROOT}/packages/mcp-server-adherence-stdio/src/index.ts\"",
+]
+env_vars = [
+  "CHART_REVIEW_ADH_PATIENT_ID",
+  "CHART_REVIEW_ADH_TASK_ID",
+  "CHART_REVIEW_ADH_SESSION_ID",
+  "CHART_REVIEW_REVIEWS_ROOT",
+  "CHART_REVIEW_PLATFORM_ROOT",
+  "PATH",
+]
+
+# Project trust is what codex calls workspace allowlist. The path
+# below is computed at runtime by CodexAgentProvider — checked-in
+# values here are placeholders so codex stops nagging on first run
+# in the canonical dev directory.
+[projects."/Users/yj38/Documents/Chart-Review-Agents-main"]
+trust_level = "trusted"
+
+[projects."/private/tmp"]
+trust_level = "trusted"
+
+[projects."/Users/yj38/Documents/Chart-Review-Agents-main/chart-review-platform-v2"]
+trust_level = "trusted"

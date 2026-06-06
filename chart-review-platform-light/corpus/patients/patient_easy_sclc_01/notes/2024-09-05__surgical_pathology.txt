@@ -1,0 +1,27 @@
+INDIANA UNIVERSITY HEALTH – SURGICAL PATHOLOGY
+Date: 2024-09-05
+Patient: [REDACTED], 67M  MRN: [REDACTED]
+Specimen: Endobronchial ultrasound-guided transbronchial needle aspiration (EBUS-TBNA), right paratracheal lymph node station 4R
+
+GROSS DESCRIPTION:
+Received in formalin: two core biopsy fragments, tan-gray, each approximately 1.0 cm in length. Moderate crush artifact noted. Cores entirely submitted for processing.
+
+MICROSCOPIC DESCRIPTION:
+Sections show sheets and nests of small, round-to-oval cells with scant cytoplasm and finely stippled "salt-and-pepper" chromatin. Nuclear molding is prominent. Nucleoli are inconspicuous. Mitotic figures are numerous (estimated >20 per 10 high-power fields). Geographic necrosis is present. Crush artifact is observed in a subset of the cores, consistent with high nuclear-to-cytoplasmic ratio tumor cells.
+
+Immunohistochemistry performed on block A1:
+- Synaptophysin: POSITIVE (diffuse)
+- Chromogranin A: POSITIVE (focal-moderate)
+- CD56: POSITIVE (diffuse)
+- TTF-1: POSITIVE (diffuse nuclear)
+- Ki-67: ~85% (high proliferative index)
+- p40: NEGATIVE
+- CK7: POSITIVE (patchy)
+- p63: NEGATIVE
+
+DIAGNOSIS:
+Small-cell carcinoma, consistent with small-cell lung carcinoma (SCLC). IHC profile (synaptophysin+, CD56+, TTF-1+, p40−, Ki-67 ~85%) supports neuroendocrine lineage and primary pulmonary origin.
+
+Pathologist: Dr. M. Okafor, MD, PhD
+Department of Pathology, IU Health
+Electronically signed: 2024-09-05 17:30

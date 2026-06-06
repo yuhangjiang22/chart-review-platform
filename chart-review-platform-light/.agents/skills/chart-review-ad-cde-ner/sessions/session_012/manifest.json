@@ -1,0 +1,16 @@
+{
+  "session_id": "session_012",
+  "session_num": 12,
+  "task_id": "ad-cde-ner",
+  "name": "smoke session A",
+  "started_at": "2026-06-06T15:20:12.052Z",
+  "started_by": "yuhang",
+  "state": "archived",
+  "cohort": {
+    "patient_ids": [
+      "patient_easy_nsclc_01"
+    ]
+  },
+  "skill_snapshot_sha": "cb8d9d0deabba12f",
+  "ended_at": "2026-06-06T15:20:12.269Z"
+}

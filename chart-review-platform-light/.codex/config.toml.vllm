@@ -1,0 +1,229 @@
+# EXAMPLE: Codex configuration for chart-review-platform pointed at a
+# local vLLM instance. Mirrors the active config.toml shape but swaps
+# the model_provider from Azure to a self-hosted vLLM endpoint.
+#
+# To activate this file:
+#   1. Verify your vLLM is up:    curl -s http://localhost:8000/v1/models | jq .
+#   2. Edit the `model = "..."` line below to match what vLLM serves.
+#   3. Replace config.toml with this file:
+#        cd chart-review-platform-v2/.codex
+#        cp config.toml config.toml.azure-backup
+#        cp config.toml.vllm config.toml
+#   4. Add to .env:
+#        AGENT_PROVIDER=codex
+#        VLLM_API_KEY=not-needed   # or whatever --api-key you passed to vllm serve
+#   5. Restart the server (npm run dev) — codex reads config.toml on every
+#      spawn, but AGENT_PROVIDER change needs a server restart.
+#   6. Smoke-test on ONE patient first (see "MCP-tool risk" below).
+#
+# ── MCP-tool risk ─────────────────────────────────────────────────────
+# vLLM serves OpenAI's Chat Completions wire (not the newer Responses
+# API Azure uses). The team's notes on the original config.toml warned:
+#
+#   "OpenRouter (model_provider = openrouter): chat-completions compat
+#    layer drops `mcp_call`; agent saw zero MCP tools and produced
+#    empty drafts."
+#
+# vLLM has the same wire shape, so the SAME RISK applies. Mitigations:
+#   - Start vLLM with `--enable-auto-tool-choice --tool-call-parser X`
+#     where X matches the model family (hermes / llama3_json / mistral).
+#   - Use a model trained for tool-calling (Qwen3-Instruct, Llama-3.1-
+#     Instruct, Mistral-Large). Smaller / base models drop tool hints.
+#   - After starting a run, watch the audit log:
+#       curl -s http://localhost:3002/api/runs/<run_id>/patients/<pid>/audit \
+#         | python3 -c "..."   # see the smoke-test snippet below
+#     If you see zero set_question_answer / set_field_assessment calls,
+#     translation broke. Stop the run and revert to the Azure config.
+
+# ──────────────────────────────────────────────────────────────────────
+# Active model + provider
+# ──────────────────────────────────────────────────────────────────────
+
+# Pick the model your vLLM serves. Confirm with:
+#   curl -s http://localhost:8000/v1/models | jq '.data[].id'
+model = "Qwen/Qwen3-72B-Instruct"
+
+# Which [model_providers.X] block is the active route.
+model_provider = "vllm"
+
+# reasoning_effort is an OpenAI Responses-API concept. vLLM's Chat
+# Completions wire ignores it. Left commented out so it doesn't quietly
+# do nothing.
+# model_reasoning_effort = "low"
+
+# ──────────────────────────────────────────────────────────────────────
+# Provider definitions
+# ──────────────────────────────────────────────────────────────────────
+
+# Local vLLM — OpenAI-compatible Chat Completions endpoint.
+[model_providers.vllm]
+name = "Local vLLM"
+# Note: /v1 suffix is required. Codex appends `/chat/completions` etc.
+# automatically. Pointing at /v1/chat/completions directly will 404.
+base_url = "http://localhost:8000/v1"
+# vLLM doesn't require auth unless you started it with `--api-key sk-...`.
+# Codex insists on this field anyway; the value can be anything when
+# vLLM doesn't enforce it. Put a real value here if you used --api-key.
+env_key = "VLLM_API_KEY"
+# CRITICAL: vLLM serves Chat Completions, not Responses. The default
+# wire_api is "responses" which would 404 against vLLM.
+wire_api = "chat"
+# Optional resilience knobs — vLLM streams may be slower than Azure for
+# long notes; give it room.
+request_max_retries = 2
+stream_idle_timeout_ms = 180000
+
+# Keep the Azure block here so you can switch back by toggling the
+# top-level `model_provider = "azure"` line — no need to redeclare it.
+[model_providers.azure]
+name = "Azure OpenAI"
+base_url = "https://iu-bhds-nlp-project.services.ai.azure.com/openai/v1"
+env_key = "AZURE_OPENAI_API_KEY"
+wire_api = "responses"
+
+# ──────────────────────────────────────────────────────────────────────
+# MCP servers — unchanged from the Azure config.
+# These are what give the agent its chart-review tools (read notes /
+# read OMOP / commit answers). If any of these registrations is
+# missing, the agent has no way to read the chart or commit work.
+# ──────────────────────────────────────────────────────────────────────
+
+# Phenotype path — chart_review_state.
+[mcp_servers.chart_review_state]
+command = "bash"
+args = [
+  "-lc",
+  "exec npx tsx \"${CHART_REVIEW_PLATFORM_ROOT}/server/lib/mcp-stdio-server.ts\"",
+]
+env_vars = [
+  "CHART_REVIEW_MCP_PATIENT_ID",
+  "CHART_REVIEW_MCP_TASK_ID",
+  "CHART_REVIEW_MCP_SESSION_ID",
+  "CHART_REVIEW_REVIEWS_ROOT",
+  "CHART_REVIEW_PLATFORM_ROOT",
+  "PATH",
+]
+
+# NER path — chart_review_ner.
+[mcp_servers.chart_review_ner]
+command = "bash"
+args = [
+  "-lc",
+  "exec npx tsx \"${CHART_REVIEW_PLATFORM_ROOT}/packages/mcp-server-ner-stdio/src/index.ts\"",
+]
+env_vars = [
+  "CHART_REVIEW_NER_PATIENT_ID",
+  "CHART_REVIEW_NER_TASK_ID",
+  "CHART_REVIEW_NER_SESSION_ID",
+  "CHART_REVIEW_NER_ONTOLOGY_PATH",
+  "CHART_REVIEW_REVIEWS_ROOT",
+  "CHART_REVIEW_PLATFORM_ROOT",
+  "PATH",
+]
+
+# Adherence path — chart_review_adherence (the asthma-adherence task we
+# just built). 10 tools: list/read_questions, set_question_answer,
+# get_adherence_state, set_review_status, list/read_notes,
+# search_notes, list/read_structured_data.
+[mcp_servers.chart_review_adherence]
+command = "bash"
+args = [
+  "-lc",
+  "exec npx tsx \"${CHART_REVIEW_PLATFORM_ROOT}/packages/mcp-server-adherence-stdio/src/index.ts\"",
+]
+env_vars = [
+  "CHART_REVIEW_ADH_PATIENT_ID",
+  "CHART_REVIEW_ADH_TASK_ID",
+  "CHART_REVIEW_ADH_SESSION_ID",
+  "CHART_REVIEW_REVIEWS_ROOT",
+  "CHART_REVIEW_PLATFORM_ROOT",
+  "PATH",
+]
+
+# Project trust — same as the Azure config.
+[projects."/Users/yj38/Documents/Chart-Review-Agents-main"]
+trust_level = "trusted"
+
+[projects."/private/tmp"]
+trust_level = "trusted"
+
+# ──────────────────────────────────────────────────────────────────────
+# How to start vLLM (reference — run this on the GPU host, not here)
+# ──────────────────────────────────────────────────────────────────────
+#
+# A vLLM startup that actually works with tool-calling:
+#
+#   vllm serve Qwen/Qwen3-72B-Instruct \
+#     --enable-auto-tool-choice \
+#     --tool-call-parser hermes \
+#     --host 0.0.0.0 \
+#     --port 8000 \
+#     --max-model-len 32768
+#
+# Parser choices per model family:
+#   - Qwen / Hermes-style:   --tool-call-parser hermes
+#   - Llama 3.1 / 3.2:       --tool-call-parser llama3_json
+#   - Mistral / Mixtral:     --tool-call-parser mistral
+#   - DeepSeek-V3:           --tool-call-parser deepseek_v3
+#   - (model-family-specific; check vllm docs)
+#
+# Without --enable-auto-tool-choice OR with the wrong parser, the
+# OpenAI-format `tools` array is dropped server-side and the agent
+# never sees the chart-review MCP tools — empty-draft failure mode.
+
+# ──────────────────────────────────────────────────────────────────────
+# Smoke test (run this BEFORE a full cohort)
+# ──────────────────────────────────────────────────────────────────────
+#
+# 1. Confirm vLLM directly:
+#      curl -s http://localhost:8000/v1/chat/completions \
+#        -H "Content-Type: application/json" \
+#        -d '{
+#          "model": "Qwen/Qwen3-72B-Instruct",
+#          "messages": [{"role":"user","content":"say hi in one word"}],
+#          "max_tokens": 16
+#        }' | jq .
+#
+# 2. Confirm the platform sees vllm:
+#      curl -s http://localhost:3002/api/diagnostics/api-providers | jq .
+#      # → active_provider: codex, codex.active_provider: vllm,
+#      #   available_providers[].id includes vllm with env_key_present=true
+#
+# 3. Run ONE patient and check MCP tools fired:
+#      TOKEN=$(curl -s -X POST http://localhost:3002/api/auth/login \
+#        -H "Content-Type: application/json" \
+#        -d '{"reviewer_id":"yuhang"}' | jq -r .token)
+#      RUN=$(curl -s -X POST http://localhost:3002/api/pilots/asthma-adherence \
+#        -H "Content-Type: application/json" \
+#        -H "Authorization: Bearer $TOKEN" \
+#        -d '{
+#          "patient_ids":["patient_demo_asthma_01"],
+#          "agent_specs":[{"id":"agent_1","interpretation_preset":"default"}],
+#          "max_concurrency":1,
+#          "max_turns_per_patient":40,
+#          "cost_cap_usd":2.0
+#        }' | jq -r .pilot.run_id)
+#      sleep 60
+#      curl -s "http://localhost:3002/api/runs/$RUN/patients/patient_demo_asthma_01/audit" \
+#        | python3 -c "
+#      import sys, json, collections
+#      calls = collections.Counter()
+#      for ln in sys.stdin:
+#          ln = ln.strip()
+#          if not ln: continue
+#          e = json.loads(ln)
+#          if e.get('step_type') == 'tool_call_pre':
+#              calls[e.get('tool_name','?')] += 1
+#      for n,c in calls.most_common(): print(f'  {n}: {c}')
+#      "
+#
+# Healthy:
+#   mcp__chart_review_adherence__set_question_answer: 13
+#   mcp__chart_review_adherence__read_notes: 1
+#   mcp__chart_review_adherence__list_notes: 1
+#   mcp__chart_review_adherence__list_questions: 1
+#
+# Broken (revert to Azure):
+#   (empty output)                     ← model emitted no tool calls
+#   only list_*, no set_*              ← model can read but not write
+#   Shell / Bash / *: ...              ← model fell back to shell commands

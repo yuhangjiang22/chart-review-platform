@@ -1,0 +1,18 @@
+{
+  "name": "@chart-review/patients",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Patient corpus accessor: listPatients, listNotes, readNote, readStructured. PLATFORM_ROOT / CORPUS_ROOT resolution via env vars with sensible defaults.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "dependencies": {
+    "@chart-review/platform-types": "*"
+  }
+}

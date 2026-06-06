@@ -1,0 +1,23 @@
+[
+  {
+    "row_id": 130010,
+    "concept_id": 4013904,
+    "cpt": "71250",
+    "concept_name": "CT thorax without contrast (low-dose)",
+    "procedure_date": "2024-06-30"
+  },
+  {
+    "row_id": 130011,
+    "concept_id": 4171651,
+    "cpt": "78816",
+    "concept_name": "PET/CT whole body",
+    "procedure_date": "2024-07-12"
+  },
+  {
+    "row_id": 130012,
+    "concept_id": 4059499,
+    "cpt": "32507",
+    "concept_name": "VATS wedge resection of lung",
+    "procedure_date": "2024-07-19"
+  }
+]

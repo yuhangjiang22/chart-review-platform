@@ -1,0 +1,39 @@
+id: probable
+title: Probable Lung Cancer
+description: >-
+  Patient has imaging findings suspicious for lung cancer plus active clinical workup
+  or treatment, but lacks tissue diagnosis.
+
+guidance: |
+  ## Probable Lung Cancer
+
+  A patient meets this criterion if there is **imaging suspicious for malignancy** combined
+  with **evidence of active lung cancer workup or treatment**, but NO tissue diagnosis yet.
+
+  ### What counts as probable:
+  - **Imaging findings** described by radiologist as suspicious for malignancy:
+    - "suspicious for lung cancer"
+    - "concerning for malignancy"
+    - "likely malignant"
+    - Pulmonary mass with features concerning for cancer
+  - **PLUS at least one of the following:**
+    - Oncology consultation with discussion of lung cancer
+    - Biopsy or bronchoscopy planned or in progress
+    - Treatment initiated (chemotherapy, radiation, immunotherapy, targeted therapy)
+    - Active staging workup (brain MRI, bone scan, adrenal protocol CT)
+    - Multiple follow-up imaging studies tracking a suspicious lesion
+
+  ### What does NOT count as probable:
+  - Incidental small nodules with no clinical workup or follow-up
+  - Imaging with radiologist assessment "benign" or "probably not malignant"
+  - Imaging findings from years ago with no current clinical activity
+  - Rule-out language without supporting oncology involvement
+
+  ### Evidence sources to look for:
+  - Radiology reports (CT, PET, chest X-ray)
+  - Oncology consultation notes
+  - Procedure notes (bronchoscopy, biopsy)
+  - Treatment records (chemo, radiation, immunotherapy orders)
+  - Imaging follow-up schedules
+
+output_value: probable
