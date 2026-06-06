@@ -231,6 +231,11 @@ export function Workspace({
 
   useEffect(() => {
     void refresh();
+    // Poll so the sidebar reflects iter state changes (running → ready →
+    // complete) without a manual reload — e.g. an iter flipping to "complete"
+    // once its patients are validated.
+    const handle = setInterval(() => void refresh(), 5000);
+    return () => clearInterval(handle);
   }, [refresh]);
 
   // Normalized discriminator used across every phase-pane prop +
