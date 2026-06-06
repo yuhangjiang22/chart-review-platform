@@ -672,6 +672,7 @@ export function PatientReview(p: PatientReviewProps) {
         isLocked={isLocked}
         reviewState={p.reviewState}
         iterId={iterId}
+        onStateChanged={p.onStateChanged}
       />
     </div>
   );
@@ -1232,6 +1233,7 @@ function ReviewFooter({
   isLocked,
   reviewState,
   iterId,
+  onStateChanged,
 }: {
   patientId: string;
   taskId: string;
@@ -1241,6 +1243,7 @@ function ReviewFooter({
   isLocked: boolean;
   reviewState: ReviewState | null;
   iterId: string | null;
+  onStateChanged: (state: ReviewState) => void;
 }) {
   const [busy, setBusy] = useState(false);
 
@@ -1252,6 +1255,7 @@ function ReviewFooter({
       });
       const body = await r.json();
       if (!body.ok) alert(`Cannot validate yet:\n${JSON.stringify(body.gate_results, null, 2)}`);
+      else if (body.state) onStateChanged(body.state);
     } finally {
       setBusy(false);
     }
@@ -1276,7 +1280,7 @@ function ReviewFooter({
   async function unvalidate() {
     setBusy(true);
     try {
-      await authFetch(`/api/reviews/${patientId}/${taskId}/uiactions`, {
+      const r = await authFetch(`/api/reviews/${patientId}/${taskId}/uiactions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1284,6 +1288,11 @@ function ReviewFooter({
           payload: { review_status: "in_progress" },
         }),
       });
+      try {
+        const body = await r.json();
+        if (body?.state) onStateChanged(body.state);
+        else if (body?.ok && body.review_status) onStateChanged(body as ReviewState);
+      } catch { /* ignore */ }
     } finally {
       setBusy(false);
     }

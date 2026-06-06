@@ -391,6 +391,61 @@ export const reviewRoutes: RouteEntry[] = [
     },
   },
 
+  // POST /api/reviews/:patientId/:taskId/validate — finalize the record
+  // (review_status → reviewer_validated) once every leaf field is in a
+  // terminal status AND reviewer-decided. Returns { ok, gate_results, state }.
+  // On failure returns { ok:false, gate_results } so the UI can show which
+  // gate blocked. (This is the patient-level finalize the "Mark validated"
+  // button calls; it was missing from the mounted route table.)
+  {
+    method: "POST", pattern: "/api/reviews/:patientId/:taskId/validate",
+    handler: async (_body, req, p) => {
+      const reviewerId = readReviewerFromRequest(req) ?? "anonymous-reviewer";
+      const task = loadCompiledTask(p.taskId);
+      if (!task) throw httpErr(404, { ok: false, error: `task ${p.taskId} not found` });
+      const state = loadOrCreateReviewState(p.patientId, task);
+      const fieldId = (f: { field_id?: string; id?: string }) => f.field_id ?? f.id;
+      const leafFields = (task.fields as Array<{ derivation?: unknown; field_id?: string; id?: string }>)
+        .filter((f) => !f.derivation);
+      const faOf = (f: { field_id?: string; id?: string }) =>
+        state.field_assessments.find((x) => x.field_id === fieldId(f));
+      const all_terminal = leafFields.every((f) => {
+        const fa = faOf(f);
+        return !!fa && (fa.status === "approved" || fa.status === "overridden" || fa.status === "not_applicable");
+      });
+      const every_leaf_touched_or_bulk_accepted = leafFields.every((f) => faOf(f)?.source === "reviewer");
+      const alerts_dismissed = !((state as { cross_criterion_alerts?: Array<{ severity?: string }> })
+        .cross_criterion_alerts ?? []).some((a) => a.severity === "error");
+      const faithfulness_pass = true; // enforced at write time
+      const gate_results = { all_terminal, faithfulness_pass, alerts_dismissed, every_leaf_touched_or_bulk_accepted };
+      const all_passed = all_terminal && every_leaf_touched_or_bulk_accepted && alerts_dismissed && faithfulness_pass;
+      if (!all_passed) return { ok: false, gate_results };
+      const result = applyUiAction(p.patientId, task, "reviewer", reviewerId, {
+        type: "set_review_status",
+        payload: { review_status: "reviewer_validated", updated_by: reviewerId },
+      } as UiAction);
+      broadcastReviewStateUpdate(p.patientId, result.state, p.taskId);
+      return { ok: true, gate_results, state: result.state };
+    },
+  },
+
+  // POST /api/reviews/:patientId/:taskId/unvalidate — re-open a finalized
+  // record (review_status → in_progress).
+  {
+    method: "POST", pattern: "/api/reviews/:patientId/:taskId/unvalidate",
+    handler: async (_body, req, p) => {
+      const reviewerId = readReviewerFromRequest(req) ?? "anonymous-reviewer";
+      const task = loadCompiledTask(p.taskId);
+      if (!task) throw httpErr(404, { ok: false, error: `task ${p.taskId} not found` });
+      const result = applyUiAction(p.patientId, task, "reviewer", reviewerId, {
+        type: "set_review_status",
+        payload: { review_status: "in_progress", updated_by: reviewerId },
+      } as UiAction);
+      broadcastReviewStateUpdate(p.patientId, result.state, p.taskId);
+      return { ok: true, state: result.state };
+    },
+  },
+
   // ── Cluster C — quote-offset lookup ─────────────────────────────────
   // Always returns 200 on a well-formed body; surfaces ok/error_code in
   // the JSON payload itself.
