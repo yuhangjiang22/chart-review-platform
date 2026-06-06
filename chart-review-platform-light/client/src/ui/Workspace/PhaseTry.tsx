@@ -322,16 +322,20 @@ export function PhaseTry({
   // Branch A: a run is in flight or just completed (within this session).
   if (activeIter && activeIter.state !== "abandoned") {
     return (
-      <RunStatusCard
-        iter={activeIter}
-        patientIds={activeIterPatients}
-        agentSpecs={agentSpecs}
-        onStop={stopRun}
-        onOverride={overrideRun}
-        onValidate={onAdvanceToValidate}
-        busy={busy}
-        error={error}
-      />
+      <div className="space-y-4">
+        {/* Rubric stays available here too — edits affect this session's next run. */}
+        <RubricPanel taskId={taskId} />
+        <RunStatusCard
+          iter={activeIter}
+          patientIds={activeIterPatients}
+          agentSpecs={agentSpecs}
+          onStop={stopRun}
+          onOverride={overrideRun}
+          onValidate={onAdvanceToValidate}
+          busy={busy}
+          error={error}
+        />
+      </div>
     );
   }
 

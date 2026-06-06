@@ -41,3 +41,7 @@ corpus/patients/patient_private_*/
 # Codex agent rollouts captured as JSONL traces — can contain note
 # content. Treat as per-machine artifacts, not source.
 .codex/sessions/
+
+# Runtime artifacts written under skill bundles (session manifests, pilot iters)
+.agents/skills/*/sessions/
+.agents/skills/*/pilots/
