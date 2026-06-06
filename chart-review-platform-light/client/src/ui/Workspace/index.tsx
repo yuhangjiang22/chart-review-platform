@@ -486,24 +486,7 @@ export function Workspace({
           <PilotsEmptyState pilots={pilots} verb="validate" onRetry={refresh} />
         )}
         {activePhase === "DECIDE" && activeSessionId && (
-          <PhaseDecide
-            taskId={taskId}
-            iterId={activeIterId ?? undefined}
-            versionTag={versionTag}
-            cells={cells}
-            patientIds={iterDetail?.patient_status.map((p) => p.patient_id) ?? []}
-            canLock={cells.stale === 0 && cells.validated >= cells.total && cells.total > 0}
-            taskKind={taskKind}
-            onRevise={() => setPhase("TRY")}
-            onLock={() => { /* no lock phase in light platform */ }}
-            onImprove={runImprovement}
-            isImproving={isImproving}
-            improveProposalCount={improveProposalCount}
-            improveRefreshKey={improveRefreshKey}
-            onRunAgain={isMethodologist ? runAgain : undefined}
-            isRunningAgain={isRunningAgain}
-            activeSessionId={activeSessionId}
-          />
+          <PhaseDecide taskId={taskId} />
         )}
       </main>
       </div>

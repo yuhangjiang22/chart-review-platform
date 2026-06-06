@@ -60,7 +60,7 @@ import { makeRouter } from "./router.js";
 import { pilotReadRoutes, pilotWriteRoutes, versionsRoutes } from "./pilot-routes.js";
 import { sessionRoutes } from "./session-routes.js";
 import { packageRoutes } from "./package-routes.js";
-import { proposalRoutes } from "./proposal-routes.js";
+import { performanceRoutes } from "./performance-routes.js";
 import { issueRoutes } from "./issue-routes.js";
 import { cohortRoutes } from "./cohort-routes.js";
 import { coreRoutes, type RawBody, type SSEStream } from "./core-routes.js";
@@ -206,7 +206,7 @@ const paramRouter = makeRouter([
   ...versionsRoutes,
   ...sessionRoutes,
   ...packageRoutes,
-  ...proposalRoutes,
+  ...performanceRoutes,
   ...issueRoutes,
   ...cohortRoutes,
   ...coreRoutes,
