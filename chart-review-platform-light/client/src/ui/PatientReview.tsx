@@ -1261,21 +1261,6 @@ function ReviewFooter({
     }
   }
 
-  async function lock() {
-    if (!confirm("Lock this record? This is irreversible — no further writes will be accepted.")) return;
-    setBusy(true);
-    try {
-      const r = await authFetch(`/api/reviews/${patientId}/${taskId}/lock`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ iter_id: iterId ?? undefined }),
-      });
-      const body = await r.json();
-      if (!body.ok) alert(`Lock failed:\n${body.error ?? "Unknown error"}`);
-    } finally {
-      setBusy(false);
-    }
-  }
 
   async function unvalidate() {
     setBusy(true);
@@ -1350,15 +1335,6 @@ function ReviewFooter({
             Unvalidate
           </Button>
         )}
-        <Button
-          size="sm"
-          onClick={lock}
-          disabled={busy || !isValidated}
-          title={isValidated ? "Commit this record permanently" : "Mark validated first"}
-        >
-          <Lock size={13} strokeWidth={2} />
-          Lock
-        </Button>
       </span>
     </footer>
   );
