@@ -204,7 +204,13 @@ export function SessionSidebar({
               <div className="text-[10.5px] text-muted-foreground italic">No iters yet.</div>
             ) : (
               <div className="space-y-0.5">
-                {sessionIters.map((it) => {
+                {(() => {
+                  // Iter ids are globally unique per task (storage keys), but
+                  // within a session we present them as "Run 1, 2, …" so the
+                  // count reads as session-relative.
+                  const byNum = [...sessionIters].sort((a, b) => a.iter_num - b.iter_num);
+                  const runNumberOf = new Map(byNum.map((it, i) => [it.iter_id, i + 1]));
+                  return sessionIters.map((it) => {
                   const isActive = it.iter_id === activeIterId;
                   return (
                     <div
@@ -218,7 +224,8 @@ export function SessionSidebar({
                         "font-mono text-[11px]",
                         isActive ? "text-ink font-medium" : "text-ink",
                       )}>
-                        {it.iter_id}
+                        Run {runNumberOf.get(it.iter_id)}
+                        <span className="ml-1 text-[9px] text-muted-foreground/70">{it.iter_id}</span>
                         {isActive && <span className="ml-1 text-[9px] text-[hsl(var(--sage))] uppercase tracking-[0.1em]">· active</span>}
                       </span>
                       <span
@@ -237,7 +244,8 @@ export function SessionSidebar({
                       </span>
                     </div>
                   );
-                })}
+                  });
+                })()}
               </div>
             )}
           </div>
