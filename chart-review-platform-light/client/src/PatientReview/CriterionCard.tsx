@@ -284,12 +284,10 @@ export function CriterionCard(props: CriterionCardProps) {
                         <span
                           className={cn(
                             "inline-flex items-center px-1.5 rounded border text-[9px] font-mono normal-case tracking-normal",
-                            d.provider === "codex"
-                              ? "bg-emerald-100 text-emerald-800 border-emerald-300"
-                              : "bg-violet-100 text-violet-800 border-violet-300",
+                            "bg-violet-100 text-violet-800 border-violet-300",
                           )}
                         >
-                          {d.provider === "codex" ? "Codex" : "Claude"}
+                          {d.provider}
                         </span>
                       )}
                       <span className="ml-auto text-[9px] tracking-[0.12em] text-muted-foreground/60 normal-case italic">

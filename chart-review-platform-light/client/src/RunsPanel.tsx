@@ -32,11 +32,8 @@ function ProviderBadge({ provider }: { provider?: ProviderName }) {
   // list tidy for legacy runs and for the common case where the
   // operator just uses whatever AGENT_PROVIDER points at.
   if (!provider) return null;
-  const label = provider === "codex" ? "Codex" : "Claude";
-  const cls =
-    provider === "codex"
-      ? "bg-emerald-100 text-emerald-800 border-emerald-300"
-      : "bg-violet-100 text-violet-800 border-violet-300";
+  const label = provider;
+  const cls = "bg-violet-100 text-violet-800 border-violet-300";
   return (
     <span className={`inline-flex items-center px-1.5 py-0.5 rounded border text-[10px] font-mono ${cls}`}>
       {label}

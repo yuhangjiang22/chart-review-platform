@@ -27,7 +27,7 @@ interface IterListing {
   n_patients?: number;
   started_at: string;
   started_by: string;
-  provider?: "claude" | "codex";
+  provider?: string;
   run_id?: string;
 }
 
@@ -48,9 +48,8 @@ interface PhaseTryProps {
    *  no-session gate to give the user a one-click path to fix the issue. */
   onOpenNewSession?: () => void;
   /** Task kind — drives the runtime indicator in the agent readout.
-   *  ner = direct LLM call (no agent runtime); phenotype/adherence
-   *  use Claude SDK or Codex CLI based on AGENT_PROVIDER. */
-  taskKind?: "phenotype" | "ner" | "adherence";
+   *  phenotype runs via the deepagents Python sidecar (AGENT_PROVIDER). */
+  taskKind?: "phenotype";
 }
 
 /**
@@ -83,13 +82,11 @@ export function PhaseTry({
     return () => { cancelled = true; };
   }, [taskKind]);
 
-  const runtimeLabel = taskKind === "ner"
-    ? "direct LLM call to Azure /responses (no agent runtime)"
-    : agentProvider === "claude"
-      ? "Claude Agent SDK (tool-using agent loop)"
-      : agentProvider === "codex"
-        ? "Codex CLI (tool-using agent loop)"
-        : "agent runtime: (loading…)";
+  const runtimeLabel = agentProvider === "deepagents"
+    ? "deepagents (Python sidecar · tool-using agent loop)"
+    : agentProvider
+      ? `agent runtime: ${agentProvider}`
+      : "agent runtime: (loading…)";
   const [patients, setPatients] = useState<Patient[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [agentSpecs, setAgentSpecs] = useState<AgentSpecForm[]>([
@@ -456,14 +453,9 @@ function RunStatusCard({
           </Badge>
           {iter.provider && (
             <span
-              className={
-                "inline-flex items-center px-1.5 py-0.5 rounded border text-[10px] font-mono " +
-                (iter.provider === "codex"
-                  ? "bg-emerald-100 text-emerald-800 border-emerald-300"
-                  : "bg-violet-100 text-violet-800 border-violet-300")
-              }
+              className="inline-flex items-center px-1.5 py-0.5 rounded border text-[10px] font-mono bg-violet-100 text-violet-800 border-violet-300"
             >
-              {iter.provider === "codex" ? "Codex" : "Claude"}
+              {iter.provider}
             </span>
           )}
         </div>
