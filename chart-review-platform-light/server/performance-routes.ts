@@ -16,6 +16,7 @@ import path from "node:path";
 import type { RouteEntry } from "./router.js";
 import { PLATFORM_ROOT } from "@chart-review/patients";
 import { loadCompiledTask } from "@chart-review/tasks";
+import { listPilotIterations } from "./lib/domain/iter/index.js";
 
 interface FieldAssessment {
   field_id: string;
@@ -45,7 +46,14 @@ function readJson<T>(p: string): T | null {
   try { return JSON.parse(fs.readFileSync(p, "utf8")) as T; } catch { return null; }
 }
 
-function computePerformance(taskId: string, primaryCriterionIds: string[]) {
+function computePerformance(
+  taskId: string,
+  primaryCriterionIds: string[],
+  // When set, only score patients whose validated review_state was imported
+  // from a run that belongs to THIS session — so a fresh session (no runs)
+  // shows nothing instead of leaking another session's results.
+  sessionRunIds: Set<string> | null,
+) {
   const reviewsDir = path.join(PLATFORM_ROOT, "var", "reviews");
   const runsDir = path.join(PLATFORM_ROOT, "var", "runs");
   const agentCounts: AgentCounts = {};
@@ -72,10 +80,13 @@ function computePerformance(taskId: string, primaryCriterionIds: string[]) {
       }
       const decidedFields = Object.keys(humanFinal);
       if (decidedFields.length === 0) continue;
-      validatedPatients.add(pid);
 
       const run = state.imported_from_run;
       if (!run) continue;
+      // Session scope: only count this patient if its validated draft came
+      // from one of the session's runs.
+      if (sessionRunIds && !sessionRunIds.has(run)) continue;
+      validatedPatients.add(pid);
       const agentsDir = path.join(runsDir, run, "per_patient", pid, "agents");
       if (!fs.existsSync(agentsDir)) continue;
 
@@ -125,7 +136,7 @@ export const performanceRoutes: RouteEntry[] = [
   {
     method: "GET",
     pattern: "/api/performance/:taskId",
-    handler: async (_b, _r, p) => {
+    handler: async (_b, _r, p, query) => {
       const task = loadCompiledTask(p.taskId);
       if (!task) {
         const err = new Error(`task ${p.taskId} not found`) as Error & { status: number };
@@ -135,7 +146,20 @@ export const performanceRoutes: RouteEntry[] = [
       const primaryCriterionIds = task.fields.map(
         (f) => (f as { field_id?: string; id?: string }).field_id ?? (f as { id: string }).id,
       );
-      return computePerformance(p.taskId, primaryCriterionIds);
+      // Scope to a session when ?session_id= is given: the session's runs are
+      // its non-abandoned iters. Empty set (a session with no runs) → no
+      // results, instead of leaking another session's scores.
+      const sessionId = query.get("session_id");
+      let sessionRunIds: Set<string> | null = null;
+      if (sessionId) {
+        sessionRunIds = new Set(
+          listPilotIterations(p.taskId)
+            .filter((i) => i.session_id === sessionId && i.state !== "abandoned")
+            .map((i) => i.run_id)
+            .filter(Boolean),
+        );
+      }
+      return computePerformance(p.taskId, primaryCriterionIds, sessionRunIds);
     },
   },
 ];

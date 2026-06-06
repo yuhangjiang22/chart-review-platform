@@ -31,16 +31,20 @@ function pct(x: number | null): string {
 
 export interface PhaseDecideProps {
   taskId: string;
+  /** Scope the report to this session's runs. Without it the report would
+   *  aggregate every validated patient for the task across all sessions. */
+  activeSessionId?: string | null;
 }
 
-export function PhaseDecide({ taskId }: PhaseDecideProps) {
+export function PhaseDecide({ taskId, activeSessionId }: PhaseDecideProps) {
   const [report, setReport] = useState<PerformanceReport | null>(null);
   const [state, setState] = useState<"loading" | "error" | "ready">("loading");
 
   useEffect(() => {
     let cancelled = false;
     setState("loading");
-    authFetch(`/api/performance/${encodeURIComponent(taskId)}`)
+    const qs = activeSessionId ? `?session_id=${encodeURIComponent(activeSessionId)}` : "";
+    authFetch(`/api/performance/${encodeURIComponent(taskId)}${qs}`)
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
       .then((d: PerformanceReport) => {
         if (cancelled) return;
@@ -53,7 +57,7 @@ export function PhaseDecide({ taskId }: PhaseDecideProps) {
     return () => {
       cancelled = true;
     };
-  }, [taskId]);
+  }, [taskId, activeSessionId]);
 
   const hasData = !!report && report.n_patients > 0 && report.agents.length > 0;
 

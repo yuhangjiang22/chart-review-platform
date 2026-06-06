@@ -413,7 +413,7 @@ export function Workspace({
           <PilotsEmptyState pilots={pilots} verb="validate" onRetry={refresh} />
         )}
         {activePhase === "DECIDE" && activeSessionId && (
-          <PhaseDecide taskId={taskId} />
+          <PhaseDecide taskId={taskId} activeSessionId={activeSessionId} />
         )}
       </main>
       </div>
