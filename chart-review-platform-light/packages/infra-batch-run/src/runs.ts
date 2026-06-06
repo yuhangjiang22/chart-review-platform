@@ -299,12 +299,11 @@ import { runAgent } from "@chart-review/agent-provider";
 import { modelFor } from "@chart-review/model-config";
 import { atomicWriteJson } from "@chart-review/storage";
 import { buildMcpServersConfig } from "@chart-review/mcp-server-anthropic";
-import { buildNerMcpServersConfig } from "@chart-review/mcp-server-ner-anthropic";
 import { buildAuditHooks } from "@chart-review/audit-trail";
 import { loadCompiledTask } from "@chart-review/tasks";
 import { computeTaskSha } from "@chart-review/lock";
 import { guidelineDir, phenotypeSkillDir } from "@chart-review/rubric";
-import { patientDir, listNotes } from "@chart-review/patients";
+import { patientDir } from "@chart-review/patients";
 import { resolveRolePrompt, validateAgentSpec } from "@chart-review/agent-specs";
 
 // #47 — env-driven defaults so a deployment can lock in a cost ceiling
@@ -671,14 +670,6 @@ async function runOneAgent(
         ].join("\n")
       : "";
 
-  // task_kind dispatch — phenotype tasks use the chart_review_state MCP
-  // server (7 cell tools, set_field_assessment, find_quote_offsets, …).
-  // NER tasks use chart_review_ner (7 span tools, set_span_label,
-  // locate_in_source, …) plus a span-shaped batch prompt. Same runAgent
-  // loop, same scratch + audit promotion logic afterwards.
-  const isNerTask = task.task_kind === "ner";
-  const isAdherenceTask = task.task_kind === "adherence";
-
   const phenotypePrompt = [
     `You are running in batch mode. Activate the \`chart-review\` skill.`,
     `If a skill named \`chart-review-${taskId}-phenotype\` exists, activate it as well — it provides the rubric scope.`,
@@ -718,37 +709,7 @@ async function runOneAgent(
     "summary line and stop.",
   ].join("\n");
 
-  // NER: prompt is built PER NOTE (one runAgent call per note) — keeps
-  // the model's context tiny so Azure / OpenAI don't choke on aggregated
-  // clinical content. The set_span_label MCP writes accumulate across
-  // calls into the same review_state.json (same scratchRoot).
-  function buildNerPromptForNote(noteId: string): string {
-    // The note path is unambiguous: agent's cwd is the patient dir
-    // (corpus/patients/<pid>/) and notes live in the `notes/` subdir.
-    // Pass an explicit relative path so the agent doesn't waste turns
-    // exploring cwd.
-    const notePath = `notes/${noteId}.txt`;
-    return [
-      `Research cataloging task: index biomedical concepts from one IRB-approved de-identified clinical note for an annotation study.`,
-      "",
-      `Note to index this turn: \`${notePath}\` (read this single file; do not enumerate the directory).`,
-      `Active ontology: BSO-AD (social determinants of Alzheimer's research).`,
-      `Skill bundle: chart-review-ner + chart-review-${taskId} (load via Skill tool if available).`,
-      "",
-      "Steps:",
-      `1. Read \`${notePath}\`.`,
-      "2. Call `list_entity_types` to see the 9 BSO-AD root labels.",
-      "3. For each label-applicable phrase in the note, call:",
-      "   `normalize_to_ontology(entity_type, label)` → `locate_in_source(note_id, anchor, text)` → `set_span_label(...)`",
-      `   (use note_id="${noteId}" — without the .txt extension or notes/ prefix).`,
-      "4. Skip phrases that don't map to a BSO-AD entity_type. Empty output is acceptable.",
-      "5. Emit a one-line summary and stop.",
-      "",
-      `This is structured indexing for downstream κ statistics — not narrative summarization or diagnosis. Use the most specific ontology concept where unambiguous; otherwise mark status="novel_candidate".`,
-    ].join("\n");
-  }
-
-  const userPrompt = isNerTask ? "" /* unused — NER loops per-note */ : phenotypePrompt;
+  const userPrompt = phenotypePrompt;
 
   let cost: number | undefined;
   const auditHooks = buildAuditHooks({ patientId, taskId, sessionId });
@@ -763,277 +724,47 @@ async function runOneAgent(
     // path uses AsyncLocalStorage (`withReviewsRoot`) to redirect
     // writes here, but that context doesn't cross process boundaries.
     // The subprocess server reads CHART_REVIEW_REVIEWS_ROOT env var.
-    const mcpServers: Record<string, unknown> = isNerTask
-      ? buildNerMcpServersConfig(
-          patientId, task, sessionId, { onStateUpdate: () => {} },
-          { reviewsRoot: scratchRoot, provider: manifest.provider },
-        )
-      : buildMcpServersConfig(
-          patientId, task, sessionId, { onStateUpdate: () => {} },
-          { reviewsRoot: scratchRoot, provider: manifest.provider },
-        );
+    const mcpServers: Record<string, unknown> = buildMcpServersConfig(
+      patientId, task, sessionId, { onStateUpdate: () => {} },
+      { reviewsRoot: scratchRoot, provider: manifest.provider },
+    );
     const sdkHooks: Record<string, Array<{ hooks: any[] }>> = {
       PreToolUse: [{ hooks: [auditHooks.pre] }],
       PostToolUse: [{ hooks: [auditHooks.post] }],
     };
-    const extraSystem = isNerTask
-      ? "Research annotation context: IRB-approved, de-identified clinical text for "
-        + "academic NLP study (inter-rater reliability of BSO-AD ontology mapping). "
-        + "Index the structured spans the ontology defines; skip what doesn't apply. "
-        + "Do not interpret diagnostically; do not produce narrative summaries."
-      : "You are running unattended in batch mode. There is no human in the "
-        + "loop for this patient — produce your draft and stop. Do not ask "
-        + "clarifying questions; pick the most defensible answer with the "
-        + "evidence available.";
+    const extraSystem = "You are running unattended in batch mode. There is no human in the "
+      + "loop for this patient — produce your draft and stop. Do not ask "
+      + "clarifying questions; pick the most defensible answer with the "
+      + "evidence available.";
 
-    if (isAdherenceTask) {
-      // Adherence: agent-loop via chart_review_adherence MCP server.
-      // Tools: list_questions / read_question / list_notes / read_notes /
-      // search_notes / list_structured_data / read_structured_data /
-      // set_question_answer / get_adherence_state / set_review_status.
-      // The agent commits one QuestionAnswer per question through MCP;
-      // after the loop completes, the platform runs the deterministic
-      // rule engine + nuanced LLM judge to produce rule_verdicts.
-      const { buildAdherenceMcpServersConfig } = await import(
-        "@chart-review/mcp-server-adherence-anthropic"
-      );
-      const adherenceMcp = buildAdherenceMcpServersConfig(
-        patientId, task, sessionId,
-        { reviewsRoot: scratchRoot, provider: manifest.provider },
-      );
-      const adherenceUserPrompt = [
-        `Adherence chart review for patient \`${patientId}\` on task \`${taskId}\`.`,
-        "",
-        `--- Role framing ---`,
-        rolePrompt,
-        `--- End role framing ---`,
-        "",
-        "FIRST ACTIONS — do these IMMEDIATELY before any reasoning. Do NOT call",
-        "`list_mcp_resources` or any generic discovery tool — the catalog you",
-        "need is already visible in your tool list.",
-        "",
-        "Step 1: call `list_questions` (no args) to see every question_id, its",
-        "        tier / answer_schema / retrieval_hints. Each question's hint",
-        "        tells you WHERE to look (OMOP structured table vs notes).",
-        "Step 2: call `list_structured_data` (no args) ONCE to see which OMOP",
-        "        tables this patient has and their row counts. Then call",
-        "        `read_structured_data({table})` for EACH non-empty table the",
-        "        questions reference — typically drugs, measurements, encounters,",
-        "        observations, conditions, procedures. Reuse the returned rows",
-        "        across all questions that need them.",
-        "Step 3: call `list_notes` (no args) to see filenames, then",
-        "        `read_notes({filenames: [...all of them...]})` in ONE batch call.",
-        "        OR — if you only need a specific phrase — use",
-        "        `search_notes({queries: ['ACT', 'action plan', 'fluticasone', ...]})`",
-        "        which returns filename + offset + ±120-char snippet per hit.",
-        "Step 4: For each question from step 1, call `set_question_answer({",
-        "        question_id, answer, confidence, evidence, reasoning})` exactly",
-        "        once. Use structured data when the question's retrieval_hints",
-        "        say 'STRUCTURED FIRST' — that's the source of truth. Notes are",
-        "        the fallback. The platform coerces `answer` to the question's",
-        "        schema; pass `null` when the chart doesn't support an answer.",
-        "",
-        "        VERIFIER FEEDBACK: every set_question_answer response includes",
-        "        `verifier_status` ('confirmed' / 'contradicted' / 'no_check').",
-        "        On `contradicted` you'll also see a `warning` like \"OMOP",
-        "        CONTRADICTS YOUR ANSWER. measurements ACT=19 ≠ answer 23. Re-",
-        "        read the structured table…\". Treat that as a hard signal:",
-        "        call read_structured_data on the relevant table, find the real",
-        "        value, and call set_question_answer again with the corrected",
-        "        answer. Re-submission is expected and free.",
-        "",
-        "Step 5: After every question has been answered, call",
-        "        `set_review_status({status: 'complete'})`. The platform runs the",
-        "        rule engine + LLM judge afterwards — you DO NOT compute rule",
-        "        verdicts yourself.",
-        "",
-        "Active tools (use ONLY these — listed in the recommended call order):",
-        "  - list_questions          (catalog of questions, call once)",
-        "  - list_structured_data    (catalog of OMOP tables, call ONCE)",
-        "  - read_structured_data    (read one table by name; call per non-empty table)",
-        "  - list_notes              (catalog of notes, call once)",
-        "  - search_notes            (keyword search across notes — cheap; use when you know the string)",
-        "  - read_notes              (bulk note reader; call when search isn't enough)",
-        "  - set_question_answer     (call N times, one per question_id — and again on `contradicted`)",
-        "  - set_review_status       (call once at the very end)",
-        "Read-only escape hatches if you need them:",
-        "  - read_question(question_id)   (one question's full definition)",
-        "  - get_adherence_state          (what you've already committed)",
-        "",
-        "Do NOT use any other tool. No shell commands, no file IO, no resource",
-        "discovery. Emit a brief one-line summary at the end and stop.",
-      ].join("\n");
-
-      const extraAdherenceSystem =
-        "You are running unattended in batch mode (chart-review-platform-v2). "
-        + "There is no human in the loop for this patient — commit every question "
-        + "answer through the MCP tools and stop. Do not ask clarifying questions; "
-        + "pick the most defensible answer with the evidence available.";
-
-      // Audit hooks reuse the same buildAuditHooks the phenotype path uses.
-      const adhAuditHooks = buildAuditHooks({ patientId, taskId, sessionId });
-      const adhSdkHooks: Record<string, Array<{ hooks: any[] }>> = {
-        PreToolUse: [{ hooks: [adhAuditHooks.pre] }],
-        PostToolUse: [{ hooks: [adhAuditHooks.post] }],
-      };
-
-      for await (const event of runAgent({
-        prompt: adherenceUserPrompt,
-        cwd: patientDir(patientId),
-        patientId,
-        taskId,
-        guidelinePath: guidelineDir(taskId),
-        mcpServers: adherenceMcp,
-        hooks: adhSdkHooks,
-        maxTurns: manifest.max_turns_per_patient,
-        permissionMode: "acceptEdits",
-        model: spec.model,
-        provider: manifest.provider,
-        transcriptPath: agentTranscriptPath(runId, patientId, spec.id),
-        extraSystemPrompt: extraAdherenceSystem,
-      })) {
-        if (event.type === "result" && typeof event.cost_usd === "number") {
-          cost = (cost ?? 0) + event.cost_usd;
-        }
-      }
-
-      // Post-agent: load the committed question_answers from the scratch
-      // review_state, run the deterministic rule engine (+ nuanced LLM
-      // judge for rules marked nuanced:true), and write the final draft.
-      const { evaluateAllRules } = await import("@chart-review/rule-engine");
-      const { loadAdherenceSkill } = await import("@chart-review/pipeline-extract-adherence");
-      const skill = loadAdherenceSkill(taskId);
-      const scratchStateFp = path.join(scratchRoot, patientId, taskId, "review_state.json");
-      let questionAnswers: any[] = [];
-      if (fs.existsSync(scratchStateFp)) {
-        try {
-          const state = JSON.parse(fs.readFileSync(scratchStateFp, "utf8"));
-          questionAnswers = state.question_answers ?? [];
-        } catch { /* leave empty */ }
-      }
-      // Eligibility gate — if the conventional `R-T0-Eligible` rule
-      // resolves to EXCLUDED, every rule becomes EXCLUDED.
-      const eligibilityRule = skill.rules.find((r) => r.rule_id === "R-T0-Eligible");
-      let auditExcluded = false;
-      if (eligibilityRule) {
-        const eligV = await evaluateAllRules([eligibilityRule], questionAnswers);
-        auditExcluded = eligV[0]?.verdict === "EXCLUDED";
-      }
-      const ruleVerdicts = auditExcluded
-        ? skill.rules.map((r) => ({
-            rule_id: r.rule_id,
-            verdict: "EXCLUDED" as const,
-            supporting_questions: r.supporting_questions,
-            source: "rule_engine" as const,
-            ts: new Date().toISOString(),
-          }))
-        : await evaluateAllRules(skill.rules, questionAnswers);
-
-      // Write the final draft. The agent already persisted
-      // question_answers via set_question_answer; we just add the
-      // computed rule_verdicts and stamp the task_kind.
-      const draftFp = agentDraftPath(runId, patientId, spec.id);
-      fs.mkdirSync(path.dirname(draftFp), { recursive: true });
-      atomicWriteJson(draftFp, {
-        task_id: taskId,
-        task_kind: "adherence",
-        question_answers: questionAnswers,
-        rule_verdicts: ruleVerdicts,
-        adherence_excluded: auditExcluded || undefined,
-        lock_task_sha: manifest.guideline_sha,
-      });
-    } else if (isNerTask) {
-      // NER: direct LLM call per note, no agent loop, no MCP tool calls.
-      // 1 round-trip per note instead of ~50 (one per span × 3 MCP tools
-      // for normalize/locate/set_span_label). ~95% cost reduction.
-      const { extractSpansDirect } = await import("@chart-review/pipeline-extract-ner");
-      const { resolveOntologyPath } = await import("@chart-review/mcp-server-ner-anthropic");
-      const ontologyPath = resolveOntologyPath(task);
-      const azureBaseUrl = process.env.AZURE_OPENAI_BASE_URL
-        ?? "https://iu-bhds-nlp-project.services.ai.azure.com/openai/v1";
-      const azureApiKey = process.env.AZURE_OPENAI_API_KEY ?? "";
-      const notes = listNotes(patientId);
-      const transcriptFp = agentTranscriptPath(runId, patientId, spec.id);
-      // Best-effort transcript header so the existing AgentLogPanel
-      // poll doesn't see an empty file.
-      try {
-        fs.mkdirSync(path.dirname(transcriptFp), { recursive: true });
-        fs.appendFileSync(transcriptFp, JSON.stringify({
-          ts: new Date().toISOString(), type: "text",
-          text: `direct-llm-ner: ${notes.length} note(s) for ${patientId}`,
-        }) + "\n");
-      } catch { /* ignore */ }
-      {
-        for (const n of notes) {
-          const noteId = n.filename.replace(/\.txt$/, "");
-          const r = await extractSpansDirect({
-            patientId,
-            task,
-            noteId,
-            ontologyPath,
-            reviewsRoot: scratchRoot,
-            sessionId,
-            azureBaseUrl,
-            azureApiKey,
-            model: spec.model,
-            rolePreset: spec.role_preset,
-          });
-          try {
-            fs.appendFileSync(transcriptFp, JSON.stringify({
-              ts: new Date().toISOString(), type: "text",
-              text: `note ${noteId}: ${r.spans_written} spans written, ${r.candidates_rejected} rejected`
-                + (r.error ? ` — ERROR: ${r.error}` : ""),
-              usage: r.usage,
-            }) + "\n");
-          } catch { /* ignore */ }
-          // Translate usage tokens to a rough cost estimate (placeholder
-          // rates; the manifest's cost_cap_usd just gates total spend).
-          if (r.usage?.input_tokens) {
-            const inT = r.usage.input_tokens ?? 0;
-            const cachedT = r.usage.cached_input_tokens ?? 0;
-            const outT = r.usage.output_tokens ?? 0;
-            // $2/M input, $0.5/M cached, $10/M output — rough Azure tier.
-            const est = ((inT - cachedT) * 2 + cachedT * 0.5 + outT * 10) / 1e6;
-            cost = (cost ?? 0) + est;
-          }
-        }
-      }
-    } else {
-      // Phenotype: one agent loop per patient (one combined assessment).
-      {
-        for await (const event of runAgent({
-          prompt: userPrompt,
-          cwd: patientDir(patientId),
-          patientId,
-          taskId,
-          guidelinePath: guidelineDir(taskId),
-          mcpServers,
-          hooks: sdkHooks,
-          maxTurns: manifest.max_turns_per_patient,
-          permissionMode: "acceptEdits",
-          model: spec.model,
-          provider: manifest.provider,
-          transcriptPath: agentTranscriptPath(runId, patientId, spec.id),
-          extraSystemPrompt: extraSystem,
-        })) {
-          if (event.type === "result" && typeof event.cost_usd === "number") {
-            cost = (cost ?? 0) + event.cost_usd;
-          }
-        }
+    // Phenotype: one agent loop per patient (one combined assessment).
+    for await (const event of runAgent({
+      prompt: userPrompt,
+      cwd: patientDir(patientId),
+      patientId,
+      taskId,
+      guidelinePath: guidelineDir(taskId),
+      mcpServers,
+      hooks: sdkHooks,
+      maxTurns: manifest.max_turns_per_patient,
+      permissionMode: "acceptEdits",
+      model: spec.model,
+      provider: manifest.provider,
+      transcriptPath: agentTranscriptPath(runId, patientId, spec.id),
+      extraSystemPrompt: extraSystem,
+    })) {
+      if (event.type === "result" && typeof event.cost_usd === "number") {
+        cost = (cost ?? 0) + event.cost_usd;
       }
     }
   });
 
-  // Adherence skips the scratch-state path entirely — the pipeline
-  // writes the draft inline above. NER + phenotype use the scratchRoot
-  // + MCP write loop, and we promote the resulting file here.
-  if (!isAdherenceTask) {
-    const scratchReviewState = path.join(scratchRoot, patientId, taskId, "review_state.json");
-    if (!fs.existsSync(scratchReviewState)) {
-      throw new Error(`agent ${spec.id} finished but did not write review_state.json — likely no MCP writes`);
-    }
-    fs.renameSync(scratchReviewState, agentDraftPath(runId, patientId, spec.id));
+  // Phenotype: promote the scratch review_state written by the MCP loop.
+  const scratchReviewState = path.join(scratchRoot, patientId, taskId, "review_state.json");
+  if (!fs.existsSync(scratchReviewState)) {
+    throw new Error(`agent ${spec.id} finished but did not write review_state.json — likely no MCP writes`);
   }
+  fs.renameSync(scratchReviewState, agentDraftPath(runId, patientId, spec.id));
 
   const scratchChat = path.join(scratchRoot, patientId, taskId, "chat", `${sessionId}.jsonl`);
   if (fs.existsSync(scratchChat)) {
@@ -1047,41 +778,15 @@ async function runOneAgent(
   try {
     const draft = JSON.parse(fs.readFileSync(agentDraftPath(runId, patientId, spec.id), "utf8")) as {
       field_assessments?: Array<{ confidence?: "low" | "medium" | "high" }>;
-      span_labels?: Array<{ entity_type?: string }>;
-      question_answers?: Array<{ confidence?: number }>;
-      rule_verdicts?: unknown[];
     };
-    if (isAdherenceTask) {
-      // For adherence, `field_count` reflects "answers produced" — the
-      // auto-advance just needs a non-zero indicator. Bucket the
-      // numeric `confidence` (0..1) into low/medium/high for the
-      // status panel — same affordance phenotype tasks get.
-      fieldCount = draft.question_answers?.length;
-      if (draft.question_answers) {
-        confidenceSummary = { low: 0, medium: 0, high: 0, unknown: 0 };
-        for (const a of draft.question_answers) {
-          if (a.confidence == null) confidenceSummary.unknown++;
-          else if (a.confidence < 0.5) confidenceSummary.low++;
-          else if (a.confidence < 0.8) confidenceSummary.medium++;
-          else confidenceSummary.high++;
-        }
-      }
-    } else if (isNerTask) {
-      // For NER tasks, `field_count` semantically becomes "span count".
-      // The post-run pipeline (auto-advance, status broadcaster) uses it
-      // as a non-zero-progress indicator; the exact label doesn't matter.
-      // Confidence summary is left undefined — NER spans don't carry it.
-      fieldCount = draft.span_labels?.length;
-    } else {
-      fieldCount = draft.field_assessments?.length;
-      if (draft.field_assessments) {
-        confidenceSummary = { low: 0, medium: 0, high: 0, unknown: 0 };
-        for (const f of draft.field_assessments) {
-          if (f.confidence === "low") confidenceSummary.low++;
-          else if (f.confidence === "medium") confidenceSummary.medium++;
-          else if (f.confidence === "high") confidenceSummary.high++;
-          else confidenceSummary.unknown++;
-        }
+    fieldCount = draft.field_assessments?.length;
+    if (draft.field_assessments) {
+      confidenceSummary = { low: 0, medium: 0, high: 0, unknown: 0 };
+      for (const f of draft.field_assessments) {
+        if (f.confidence === "low") confidenceSummary.low++;
+        else if (f.confidence === "medium") confidenceSummary.medium++;
+        else if (f.confidence === "high") confidenceSummary.high++;
+        else confidenceSummary.unknown++;
       }
     }
   } catch { /* leave unset */ }

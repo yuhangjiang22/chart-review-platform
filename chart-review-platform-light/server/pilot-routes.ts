@@ -49,7 +49,7 @@ import {
   getRunManifest, getRunStatus,
 } from "./lib/infra/batch-run/index.js";
 import {
-  readJudgeAnalyses, isJudgeBatchRunning, runJudgeBatch, runJudgeSpanBatch,
+  readJudgeAnalyses, isJudgeBatchRunning, runJudgeBatch,
   lockJudgeBatch, unlockJudgeBatch,
 } from "./lib/judge-batch.js";
 import {
@@ -499,25 +499,19 @@ export const pilotWriteRoutes: RouteEntry[] = [
         err.status = 409;
         throw err;
       }
-      // task_kind dispatch — phenotype tasks judge cells, NER tasks
-      // judge spans. Both write to the same judge_analyses.json file
-      // (the schema carries a `task_kind` discriminator).
-      const task = loadCompiledTask(p.taskId);
-      const runner = task?.task_kind === "ner" ? runJudgeSpanBatch : runJudgeBatch;
-      const label = task?.task_kind === "ner" ? "judge-batch-ner" : "judge-batch";
-      void runner({
+      void runJudgeBatch({
         taskId: p.taskId,
         iterId: p.iterId,
         startedBy: reviewerId,
       })
         .then((result) => {
           console.log(
-            `[${label}] ${p.taskId}/${p.iterId} done: ${result.cells_analyzed}/${result.cells_total} cells, ` +
+            `[judge-batch] ${p.taskId}/${p.iterId} done: ${result.cells_analyzed}/${result.cells_total} cells, ` +
             `$${result.total_cost_usd.toFixed(4)}, ${result.total_duration_ms}ms`,
           );
         })
         .catch((e) => {
-          console.error(`[${label}] ${p.taskId}/${p.iterId} failed:`, e);
+          console.error(`[judge-batch] ${p.taskId}/${p.iterId} failed:`, e);
         })
         .finally(() => {
           unlockJudgeBatch(p.taskId, p.iterId);

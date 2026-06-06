@@ -75,15 +75,7 @@ import { runRoutes } from "./run-routes.js";
 import { guidelineRoutes } from "./guideline-routes.js";
 import { reviewRoutes } from "./review-routes.js";
 import { phasesRoutes } from "./phases-routes.js";
-import { ontologyRoutes } from "./ontology-routes.js";
-import { entityTypeGuidanceRoutes } from "./entity-type-guidance-routes.js";
-import { adherenceRoutes } from "./adherence-routes.js";
 import { scaffoldRoutes } from "./scaffold-routes.js";
-import { spanStatsRoutes } from "./span-stats-routes.js";
-import { adherenceStatsRoutes } from "./adherence-stats-routes.js";
-import { adherenceIaaRoutes } from "./adherence-iaa-routes.js";
-import { adherenceSummaryRoutes } from "./adherence-summary-routes.js";
-import { nerCalibrationRoutes } from "./ner-calibration-routes.js";
 import { deployRoutes } from "./deploy-routes.js";
 import { attachWebSocketServer, registerBroadcasters } from "./ws.js";
 import {
@@ -232,15 +224,7 @@ const paramRouter = makeRouter([
   ...guidelineRoutes,
   ...reviewRoutes,
   ...phasesRoutes,
-  ...ontologyRoutes,
-  ...entityTypeGuidanceRoutes,
-  ...adherenceRoutes,
   ...scaffoldRoutes,
-  ...spanStatsRoutes,
-  ...adherenceStatsRoutes,
-  ...adherenceIaaRoutes,
-  ...adherenceSummaryRoutes,
-  ...nerCalibrationRoutes,
   ...deployRoutes,
 ]);
 
