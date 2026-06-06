@@ -3,10 +3,9 @@
 // This package is the dependency floor of the agent stack. It holds
 // only types + small validation helpers; no SDK, no runtime.
 //
-// Concrete providers (@chart-review/agent-provider-claude,
-// @chart-review/agent-provider-codex, …) implement AgentProvider against
-// this contract. Callers depend on AgentProvider (the interface) and
-// never on a specific implementation.
+// The concrete provider (@chart-review/agent-provider-deepagents)
+// implements AgentProvider against this contract. Callers depend on
+// AgentProvider (the interface) and never on a specific implementation.
 
 /** A single event emitted by an agent during a run. Providers translate
  *  their underlying SDK / CLI events into this shape. */

@@ -1,9 +1,8 @@
 // agent-provider.ts — provider-agnostic interface for running an agent.
 //
-// Today: only ClaudeAgentProvider exists, wrapping the @anthropic-ai/
-// claude-agent-sdk's `query()`. Future: a CodexAgentProvider can be
-// added by translating `codex exec --json` JSONL events into the same
-// AgentEvent taxonomy.
+// The only provider is DeepAgentsProvider, which spawns a Python
+// deepagents sidecar and translates its JSONL stdout into the
+// AgentEvent taxonomy below.
 //
 // Call sites import { agentProvider } from this module and never
 // reference the SDK directly. The provider is selected at module load
