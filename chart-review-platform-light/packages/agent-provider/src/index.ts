@@ -7,7 +7,7 @@
 //
 // Call sites import { agentProvider } from this module and never
 // reference the SDK directly. The provider is selected at module load
-// based on the AGENT_PROVIDER env var (defaults to "claude").
+// based on the AGENT_PROVIDER env var (defaults to "deepagents").
 
 import type { ComposeAgentInput } from "@chart-review/agent-compose";
 

@@ -402,10 +402,11 @@ export interface BuildMcpServersOptions {
    *  honors (taking precedence over the default
    *  `<PLATFORM_ROOT>/reviews/`). */
   reviewsRoot?: string;
-  /** Per-run agent provider — when not "claude", forces subprocess MCP
-   *  transport regardless of MCP_TRANSPORT env var. Falls back to
-   *  AGENT_PROVIDER env var when omitted. */
-  provider?: string;
+  /** Per-run agent provider. The only provider is "deepagents", which
+   *  always uses subprocess MCP transport (its Python sidecar can't host
+   *  an in-process server). Falls back to AGENT_PROVIDER env var when
+   *  omitted. */
+  provider?: "deepagents";
 }
 
 /**
@@ -437,16 +438,14 @@ export function buildMcpServersConfig(
   hooks: ReviewToolHooks,
   opts: BuildMcpServersOptions = {},
 ): Record<string, unknown> {
-  // Codex (and any future non-Anthropic provider) can't host an
-  // in-process Anthropic-SDK server, so subprocess transport is the
-  // only viable shape. Auto-promote when the active provider demands
-  // it, even if the operator didn't set MCP_TRANSPORT explicitly.
-  // The per-run override (opts.provider) wins over the env var so a
-  // single server can host runs from both providers.
+  // The deepagents provider runs the agent in a Python sidecar, which
+  // can't host an in-process Anthropic-SDK server — so it always uses
+  // the standalone stdio MCP server (subprocess transport). The
+  // per-run override (opts.provider) wins over the env var.
   const provider = opts.provider
-    ?? (process.env.AGENT_PROVIDER ?? "claude").toLowerCase();
+    ?? ((process.env.AGENT_PROVIDER ?? "deepagents").toLowerCase() as "deepagents");
   const wantsSubprocess =
-    process.env.MCP_TRANSPORT === "subprocess" || provider !== "claude";
+    process.env.MCP_TRANSPORT === "subprocess" || provider === "deepagents";
   if (wantsSubprocess) {
     const env: Record<string, string> = {
       ...(process.env as Record<string, string>),

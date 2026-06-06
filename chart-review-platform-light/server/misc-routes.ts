@@ -115,7 +115,7 @@ export const miscRoutes: RouteEntry[] = [
  *  partial data if config.toml is missing / malformed instead of
  *  failing the whole endpoint. */
 function buildApiProviderDiagnostics() {
-  const activeProvider = (process.env.AGENT_PROVIDER ?? "claude").toLowerCase();
+  const activeProvider = (process.env.AGENT_PROVIDER ?? "deepagents").toLowerCase();
   const claude = {
     model: modelFor("default") ?? null,
     base_url: process.env.ANTHROPIC_BASE_URL ?? null,
