@@ -15,7 +15,7 @@
 // The LLM-as-judge pre-screening lives in its own PhaseJudge component;
 // this file only renders the per-patient validation surface.
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { authFetch } from "../../auth";
 import { Button } from "@/components/ui/button";
@@ -98,6 +98,22 @@ export function PhaseValidate({
   }, [taskId, iterId]);
 
   const validated = patients.filter((p) => p.oracle_done).length;
+
+  // When every patient in the iter's cohort is validated, finalize the iter
+  // (state → complete) so it stops showing "validating" in the sidebar.
+  // Guarded by a ref so the 4s poll doesn't re-PATCH.
+  const finalizedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!iterId || patients.length === 0) return;
+    if (validated !== patients.length) return;
+    if (finalizedRef.current === iterId) return;
+    finalizedRef.current = iterId;
+    authFetch(`/api/pilots/${taskId}/${encodeURIComponent(iterId)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ state: "complete" }),
+    }).catch(() => undefined);
+  }, [validated, patients.length, taskId, iterId]);
 
   // Skip-agreed navigation:
   // 1. Prefer ready patients WITH at least one disagreement (they need adjudication).

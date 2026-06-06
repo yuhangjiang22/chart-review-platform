@@ -27,6 +27,7 @@ interface FieldAssessment {
 interface ReviewState {
   field_assessments?: FieldAssessment[];
   imported_from_run?: string;
+  review_status?: string;
 }
 
 function answersEqual(a: unknown, b: unknown): boolean {
@@ -70,6 +71,11 @@ function computePerformance(
       if (pid.startsWith(".")) continue;
       const state = readJson<ReviewState>(path.join(reviewsDir, pid, taskId, "review_state.json"));
       if (!state) continue;
+      // Only finalized records count. Re-running a session resets review_status
+      // to in_progress, so this means a patient is scored only after you Mark
+      // validated WITHIN the current session — performance is empty until then,
+      // and a prior session's validation doesn't leak into a fresh run.
+      if (state.review_status !== "reviewer_validated") continue;
 
       // Human's final answer for each human-decided primary field.
       const humanFinal: Record<string, unknown> = {};
