@@ -1,0 +1,17 @@
+task_type: phenotype_validation
+review_unit: patient
+manual_version: 2026-06-06
+final_output: cancer_characterization
+overview_prose: >-
+  Extract two categorical fields per patient from clinical notes only:
+  the cancer histology type and the disease extent. Notes are the sole
+  source — there is no structured/OMOP data in this task.
+
+
+  Source-document priority (apply globally): surgical pathology report >
+  biopsy pathology report > treating-oncologist progress note > imaging
+  report. Cite verbatim note text as evidence for every answer.
+phases:
+  - try
+  - validate
+  - decide
