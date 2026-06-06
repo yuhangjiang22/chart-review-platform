@@ -1,8 +1,0 @@
-[
-  { "row_id": 12101, "encounter_id": "enc_e8101", "type": "Outpatient",        "department": "Primary Care",     "primary_provider": "L. Chen, MD",  "start_date": "2025-05-12", "end_date": "2025-05-12" },
-  { "row_id": 12102, "encounter_id": "enc_e8102", "type": "Outpatient",        "department": "Primary Care",     "primary_provider": "L. Chen, MD",  "start_date": "2025-11-04", "end_date": "2025-11-04" },
-  { "row_id": 12103, "encounter_id": "enc_e8103", "type": "Outpatient",        "department": "Pulmonology",      "primary_provider": "R. Okafor, MD","start_date": "2025-12-16", "end_date": "2025-12-16" },
-  { "row_id": 12104, "encounter_id": "enc_e8104", "type": "Outpatient",        "department": "Primary Care",     "primary_provider": "L. Chen, MD",  "start_date": "2026-04-12", "end_date": "2026-04-12" },
-
-  { "row_id": 12201, "encounter_id": "enc_e8201", "type": "Emergency",         "department": "Emergency",        "primary_provider": "T. Brody, MD", "start_date": "2025-11-15", "end_date": "2025-11-15", "chief_complaint": "wheezing, shortness of breath", "discharge_disposition": "Home", "asthma_related": true }
-]

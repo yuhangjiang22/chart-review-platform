@@ -39,8 +39,6 @@ import {
   setReviewStatus as hSetReviewStatus,
   listNotesTool as hListNotes,
   readNoteTool as hReadNote,
-  listStructuredDataTool as hListStructured,
-  readStructuredDataTool as hReadStructured,
   listCriteriaTool as hListCriteria,
   readCriterionTool as hReadCriterion,
   readNotesTool as hReadNotes,
@@ -300,41 +298,8 @@ if (want("read_note")) {
   );
 }
 
-if (want("list_structured_data")) {
-  server.registerTool(
-    "list_structured_data",
-    {
-      description: [
-        "PREFER OVER SHELL. List the structured (OMOP-style) data tables",
-        "available for this patient with row counts. Decide which tables to",
-        "read in full from this output — do not `ls omop/` via shell.",
-      ].join(" "),
-      inputSchema: {},
-    },
-    async (): Promise<CallToolResult> => hListStructured(session, {}),
-  );
-}
-
-if (want("read_structured_data")) {
-  server.registerTool(
-    "read_structured_data",
-    {
-      description: [
-        "PREFER OVER SHELL. Return rows from one structured-data table",
-        "(measurements, conditions, drug_exposures, observations, encounters,",
-        "procedures, …). Pass `table` (a name from list_structured_data).",
-        "`max_rows` caps the slice (default 200); response includes",
-        "`truncated` and `total_rows`. Do not `cat` OMOP JSON files via",
-        "shell — that dumps every row into context.",
-      ].join(" "),
-      inputSchema: {
-        table: z.string(),
-        max_rows: z.number().int().positive().optional(),
-      },
-    },
-    async (args): Promise<CallToolResult> => hReadStructured(session, args as any),
-  );
-}
+// Notes-only platform: OMOP / structured-data tools (list_structured_data,
+// read_structured_data) are intentionally not registered here.
 
 if (want("list_criteria")) {
   server.registerTool(
