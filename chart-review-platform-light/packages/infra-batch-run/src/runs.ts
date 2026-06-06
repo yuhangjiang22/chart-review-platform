@@ -705,7 +705,17 @@ async function runOneAgent(
       ? `targeted criterion via set_field_assessment (and select_evidence as needed).`
       : `leaf criterion via set_field_assessment (and select_evidence as needed).`,
     "Use find_quote_offsets BEFORE citing any note quote so faithfulness validation",
-    "passes. After all leaf criteria are answered, you are done — emit a brief",
+    "passes.",
+    "",
+    "EVIDENCE DISCIPLINE — cite the SMALLEST span that supports the answer:",
+    "- Quote only the sentence or phrase that justifies the answer (≈1–2",
+    "  sentences, well under 300 characters). Do NOT cite the whole note — a",
+    "  citation spanning the entire document is not acceptable evidence.",
+    "- For a 'no_info' answer: cite the single most-relevant section you checked",
+    "  (e.g. the diagnosis / assessment line), or leave the evidence list empty.",
+    "  Do not paste the full note to 'prove' that information is absent.",
+    "",
+    "After all leaf criteria are answered, you are done — emit a brief",
     "summary line and stop.",
   ].join("\n");
 

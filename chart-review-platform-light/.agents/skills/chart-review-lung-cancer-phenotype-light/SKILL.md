@@ -16,8 +16,17 @@ This is a notes-only phenotype task with two categorical fields:
    each field's enum of allowed answers and its extraction guidance.
 3. For each field, commit one answer via
    `set_field_assessment(field_id, answer, confidence, evidence, rationale)`.
-   The `answer` MUST be one of the field's enum values. Quote verbatim note
-   text in `evidence` (with the note_id) so the faithfulness gate passes.
+   The `answer` MUST be one of the field's enum values.
+
+   Evidence rules — cite the SMALLEST span that supports the answer:
+   - Quote the single sentence or phrase that justifies the answer (roughly
+     one or two sentences, well under ~300 characters). Use `find_quote_offsets`
+     to get exact offsets so the faithfulness gate passes.
+   - Do NOT cite the whole note. A citation that spans the entire document is
+     not acceptable evidence.
+   - For `no_info`: if no sentence is relevant, cite the single most-relevant
+     section you checked (e.g. the diagnosis/assessment line), or leave
+     `evidence` empty — do not paste the full note to "prove" absence.
 4. Apply the source-document priority: surgical pathology > biopsy pathology >
    treating-oncologist note > imaging. Use `no_info` when the notes do not
    document the field.
