@@ -24,9 +24,10 @@ This is a notes-only phenotype task with two categorical fields:
      to get exact offsets so the faithfulness gate passes.
    - Do NOT cite the whole note. A citation that spans the entire document is
      not acceptable evidence.
-   - For `no_info`: if no sentence is relevant, cite the single most-relevant
-     section you checked (e.g. the diagnosis/assessment line), or leave
-     `evidence` empty — do not paste the full note to "prove" absence.
+   - For `no_info`: ALWAYS cite at least one short span — the section you
+     checked where this information would appear if present (e.g. the
+     Assessment/Plan, Diagnosis, or relevant History line). This shows where
+     you looked. Do not leave `evidence` empty, and do not paste the full note.
 4. Apply the source-document priority: surgical pathology > biopsy pathology >
    treating-oncologist note > imaging. Use `no_info` when the notes do not
    document the field.
