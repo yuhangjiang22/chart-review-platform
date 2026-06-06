@@ -1,18 +1,15 @@
-import { Check, Circle, RotateCcw } from "lucide-react";
+import { Check, Circle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Phase, MaturityState } from "./phase-logic";
 import {
   PHASE_ORDER,
   PHASE_LABEL,
   ITER_PHASES,
-  EXIT_PHASES,
 } from "./phases";
 
-// Canonical lists (PHASE_ORDER / ITER_PHASES / EXIT_PHASES / PHASE_LABEL)
+// Canonical lists (PHASE_ORDER / ITER_PHASES / PHASE_LABEL)
 // live in phases.ts so editing this one file is enough to add or reorder
-// a phase. AUTHOR → TRY → JUDGE → VALIDATE → DECIDE is the iteration
-// cycle; LOCK + DEPLOY are the exit ramp. We render the two visual
-// groups separated by a gate marker so the cyclic shape is legible.
+// a phase. TRY → VALIDATE → DECIDE is the workflow cycle.
 
 // Re-export PHASE_ORDER for callers that imported from this module
 // historically — the legacy import path keeps working.
@@ -21,31 +18,25 @@ export { PHASE_ORDER };
 /**
  * Compute which phases are checked (done) based on guideline maturity.
  *
- * JUDGE is optional — never auto-marked done, since reviewers can skip
- * it. The pill renders as upcoming/active as appropriate but doesn't
- * receive a checkmark from maturity alone.
- *
- * | Maturity     | Phases marked done                        |
- * |--------------|-------------------------------------------|
- * | authoring    | none                                      |
- * | draft        | AUTHOR                                    |
- * | piloted      | AUTHOR + TRY + VALIDATE                   |
- * | calibrated   | + DECIDE + LOCK                           |
- * | locked       | (same as calibrated)                      |
- * | deployed     | all                                       |
+ * | Maturity     | Phases marked done          |
+ * |--------------|-----------------------------|
+ * | authoring    | none                        |
+ * | draft        | none                        |
+ * | piloted      | TRY + VALIDATE              |
+ * | calibrated   | TRY + VALIDATE + DECIDE     |
+ * | locked       | TRY + VALIDATE + DECIDE     |
+ * | deployed     | all                         |
  */
 export function maturityToDonePhases(maturity: MaturityState | "authoring" | "deployed"): Phase[] {
   switch (maturity) {
     case "authoring":
-      return [];
     case "draft":
-      return ["AUTHOR"];
+      return [];
     case "piloted":
-      return ["AUTHOR", "TRY", "VALIDATE"];
+      return ["TRY", "VALIDATE"];
     case "calibrated":
-      return ["AUTHOR", "TRY", "VALIDATE", "DECIDE", "LOCK"];
     case "locked":
-      return ["AUTHOR", "TRY", "VALIDATE", "DECIDE", "LOCK"];
+      return ["TRY", "VALIDATE", "DECIDE"];
     case "deployed":
       return [...PHASE_ORDER];
     default:
@@ -87,7 +78,6 @@ export function PhasePillBar({
     : null;
   const isEnabled = (p: Phase) => !enabledSet || enabledSet.has(p);
   const iterPhasesToRender = ITER_PHASES.filter(isEnabled);
-  const exitPhasesToRender = EXIT_PHASES.filter(isEnabled);
 
   function renderPill(phase: Phase, withConnector: boolean) {
     const isDone = effectiveDone.includes(phase);
@@ -134,36 +124,10 @@ export function PhasePillBar({
       aria-label="Workflow phases"
       className="flex items-center gap-2 overflow-x-auto py-2"
     >
-      {/* Iteration cycle group — Author → Try → Validate → Decide, with a
-       *  loop-back affordance on the right edge of the group. The icon is
-       *  clickable as a shortcut for "back to Author to start the next iter". */}
+      {/* Workflow cycle: TRY → VALIDATE → DECIDE */}
       <div className="flex items-center gap-1 rounded-full border border-dashed border-border/70 px-2 py-1">
         {iterPhasesToRender.map((phase, i) => renderPill(phase, i > 0))}
-        <button
-          type="button"
-          onClick={() => onPhaseClick?.("AUTHOR")}
-          className="ml-1 inline-flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground hover:bg-muted/40 hover:text-foreground"
-          title="Loop back to Author — start the next iteration"
-          aria-label="Loop back to Author"
-        >
-          <RotateCcw size={11} strokeWidth={2} />
-        </button>
       </div>
-
-      {/* Gate marker between the iteration loop and the terminal phases. */}
-      <span
-        aria-hidden
-        className="px-1 text-[10px] uppercase tracking-[0.2em] text-muted-foreground/70"
-      >
-        gate
-      </span>
-
-      {/* Terminal group — Lock + Deploy, the one-way exit. */}
-      {exitPhasesToRender.length > 0 && (
-        <div className="flex items-center gap-1">
-          {exitPhasesToRender.map((phase, i) => renderPill(phase, i > 0))}
-        </div>
-      )}
     </nav>
   );
 }

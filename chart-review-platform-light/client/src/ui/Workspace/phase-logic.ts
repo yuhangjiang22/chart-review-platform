@@ -50,23 +50,10 @@ export function derivePhase(
   cells: CellCounts,
   deployedCohortExists: boolean,
 ): PhaseInfo {
-  // Rule 1: locked + deployed → DEPLOY
-  if (maturity === "locked" && deployedCohortExists) {
-    return {
-      phase: "DEPLOY",
-      completeness: null,
-      status_label: "deployed",
-    };
-  }
-
-  // Rule 2: locked, no deploy yet → LOCK
-  if (maturity === "locked") {
-    return {
-      phase: "LOCK",
-      completeness: null,
-      status_label: "ready to deploy",
-    };
-  }
+  // Unused in the light platform (no LOCK/DEPLOY phases) — kept as a
+  // parameter to preserve the call signature for existing callers.
+  void maturity;
+  void deployedCohortExists;
 
   // Treat abandoned iter same as no iter for rules 3–7
   const iter = latestIter?.state === "abandoned" ? null : latestIter;
@@ -119,26 +106,20 @@ export function derivePhase(
     };
   }
 
-  // Rule 8: no iter or all abandoned → AUTHOR (initial draft *or* re-author
-  // after a refinement cycle — same surface, recurring state).
+  // Rule 8: no iter or all abandoned → TRY (entry phase for the light
+  // platform — task is pre-authored so the workflow opens at the run step).
   return {
-    phase: "AUTHOR",
+    phase: "TRY",
     completeness: null,
-    status_label: "authoring",
+    status_label: "ready to run",
   };
 }
 
 export type CTAAction =
-  | "open-draft"
   | "run-agent"
   | "open-validate"
   | "advance-decide"
-  | "revise"
-  | "lock"
-  | "run-calibration"
-  | "run-lock-test"
-  | "lock-version"
-  | "run-cohort";
+  | "revise";
 
 export interface CTADescriptor {
   label: string;
@@ -155,25 +136,14 @@ export function deriveNextCTA(
   status_label: string,
   cells: CellCounts,
 ): CTADescriptor {
+  // status_label is kept in the signature for future CTA differentiation.
+  void status_label;
   switch (phase) {
-    case "AUTHOR":
-      // AUTHOR phase actually renders two CTAs ("Edit guideline" + "Try on
-      // patients") directly in Workspace/index.tsx — this single-CTA branch
-      // is the safe fallback if anyone asks generically.
-      return { label: "Edit guideline", action: "open-draft" };
-
     case "TRY":
       return {
         label: `Run agent on ${cells.patient_count} patients`,
         action: "run-agent",
       };
-
-    case "JUDGE":
-      // JUDGE is optional — the page itself surfaces "Run judge" /
-      // "Skip to validate" buttons. The pill bar still wants a primary
-      // CTA when JUDGE is the active phase, so direct the reviewer
-      // forward to VALIDATE.
-      return { label: "Continue to validate", action: "open-validate" };
 
     case "VALIDATE": {
       const remaining = cells.total - cells.validated;
@@ -184,14 +154,7 @@ export function deriveNextCTA(
     }
 
     case "DECIDE":
-      // Primary CTA is Revise; Lock is always shown as the secondary equal CTA in PhaseDecide
+      // Primary CTA is Revise; the performance report is shown inline
       return { label: "Revise", action: "revise" };
-
-    case "LOCK":
-      // Sequenced: first calibration, then lock test, then lock. Default to first step.
-      return { label: "Run calibration", action: "run-calibration" };
-
-    case "DEPLOY":
-      return { label: "Run on cohort", action: "run-cohort" };
   }
 }

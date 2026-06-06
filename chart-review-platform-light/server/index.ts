@@ -62,21 +62,17 @@ import { sessionRoutes } from "./session-routes.js";
 import { packageRoutes } from "./package-routes.js";
 import { proposalRoutes } from "./proposal-routes.js";
 import { issueRoutes } from "./issue-routes.js";
-import { lockTestRoutes } from "./lock-test-routes.js";
 import { cohortRoutes } from "./cohort-routes.js";
 import { coreRoutes, type RawBody, type SSEStream } from "./core-routes.js";
 import { reconcilePilotStatesOnStartup } from "./lib/domain/iter/index.js";
 import { miscRoutes } from "./misc-routes.js";
 import { jobsRoutes } from "./jobs-routes.js";
-import { methodsRoutes } from "./methods-routes.js";
 import { authoringRoutes } from "./authoring-routes.js";
 import { feedbackRoutes } from "./feedback-routes.js";
 import { runRoutes } from "./run-routes.js";
-import { guidelineRoutes } from "./guideline-routes.js";
 import { reviewRoutes } from "./review-routes.js";
 import { phasesRoutes } from "./phases-routes.js";
 import { scaffoldRoutes } from "./scaffold-routes.js";
-import { deployRoutes } from "./deploy-routes.js";
 import { attachWebSocketServer, registerBroadcasters } from "./ws.js";
 import {
   isBuilderPath, delegateBuilder,
@@ -212,20 +208,16 @@ const paramRouter = makeRouter([
   ...packageRoutes,
   ...proposalRoutes,
   ...issueRoutes,
-  ...lockTestRoutes,
   ...cohortRoutes,
   ...coreRoutes,
   ...miscRoutes,
   ...jobsRoutes,
-  ...methodsRoutes,
   ...authoringRoutes,
   ...feedbackRoutes,
   ...runRoutes,
-  ...guidelineRoutes,
   ...reviewRoutes,
   ...phasesRoutes,
   ...scaffoldRoutes,
-  ...deployRoutes,
 ]);
 
 // ── http plumbing ───────────────────────────────────────────────────

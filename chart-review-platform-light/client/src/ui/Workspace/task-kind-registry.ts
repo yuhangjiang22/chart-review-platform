@@ -1,27 +1,17 @@
 // TaskKindRegistry — consolidates the per-task-kind UI pieces so the
-// rest of Workspace.tsx + App.tsx looks up "the AUTHOR pane for this
-// kind" / "the reviewer pane for this kind" / "the unit-noun for this
-// kind" in one place instead of branching on task_kind at every consumer.
+// rest of Workspace.tsx + App.tsx looks up "the reviewer pane for this
+// kind" / "the unit-noun for this kind" in one place instead of branching
+// on task_kind at every consumer.
 //
-// Platform v2 light: only phenotype is supported.
+// Platform v2 light: only phenotype is supported. AUTHOR pane removed
+// (tasks are pre-authored; the workflow starts at TRY).
 
 import type { ComponentType } from "react";
 import type { CompiledField, NoteFocus, ReviewState } from "../../types";
 
-import { PhaseDraft } from "./PhaseDraft";
 import { PatientReview } from "../PatientReview";
 
 export type TaskKind = "phenotype";
-
-/** Props shared by every AUTHOR pane. */
-export interface AuthorPaneCommonProps {
-  taskId: string;
-}
-
-export type AuthorPaneComponent = ComponentType<{
-  taskId: string;
-  onPreflightHasErrors?: (b: boolean) => void;
-}>;
 
 /** Reviewer-page props mirrored from PatientReview. */
 export interface ReviewerPaneCommonProps {
@@ -47,7 +37,6 @@ export type ReviewerPaneComponent = ComponentType<{
 
 export interface TaskKindUiBundle {
   kind: TaskKind;
-  authorPane: AuthorPaneComponent;
   reviewerPane: ReviewerPaneComponent;
   unitLabel: { singular: string; plural: string };
 }
@@ -55,7 +44,6 @@ export interface TaskKindUiBundle {
 const REGISTRY: Record<TaskKind, TaskKindUiBundle> = {
   phenotype: {
     kind: "phenotype",
-    authorPane: PhaseDraft as AuthorPaneComponent,
     reviewerPane: PatientReview as ReviewerPaneComponent,
     unitLabel: { singular: "cell", plural: "cells" },
   },

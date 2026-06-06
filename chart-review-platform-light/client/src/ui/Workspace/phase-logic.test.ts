@@ -7,18 +7,15 @@ const allFresh: CellCounts = { validated: 10, total: 10, stale: 0, patient_count
 const partialNoStale: CellCounts = { validated: 5, total: 10, stale: 0, patient_count: 10 };
 const partialWithStale: CellCounts = { validated: 10, total: 10, stale: 2, patient_count: 10 };
 
-describe("derivePhase — rule 1: locked + deployed", () => {
-  it("returns DEPLOY when maturity locked and deployedCohortExists true", () => {
+describe("derivePhase — rule 1+2: maturity flags ignored in light platform → falls through to TRY", () => {
+  it("returns TRY (not DEPLOY) when maturity locked and deployedCohortExists true, no iter", () => {
     const result = derivePhase("locked", null, noCells, true);
-    expect(result.phase).toBe("DEPLOY");
+    expect(result.phase).toBe("TRY");
   });
-});
 
-describe("derivePhase — rule 2: locked, no deploy", () => {
-  it("returns LOCK when maturity locked and no deployed cohort", () => {
+  it("returns TRY (not LOCK) when maturity locked and no deployed cohort, no iter", () => {
     const result = derivePhase("locked", null, noCells, false);
-    expect(result.phase).toBe("LOCK");
-    expect(result.status_label).toBe("ready to deploy");
+    expect(result.phase).toBe("TRY");
   });
 });
 
@@ -71,28 +68,20 @@ describe("derivePhase — rule 7: ready_to_validate + no validated → VALIDATE 
   });
 });
 
-describe("derivePhase — rule 8: no iter → AUTHOR", () => {
-  it("returns AUTHOR when no iter", () => {
+describe("derivePhase — rule 8: no iter → TRY (entry phase in light platform)", () => {
+  it("returns TRY when no iter", () => {
     const result = derivePhase("draft", null, noCells, false);
-    expect(result.phase).toBe("AUTHOR");
+    expect(result.phase).toBe("TRY");
   });
 
-  it("returns AUTHOR when iter is abandoned", () => {
+  it("returns TRY when iter is abandoned", () => {
     const result = derivePhase("draft", { state: "abandoned" } as IterState, noCells, false);
-    expect(result.phase).toBe("AUTHOR");
+    expect(result.phase).toBe("TRY");
   });
 });
 
 import { deriveNextCTA } from "./phase-logic";
 import type { CTADescriptor } from "./phase-logic";
-
-describe("deriveNextCTA — AUTHOR phase", () => {
-  it("returns 'Edit guideline' when idle (no cells)", () => {
-    const cta = deriveNextCTA("AUTHOR", "authoring", { validated: 0, total: 0, stale: 0, patient_count: 0 });
-    expect(cta.label).toBe("Edit guideline");
-    expect(cta.action).toBe("open-draft");
-  });
-});
 
 describe("deriveNextCTA — TRY phase", () => {
   it("returns 'Run agent' CTA referencing patient count", () => {
@@ -126,18 +115,3 @@ describe("deriveNextCTA — DECIDE phase", () => {
   });
 });
 
-describe("deriveNextCTA — LOCK phase", () => {
-  it("returns 'Run calibration' CTA", () => {
-    const cta = deriveNextCTA("LOCK", "ready to deploy", { validated: 10, total: 10, stale: 0, patient_count: 10 });
-    expect(cta.label).toBe("Run calibration");
-    expect(cta.action).toBe("run-calibration");
-  });
-});
-
-describe("deriveNextCTA — DEPLOY phase", () => {
-  it("returns 'Run on cohort' CTA", () => {
-    const cta = deriveNextCTA("DEPLOY", "deployed", { validated: 0, total: 0, stale: 0, patient_count: 0 });
-    expect(cta.label).toBe("Run on cohort");
-    expect(cta.action).toBe("run-cohort");
-  });
-});

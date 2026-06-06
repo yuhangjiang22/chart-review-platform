@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { authFetch } from "../../auth";
 import { Button } from "@/components/ui/button";
-import { ArrowRight } from "lucide-react";
 import {
   derivePhase,
   deriveNextCTA,
@@ -13,26 +12,13 @@ import { PHASE_ORDER, PhasePillBar } from "./PhasePillBar";
 import { PHASE_SLUG_TO_ID } from "./phases";
 import { PhaseHeadline } from "./PhaseHeadline";
 import { WorkspaceSettings } from "./WorkspaceSettings";
-import { PhaseDraft } from "./PhaseDraft";
-import { taskKindUi, taskKindFromTaskType } from "./task-kind-registry";
+import { taskKindFromTaskType } from "./task-kind-registry";
 import { PhaseTry } from "./PhaseTry";
-import { PhaseJudge } from "./PhaseJudge";
 import { PhaseValidate } from "./PhaseValidate";
 import { PhaseDecide } from "./PhaseDecide";
-import { PhaseLock } from "./PhaseLock";
-import { PhaseDeploy } from "./PhaseDeploy";
 import { SessionSwitcher, type SessionListItem } from "./SessionSwitcher";
 import { NewSessionDialog } from "./NewSessionDialog";
 import { SessionSidebar } from "./SessionSidebar";
-
-// Legacy-tabs secondary nav — only shown in "Show all tools" mode.
-// These are the tabs that do not have a dedicated phase home in the new shell.
-const LEGACY_TABS: Array<{ id: string; label: string }> = [
-  { id: "issues", label: "Issues" },
-  { id: "rules", label: "Rules" },
-  { id: "methods", label: "Methods" },
-  { id: "bundles", label: "Bundles" },
-];
 
 // ── Data shapes mirrored from WorkflowStatusBanner ───────────────────────────
 
@@ -46,7 +32,7 @@ interface PilotIterListing {
 
 // Three-state load tracker for the pilots fetch. Distinguishes "still
 // loading" from "server returned but list is empty" from "fetch failed"
-// — without this the JUDGE/VALIDATE empty-state mis-reports a transient
+// — without this the VALIDATE empty-state mis-reports a transient
 // dev-server restart as "no run yet". See [Workspace empty-state copy].
 type PilotsState = "loading" | "error" | PilotIterListing[];
 
@@ -89,9 +75,9 @@ const PHASE_TABS: Record<string, Phase> = PHASE_SLUG_TO_ID;
 export function Workspace({
   taskId,
   tasks,
-  reviewerId,
+  reviewerId: _reviewerId,
   isMethodologist,
-  onEditGuideline,
+  onEditGuideline: _onEditGuideline,
   onOpenPatient,
   tab,
   onTabChange,
@@ -100,8 +86,6 @@ export function Workspace({
   const [pilots, setPilots] = useState<PilotsState>("loading");
   const [iterDetail, setIterDetail] = useState<PilotIterDetail | null>(null);
   const [revisitsTotal, setRevisitsTotal] = useState(0);
-  const [deployedCohortExists, setDeployedCohortExists] = useState(false);
-  const [showAllTools, setShowAllTools] = useState(false);
 
   // Per-task enabled phases — fetched from /api/tasks/:taskId/phases.
   // null until the fetch resolves (PhasePillBar treats null as "all enabled").
@@ -115,15 +99,12 @@ export function Workspace({
       .then((d) => {
         if (cancelled || !d) return;
         const ids: string[] = Array.isArray(d.enabled) ? d.enabled : [];
-        // map "author" → "AUTHOR" etc.
+        // map slug → Phase ID ("try" → "TRY", etc.)
         setEnabledPhases(ids.map((id) => id.toUpperCase() as Phase));
       })
       .catch(() => { /* fall back to all phases */ });
     return () => { cancelled = true; };
   }, [taskId]);
-
-  /** True when pre-flight reports error-level diagnostics in the AUTHOR phase. */
-  const [preflightHasErrors, setPreflightHasErrors] = useState(false);
 
   // Phase override is now URL-driven via the `tab` prop. When the URL has
   // /studio/<task>/<phase> (where phase is a key in PHASE_TABS), that phase
@@ -131,8 +112,7 @@ export function Workspace({
   // setPhase writes to the URL via onTabChange, so back/forward and refresh
   // all preserve the phase the reviewer was on.
   //
-  // Guard: if the URL points at a phase that THIS task has disabled
-  // (e.g. /judge for adherence, where JUDGE is filtered from enabledPhases),
+  // Guard: if the URL points at a phase that THIS task has disabled,
   // ignore the override so the pill bar's auto-derived active phase wins.
   // Otherwise the body renders a phase the pill bar can't show, leaving
   // the user with no visible "active" cue.
@@ -329,19 +309,8 @@ export function Workspace({
   }, [taskId]);
 
   useEffect(() => {
-    refresh();
-    // Reset preflight state on task change so stale errors from a previous
-    // task don't bleed into the newly selected task.
-    setPreflightHasErrors(false);
+    void refresh();
   }, [refresh]);
-
-  // Check if any cohort run exists (for DEPLOY phase detection).
-  useEffect(() => {
-    authFetch("/api/cohorts")
-      .then((r) => (r.ok ? r.json() : { cohorts: [] }))
-      .then((body) => setDeployedCohortExists((body.cohorts ?? []).length > 0))
-      .catch(() => setDeployedCohortExists(false));
-  }, [taskId]);
 
   // Normalized discriminator used across every phase-pane prop +
   // dispatched component lookup. Mirrors the server's taskKindFromTaskType.
@@ -376,9 +345,9 @@ export function Workspace({
         maturity,
         activeIter ?? null,
         cells,
-        deployedCohortExists,
+        false, // deployedCohortExists — no DEPLOY phase in light platform
       ),
-    [maturity, activeIter, cells, deployedCohortExists],
+    [maturity, activeIter, cells],
   );
 
   const activePhase: Phase = manualPhaseOverride ?? phaseInfo.phase;
@@ -397,9 +366,6 @@ export function Workspace({
 
   function handleCTA() {
     switch (cta.action) {
-      case "open-draft":
-        onEditGuideline?.(maturity);
-        break;
       case "run-agent":
         setPhase("TRY");
         break;
@@ -410,19 +376,7 @@ export function Workspace({
         );
         break;
       case "revise":
-        setPhase("AUTHOR");
-        onEditGuideline?.(maturity);
-        break;
-      case "lock":
-        setPhase("LOCK");
-        break;
-      case "run-calibration":
-      case "run-lock-test":
-      case "lock-version":
-        setPhase("LOCK");
-        break;
-      case "run-cohort":
-        setPhase("DEPLOY");
+        setPhase("TRY");
         break;
     }
   }
@@ -467,7 +421,7 @@ export function Workspace({
             onSelect={setActiveSessionId}
             onNewSession={() => setNewSessionOpen(true)}
           />
-          <WorkspaceSettings taskId={taskId} onShowAllToolsChange={setShowAllTools} />
+          <WorkspaceSettings taskId={taskId} onShowAllToolsChange={() => { /* show-all-tools not used in light platform */ }} />
         </div>
       </div>
 
@@ -486,49 +440,10 @@ export function Workspace({
         <PhaseHeadline phaseInfo={{ ...phaseInfo, phase: activePhase }} versionTag={versionTag} taskKind={taskKind} />
       </div>
 
-      {/* Legacy secondary nav — only when Show all tools is on */}
-      {showAllTools && (
-        <nav
-          aria-label="Legacy tabs"
-          className="flex gap-1 border-b border-border/40 pb-2 animate-fade-in"
-        >
-          {LEGACY_TABS.map((lt) => (
-            <button
-              key={lt.id}
-              type="button"
-              onClick={() => {
-                // Map to nearest phase equivalent or just show LOCK (which contains them)
-                setPhase("LOCK");
-              }}
-              className="rounded-md border border-border px-3 py-1 text-[11px] text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground uppercase tracking-[0.12em]"
-            >
-              {lt.label}
-            </button>
-          ))}
-        </nav>
-      )}
-
       {/* Active phase surface */}
       <main className="min-h-[400px] py-6">
-        {activePhase === "AUTHOR" && (() => {
-          // Per-kind AUTHOR pane is registered in task-kind-registry.
-          // Phenotype gets the preflight callback; the other panes
-          // ignore it (they declare it optional on their props).
-          const AuthorPane = taskKindUi(task?.task_type).authorPane;
-          return (
-            <AuthorPane
-              taskId={taskId}
-              canEdit={isMethodologist}
-              onPreflightHasErrors={setPreflightHasErrors}
-            />
-          );
-        })()}
-
-        {/* No-session gate — every non-AUTHOR phase requires an active
-            session. AUTHOR is exempt because the methodologist can edit
-            the rubric without running anything. The gate hides the
-            phase pane entirely until the user picks or starts a session. */}
-        {activePhase !== "AUTHOR" && !activeSessionId && (
+        {/* No-session gate — every phase requires an active session. */}
+        {!activeSessionId && (
           <div className="mx-auto max-w-[520px] py-12 space-y-4 text-center">
             <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
               No active session
@@ -540,7 +455,7 @@ export function Workspace({
               Pick or start a session to see this phase
             </h3>
             <p className="text-[13px] text-muted-foreground">
-              Every iter — and the validation, judging, scoring, and locking
+              Every iter — and the validation, scoring, and performance review
               that follow — lives inside a session. Without one, there's nothing
               to show here.
             </p>
@@ -553,23 +468,11 @@ export function Workspace({
         {activePhase === "TRY" && activeSessionId && (
           <PhaseTry
             taskId={taskId}
-            onAdvanceToValidate={() => setPhase("JUDGE")}
+            onAdvanceToValidate={() => setPhase("VALIDATE")}
             activeSessionId={activeSessionId}
             onOpenNewSession={() => setNewSessionOpen(true)}
             taskKind={taskKind}
           />
-        )}
-        {activePhase === "JUDGE" && activeSessionId && activeIter && (
-          <PhaseJudge
-            taskId={taskId}
-            iterId={activeIter.iter_id}
-            onSkipToValidate={() => setPhase("VALIDATE")}
-            taskKind={taskKind}
-            onOpenSpan={(pid) => onOpenPatient?.(pid)}
-          />
-        )}
-        {activePhase === "JUDGE" && activeSessionId && !activeIter && (
-          <PilotsEmptyState pilots={pilots} verb="judge" onRetry={refresh} />
         )}
         {activePhase === "VALIDATE" && activeSessionId && activeIter && (
           <PhaseValidate
@@ -591,11 +494,8 @@ export function Workspace({
             patientIds={iterDetail?.patient_status.map((p) => p.patient_id) ?? []}
             canLock={cells.stale === 0 && cells.validated >= cells.total && cells.total > 0}
             taskKind={taskKind}
-            onRevise={() => {
-              setPhase("AUTHOR");
-              onEditGuideline?.(maturity);
-            }}
-            onLock={() => setPhase("LOCK")}
+            onRevise={() => setPhase("TRY")}
+            onLock={() => { /* no lock phase in light platform */ }}
             onImprove={runImprovement}
             isImproving={isImproving}
             improveProposalCount={improveProposalCount}
@@ -605,57 +505,7 @@ export function Workspace({
             activeSessionId={activeSessionId}
           />
         )}
-        {activePhase === "LOCK" && activeSessionId && (
-          <PhaseLock
-            taskId={taskId}
-            reviewerId={reviewerId}
-            isMethodologist={isMethodologist}
-            taskKind={taskKind}
-          />
-        )}
-        {activePhase === "DEPLOY" && activeSessionId && (
-          <PhaseDeploy taskId={taskId} taskKind={taskKind} />
-        )}
       </main>
-
-      {/* CTA footer — AUTHOR has dual CTAs ("Edit guideline" + "Try on
-       *  patients"). DECIDE and TRY render their actions inline (DECIDE has
-       *  Revise + Lock; TRY has Stop / Override / Validate on the run card,
-       *  or the form's own Run button). Other phases use the single derived
-       *  CTA. */}
-      {activePhase === "AUTHOR" ? (
-        <footer className="sticky bottom-0 border-t border-border/60 bg-background/80 backdrop-blur-sm py-3 flex justify-end gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            className="gap-1.5"
-            onClick={() => onEditGuideline?.(maturity)}
-          >
-            Edit guideline
-          </Button>
-          <Button
-            size="sm"
-            className="gap-1.5"
-            disabled={preflightHasErrors}
-            title={
-              preflightHasErrors
-                ? "Resolve pre-flight diagnostics before running TRY"
-                : undefined
-            }
-            onClick={() => !preflightHasErrors && setPhase("TRY")}
-          >
-            Try on patients
-            <ArrowRight size={12} strokeWidth={1.75} />
-          </Button>
-        </footer>
-      ) : activePhase !== "DECIDE" && activePhase !== "TRY" && activePhase !== "VALIDATE" && activePhase !== "LOCK" ? (
-        <footer className="sticky bottom-0 border-t border-border/60 bg-background/80 backdrop-blur-sm py-3 flex justify-end">
-          <Button size="sm" className="gap-1.5" onClick={handleCTA}>
-            {cta.label}
-            <ArrowRight size={12} strokeWidth={1.75} />
-          </Button>
-        </footer>
-      ) : null}
       </div>
 
       <SessionSidebar
@@ -666,7 +516,7 @@ export function Workspace({
         patientStatus={sidebarPatientStatus}
         isOpen={sidebarOpen}
         onToggle={() => setSidebarOpen(!sidebarOpen)}
-        onJumpToAuthor={() => setPhase("AUTHOR")}
+        onJumpToAuthor={() => setPhase("TRY")}
         taskKind={taskKind}
       />
     </div>
