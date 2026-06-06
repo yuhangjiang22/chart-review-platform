@@ -46,8 +46,12 @@ export function methodologistAllowlist(): string[] {
 }
 
 export function isMethodologist(reviewerId: string | null | undefined): boolean {
-  if (!reviewerId || reviewerId === "anonymous-reviewer") return false;
+  // Light platform: open by default. With no METHODOLOGISTS allowlist set,
+  // anyone — including anonymous reviewers — can author tasks, create
+  // sessions, and start runs (a session = a new run). Set METHODOLOGISTS in
+  // the env to restrict those actions to named reviewers.
   if (METHODOLOGIST_ALLOWLIST.length === 0) return true;
+  if (!reviewerId || reviewerId === "anonymous-reviewer") return false;
   return METHODOLOGIST_ALLOWLIST.includes(reviewerId);
 }
 
