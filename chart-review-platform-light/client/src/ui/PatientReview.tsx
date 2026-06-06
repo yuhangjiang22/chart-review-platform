@@ -527,7 +527,7 @@ export function PatientReview(p: PatientReviewProps) {
                           matched?.rationale ??
                           judgeRec.analysis?.reasoning ??
                           "Applied judge suggestion";
-                        await authFetch(`/api/reviews/${p.patientId}/${p.taskId}/actions`, {
+                        const res = await authFetch(`/api/reviews/${p.patientId}/${p.taskId}/actions`, {
                           method: "POST",
                           headers: { "Content-Type": "application/json" },
                           body: JSON.stringify({
@@ -539,6 +539,10 @@ export function PatientReview(p: PatientReviewProps) {
                             status: "approved",
                           }),
                         });
+                        try {
+                          const data = await res.json();
+                          if (data?.ok && data.state) p.onStateChanged(data.state);
+                        } catch { /* ignore */ }
                         jumpToNextPending();
                       }}
                     />
@@ -551,7 +555,7 @@ export function PatientReview(p: PatientReviewProps) {
                     isLocked={isLocked}
                     derivedView={derivedView}
                     onSubmit={async ({ field_id, answer, evidence, rationale, comment }) => {
-                      await authFetch(`/api/reviews/${p.patientId}/${p.taskId}/actions`, {
+                      const res = await authFetch(`/api/reviews/${p.patientId}/${p.taskId}/actions`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
@@ -563,6 +567,13 @@ export function PatientReview(p: PatientReviewProps) {
                           status: "approved",
                         }),
                       });
+                      // Apply the returned state immediately so the done-count
+                      // and committed view update without waiting on a WS
+                      // broadcast (REST returns the new state by design).
+                      try {
+                        const data = await res.json();
+                        if (data?.ok && data.state) p.onStateChanged(data.state);
+                      } catch { /* non-JSON / error already surfaced */ }
                       // Auto-advance to next pending so the reviewer sees a
                       // visible state change after Submit.
                       jumpToNextPending();
