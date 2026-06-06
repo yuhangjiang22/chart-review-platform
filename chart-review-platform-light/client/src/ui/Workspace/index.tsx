@@ -138,15 +138,6 @@ export function Workspace({
     onTabChange?.(phase ? phase.toLowerCase() : "");
   };
 
-  // chart-review-improve runner. Posts to /api/guideline-improvement/:taskId
-  // with the validated patient cohort.
-  const [isImproving, setIsImproving] = useState(false);
-  const [improveProposalCount, setImproveProposalCount] = useState<number | undefined>();
-  const [improveRefreshKey, setImproveRefreshKey] = useState(0);
-  // DECIDE → TRY inner loop: re-run the same cohort + agent_specs as the
-  // active iter. Reviewer's persisted answers carry forward as the gold
-  // standard, so the next iter scores automatically.
-  const [isRunningAgain, setIsRunningAgain] = useState(false);
 
   // ── Sessions (fixed-cohort grouping above iters) ──────────────────────────
   const [sessions, setSessions] = useState<SessionListItem[]>([]);
@@ -197,77 +188,6 @@ export function Workspace({
   }, [taskId]);
 
   useEffect(() => { void refreshSessions(); }, [refreshSessions]);
-
-  async function runImprovement() {
-    if (isImproving) return;
-    // Phenotype: per-patient validation (oracle_done flag).
-    let cohortPids: string[] = [];
-    cohortPids = (iterDetail?.patient_status ?? [])
-      .filter((p) => p.oracle_done)
-      .map((p) => p.patient_id);
-    if (cohortPids.length === 0) {
-      alert("No validated patients yet — finish validating before running improvement.");
-      return;
-    }
-    setIsImproving(true);
-    setImproveProposalCount(undefined);
-    try {
-      const r = await authFetch(`/api/guideline-improvement/${encodeURIComponent(taskId)}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ patient_ids: cohortPids }),
-      });
-      const body = await r.json();
-      if (!r.ok || !body.ok) {
-        alert(`Improvement failed: ${body.error ?? body.message ?? "unknown"}`);
-        return;
-      }
-      setImproveProposalCount(
-        typeof body.proposal_count === "number"
-          ? body.proposal_count
-          : Array.isArray(body.proposals)
-            ? body.proposals.length
-            : 0,
-      );
-      setImproveRefreshKey((k) => k + 1);
-    } finally {
-      setIsImproving(false);
-    }
-  }
-
-  // POST /api/pilots/:taskId/:iterId/run-again — kicks off a new iter on
-  // the SAME cohort + agent_specs as the active iter. The server resolves
-  // patient_ids + agent_specs from the prior run manifest, so the client
-  // doesn't need to know them. After the new iter is born we refresh the
-  // pilots list and jump back to TRY so the reviewer can watch the run.
-  async function runAgain() {
-    if (isRunningAgain) return;
-    if (!Array.isArray(pilots) || pilots.length === 0) {
-      alert("No prior iter to re-run.");
-      return;
-    }
-    const active = pickActiveIter(pilots, activeSessionId);
-    if (!active) {
-      alert("No prior iter to re-run.");
-      return;
-    }
-    setIsRunningAgain(true);
-    try {
-      const r = await authFetch(
-        `/api/pilots/${encodeURIComponent(taskId)}/${encodeURIComponent(active.iter_id)}/run-again`,
-        { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" },
-      );
-      const bodyText = await r.text();
-      if (!r.ok) {
-        alert(`Re-run failed: ${bodyText}`);
-        return;
-      }
-      await refresh();
-      setPhase("TRY");
-    } finally {
-      setIsRunningAgain(false);
-    }
-  }
 
   const task = tasks.find((t) => t.id === taskId);
   const versionTag = task?.manual_version ? `v${task.manual_version}` : null;
