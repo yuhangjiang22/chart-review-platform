@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { Download } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { authFetch } from "../../auth";
 
 // Performance report (light platform DECIDE phase).
@@ -39,6 +41,32 @@ export interface PhaseDecideProps {
 export function PhaseDecide({ taskId, activeSessionId }: PhaseDecideProps) {
   const [report, setReport] = useState<PerformanceReport | null>(null);
   const [state, setState] = useState<"loading" | "error" | "ready">("loading");
+
+  // Export the validated task package (rubric + agent config + performance +
+  // gold answers) to var/exports/ so it can be re-run on a larger cohort.
+  const [exporting, setExporting] = useState(false);
+  const [exportResult, setExportResult] = useState<
+    { dir: string; n_gold_patients: number } | { error: string } | null
+  >(null);
+
+  async function exportPackage() {
+    setExporting(true);
+    setExportResult(null);
+    try {
+      const qs = activeSessionId ? `?session_id=${encodeURIComponent(activeSessionId)}` : "";
+      const r = await authFetch(`/api/export/${encodeURIComponent(taskId)}${qs}`, { method: "POST" });
+      const body = await r.json().catch(() => ({}));
+      if (r.ok && body?.ok) {
+        setExportResult({ dir: body.dir, n_gold_patients: body.n_gold_patients });
+      } else {
+        setExportResult({ error: body?.error ?? `HTTP ${r.status}` });
+      }
+    } catch (e) {
+      setExportResult({ error: (e as Error).message });
+    } finally {
+      setExporting(false);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -144,6 +172,30 @@ export function PhaseDecide({ taskId, activeSessionId }: PhaseDecideProps) {
           </p>
         </div>
       )}
+
+      {/* Export the validated task package for running on a larger cohort. */}
+      <div className="border-t border-border/60 pt-5 space-y-2">
+        <div className="flex items-center gap-3">
+          <Button size="sm" variant="outline" onClick={exportPackage} disabled={exporting}>
+            <Download size={13} strokeWidth={1.75} />
+            {exporting ? "Exporting…" : "Export task package"}
+          </Button>
+          <span className="text-[11.5px] text-muted-foreground">
+            Saves the rubric, agent config, this session's performance, and your
+            validated gold answers — to re-run on a larger cohort.
+          </span>
+        </div>
+        {exportResult && "dir" in exportResult && (
+          <div className="text-[12px] text-[hsl(var(--sage))]">
+            Saved to <span className="font-mono">{exportResult.dir}</span> ·{" "}
+            {exportResult.n_gold_patients} gold patient
+            {exportResult.n_gold_patients === 1 ? "" : "s"}.
+          </div>
+        )}
+        {exportResult && "error" in exportResult && (
+          <div className="text-[12px] text-destructive">Export failed: {exportResult.error}</div>
+        )}
+      </div>
     </div>
   );
 }

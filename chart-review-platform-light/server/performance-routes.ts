@@ -47,7 +47,7 @@ function readJson<T>(p: string): T | null {
   try { return JSON.parse(fs.readFileSync(p, "utf8")) as T; } catch { return null; }
 }
 
-function computePerformance(
+export function computePerformance(
   taskId: string,
   primaryCriterionIds: string[],
   // When set, only score patients whose validated review_state was imported
