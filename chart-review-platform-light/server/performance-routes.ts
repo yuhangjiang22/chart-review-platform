@@ -1,17 +1,15 @@
 // Performance report routes (light platform).
 //
-// GET /api/performance/:taskId — per-field agent-vs-human accuracy across
-// every patient the reviewer has actually validated for this task. This is
-// the DECIDE-phase "performance after human validation" report.
+// GET /api/performance/:taskId — PER-AGENT agent-vs-human accuracy across the
+// patients the reviewer has validated for this task. This is the DECIDE-phase
+// "performance after human validation" report.
 //
-// IMPORTANT: a field counts ONLY when a human has made a decision on it —
-// i.e. source === "reviewer" (status "approved" or "overridden"). The agent
-// run itself writes a review_state.json (its draft, source "agent" / status
-// "agent_proposed"); those un-reviewed drafts must NOT be scored, or every
-// field would trivially read 100% (agent compared against itself). For a
-// human-decided field, the agent's answer is the original_agent_snapshot
-// (captured when the reviewer touched it) and the human's answer is the
-// current answer; they match iff the reviewer accepted the agent unchanged.
+// For each validated patient we take the reviewer's final answer on each
+// human-decided field, then look up EACH agent's draft for that patient from
+// the run the review was imported from (review_state.imported_from_run →
+// var/runs/<run>/per_patient/<pid>/agents/<agent>.json) and compare. This
+// gives a true default-vs-skeptical leaderboard rather than scoring a single
+// agent's snapshot.
 
 import fs from "node:fs";
 import path from "node:path";
@@ -24,19 +22,15 @@ interface FieldAssessment {
   answer?: unknown;
   source?: string;
   status?: string;
-  original_agent_snapshot?: { answer?: unknown };
 }
 interface ReviewState {
   field_assessments?: FieldAssessment[];
+  imported_from_run?: string;
 }
 
 function answersEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;
-  try {
-    return JSON.stringify(a) === JSON.stringify(b);
-  } catch {
-    return false;
-  }
+  try { return JSON.stringify(a) === JSON.stringify(b); } catch { return false; }
 }
 
 /** A field is scored only when a human has decided it (reviewer-sourced). */
@@ -44,66 +38,86 @@ function isHumanDecided(fa: FieldAssessment): boolean {
   return fa.source === "reviewer" || fa.status === "approved" || fa.status === "overridden";
 }
 
-interface PerCriterion {
-  field_id: string;
-  n_evaluable: number;
-  n_correct: number;
-  accuracy: number | null;
+interface Cell { n_evaluable: number; n_correct: number; }
+type AgentCounts = Record<string, Record<string, Cell>>; // agentId -> fieldId -> cell
+
+function readJson<T>(p: string): T | null {
+  try { return JSON.parse(fs.readFileSync(p, "utf8")) as T; } catch { return null; }
 }
 
 function computePerformance(taskId: string, primaryCriterionIds: string[]) {
   const reviewsDir = path.join(PLATFORM_ROOT, "var", "reviews");
-  const counts: Record<string, { evaluable: number; correct: number }> = {};
-  for (const fid of primaryCriterionIds) counts[fid] = { evaluable: 0, correct: 0 };
+  const runsDir = path.join(PLATFORM_ROOT, "var", "runs");
+  const agentCounts: AgentCounts = {};
+  const agentIds = new Set<string>();
   const validatedPatients = new Set<string>();
-  let overrides = 0;
+
+  const ensure = (agentId: string, fid: string): Cell => {
+    (agentCounts[agentId] ??= {});
+    return (agentCounts[agentId][fid] ??= { n_evaluable: 0, n_correct: 0 });
+  };
 
   if (fs.existsSync(reviewsDir)) {
     for (const pid of fs.readdirSync(reviewsDir)) {
       if (pid.startsWith(".")) continue;
-      const rsPath = path.join(reviewsDir, pid, taskId, "review_state.json");
-      if (!fs.existsSync(rsPath)) continue;
-      let state: ReviewState;
-      try {
-        state = JSON.parse(fs.readFileSync(rsPath, "utf8")) as ReviewState;
-      } catch {
-        continue;
-      }
+      const state = readJson<ReviewState>(path.join(reviewsDir, pid, taskId, "review_state.json"));
+      if (!state) continue;
+
+      // Human's final answer for each human-decided primary field.
+      const humanFinal: Record<string, unknown> = {};
       for (const fa of state.field_assessments ?? []) {
-        if (!counts[fa.field_id]) continue; // not a primary criterion
-        if (!isHumanDecided(fa)) continue; // skip un-reviewed agent drafts
-        validatedPatients.add(pid);
-        const slot = counts[fa.field_id];
-        slot.evaluable += 1;
-        const finalAnswer = fa.answer;
-        const agentAnswer = fa.original_agent_snapshot
-          ? fa.original_agent_snapshot.answer
-          : fa.answer;
-        if (answersEqual(agentAnswer, finalAnswer)) slot.correct += 1;
-        else overrides += 1;
+        if (!primaryCriterionIds.includes(fa.field_id)) continue;
+        if (!isHumanDecided(fa)) continue;
+        humanFinal[fa.field_id] = fa.answer;
+      }
+      const decidedFields = Object.keys(humanFinal);
+      if (decidedFields.length === 0) continue;
+      validatedPatients.add(pid);
+
+      const run = state.imported_from_run;
+      if (!run) continue;
+      const agentsDir = path.join(runsDir, run, "per_patient", pid, "agents");
+      if (!fs.existsSync(agentsDir)) continue;
+
+      for (const file of fs.readdirSync(agentsDir)) {
+        if (!file.endsWith(".json") || file.endsWith("_transcript.jsonl")) continue;
+        const agentId = file.replace(/\.json$/, "");
+        const draft = readJson<{ field_assessments?: FieldAssessment[] }>(path.join(agentsDir, file));
+        if (!draft) continue;
+        agentIds.add(agentId);
+        const agentAns: Record<string, unknown> = {};
+        for (const fa of draft.field_assessments ?? []) agentAns[fa.field_id] = fa.answer;
+        for (const fid of decidedFields) {
+          if (!(fid in agentAns)) continue; // agent didn't answer this field
+          const cell = ensure(agentId, fid);
+          cell.n_evaluable += 1;
+          if (answersEqual(agentAns[fid], humanFinal[fid])) cell.n_correct += 1;
+        }
       }
     }
   }
 
-  const per_criterion: PerCriterion[] = primaryCriterionIds.map((fid) => {
-    const c = counts[fid];
-    return {
-      field_id: fid,
-      n_evaluable: c.evaluable,
-      n_correct: c.correct,
-      accuracy: c.evaluable === 0 ? null : c.correct / c.evaluable,
-    };
+  const agents = [...agentIds].sort().map((agentId) => {
+    const per_field = primaryCriterionIds.map((fid) => {
+      const c = agentCounts[agentId]?.[fid] ?? { n_evaluable: 0, n_correct: 0 };
+      return {
+        field_id: fid,
+        n_evaluable: c.n_evaluable,
+        n_correct: c.n_correct,
+        accuracy: c.n_evaluable === 0 ? null : c.n_correct / c.n_evaluable,
+      };
+    });
+    const scored = per_field.filter((c) => c.accuracy != null);
+    const avg_accuracy =
+      scored.length === 0 ? null : scored.reduce((s, c) => s + (c.accuracy as number), 0) / scored.length;
+    return { agent_id: agentId, per_field, avg_accuracy };
   });
-  const scored = per_criterion.filter((c) => c.accuracy != null);
-  const avg_accuracy =
-    scored.length === 0 ? null : scored.reduce((s, c) => s + (c.accuracy as number), 0) / scored.length;
 
   return {
     task_id: taskId,
     n_patients: validatedPatients.size,
-    per_criterion,
-    avg_accuracy,
-    override_count: overrides,
+    field_ids: primaryCriterionIds,
+    agents,
   };
 }
 
@@ -118,8 +132,6 @@ export const performanceRoutes: RouteEntry[] = [
         err.status = 404;
         throw err;
       }
-      // Criterion objects carry `field_id` from the markdown frontmatter;
-      // the compiled type surfaces it as `id`. Accept either.
       const primaryCriterionIds = task.fields.map(
         (f) => (f as { field_id?: string; id?: string }).field_id ?? (f as { id: string }).id,
       );

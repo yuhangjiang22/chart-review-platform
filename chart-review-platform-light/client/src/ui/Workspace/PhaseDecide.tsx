@@ -3,33 +3,34 @@ import { authFetch } from "../../auth";
 
 // Performance report (light platform DECIDE phase).
 //
-// Shows per-field agent-vs-human accuracy across every patient that has a
-// validated review_state for this task. Data comes from
-// GET /api/performance/:taskId (which reuses computeIterAccuracy). This is
-// the terminal phase: run → validate → performance. No iterate/lock loop.
+// Per-agent agent-vs-human accuracy across the patients you've validated.
+// Data: GET /api/performance/:taskId. Each agent's run draft is compared to
+// your validated answers, so a default-vs-skeptical run shows both agents.
 
-interface PerCriterion {
+interface PerField {
   field_id: string;
   n_evaluable: number;
   n_correct: number;
   accuracy: number | null;
 }
-
+interface AgentPerf {
+  agent_id: string;
+  per_field: PerField[];
+  avg_accuracy: number | null;
+}
 interface PerformanceReport {
   task_id: string;
   n_patients: number;
-  per_criterion: PerCriterion[];
-  avg_accuracy: number | null;
-  override_count: number;
-  computed_at: string;
-}
-
-export interface PhaseDecideProps {
-  taskId: string;
+  field_ids: string[];
+  agents: AgentPerf[];
 }
 
 function pct(x: number | null): string {
   return x == null ? "—" : `${(x * 100).toFixed(0)}%`;
+}
+
+export interface PhaseDecideProps {
+  taskId: string;
 }
 
 export function PhaseDecide({ taskId }: PhaseDecideProps) {
@@ -54,12 +55,18 @@ export function PhaseDecide({ taskId }: PhaseDecideProps) {
     };
   }, [taskId]);
 
+  const hasData = !!report && report.n_patients > 0 && report.agents.length > 0;
+
+  // field_id -> agent_id -> PerField, for matrix lookup
+  const cell = (agent: AgentPerf, fid: string) =>
+    agent.per_field.find((c) => c.field_id === fid);
+
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-lg font-semibold">Performance</h2>
         <p className="text-[12.5px] text-muted-foreground">
-          How the agent's answers compared to your validated answers, per field.
+          How each agent's answers compared to your validated answers, per field.
         </p>
       </div>
 
@@ -75,48 +82,61 @@ export function PhaseDecide({ taskId }: PhaseDecideProps) {
 
       {state === "ready" && report && report.n_patients === 0 && (
         <div className="rounded-md border border-border/60 bg-muted/30 px-4 py-3 text-[12.5px] text-muted-foreground">
-          No validated patients yet. Run the agent (TRY) and validate at least one
-          patient (VALIDATE) to see performance.
+          No validated patients yet. Run the agents (TRY), validate at least one
+          patient and mark it validated (VALIDATE) to see performance.
         </div>
       )}
 
-      {state === "ready" && report && report.n_patients > 0 && (
+      {state === "ready" && hasData && report && (
         <div className="space-y-4">
           <div className="text-[12.5px] text-muted-foreground">
             Across <strong>{report.n_patients}</strong> validated patient
-            {report.n_patients === 1 ? "" : "s"} · {report.override_count} override
-            {report.override_count === 1 ? "" : "s"}
+            {report.n_patients === 1 ? "" : "s"} · {report.agents.length} agent
+            {report.agents.length === 1 ? "" : "s"}
           </div>
 
           <table className="w-full border-collapse text-[13px]">
             <thead>
               <tr className="border-b border-border/60 text-left text-muted-foreground">
                 <th className="py-2 pr-4 font-medium">Field</th>
-                <th className="py-2 pr-4 font-medium">Agreement</th>
-                <th className="py-2 pr-4 font-medium">Correct / evaluable</th>
+                {report.agents.map((a) => (
+                  <th key={a.agent_id} className="py-2 pr-4 font-medium font-mono text-[12px]">
+                    {a.agent_id}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {report.per_criterion.map((c) => (
-                <tr key={c.field_id} className="border-b border-border/30">
-                  <td className="py-2 pr-4 font-mono text-[12px]">{c.field_id}</td>
-                  <td className="py-2 pr-4 tabular-nums">{pct(c.accuracy)}</td>
-                  <td className="py-2 pr-4 tabular-nums text-muted-foreground">
-                    {c.n_correct} / {c.n_evaluable}
-                  </td>
+              {report.field_ids.map((fid) => (
+                <tr key={fid} className="border-b border-border/30">
+                  <td className="py-2 pr-4 font-mono text-[12px]">{fid}</td>
+                  {report.agents.map((a) => {
+                    const c = cell(a, fid);
+                    return (
+                      <td key={a.agent_id} className="py-2 pr-4 tabular-nums">
+                        {pct(c?.accuracy ?? null)}
+                        <span className="ml-1.5 text-[11px] text-muted-foreground">
+                          ({c?.n_correct ?? 0}/{c?.n_evaluable ?? 0})
+                        </span>
+                      </td>
+                    );
+                  })}
                 </tr>
               ))}
               <tr className="font-medium">
                 <td className="py-2 pr-4">Overall (avg)</td>
-                <td className="py-2 pr-4 tabular-nums">{pct(report.avg_accuracy)}</td>
-                <td className="py-2 pr-4" />
+                {report.agents.map((a) => (
+                  <td key={a.agent_id} className="py-2 pr-4 tabular-nums">
+                    {pct(a.avg_accuracy)}
+                  </td>
+                ))}
               </tr>
             </tbody>
           </table>
 
           <p className="text-[11px] text-muted-foreground">
-            Agreement = fraction of validated patients where the agent's answer matched
-            your final answer for that field.
+            Agreement = fraction of validated patients where that agent's answer
+            matched your final answer for the field.
           </p>
         </div>
       )}
