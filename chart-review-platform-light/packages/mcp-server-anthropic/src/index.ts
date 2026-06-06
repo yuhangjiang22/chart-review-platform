@@ -387,7 +387,14 @@ export function makeReviewMcpServer(
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const STDIO_SERVER_PATH = path.join(__dirname, "mcp-stdio-server.ts");
+// The standalone stdio MCP server lives in the sibling package
+// @chart-review/mcp-server-stdio. (This subprocess path was dead in v2 —
+// Codex spawned the server via .codex/config.toml — so the previously
+// wrong colocated filename never surfaced. The deepagents sidecar is the
+// first real consumer of this config.)
+const STDIO_SERVER_PATH = path.join(
+  __dirname, "..", "..", "mcp-server-stdio", "src", "index.ts",
+);
 
 /** Optional overrides the call site needs to flow into the subprocess
  *  env vars. The most important one is `reviewsRoot` — the parent
