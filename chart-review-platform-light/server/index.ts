@@ -82,7 +82,8 @@ import {
 const PORT = Number(process.env.PORT ?? 3002);
 const REVIEWS_ROOT = process.env.CHART_REVIEW_REVIEWS_ROOT
   ?? path.join(process.cwd(), "var", "reviews");
-const PLATFORM_ROOT = path.resolve(__dirname, "..", "..", "chart-review-platform");
+const PLATFORM_ROOT = process.env.CHART_REVIEW_PLATFORM_ROOT
+  ?? path.resolve(__dirname, "..");
 const CORPUS_ROOT = process.env.CHART_REVIEW_CORPUS_ROOT
   ?? path.join(PLATFORM_ROOT, "corpus", "patients");
 

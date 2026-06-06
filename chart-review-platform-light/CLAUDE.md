@@ -131,7 +131,10 @@ cd python && ./.venv/bin/python -m pytest -q
    the same offset-match check. There is no Python-side parity copy
    for this (unlike the derivation evaluator in v2).
 
-4. **`packages/mcp-server-stdio` is the ONLY MCP server** for the light
-   platform. The anthropic-transport MCP server (`mcp-server-anthropic`)
-   from v2 is still in the packages directory but is not wired up —
-   deepagents always uses stdio transport.
+4. **`packages/mcp-server-stdio` is the MCP server the agent talks to.**
+   `packages/mcp-server-anthropic` is still wired — but only for its
+   `buildMcpServersConfig()` helper, which builds the *stdio subprocess*
+   config (command/args/env) pointing at `mcp-server-stdio`. Its
+   in-process Anthropic-SDK server path (`makeReviewMcpServer`) is dead,
+   since deepagents always uses subprocess transport. `STDIO_SERVER_PATH`
+   in that file must point at `mcp-server-stdio/src/index.ts`.
