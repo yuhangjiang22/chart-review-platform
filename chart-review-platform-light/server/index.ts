@@ -399,7 +399,7 @@ server.on("upgrade", (req, socket, head) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`chart-review-platform-v2 listening on http://localhost:${PORT}`);
+  console.log(`chart-review-platform-light listening on http://localhost:${PORT}`);
   console.log(`reviewsRoot: ${REVIEWS_ROOT}`);
   // Catch any pilot iters that finished while the server was down and got
   // stuck in "running". v1 does this on boot; the screenshot of a 100%-
