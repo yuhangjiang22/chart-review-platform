@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, Play, Square, RotateCcw, Shuffle } from "lucide-react";
 import { authFetch } from "../../auth";
 import { Badge } from "@/components/ui/badge";
@@ -122,6 +122,20 @@ export function PhaseTry({
   const [activeIterPatients, setActiveIterPatients] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // When a run becomes active (you clicked Run, or you navigated to a session
+  // that has one), bring the run-status card into view. Without this the view
+  // stays scrolled where the Run button was (bottom of the config), leaving
+  // the just-started run above the fold. Keyed on iter_id so it fires once
+  // per run, not on every poll.
+  const runViewRef = useRef<HTMLDivElement>(null);
+  const activeIterId = activeIter && activeIter.state !== "abandoned" ? activeIter.iter_id : null;
+  useEffect(() => {
+    if (!activeIterId) return;
+    requestAnimationFrame(() =>
+      runViewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
+    );
+  }, [activeIterId]);
 
   // ── Loaders ───────────────────────────────────────────────────────────────
 
@@ -329,7 +343,7 @@ export function PhaseTry({
   // so it can't bury the run status.
   if (activeIter && activeIter.state !== "abandoned") {
     return (
-      <div className="space-y-4">
+      <div ref={runViewRef} className="space-y-4 scroll-mt-4">
         <RunStatusCard
           iter={activeIter}
           patientIds={activeIterPatients}
