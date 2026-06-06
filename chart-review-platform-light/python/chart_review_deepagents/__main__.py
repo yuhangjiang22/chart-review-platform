@@ -76,10 +76,19 @@ def main() -> None:
         spec = json.load(f)
     try:
         asyncio.run(run(spec))
-    except Exception as e:  # surface any failure as an AgentEvent error
+    except BaseException as e:  # includes (Base)ExceptionGroup from TaskGroups
         traceback.print_exc()
-        emit({"type": "error", "error": f"{type(e).__name__}: {e}"})
+        emit({"type": "error", "error": _format_exc(e)})
         raise SystemExit(1)
+
+
+def _format_exc(e: BaseException) -> str:
+    """Flatten ExceptionGroups so the emitted error names the real cause
+    instead of the opaque 'unhandled errors in a TaskGroup (1 sub-exception)'."""
+    excs = getattr(e, "exceptions", None)
+    if excs:
+        return " | ".join(_format_exc(sub) for sub in excs)
+    return f"{type(e).__name__}: {e}"
 
 
 if __name__ == "__main__":

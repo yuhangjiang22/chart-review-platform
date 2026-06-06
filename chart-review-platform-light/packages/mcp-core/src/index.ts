@@ -181,8 +181,16 @@ async function runAction(
     };
   } catch (e) {
     const code = (e as { code?: string }).code ?? "error";
+    // Return the rejection as a NORMAL (non-isError) tool result. With
+    // isError:true, langchain-mcp-adapters raises a ToolException that
+    // deepagents' middleware re-raises — crashing the whole run instead of
+    // letting the model react. As a recoverable result the model reads
+    // {ok:false,...} and can retry (the documented intent of this funnel).
+    const hint =
+      code === "faithfulness_failed"
+        ? "Evidence offsets did not match the verbatim_quote. Call find_quote_offsets to get the exact offsets for your quote, then retry set_field_assessment."
+        : undefined;
     return {
-      isError: true,
       content: [
         {
           type: "text",
@@ -191,6 +199,7 @@ async function runAction(
             action_type: action.type,
             error_code: code,
             message: (e as Error).message,
+            ...(hint ? { hint } : {}),
           }),
         },
       ],
