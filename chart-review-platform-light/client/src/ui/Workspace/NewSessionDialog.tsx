@@ -1,10 +1,9 @@
 // NewSessionDialog — modal for starting a new session.
 //
 // Single end-to-end flow: name → cohort → agent config → submit.
-// Submit is atomic from the user's perspective: it creates the session
-// manifest AND kicks off the first iter (POST /api/pilots/:taskId with
-// session_id) so the methodologist lands in a usable workspace
-// immediately.
+// Submit creates the session manifest (cohort + agent config) only — it
+// does NOT start a run. The reviewer lands in TRY, reviews the rubric +
+// cohort, and clicks Run when ready.
 //
 // If the iter-start fails after session creation succeeds, the session
 // is left in place (no iters) and the dialog shows an error; the user
@@ -223,29 +222,8 @@ export function NewSessionDialog({
       const sessionBody = await r1.json() as { session: { session_id: string } };
       const sessionId = sessionBody.session.session_id;
 
-      // 2. Kick off the first iter for this session. Cohort + agents come
-      // from the session (strict lock); we only pass session_id + notes.
-      const r2 = await authFetch(`/api/pilots/${encodeURIComponent(taskId)}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          session_id: sessionId,
-          notes: notes.trim() || undefined,
-        }),
-      });
-      if (!r2.ok) {
-        const body = await r2.json().catch(() => ({}));
-        // Session is created but first iter failed. Surface the error;
-        // the methodologist can manually start an iter later.
-        setError(
-          `Session created (id ${sessionId}) but starting the first iter failed: `
-          + (body?.error ?? `HTTP ${r2.status}`)
-          + ". The session is usable; click 'Run again' on DECIDE to retry.",
-        );
-        // Still call onCreated so the parent switches to this session.
-        onCreated(sessionId);
-        return;
-      }
+      // Session created. Do NOT auto-start a run — the reviewer reviews the
+      // rubric + cohort in TRY and clicks Run when ready.
       onCreated(sessionId);
       onClose();
     } catch (e) {
@@ -261,8 +239,8 @@ export function NewSessionDialog({
         <DialogHeader>
           <DialogTitle>Start a new session</DialogTitle>
           <DialogDescription>
-            A session locks a cohort + agent config. The first iter starts automatically once
-            you submit; subsequent iters in this session reuse the same cohort.
+            A session locks a cohort + agent config. After you create it you'll land in TRY,
+            where you can review the rubric and click Run to start the first iter.
           </DialogDescription>
         </DialogHeader>
 
@@ -386,7 +364,7 @@ export function NewSessionDialog({
             </Button>
             <Button size="sm" className="gap-1.5" onClick={submit} disabled={submitting}>
               <Plus size={12} />
-              {submitting ? "Creating session + starting iter…" : "Start session"}
+              {submitting ? "Creating session…" : "Create session"}
             </Button>
           </div>
         </div>

@@ -415,7 +415,7 @@ export function PhaseTry({
           onClick={() => startRun()}
         >
           <Play size={12} strokeWidth={1.75} />
-          {busy ? "Starting…" : "Start iter"}
+          {busy ? "Running…" : "Run"}
         </Button>
       </div>
     </div>
