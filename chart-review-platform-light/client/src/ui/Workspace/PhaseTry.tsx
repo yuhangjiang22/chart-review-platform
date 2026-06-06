@@ -323,11 +323,13 @@ export function PhaseTry({
   }
 
   // Branch A: a run is in flight or just completed (within this session).
+  // Run status is the focus here — it renders FIRST so clicking Run drops you
+  // straight onto the progress. The rubric stays available (collapsed, below)
+  // for editing before the next run, but never auto-expands here (no nonce),
+  // so it can't bury the run status.
   if (activeIter && activeIter.state !== "abandoned") {
     return (
       <div className="space-y-4">
-        {/* Rubric stays available here too — edits affect this session's next run. */}
-        <RubricPanel taskId={taskId} revealNonce={revealRubricNonce} />
         <RunStatusCard
           iter={activeIter}
           patientIds={activeIterPatients}
@@ -338,6 +340,7 @@ export function PhaseTry({
           busy={busy}
           error={error}
         />
+        <RubricPanel taskId={taskId} />
       </div>
     );
   }
