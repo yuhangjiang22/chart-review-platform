@@ -7,6 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { AgentConfigPanel, type AgentSpecForm } from "../PilotsTab/AgentConfigPanel";
 import { AgentLogPanel } from "./AgentLogPanel";
+import { RubricPanel } from "./RubricPanel";
 
 interface Patient {
   patient_id: string;
@@ -348,6 +349,8 @@ export function PhaseTry({
           start a new session.
         </p>
       </div>
+
+      <RubricPanel taskId={taskId} />
 
       <div className="rounded-md border border-border bg-paper/40 px-4 py-3">
         <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-1">
