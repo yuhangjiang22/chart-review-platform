@@ -1,20 +1,15 @@
 import { useState } from "react";
 import { CalibrationFigure, RulesFigure, MethodsFigure, BundlesFigure } from "../Studio";
 import { cn } from "@/lib/utils";
-import { CheckSquare, Square, Lock } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { authFetch } from "../../auth";
+import { CheckSquare, Square } from "lucide-react";
 import { CodifyButton } from "./CodifyButton";
-import { NerCalibrationFigure } from "./NerCalibrationFigure";
 
 interface PhaseLockProps {
   taskId: string;
   reviewerId: string;
   isMethodologist: boolean;
-  /** NER / adherence / phenotype — gates the rules-queue + methods steps
-   *  (vestigial for non-phenotype kinds) and swaps the calibration figure
-   *  shape per kind. */
-  taskKind?: "phenotype" | "ner" | "adherence";
+  /** Kept for API compatibility with Workspace caller — phenotype only now. */
+  taskKind?: "phenotype";
 }
 
 type LockStep = "calibration" | "rules" | "methods" | "bundles";
@@ -23,49 +18,19 @@ interface StepDef {
   id: LockStep;
   label: string;
   description: string;
-  /** When true, this step is omitted for NER + adherence tasks (kept
-   *  only for phenotype). */
-  phenotypeOnly?: boolean;
 }
 
-const PHENOTYPE_CALIBRATION: StepDef = {
-  id: "calibration", label: "Run calibration (κ)",
-  description: "Measure inter-rater agreement — overall κ ≥ 0.6 required.",
-};
-const NER_CALIBRATION: StepDef = {
-  id: "calibration", label: "Check agent-vs-reviewer F1",
-  description: "Compute per-entity-type F1 of each agent's draft against your validated spans.",
-};
-const ADHERENCE_CALIBRATION: StepDef = {
-  id: "calibration", label: "Check question + rule κ",
-  description: "Compute per-question + per-rule κ against your adjudicated verdicts. Macro κ ≥ 0.6 expected.",
-};
 const STEPS: StepDef[] = [
-  // calibration is inserted dynamically based on task_kind
-  { id: "rules", label: "Drain rule queue", description: "Accept or reject all pending rule proposals.", phenotypeOnly: true },
-  { id: "methods", label: "Draft methods section", description: "Generate the manuscript methods section from the locked rubric.", phenotypeOnly: true },
+  { id: "calibration", label: "Run calibration (κ)", description: "Measure inter-rater agreement — overall κ ≥ 0.6 required." },
+  { id: "rules", label: "Drain rule queue", description: "Accept or reject all pending rule proposals." },
+  { id: "methods", label: "Draft methods section", description: "Generate the manuscript methods section from the locked rubric." },
   { id: "bundles", label: "Export reproducibility bundle", description: "Package everything for the collaborator handoff." },
 ];
 
 /**
  * LOCK phase — presents the four lock prerequisites as a sequential checklist.
- * Each step expands to show the corresponding existing figure from Studio.
  */
-export function PhaseLock({ taskId, reviewerId, isMethodologist, taskKind }: PhaseLockProps) {
-  const isNer = taskKind === "ner";
-  const isAdherence = taskKind === "adherence";
-  const dropPhenotypeOnly = isNer || isAdherence;
-  // Build the effective step list — non-phenotype tasks drop the
-  // rules-queue + methods steps (vestigial after the DECIDE proposals
-  // refactor) and use a kind-specific calibration variant.
-  const calibrationStep =
-    isNer ? NER_CALIBRATION
-    : isAdherence ? ADHERENCE_CALIBRATION
-    : PHENOTYPE_CALIBRATION;
-  const effectiveSteps: StepDef[] = [
-    calibrationStep,
-    ...STEPS.filter((s) => !s.phenotypeOnly || !dropPhenotypeOnly),
-  ];
+export function PhaseLock({ taskId, reviewerId, isMethodologist }: PhaseLockProps) {
   const [openStep, setOpenStep] = useState<LockStep>("calibration");
   const [done, setDone] = useState<Set<LockStep>>(new Set());
 
@@ -84,7 +49,7 @@ export function PhaseLock({ taskId, reviewerId, isMethodologist, taskKind }: Pha
       <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
         Lock prerequisites — complete each step before locking the version.
       </div>
-      {effectiveSteps.map((step) => {
+      {STEPS.map((step) => {
         const isOpen = openStep === step.id;
         const isDone = done.has(step.id);
         return (
@@ -120,13 +85,7 @@ export function PhaseLock({ taskId, reviewerId, isMethodologist, taskKind }: Pha
             </div>
             {isOpen && (
               <div className="border-t border-border/60 px-4 py-4">
-                {step.id === "calibration" && (
-                  isNer
-                    ? <NerCalibrationFigure taskId={taskId} />
-                    : isAdherence
-                      ? <AdherenceCalibrationPlaceholder taskId={taskId} />
-                      : <CalibrationFigure taskId={taskId} />
-                )}
+                {step.id === "calibration" && <CalibrationFigure taskId={taskId} />}
                 {step.id === "rules" && (
                   <RulesFigure
                     taskId={taskId}
@@ -143,100 +102,9 @@ export function PhaseLock({ taskId, reviewerId, isMethodologist, taskKind }: Pha
       })}
       </div>
 
-      {isNer && (
-        <div className="border-t border-border/60 pt-4">
-          <LockVersionButton taskId={taskId} />
-        </div>
-      )}
-
       <div className="border-t border-border/60 pt-4">
         <CodifyButton taskId={taskId} />
       </div>
-    </div>
-  );
-}
-
-/** Explicit "Lock this version" trigger for NER tasks — POSTs the
- *  calibrated → locked maturity transition. Pre-gate: shown only when
- *  maturity is already "calibrated" (the F1 calibration auto-advances
- *  to that state when the calibration card renders). */
-function LockVersionButton({ taskId }: { taskId: string }) {
-  const [locking, setLocking] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
-  async function lockVersion() {
-    if (locking) return;
-    if (!confirm("Lock this version? Further edits will require an explicit unlock.")) return;
-    setLocking(true);
-    setErr(null);
-    try {
-      const r = await authFetch(
-        `/api/guidelines/${encodeURIComponent(taskId)}/maturity`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ state: "locked" }),
-        },
-      );
-      const body = await r.json().catch(() => ({} as { error?: string }));
-      if (!r.ok) {
-        setErr(body?.error ?? `HTTP ${r.status}`);
-        return;
-      }
-      setSuccess(true);
-      // Force a refresh so the pill colors flip to all-green.
-      setTimeout(() => window.location.reload(), 500);
-    } catch (e) {
-      setErr((e as Error).message);
-    } finally {
-      setLocking(false);
-    }
-  }
-  return (
-    <div className="space-y-2">
-      <Button
-        variant="default"
-        size="lg"
-        className="h-14 gap-2"
-        onClick={lockVersion}
-        disabled={locking || success}
-      >
-        <Lock size={14} />
-        {success ? "Locked ✓" : locking ? "Locking…" : "Lock this version"}
-      </Button>
-      <div className="text-[11px] text-muted-foreground">
-        Freezes the annotation guidance + ontology + accepted proposals at the current SHA.
-        No further edits accepted until an explicit unlock.
-      </div>
-      {err && (
-        <div className="text-[11.5px] text-[hsl(var(--oxblood))]">
-          Lock failed: {err}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── Adherence calibration placeholder ──────────────────────────────────────
-//
-// Lightweight inline figure for adherence tasks. Full κ figure renders
-// per-question + per-rule κ from the eval-adherence-iaa report; a
-// dedicated IAA server endpoint is pending — this stub explains the
-// gate criterion and points at the underlying eval helper.
-function AdherenceCalibrationPlaceholder({ taskId }: { taskId: string }) {
-  return (
-    <div className="space-y-2 text-[12.5px]">
-      <div className="font-medium">Question + rule agreement (κ)</div>
-      <p className="text-muted-foreground">
-        For task <code>{taskId}</code>, the lock gate is macro Cohen&apos;s κ
-        across rules (and across questions for finer-grained signal).
-        Compute with <code>@chart-review/eval-adherence-iaa</code> against
-        your adjudicated verdicts.
-      </p>
-      <p className="text-muted-foreground italic">
-        Per-question + per-rule κ table renders here once the IAA endpoint
-        is wired (Phase 3 follow-up).
-      </p>
     </div>
   );
 }

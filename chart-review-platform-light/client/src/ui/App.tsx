@@ -11,8 +11,6 @@ import { useAgentSocket } from "../useAgentSocket";
 import { AppShell } from "./AppShell";
 import { QueueView } from "./QueueView";
 import { PatientReview } from "./PatientReview";
-import { SpanReview } from "./SpanReview";
-import { AdherenceReview } from "./AdherenceReview";
 import { CommandPalette, type PaletteAction } from "./CommandPalette";
 import { Studio } from "./Studio";
 import { Workspace } from "./Workspace";
@@ -190,10 +188,7 @@ export function App() {
     const reviewState = sock.reviewState;
     if (!reviewState) return;
     const hasWork =
-      (reviewState.field_assessments?.length ?? 0) > 0
-      || (reviewState.span_labels?.length ?? 0) > 0
-      || (reviewState.question_answers?.length ?? 0) > 0
-      || (reviewState.rule_verdicts?.length ?? 0) > 0;
+      (reviewState.field_assessments?.length ?? 0) > 0;
     let cancelled = false;
     const patientId = activePatient.patient_id;
     const taskId = task.task_id;
@@ -334,28 +329,8 @@ export function App() {
       )}
 
       {route.page === "patient" && task && route.patientId &&
-        // task_kind dispatch — each kind has its own reviewer pane:
-        //   ner       → SpanReview
-        //   adherence → AdherenceReview
-        //   phenotype → PatientReview (criterion-row UI)
-        // The TaskSummary's task_type is the raw meta.yaml field.
-        (task.task_type === "ner" ? (
-          <SpanReview
-            patientId={route.patientId}
-            patientDisplay={activePatient?.display_name ?? route.patientId}
-            taskId={task.task_id}
-            onBack={() => navigate(studioHash(task.task_id, lastStudioSubTabRef.current))}
-          />
-        ) : task.task_type === "adherence" ? (
-          <AdherenceReview
-            patientId={route.patientId}
-            patientDisplay={activePatient?.display_name ?? route.patientId}
-            taskId={task.task_id}
-            reviewState={sock.reviewState}
-            onStateChanged={sock.refreshReviewState}
-            onBack={() => navigate(studioHash(task.task_id, lastStudioSubTabRef.current))}
-          />
-        ) : taskFields.length > 0 ? (
+        // Phenotype: PatientReview (criterion-row UI).
+        (taskFields.length > 0 ? (
           // Patient pages use PatientReview — the lean ground-truth surface
           // (one card per criterion with inline accept/override). The dual-
           // agent comparison is for adjudication of pilot disagreements and

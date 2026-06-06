@@ -4,15 +4,10 @@
 // where "Create new task" lives — once the user enters a guideline (Studio,
 // Queue, Patient, Builder), the create-task affordance disappears.
 //
-// Tasks are grouped into three tabs by task_kind (phenotype / ner /
-// adherence). The mapping mirrors the server's `taskKindFromTaskType`:
-// "phenotype_validation" + "outcome_adjudication" + everything-else fall
-// under phenotype; only "ner" and "adherence" peel off. Active tab
-// persists in localStorage so a refresh keeps the user where they were.
+// Platform v2 light: only phenotype tasks are supported.
 //
 // Clicking a row navigates into Studio at `#/studio/<task-id>`.
 
-import { useEffect, useState } from "react";
 import { ArrowRight, BookOpen, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -32,63 +27,7 @@ export interface TasksIndexProps {
   onCreateTask: () => void;
 }
 
-type TaskKind = "phenotype" | "ner" | "adherence";
-
-const KIND_TAB_KEY = "tasks-index-active-kind";
-
-/** Mirror of server-side `taskKindFromTaskType`. Keep in sync. */
-function kindOf(task: TaskListing): TaskKind {
-  if (task.task_type === "ner") return "ner";
-  if (task.task_type === "adherence") return "adherence";
-  return "phenotype";
-}
-
-interface TabDef {
-  id: TaskKind;
-  label: string;
-  blurb: string;
-}
-
-const TABS: TabDef[] = [
-  {
-    id: "phenotype",
-    label: "Phenotype",
-    blurb: "Per-criterion adjudication. Reviewer accepts/overrides agent answers; κ stabilizes; rubric locks.",
-  },
-  {
-    id: "ner",
-    label: "NER",
-    blurb: "Span extraction against an ontology. Reviewer validates spans and concept mappings note-by-note.",
-  },
-  {
-    id: "adherence",
-    label: "Adherence",
-    blurb: "Question-and-rule chart review. Per-agent leaderboards drive guidance edits between iters.",
-  },
-];
-
 export function TasksIndex({ tasks, onOpen, onCreateTask }: TasksIndexProps) {
-  const [activeKind, setActiveKind] = useState<TaskKind>(() => {
-    try {
-      const saved = localStorage.getItem(KIND_TAB_KEY);
-      if (saved === "phenotype" || saved === "ner" || saved === "adherence") return saved;
-    } catch { /* localStorage may be unavailable */ }
-    return "phenotype";
-  });
-
-  // Persist tab selection across refreshes.
-  useEffect(() => {
-    try { localStorage.setItem(KIND_TAB_KEY, activeKind); }
-    catch { /* ignore */ }
-  }, [activeKind]);
-
-  // Bucket tasks by kind so the tab bar can show counts AND we can
-  // render the active list in one pass.
-  const buckets: Record<TaskKind, TaskListing[]> = { phenotype: [], ner: [], adherence: [] };
-  for (const t of tasks) buckets[kindOf(t)].push(t);
-  const activeList = buckets[activeKind];
-  const activeTab = TABS.find((t) => t.id === activeKind)!;
-
   return (
     <div className="animate-rise-in">
       <header className="mb-6 flex items-end justify-between gap-8">
@@ -117,66 +56,27 @@ export function TasksIndex({ tasks, onOpen, onCreateTask }: TasksIndexProps) {
         </button>
       </header>
 
-      {/* Kind tab bar. Counts come from the bucketed map so an empty
-       *  kind still shows its tab — clicking gives a useful "0 tasks"
-       *  empty state instead of hiding the kind entirely. */}
-      <nav
-        aria-label="Task kinds"
-        className="mb-3 flex items-center gap-1 border-b border-border"
-      >
-        {TABS.map((t) => {
-          const count = buckets[t.id].length;
-          const isActive = activeKind === t.id;
-          return (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => setActiveKind(t.id)}
-              aria-current={isActive ? "page" : undefined}
-              className={cn(
-                "relative -mb-px flex items-baseline gap-2 px-4 py-2.5 text-[13px] font-medium transition-colors",
-                isActive
-                  ? "text-foreground border-b-2 border-foreground"
-                  : "text-muted-foreground hover:text-foreground border-b-2 border-transparent",
-              )}
-            >
-              <span>{t.label}</span>
-              <span
-                className={cn(
-                  "rounded-full px-1.5 py-0.5 text-[10px] tabular-nums",
-                  isActive ? "bg-foreground/10 text-foreground" : "bg-muted text-muted-foreground",
-                )}
-              >
-                {count}
-              </span>
-            </button>
-          );
-        })}
-      </nav>
-
       <p className="mb-5 text-[12.5px] leading-relaxed text-muted-foreground">
-        {activeTab.blurb}
+        Per-criterion adjudication. Reviewer accepts/overrides agent answers; κ stabilizes; rubric locks.
       </p>
 
       <Separator className="mb-5" />
 
-      {activeList.length === 0 ? (
+      {tasks.length === 0 ? (
         <Card>
           <CardContent className="py-10 text-center text-muted-foreground">
             <BookOpen className="mx-auto mb-3" size={28} />
             <div className="text-[15px] text-foreground">
-              No {activeTab.label.toLowerCase()} tasks yet.
+              No tasks yet.
             </div>
             <div className="mt-1 text-[13px]">
-              {tasks.length === 0
-                ? <>Click <span className="font-medium">Create new task</span> to draft your first one.</>
-                : <>Switch tabs to see tasks of other kinds, or create a new one.</>}
+              Click <span className="font-medium">Create new task</span> to draft your first one.
             </div>
           </CardContent>
         </Card>
       ) : (
         <ol className="grid grid-cols-1 gap-2.5 md:grid-cols-2">
-          {activeList.map((task) => (
+          {tasks.map((task) => (
             <TaskRow key={task.id} task={task} onOpen={onOpen} />
           ))}
         </ol>
@@ -186,12 +86,7 @@ export function TasksIndex({ tasks, onOpen, onCreateTask }: TasksIndexProps) {
 }
 
 function TaskRow({ task, onOpen }: { task: TaskListing; onOpen: (taskId: string) => void }) {
-  const kind = kindOf(task);
-  // Unit label depends on task_kind. Adherence's "fields" are questions,
-  // NER's "fields" are entity-types — the raw `field_count` from the
-  // server is 0 for both today since they don't use field_assessments,
-  // so we hide it for those kinds rather than print "0 fields".
-  const unitLabel = kind === "phenotype" ? `${task.field_count} fields` : null;
+  const unitLabel = `${task.field_count} fields`;
   return (
     <li className="list-none">
       <button
@@ -213,11 +108,9 @@ function TaskRow({ task, onOpen }: { task: TaskListing; onOpen: (taskId: string)
                 </Badge>
               )}
             </div>
-            {unitLabel && (
-              <div className="mt-1 flex items-center gap-2 text-[12px] text-muted-foreground">
-                <span className="tabular-nums">{unitLabel}</span>
-              </div>
-            )}
+            <div className="mt-1 flex items-center gap-2 text-[12px] text-muted-foreground">
+              <span className="tabular-nums">{unitLabel}</span>
+            </div>
           </div>
           <ArrowRight
             size={16}

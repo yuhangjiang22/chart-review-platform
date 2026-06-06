@@ -42,30 +42,3 @@ export {
   type ImproveGuidelineResult,
 } from "./guideline-improvement.js";
 
-// ner-improvement: span-shaped auto-critique driver for task_kind=ner
-export {
-  improveNerTask,
-  type ImproveNerTaskOptions,
-  type ImproveNerTaskResult,
-} from "./ner-improvement.js";
-
-// adherence-improvement: question/rule-shaped auto-critique driver for
-// task_kind=adherence
-export {
-  improveAdherenceTask,
-  type ImproveAdherenceTaskOptions,
-  type ImproveAdherenceTaskResult,
-} from "./adherence-improvement.js";
-
-// ner-proposal-apply: patch the entity_type_guidance YAML from a NER proposal
-export {
-  applyNerProposal,
-  type ApplyProposalResult,
-} from "./ner-proposal-apply.js";
-
-// adherence-proposal-apply: patch the questions / rules YAML from an
-// adherence proposal
-export {
-  applyAdherenceProposal,
-  type ApplyAdherenceResult,
-} from "./adherence-proposal-apply.js";

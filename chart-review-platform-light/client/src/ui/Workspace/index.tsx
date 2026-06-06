@@ -55,21 +55,6 @@ interface PilotIterDetail {
   patient_status: Array<{ patient_id: string; oracle_done: boolean; agent_done: boolean }>;
 }
 
-interface SpanStatsTotals {
-  total: number;
-  mapped: number;
-  novel: number;
-  rejected: number;
-  validated: number;
-}
-
-interface AdherenceStatsTotals {
-  total: number;            // sum of questions × patients
-  validated: number;        // sum of validated_questions across patients
-  total_rules: number;      // sum of rules × patients
-  validated_rules: number;  // sum of validated_rules across patients
-}
-
 interface RevisitsResponse {
   ok: boolean;
   total?: number;
@@ -118,11 +103,6 @@ export function Workspace({
   const [revisitsTotal, setRevisitsTotal] = useState(0);
   const [deployedCohortExists, setDeployedCohortExists] = useState(false);
   const [showAllTools, setShowAllTools] = useState(false);
-  // NER span stats (Phase 4.4) — only fetched when task_kind=ner.
-  // For phenotype tasks this stays null and the cells useMemo computes
-  // from field_assessments × criterionCount as before.
-  const [spanStats, setSpanStats] = useState<SpanStatsTotals | null>(null);
-  const [adherenceStats, setAdherenceStats] = useState<AdherenceStatsTotals | null>(null);
 
   // Per-task enabled phases — fetched from /api/tasks/:taskId/phases.
   // null until the fetch resolves (PhasePillBar treats null as "all enabled").
@@ -241,61 +221,14 @@ export function Workspace({
 
   async function runImprovement() {
     if (isImproving) return;
-    // Cohort selection differs by task_kind:
-    //   - phenotype: per-patient validation (oracle_done flag) — gate on
-    //     "patient marked validated"
-    //   - NER: per-note validation (validated_notes[] inside review_state).
-    //     Hand the driver every patient with a review_state.json; the
-    //     server-side driver filters by validated_notes internally and
-    //     only clusters spans inside validated notes. Gate on "at least
-    //     one note validated across the cohort" via spanStats.
-    //   - adherence: per-question validation (validated_questions[]).
-    //     Hand the driver every patient with a review_state; server-side
-    //     improvement filters by validated_questions. Gate on "at least
-    //     one question validated across the cohort" via adherenceStats.
+    // Phenotype: per-patient validation (oracle_done flag).
     let cohortPids: string[] = [];
-    const isNer = task?.task_type === "ner";
-    const isAdherence = task?.task_type === "adherence";
-    if (isNer) {
-      cohortPids = (iterDetail?.patient_status ?? [])
-        .filter((p) => p.agent_done)
-        .map((p) => p.patient_id);
-      const totalsValidated = spanStats?.validated ?? 0;
-      if (totalsValidated === 0) {
-        alert(
-          "No notes validated yet — validate at least one note before "
-          + "running improvement (the driver clusters only spans inside "
-          + "validated notes).",
-        );
-        return;
-      }
-    } else if (isAdherence) {
-      cohortPids = (iterDetail?.patient_status ?? [])
-        .filter((p) => p.agent_done)
-        .map((p) => p.patient_id);
-      const validatedCount = adherenceStats?.validated ?? 0;
-      if (validatedCount === 0) {
-        alert(
-          "No questions validated yet — accept or override at least one "
-          + "question in AdherenceReview before running improvement.",
-        );
-        return;
-      }
-      // iterDetail is on its own fetch — landing on DECIDE before it
-      // resolves leaves cohortPids empty. Bail with a clear message
-      // instead of letting the server reject with a generic 400.
-      if (cohortPids.length === 0) {
-        alert("Patient list is still loading — wait a second and click again.");
-        return;
-      }
-    } else {
-      cohortPids = (iterDetail?.patient_status ?? [])
-        .filter((p) => p.oracle_done)
-        .map((p) => p.patient_id);
-      if (cohortPids.length === 0) {
-        alert("No validated patients yet — finish validating before running improvement.");
-        return;
-      }
+    cohortPids = (iterDetail?.patient_status ?? [])
+      .filter((p) => p.oracle_done)
+      .map((p) => p.patient_id);
+    if (cohortPids.length === 0) {
+      alert("No validated patients yet — finish validating before running improvement.");
+      return;
     }
     setIsImproving(true);
     setImproveProposalCount(undefined);
@@ -411,52 +344,12 @@ export function Workspace({
       .catch(() => setDeployedCohortExists(false));
   }, [taskId]);
 
-  // NER span stats — fetched only when task_kind=ner and an active iter
-  // exists. Phenotype tasks leave `spanStats=null` so the cells useMemo
-  // falls back to its existing field_assessments × criterionCount math.
-  const isNerTask = task?.task_type === "ner";
   // Normalized discriminator used across every phase-pane prop +
-  // dispatched component lookup. Mirrors the server's
-  // taskKindFromTaskType so client and server stay in lockstep.
+  // dispatched component lookup. Mirrors the server's taskKindFromTaskType.
   const taskKind = taskKindFromTaskType(task?.task_type);
-  const isAdherenceTask = taskKind === "adherence";
   const activeIterId = Array.isArray(pilots)
     ? pickActiveIter(pilots, activeSessionId)?.iter_id ?? null
     : null;
-  useEffect(() => {
-    if (!isNerTask || !activeIterId) { setSpanStats(null); return; }
-    let cancelled = false;
-    authFetch(`/api/pilots/${encodeURIComponent(taskId)}/${encodeURIComponent(activeIterId)}/span-stats`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d: { totals?: SpanStatsTotals } | null) => {
-        if (cancelled || !d) return;
-        if (d.totals) setSpanStats(d.totals);
-      })
-      .catch(() => { if (!cancelled) setSpanStats(null); });
-    return () => { cancelled = true; };
-  }, [isNerTask, activeIterId, taskId]);
-
-  // Adherence stats — fetched only when task_kind=adherence and an active
-  // iter exists. Mirrors the spanStats effect for NER. Refetched whenever
-  // the maturity / pilots view ticks so the counter stays live as the
-  // reviewer validates questions.
-  useEffect(() => {
-    if (!isAdherenceTask || !activeIterId) { setAdherenceStats(null); return; }
-    let cancelled = false;
-    const tick = () =>
-      authFetch(`/api/pilots/${encodeURIComponent(taskId)}/${encodeURIComponent(activeIterId)}/adherence-stats`)
-        .then((r) => (r.ok ? r.json() : null))
-        .then((d: { totals?: AdherenceStatsTotals } | null) => {
-          if (cancelled || !d?.totals) return;
-          setAdherenceStats(d.totals);
-        })
-        .catch(() => { /* swallow; counter stays where it was */ });
-    void tick();
-    // Light polling so the DECIDE counter updates while the reviewer is
-    // working through questions in the AdherenceReview pane.
-    const handle = setInterval(tick, 4000);
-    return () => { cancelled = true; clearInterval(handle); };
-  }, [isAdherenceTask, activeIterId, taskId]);
 
   // ── Phase derivation ──────────────────────────────────────────────────────
 
@@ -467,27 +360,7 @@ export function Workspace({
 
   const cells = useMemo((): CellCounts => {
     const patientCount = iterDetail?.patient_status.length ?? 0;
-    // NER: span-stats totals.
-    if (isNerTask && spanStats) {
-      return {
-        validated: spanStats.validated,
-        total: Math.max(spanStats.total, spanStats.validated),
-        stale: revisitsTotal,
-        patient_count: patientCount,
-      };
-    }
-    // Adherence: adherence-stats totals (questions × patients).
-    // The reviewer's per-question Accept flips validated_questions in
-    // review_state, which the adherence-stats endpoint sums up.
-    if (isAdherenceTask && adherenceStats) {
-      return {
-        validated: adherenceStats.validated,
-        total: Math.max(adherenceStats.total, adherenceStats.validated),
-        stale: revisitsTotal,
-        patient_count: patientCount,
-      };
-    }
-    // Phenotype: historical field_assessments × criterionCount derivation.
+    // Phenotype: field_assessments × criterionCount derivation.
     const total = patientCount * Math.max(criterionCount, 1);
     const validated = (iterDetail?.patient_status.filter((p) => p.oracle_done).length ?? 0) * Math.max(criterionCount, 1);
     return {
@@ -496,7 +369,7 @@ export function Workspace({
       stale: revisitsTotal,
       patient_count: patientCount,
     };
-  }, [iterDetail, criterionCount, revisitsTotal, isNerTask, spanStats, isAdherenceTask, adherenceStats]);
+  }, [iterDetail, criterionCount, revisitsTotal]);
 
   const phaseInfo = useMemo(
     () =>

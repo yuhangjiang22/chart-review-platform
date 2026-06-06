@@ -46,10 +46,9 @@ import { runPreflight } from "./lib/adapters/http/preflight-routes.js";
 
 // Guideline imports
 import {
-  improveGuideline, improveNerTask, improveAdherenceTask, applyNerProposal, applyAdherenceProposal,
+  improveGuideline,
   listImprovementProposals, readImprovementProposal,
 } from "./lib/domain/proposal/index.js";
-import { loadCompiledTask } from "./lib/tasks.js";
 import { calibrateGuideline } from "./lib/guideline-calibration.js";
 import { guidelineDir } from "./lib/domain/rubric/index.js";
 import { computeTaskSha } from "./lib/lock.js";
@@ -186,36 +185,14 @@ export const guidelineRoutes: RouteEntry[] = [
   {
     method: "POST", pattern: "/api/guideline-improvement/:taskId",
     handler: async (body, _r, p) => {
-      const { patient_ids, focus_criterion, focus_entity_type, focus_question_id } = (body ?? {}) as {
+      const { patient_ids, focus_criterion } = (body ?? {}) as {
         patient_ids?: string[];
         focus_criterion?: string;
-        focus_entity_type?: string;
-        focus_question_id?: string;
       };
       if (!Array.isArray(patient_ids) || patient_ids.length === 0) {
         throw httpErr(400, "patient_ids[] required (non-empty)");
       }
-      // task_kind dispatch:
-      //   - NER → span-shaped driver, proposals patch entity-type-guidance YAMLs
-      //   - adherence → question/rule-shaped driver, proposals patch
-      //     references/questions/*.yaml and references/rules/*.yaml
-      //   - phenotype → original criterion-shaped driver
-      const task = loadCompiledTask(p.taskId);
       try {
-        if (task?.task_kind === "ner") {
-          const result = await improveNerTask({
-            task_id: p.taskId, patient_ids, focus_entity_type,
-          });
-          if (!result.ok) throw httpErr(500, (result as { error?: string }).error ?? "improveNerTask failed", result);
-          return result;
-        }
-        if (task?.task_kind === "adherence") {
-          const result = await improveAdherenceTask({
-            task_id: p.taskId, patient_ids, focus_question_id,
-          });
-          if (!result.ok) throw httpErr(500, (result as { error?: string }).error ?? "improveAdherenceTask failed", result);
-          return result;
-        }
         const result = await improveGuideline({
           guideline_id: p.taskId, patient_ids, focus_criterion,
         });
@@ -284,30 +261,12 @@ export const guidelineRoutes: RouteEntry[] = [
     },
   },
 
-  // POST /api/guideline-improvement/:taskId/proposals/:proposalId/apply
-  // Apply a proposal by task_kind:
-  //   - ner       → patch entity_type_guidance YAML
-  //   - adherence → patch references/questions/*.yaml or references/rules/*.yaml
-  //   - phenotype → not supported here (legacy rule-store has its own path)
-  // The proposal is archived under <proposals>/<task>/applied/ on success.
   {
     method: "POST", pattern: "/api/guideline-improvement/:taskId/proposals/:proposalId/apply",
-    handler: async (_b, _r, p) => {
-      const task = loadCompiledTask(p.taskId);
-      let result: { ok: boolean; error?: string; applied_to?: string; archived_to?: string };
-      if (task?.task_kind === "ner") {
-        result = applyNerProposal(p.taskId, p.proposalId);
-      } else if (task?.task_kind === "adherence") {
-        result = applyAdherenceProposal(p.taskId, p.proposalId);
-      } else {
-        throw httpErr(400, "apply only supported for NER and adherence tasks");
-      }
-      if (!result.ok) {
-        const err = httpErr(400, result.error ?? "apply failed");
-        (err as Error & { payload?: unknown }).payload = result;
-        throw err;
-      }
-      return result;
+    handler: async (_b, _r, _p) => {
+      // Apply proposals: only NER/adherence tasks used this endpoint.
+      // Phenotype uses the rule-store path (proposal-routes.ts).
+      throw httpErr(400, "apply only supported for NER and adherence tasks (removed in platform-light)");
     },
   },
 

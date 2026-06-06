@@ -152,92 +152,13 @@ export interface ReviewState {
   assigned_to?: string[];
   /** #45 — encounter/episode list. */
   encounters?: Encounter[];
-  /** NER tasks carry their work here instead of field_assessments. Kept
-   *  as `unknown[]` on the client so we don't pull the SpanLabel type
-   *  into every reviewState consumer; the SpanReview surface narrows. */
-  span_labels?: unknown[];
-  task_kind?: "phenotype" | "ner" | "adherence";
-  /** NER-only: note IDs the reviewer has marked validated for this
-   *  patient × task. Defaults to empty (nothing validated). */
-  validated_notes?: string[];
-  /** Adherence-only — see server-side ReviewState. Kept as opaque
-   *  arrays on the client to avoid pulling the full QuestionAnswer/
-   *  RuleVerdict types into every consumer. AdherenceReview narrows. */
-  question_answers?: QuestionAnswer[];
-  rule_verdicts?: RuleVerdict[];
-  validated_questions?: string[];
-  validated_rules?: string[];
-  /** Per-agent shadow drafts captured at import time. Read-only; the
-   *  reviewer-editable answers stay in question_answers/rule_verdicts.
-   *  Keys = agent_id ("agent_1", "agent_2"), values = full per-agent
-   *  draft. Drives the A/B provenance columns. */
-  agent_question_answers?: Record<string, QuestionAnswer[]>;
-  agent_rule_verdicts?: Record<string, RuleVerdict[]>;
+  task_kind?: "phenotype";
   /** Run id whose agent drafts populated this review_state. The patient-
    *  open auto-import flow compares this against the latest run for the
    *  task and re-imports (force:true) when a newer run exists, so iter
    *  2+ surfaces the new agent drafts to the reviewer without losing
-   *  their prior accept/override rows (server-side merge preserves
-   *  source=reviewer rows + validated_questions / validated_rules). */
+   *  their prior accept/override rows. */
   imported_from_run?: string;
-}
-
-// ── Adherence (task_kind="adherence") shapes ──────────────────────────────
-
-export type AttributionCategory =
-  | "DOCUMENTATION_GAP"
-  | "GUIDELINE_DEVIATION"
-  | "PATIENT_REFUSAL"
-  | "CONTRAINDICATION"
-  | "PENDING_FOLLOWUP"
-  | "OTHER";
-
-export interface QuestionAnswer {
-  question_id: string;
-  tier: number;
-  answer: string | number | boolean | null;
-  confidence?: number;
-  evidence?: Array<{ note_id: string; quote: string; start?: number; end?: number }>;
-  reasoning?: string;
-  verifier_status?: "confirmed" | "contradicted" | "no_check";
-  source?: "agent" | "reviewer";
-  ts?: string;
-}
-
-export interface RuleVerdict {
-  rule_id: string;
-  verdict: "CONCORDANT" | "NON_CONCORDANT" | "EXCLUDED";
-  attribution?: AttributionCategory;
-  supporting_questions?: string[];
-  rationale?: string;
-  source?: "rule_engine" | "llm_judge" | "reviewer";
-  ts?: string;
-}
-
-export interface QuestionDefinition {
-  question_id: string;
-  text: string;
-  tier: number;
-  answer_schema?: {
-    type?: "boolean" | "string" | "number";
-    enum?: Array<string | number | boolean>;
-    description?: string;
-  };
-  depends_on?: string[];
-  retrieval_hints?: string;
-}
-
-export interface RuleDefinition {
-  rule_id: string;
-  description: string;
-  verdict_if: string;
-  invert?: boolean;
-  excluded_if?: string;
-  attribution?: AttributionCategory;
-  attribution_when?: Array<{ when: string; category: AttributionCategory }>;
-  nuanced?: boolean;
-  judge_can_override?: boolean;
-  supporting_questions?: string[];
 }
 
 /** Cross-pane navigation: jump-to-source signal from ReviewForm → NoteViewer. */
