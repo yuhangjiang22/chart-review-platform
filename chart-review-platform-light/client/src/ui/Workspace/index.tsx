@@ -14,7 +14,6 @@ import { PHASE_SLUG_TO_ID } from "./phases";
 import { PhaseHeadline } from "./PhaseHeadline";
 import { WorkspaceSettings } from "./WorkspaceSettings";
 import { PhaseDraft } from "./PhaseDraft";
-import { PhaseSpanAuthor } from "./PhaseSpanAuthor";
 import { taskKindUi, taskKindFromTaskType } from "./task-kind-registry";
 import { PhaseTry } from "./PhaseTry";
 import { PhaseJudge } from "./PhaseJudge";

@@ -35,7 +35,6 @@ import {
 import type { RunStatus } from "./lib/infra/batch-run/index.js";
 import { evaluateStopRule } from "./lib/domain/iter/stop-rule.js";
 import { extractDisagreements } from "./lib/domain/iter/pilots.js";
-import { loadCompiledTask } from "./lib/tasks.js";
 import { loadCriteria, guidelineDir, phenotypeSkillDir } from "./lib/domain/rubric/index.js";
 import { readCohortSampling } from "./lib/domain/cohort/index.js";
 import {
