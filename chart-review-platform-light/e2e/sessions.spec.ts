@@ -18,7 +18,8 @@ import {
   setActiveSession,
 } from "./_helpers";
 
-const TASK_ID = "ad-cde-ner";
+// Light platform: one phenotype task only.
+const TASK_ID = "lung-cancer-phenotype-light";
 const COHORT_PATIENT = "patient_easy_nsclc_01";
 
 test.describe("session workflow", () => {
@@ -36,8 +37,8 @@ test.describe("session workflow", () => {
   test("no active session: TRY phase shows the gate, not a run card", async ({ page }) => {
     await setActiveSession(page, TASK_ID, null);
     await gotoWorkspace(page, TASK_ID, "try");
-    // Workspace-level no-session gate copy (fires for every non-AUTHOR
-    // phase when activeSessionId is null).
+    // Workspace-level no-session gate copy (fires for every phase
+    // when activeSessionId is null).
     await expect(
       page.getByText(/Pick or start a session to see this phase/i),
     ).toBeVisible();
@@ -45,15 +46,15 @@ test.describe("session workflow", () => {
     await expect(page.getByRole("button", { name: /Start iter/i })).toHaveCount(0);
   });
 
-  test("no active session: VALIDATE phase also shows the gate (not a stale 'spans ready')", async ({ page }) => {
+  test("no active session: VALIDATE phase also shows the gate (not a stale run card)", async ({ page }) => {
     await setActiveSession(page, TASK_ID, null);
     await gotoWorkspace(page, TASK_ID, "validate");
     // Workspace-level gate fires here, not the in-pane validation form.
     await expect(
       page.getByText(/Pick or start a session to see this phase/i),
     ).toBeVisible();
-    // The previous bug rendered patient chips with "spans ready" even with
-    // no session. Assert no patient_id chip is visible.
+    // The previous bug rendered patient chips even with no session. Assert
+    // no patient chip for the corpus patient is visible.
     await expect(page.getByText(COHORT_PATIENT)).toHaveCount(0);
   });
 
@@ -82,18 +83,18 @@ test.describe("session workflow", () => {
     await expect(page.getByText(COHORT_PATIENT)).toBeVisible();
   });
 
-  test("NER task: sidebar uses 'Reviewers' label, matching PhaseTry", async ({ page }) => {
+  test("phenotype task: sidebar uses 'Agents' label, matching PhaseTry", async ({ page }) => {
     const token = (page as unknown as { _token: string })._token;
     const sid = await startSession(page, token, TASK_ID, "smoke session B", [COHORT_PATIENT]);
     await setActiveSession(page, TASK_ID, sid);
     await gotoWorkspace(page, TASK_ID, "try");
-    // NER → "Reviewers" in BOTH the main pane and the sidebar. No
+    // Phenotype → "Agents" in BOTH the main pane and the sidebar. No
     // mismatch like the earlier bug where main said REVIEWERS but
     // sidebar said AGENTS for the same task.
-    const reviewersLabels = await page.getByText(/Reviewers \(/).count();
-    expect(reviewersLabels, "expected ≥1 'Reviewers' label").toBeGreaterThan(0);
-    // And the misleading "Agents (" label should NOT appear for NER tasks.
-    await expect(page.getByText(/^Agents \(/)).toHaveCount(0);
+    const agentsLabels = await page.getByText(/Agents \(/).count();
+    expect(agentsLabels, "expected ≥1 'Agents' label").toBeGreaterThan(0);
+    // And the "Reviewers (" label should NOT appear for phenotype tasks.
+    await expect(page.getByText(/^Reviewers \(/)).toHaveCount(0);
   });
 
   test("cross-session isolation: switching to a session with no iters doesn't show another session's iter", async ({ page }) => {
@@ -111,8 +112,20 @@ test.describe("session workflow", () => {
     await expect(
       page.locator("main").getByText(/No active iteration to validate/i),
     ).toBeVisible();
-    // And no "spans ready" patient chip leaks into main from another session.
-    await expect(page.locator("main").getByText(/spans ready/i)).toHaveCount(0);
     expect(sidA).not.toEqual(sidB); // sanity check
+  });
+
+  test("agent run: TRY → VALIDATE works end-to-end (needs Azure)", async ({ page }) => {
+    test.skip(!process.env.AZURE_OPENAI_API_KEY, "needs Azure — set AZURE_OPENAI_API_KEY to run");
+    const token = (page as unknown as { _token: string })._token;
+    const sid = await startSession(page, token, TASK_ID, "e2e run", [COHORT_PATIENT]);
+    await setActiveSession(page, TASK_ID, sid);
+    await gotoWorkspace(page, TASK_ID, "try");
+    // Start the run and wait for it to reach ready_to_validate.
+    await page.getByRole("button", { name: /Start iter/i }).click();
+    await expect(page.getByText(/ready to validate/i)).toBeVisible({ timeout: 120_000 });
+    // Advance to VALIDATE — patient chip should appear.
+    await gotoWorkspace(page, TASK_ID, "validate");
+    await expect(page.getByText(COHORT_PATIENT)).toBeVisible();
   });
 });
