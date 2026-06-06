@@ -173,7 +173,8 @@ export function Workspace({
   const refreshSessions = useCallback(async () => {
     const r = await authFetch(`/api/sessions/${encodeURIComponent(taskId)}`);
     if (!r.ok) return;
-    const body = await r.json() as { sessions: SessionListItem[] };
+    const body = await r.json() as { sessions: SessionListItem[] } | null;
+    if (!body?.sessions) return;
     setSessions(body.sessions);
     // If active session no longer exists, fall back to the newest active.
     if (activeSessionId
