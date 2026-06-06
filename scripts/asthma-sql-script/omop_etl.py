@@ -184,6 +184,60 @@ def write_atomic(path: Path, payload) -> None:
     tmp.replace(path)
 
 
+def write_text_atomic(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(text, encoding="utf-8")
+    tmp.replace(path)
+
+
+import re as _re
+
+
+def slugify_doc_type(s: str | None) -> str:
+    """date__doc-type filename component. Lowercase, alphanumerics +
+    underscores only, max 40 chars."""
+    if not s:
+        return "note"
+    out = _re.sub(r"[^a-z0-9]+", "_", s.lower()).strip("_")
+    return out[:40] or "note"
+
+
+def write_notes(
+    notes_df: pd.DataFrame,
+    pdir: Path,
+) -> int:
+    """Persist each row of the notes query as a .txt file under
+    <pdir>/notes/<YYYY-MM-DD>__<slug>.txt. Returns the file count.
+    Disambiguates collisions (same date + same slug) with -2, -3, ..."""
+    notes_dir = pdir / "notes"
+    notes_dir.mkdir(parents=True, exist_ok=True)
+    # Clear any stale files from a prior run so re-extraction is idempotent.
+    for old in notes_dir.glob("*.txt"):
+        try: old.unlink()
+        except OSError: pass
+
+    used: set[str] = set()
+    written = 0
+    for row in notes_df.to_dict(orient="records"):
+        text = row.get("note_text")
+        if not isinstance(text, str) or len(text.strip()) == 0:
+            continue
+        date_val = row.get("note_date")
+        date_str = (pd.Timestamp(date_val).date().isoformat()
+                    if date_val is not None and not pd.isna(date_val) else "0000-00-00")
+        slug = slugify_doc_type(row.get("doc_type"))
+        base = f"{date_str}__{slug}"
+        name = f"{base}.txt"
+        n = 2
+        while name in used:
+            name = f"{base}-{n}.txt"; n += 1
+        used.add(name)
+        write_text_atomic(notes_dir / name, text)
+        written += 1
+    return written
+
+
 def extract_patient(engine: Engine, sql: dict[str, str], schema: str,
                     person_id: int, index_date: date, lookback_days: int,
                     anon_id: str, output_dir: Path,
@@ -205,6 +259,7 @@ def extract_patient(engine: Engine, sql: dict[str, str], schema: str,
     observations  = to_jsonable(run("observations"))
     procedures    = to_jsonable(run("procedures"))
     encounters    = to_jsonable(run("encounters"))
+    notes_df      = run("notes") if "notes" in sql else pd.DataFrame()
 
     pdir = output_dir / anon_id
     write_atomic(pdir / "omop" / "conditions.json",   conditions)
@@ -213,6 +268,7 @@ def extract_patient(engine: Engine, sql: dict[str, str], schema: str,
     write_atomic(pdir / "omop" / "observations.json", observations)
     write_atomic(pdir / "omop" / "procedures.json",   procedures)
     write_atomic(pdir / "omop" / "encounters.json",   encounters)
+    n_notes = write_notes(notes_df, pdir) if not notes_df.empty else 0
 
     meta = {
         "patient_id": anon_id,
@@ -233,6 +289,7 @@ def extract_patient(engine: Engine, sql: dict[str, str], schema: str,
         "n_observations": len(observations),
         "n_procedures":   len(procedures),
         "n_encounters":   len(encounters),
+        "n_notes":        n_notes,
     }
 
 
@@ -273,6 +330,9 @@ def main():
     missing = required - set(sql)
     if missing:
         log.error(f"extracts.sql is missing sections: {missing}"); sys.exit(2)
+    if "notes" not in sql:
+        log.warning("extracts.sql has no `notes` section — extraction will skip notes. "
+                    "Add the ==NAME notes== block to pull clinical text.")
 
     engine = create_engine(db_url)
     cohort = pd.read_csv(args.cohort_csv, parse_dates=["index_date"])
@@ -303,7 +363,8 @@ def main():
                      f"cond={summary['n_conditions']} "
                      f"drug={summary['n_drugs']} "
                      f"meas={summary['n_measurements']} "
-                     f"enc={summary['n_encounters']}")
+                     f"enc={summary['n_encounters']} "
+                     f"notes={summary.get('n_notes', 0)}")
         except Exception as e:
             log.exception(f"[{i+1}/{len(cohort)}] person_id={person_id} FAILED")
             errors.append({"person_id": person_id, "anon_id": anon_id,

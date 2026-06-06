@@ -206,3 +206,51 @@ LEFT JOIN {schema}.provider prov ON prov.provider_id = v.provider_id
 WHERE v.person_id = :person_id
   AND v.visit_start_date BETWEEN :start_date AND :end_date
 ORDER BY v.visit_start_date, v.visit_occurrence_id;
+
+
+-- ==NAME notes==
+-- Clinical notes from the OMOP `note` table. One row per note; each row
+-- becomes a .txt file at corpus/patients/<anon_id>/notes/<date>__<doc_type>.txt
+-- via omop_etl.py.
+--
+-- Filtering:
+--   - person_id + date window match
+--   - non-empty note_text (skip stubs and auto-generated zero-length notes)
+--   - note_type_concept_id allowlist: standard "clinical note" types
+--     (progress notes, discharge summaries, consult notes, outpatient
+--     notes). Adjust per site if WCM uses different local concepts.
+--
+-- The agent's `list_notes` + `read_notes` MCP tools read these from disk
+-- after extraction — no DB access at runtime.
+SELECT
+  n.note_id,
+  n.note_date,
+  COALESCE(c_class.concept_name, c_type.concept_name) AS doc_type,
+  n.note_title,
+  n.note_text
+FROM {schema}.note n
+LEFT JOIN {schema}.concept c_type
+       ON c_type.concept_id = n.note_type_concept_id
+LEFT JOIN {schema}.concept c_class
+       ON c_class.concept_id = n.note_class_concept_id
+WHERE n.person_id = :person_id
+  AND n.note_date BETWEEN :start_date AND :end_date
+  AND n.note_text IS NOT NULL
+  AND LEN(n.note_text) > 50
+  AND (
+    -- Standard clinical note types (LOINC-mapped via OMOP):
+    --   44814637 progress note
+    --   44814638 discharge summary
+    --   44814648 consult note
+    --   44814673 outpatient note
+    --   706531   referral note
+    n.note_type_concept_id IN (44814637, 44814638, 44814648, 44814673, 706531)
+    -- Or anything classified as a clinical note via note_class_concept_id:
+    OR LOWER(c_class.concept_name) LIKE '%progress%'
+    OR LOWER(c_class.concept_name) LIKE '%discharge%'
+    OR LOWER(c_class.concept_name) LIKE '%consult%'
+    OR LOWER(c_class.concept_name) LIKE '%outpatient%'
+    OR LOWER(c_class.concept_name) LIKE '%referral%'
+    OR LOWER(c_class.concept_name) LIKE '%clinic note%'
+  )
+ORDER BY n.note_date, n.note_id;

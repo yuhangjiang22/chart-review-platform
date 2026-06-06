@@ -10,8 +10,8 @@ comparable patient corpus from their own EHR data warehouses.
 | File | Purpose |
 |---|---|
 | `cohort.sql` | Identifies the study cohort per the protocol's Cohort Definition. Pediatric (ages 2–17) at index_date, active asthma diagnosis (SNOMED 317009 + descendants, which includes ICD-10 J45.x), ≥2 asthma-related encounters anywhere in the study window, alive at index, no primary diagnosis of cystic fibrosis / bronchiectasis / bronchopulmonary dysplasia (chronic lung disease that would confound asthma management). Returns one row per eligible patient with `(person_id, index_date, age_at_index, gender_concept_id, n_asthma_encounters)`. |
-| `extracts.sql` | The six per-patient queries (`conditions`, `drug_regimens` + `drug_fills` + `drug_sig`, `measurements`, `observations`, `procedures`, `encounters`). Each section is delimited by a `-- ==NAME foo==` marker so `omop_etl.py` can load them by name. Result sets serialize 1:1 into the JSON shapes the platform's `read_structured_data` MCP tool consumes. |
-| `omop_etl.py` | Python wrapper. Reads the cohort CSV, runs the 6 extracts per patient, aggregates drug fills into the platform's nested shape, computes `refill_pdc_12mo` (HEDIS MAM-style) and `saba_canisters_12mo`, anonymizes `person_id` with a site-prefixed salted hash, and writes the full `corpus/patients/<anon_id>/` layout. |
+| `extracts.sql` | The seven per-patient queries (`conditions`, `drug_regimens` + `drug_fills` + `drug_sig`, `measurements`, `observations`, `procedures`, `encounters`, `notes`). Each section is delimited by a `-- ==NAME foo==` marker so `omop_etl.py` can load them by name. Result sets serialize 1:1 into the JSON shapes the platform's `read_structured_data` MCP tool consumes; notes are written as flat `.txt` files. |
+| `omop_etl.py` | Python wrapper. Reads the cohort CSV, runs the 6 OMOP extracts + the notes query per patient, aggregates drug fills into the platform's nested shape, computes `refill_pdc_12mo` (HEDIS MAM-style) and `saba_canisters_12mo`, anonymizes `person_id` with a site-prefixed salted hash, writes the full `corpus/patients/<anon_id>/` layout including `notes/*.txt`. |
 
 ## How to run
 
@@ -48,8 +48,18 @@ corpus/patients/<anon_id>/
 │   ├── observations.json
 │   ├── procedures.json
 │   └── encounters.json
+└── notes/                          clinical notes from OMOP `note` table
+    ├── 2024-11-12__progress_note.txt
+    ├── 2024-11-26__consult_note.txt
+    ├── 2025-01-15__outpatient_note.txt
+    └── ...
 └── _manifest.json                  (parent dir) — anon_id → row counts per site
 ```
+
+Notes filename convention: `<YYYY-MM-DD>__<slugified_doc_type>.txt`.
+`doc_type` is sourced from `note_class_concept_id` (preferred) or
+`note_type_concept_id` (fallback). Collisions disambiguated by appending
+`-2`, `-3`, etc.
 
 Anonymized IDs look like `iu_a3f2c91e88` (site_prefix + 10-char SHA-256 of
 `{salt}:{person_id}`). Idempotent across re-runs.
@@ -79,15 +89,26 @@ The SQL is T-SQL (SQL Server) flavored: `DATEDIFF`, `DATEADD`,
 For Postgres / Snowflake, either run through OHDSI `SqlRender` or port
 the ~8 date arithmetic / string concat sites by hand.
 
+## Cross-site contracts (continued)
+
+The notes pipeline adds a fourth contract:
+
+4. **Note type allowlist** (in `extracts.sql`, `notes` section) —
+   which `note_type_concept_id` / `note_class_concept_id` values count
+   as "clinical notes" worth pulling. Defaults to standard LOINC-mapped
+   types (progress note, discharge summary, consult note, outpatient
+   note, referral note) plus a name-match fallback against
+   `note_class_concept_id.concept_name`. Sites with custom local
+   note-type concepts will need to extend the allowlist.
+
 ## What's NOT in this pipeline
 
-- **Note text extraction.** The platform also reads
-  `corpus/patients/<anon_id>/notes/*.txt`. Without notes the agents can
-  answer ~9 of the 16 questions; the qualitative T2 questions
-  (WrittenActionPlan, InhalerTechniqueChecked, ComorbidityAddressed,
-  ContraindicationDocumented) degrade significantly. Notes extraction +
-  de-identification (Philter, MS PII detector, or local) is a separate
-  pipeline; deciding the de-id approach is the prerequisite, not the code.
+- **De-identification of notes.** `note_text` is pulled verbatim from
+  OMOP. If your site requires scrubbing PHI before notes can be shared,
+  add a de-id pass (Philter / MS PII detector / local tool) between
+  the SQL extract and the `write_notes` call in `omop_etl.py`. The
+  current pipeline assumes the methodologist has authorization to
+  handle raw clinical text under the study's data use agreement.
 - **Provider PII scrubbing.** `encounters.json` carries
   `primary_provider` and `care_site_name`. If those are real names (not
   de-identified providers), strip or hash them in `to_jsonable` before
