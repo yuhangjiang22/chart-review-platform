@@ -8,7 +8,7 @@
 //   PUT /api/tasks/:taskId/overview   — overview_prose
 //   PUT /api/tasks/:taskId/criteria/:fieldId — per-field edits
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronRight, Save, CheckCircle } from "lucide-react";
 import { authFetch } from "../../auth";
 import { Button } from "@/components/ui/button";
@@ -222,12 +222,29 @@ function FieldEditor({ taskId, field, onSaved }: FieldEditorProps) {
 
 export interface RubricPanelProps {
   taskId: string;
+  /** Bumped by the sidebar's "Open skill rubric" link. When > 0 the panel
+   *  expands + scrolls into view — on mount (so it survives PhaseTry's
+   *  Branch B→A remount when a run loads) and on subsequent bumps. */
+  revealNonce?: number;
 }
 
-export function RubricPanel({ taskId }: RubricPanelProps) {
+export function RubricPanel({ taskId, revealNonce }: RubricPanelProps) {
   const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
   const [data, setData] = useState<RubricData | null>(null);
   const [loadState, setLoadState] = useState<"idle" | "loading" | "error">("idle");
+
+  // Reveal when the "Open skill rubric" link bumps the nonce (>0). Runs on
+  // mount too, so a freshly-mounted panel (e.g. after Branch B→A remount)
+  // still opens.
+  useEffect(() => {
+    if ((revealNonce ?? 0) > 0) {
+      setOpen(true);
+      requestAnimationFrame(() =>
+        rootRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
+      );
+    }
+  }, [revealNonce]);
 
   // Overview edit state
   const [overviewText, setOverviewText] = useState("");
@@ -300,7 +317,7 @@ export function RubricPanel({ taskId }: RubricPanelProps) {
   }
 
   return (
-    <div className="rounded-md border border-border bg-paper/40">
+    <div ref={rootRef} className="rounded-md border border-border bg-paper/40">
       {/* Header / toggle */}
       <button
         type="button"

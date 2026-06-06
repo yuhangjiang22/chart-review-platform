@@ -273,6 +273,11 @@ export function Workspace({
 
   const activePhase: Phase = manualPhaseOverride ?? phaseInfo.phase;
 
+  // "Open skill rubric" reveal: the sidebar link bumps this nonce and switches
+  // to TRY. The nonce flows to RubricPanel as a prop, which opens when it's >0
+  // — robust to PhaseTry remounting (Branch B→A) when a run loads.
+  const [revealRubricNonce, setRevealRubricNonce] = useState(0);
+
   const donePhases = useMemo((): Phase[] => {
     const idx = PHASE_ORDER.indexOf(phaseInfo.phase);
     return PHASE_ORDER.slice(0, idx) as Phase[];
@@ -393,6 +398,7 @@ export function Workspace({
             activeSessionId={activeSessionId}
             onOpenNewSession={() => setNewSessionOpen(true)}
             taskKind={taskKind}
+            revealRubricNonce={revealRubricNonce}
           />
         )}
         {activePhase === "VALIDATE" && activeSessionId && activeIter && (
@@ -420,7 +426,10 @@ export function Workspace({
         patientStatus={sidebarPatientStatus}
         isOpen={sidebarOpen}
         onToggle={() => setSidebarOpen(!sidebarOpen)}
-        onJumpToAuthor={() => setPhase("TRY")}
+        onJumpToAuthor={() => {
+          setPhase("TRY");
+          setRevealRubricNonce((n) => n + 1);
+        }}
         taskKind={taskKind}
       />
     </div>

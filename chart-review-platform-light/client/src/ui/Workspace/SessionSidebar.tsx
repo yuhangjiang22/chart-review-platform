@@ -250,7 +250,7 @@ export function SessionSidebar({
               className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-ink underline-offset-2 hover:underline"
             >
               <FileText size={11} strokeWidth={1.75} />
-              Open skill rubric (AUTHOR)
+              Open skill rubric
             </button>
             <p className="mt-1 text-[10px] text-muted-foreground/80 leading-[1.4]">
               Edits made here affect THIS session's next iter — that's the inner loop.

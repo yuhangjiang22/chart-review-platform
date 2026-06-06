@@ -51,6 +51,9 @@ interface PhaseTryProps {
   /** Task kind — drives the runtime indicator in the agent readout.
    *  phenotype runs via the deepagents Python sidecar (AGENT_PROVIDER). */
   taskKind?: "phenotype";
+  /** Bumped by the sidebar "Open skill rubric" link to reveal the inline
+   *  rubric editor. Forwarded to RubricPanel. */
+  revealRubricNonce?: number;
 }
 
 /**
@@ -60,7 +63,7 @@ interface PhaseTryProps {
  * run, the user abandons it and starts a fresh one with new selections.
  */
 export function PhaseTry({
-  taskId, onAdvanceToValidate, activeSessionId, onOpenNewSession, taskKind,
+  taskId, onAdvanceToValidate, activeSessionId, onOpenNewSession, taskKind, revealRubricNonce,
 }: PhaseTryProps) {
   // Session manifest — source of truth for cohort + agent_specs.
   // Loaded fresh whenever activeSessionId changes.
@@ -324,7 +327,7 @@ export function PhaseTry({
     return (
       <div className="space-y-4">
         {/* Rubric stays available here too — edits affect this session's next run. */}
-        <RubricPanel taskId={taskId} />
+        <RubricPanel taskId={taskId} revealNonce={revealRubricNonce} />
         <RunStatusCard
           iter={activeIter}
           patientIds={activeIterPatients}
@@ -354,7 +357,7 @@ export function PhaseTry({
         </p>
       </div>
 
-      <RubricPanel taskId={taskId} />
+      <RubricPanel taskId={taskId} revealNonce={revealRubricNonce} />
 
       <div className="rounded-md border border-border bg-paper/40 px-4 py-3">
         <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-1">
