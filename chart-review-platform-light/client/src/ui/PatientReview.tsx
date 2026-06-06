@@ -628,7 +628,7 @@ export function PatientReview(p: PatientReviewProps) {
         <aside className="flex w-[560px] shrink-0 flex-col min-h-0 border-l border-border bg-paper/40">
           <div className="flex h-10 shrink-0 items-center gap-2 border-b border-border px-4">
             <span className="font-display text-[13px] tracking-tight">Source</span>
-            <span className="text-[11px] text-muted-foreground">notes · structured · timeline</span>
+            <span className="text-[11px] text-muted-foreground">notes · timeline</span>
           </div>
           <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
             <NoteViewer

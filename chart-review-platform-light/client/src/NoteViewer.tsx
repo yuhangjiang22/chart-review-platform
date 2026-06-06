@@ -9,7 +9,7 @@ import type {
   ReviewState,
 } from "./types";
 import { authFetch } from "./auth";
-import { StructuredTab, type StructuredData } from "./StructuredTab";
+import { type StructuredData } from "./StructuredTab";
 import { TimelineTab } from "./TimelineTab";
 import type { Citer } from "./citers";
 import { citerKey, citerLabel, buildCitersByNoteSpan, buildCitersByRowKey } from "./citers";
@@ -55,7 +55,7 @@ interface Props {
 
 type ActiveView = { kind: "note"; filename: string };
 
-type MainTab = "notes" | "structured" | "timeline";
+type MainTab = "notes" | "timeline";
 
 /** Map OMOP-canonical table names → the simplified plurals the UI tabs use.
  *  Agents emit canonical names in evidence; tabs are keyed by the plurals.
@@ -430,13 +430,6 @@ export function NoteViewer({
     setSearchCursor(0);
   }, [searchQuery, active]);
 
-  // External jump from an OMOP evidence card → flip to the Structured tab.
-  // The structuredFocus prop carries a nonce so repeated clicks re-fire.
-  useEffect(() => {
-    if (!structuredFocus) return;
-    setMainTab("structured");
-  }, [structuredFocus]);
-
   // 's' keyboard shortcut focuses the in-note Find input.
   useEffect(() => {
     const onFocusSearch = () => {
@@ -747,9 +740,10 @@ export function NoteViewer({
           )}
         </div>
       )}
-      {/* Main tabs — Notes / Structured / Timeline (per-criterion source view) */}
+      {/* Main tabs — Notes / Timeline (per-criterion source view).
+          Notes-only platform: the OMOP "structured" tab is removed. */}
       <div className="shrink-0 border-b border-border bg-paper/40 px-4 pt-2 flex items-end gap-1">
-        {(["notes", "structured", "timeline"] as const).map((t) => (
+        {(["notes", "timeline"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setMainTab(t)}
@@ -1035,7 +1029,7 @@ export function NoteViewer({
         </div>
       )}
 
-      {(mainTab === "structured" || mainTab === "timeline") && selectedField && (
+      {mainTab === "timeline" && selectedField && (
         <div className="shrink-0 border-b border-border/60 bg-paper/40 px-4 py-1.5 flex items-center gap-3 text-[11.5px]">
           <label className="flex items-center gap-1.5 cursor-pointer select-none">
             <input
@@ -1058,25 +1052,6 @@ export function NoteViewer({
               No evidence cited yet for this criterion.
             </span>
           )}
-        </div>
-      )}
-
-      {mainTab === "structured" && (
-        <div className="flex-1 min-h-0 overflow-auto">
-          <StructuredTab
-            data={structured}
-            indexDate={effectiveIndexDate}
-            activeFieldId={selectedField?.id ?? null}
-            citedKeys={citedStructuredKeys}
-            citersByRowKey={citersByRowKey}
-            showOnlyCited={showOnlyCited && hasCitedAny}
-            focus={structuredFocus}
-            onCite={
-              onCite
-                ? (ev) => onCite({ source: "omop" as const, ...ev })
-                : undefined
-            }
-          />
         </div>
       )}
 

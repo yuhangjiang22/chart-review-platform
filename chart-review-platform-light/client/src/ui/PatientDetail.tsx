@@ -206,7 +206,7 @@ export function PatientDetail(p: PatientDetailProps) {
           <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-4">
             <BookOpen size={13} className="text-muted-foreground" strokeWidth={1.75} />
             <div className="font-display text-[14px] tracking-tight">Source</div>
-            <span className="text-[11px] text-muted-foreground">notes · structured · timeline</span>
+            <span className="text-[11px] text-muted-foreground">notes · timeline</span>
           </div>
           <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
             <NoteViewer
