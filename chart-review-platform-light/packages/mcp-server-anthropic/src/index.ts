@@ -402,10 +402,10 @@ export interface BuildMcpServersOptions {
    *  honors (taking precedence over the default
    *  `<PLATFORM_ROOT>/reviews/`). */
   reviewsRoot?: string;
-  /** Per-run agent provider — when "codex", forces subprocess MCP
+  /** Per-run agent provider — when not "claude", forces subprocess MCP
    *  transport regardless of MCP_TRANSPORT env var. Falls back to
    *  AGENT_PROVIDER env var when omitted. */
-  provider?: "claude" | "codex";
+  provider?: string;
 }
 
 /**
@@ -444,9 +444,9 @@ export function buildMcpServersConfig(
   // The per-run override (opts.provider) wins over the env var so a
   // single server can host runs from both providers.
   const provider = opts.provider
-    ?? ((process.env.AGENT_PROVIDER ?? "claude").toLowerCase() as "claude" | "codex");
+    ?? (process.env.AGENT_PROVIDER ?? "claude").toLowerCase();
   const wantsSubprocess =
-    process.env.MCP_TRANSPORT === "subprocess" || provider === "codex";
+    process.env.MCP_TRANSPORT === "subprocess" || provider !== "claude";
   if (wantsSubprocess) {
     const env: Record<string, string> = {
       ...(process.env as Record<string, string>),

@@ -1,0 +1,11 @@
+{
+  "name": "@chart-review/agent-provider-deepagents",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "dependencies": {
+    "@chart-review/agent-provider": "*",
+    "@chart-review/agent-compose": "*"
+  }
+}

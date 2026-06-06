@@ -302,9 +302,10 @@ export const pilotWriteRoutes: RouteEntry[] = [
 
       // Validate provider when set; "default" / undefined → let server
       // fall back to AGENT_PROVIDER env var.
-      let resolvedProvider: "claude" | "codex" | undefined;
+      let resolvedProvider: import("@chart-review/agent-provider").ProviderName | undefined;
       if (provider && provider !== "default") {
-        if (provider !== "claude" && provider !== "codex") {
+        const { isProviderName } = await import("@chart-review/agent-provider");
+        if (!isProviderName(provider)) {
           const err = new Error(`unknown provider: ${provider}`) as Error & { status: number };
           err.status = 400; throw err;
         }

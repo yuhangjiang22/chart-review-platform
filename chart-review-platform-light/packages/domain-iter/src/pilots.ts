@@ -41,6 +41,7 @@ import {
   computeRerunPlan,
   type RerunPlan,
 } from "@chart-review/criterion-hash";
+import type { ProviderName } from "@chart-review/agent-provider";
 
 export type PilotState =
   | "running"
@@ -233,7 +234,7 @@ export interface PilotListing extends PilotManifest {
   /** Agent provider that produced this iter's draft, sourced from the run
    *  manifest. Absent for pre-v0.7.1 runs that didn't record a provider —
    *  consumers should display "(server default)" in that case. */
-  provider?: "claude" | "codex";
+  provider?: ProviderName;
   /** Latest self-critique record (#12) for this iteration, if any. */
   critique?: {
     ran_at: string;
@@ -427,7 +428,7 @@ export interface StartPilotOptions {
   onRunStatus?: (s: RunStatus) => void;
   agent_specs?: AgentSpec[];
   /** Per-run override of the AGENT_PROVIDER env var. */
-  provider?: "claude" | "codex";
+  provider?: ProviderName;
   /** Per-run model override — wins over CHART_REVIEW_MODEL env var.
    *  Stamped onto every agent_spec that doesn't carry its own model. */
   model?: string;

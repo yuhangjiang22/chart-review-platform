@@ -187,7 +187,7 @@ const STDIO_SERVER_PATH = path.join(
 
 export interface BuildNerMcpServersOptions {
   reviewsRoot?: string;
-  provider?: "claude" | "codex";
+  provider?: string;
   ontologyPath?: string;
 }
 
@@ -205,9 +205,9 @@ export function buildNerMcpServersConfig(
   opts: BuildNerMcpServersOptions = {},
 ): Record<string, unknown> {
   const provider = opts.provider
-    ?? ((process.env.AGENT_PROVIDER ?? "claude").toLowerCase() as "claude" | "codex");
+    ?? (process.env.AGENT_PROVIDER ?? "claude").toLowerCase();
   const wantsSubprocess =
-    process.env.MCP_TRANSPORT === "subprocess" || provider === "codex";
+    process.env.MCP_TRANSPORT === "subprocess" || provider !== "claude";
   if (wantsSubprocess) {
     const env: Record<string, string> = {
       ...(process.env as Record<string, string>),

@@ -138,7 +138,7 @@ async function main() {
         agent_a: {
           agent_id: "agent_1", ...novel, status: "novel_candidate",
         },
-        provider: "claude",
+        provider: "deepagents",
       });
       console.log(`  ok=${jOut.ok} cost=$${jOut.cost_usd}  ms=${jOut.duration_ms}`);
       if (jOut.analysis) {

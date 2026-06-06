@@ -49,10 +49,8 @@ const CODEX_DEFAULTS: Record<ModelFeature, string | undefined> = {
   phi: undefined,
 };
 
-function activeProvider(): "claude" | "codex" {
-  return (process.env.AGENT_PROVIDER ?? "claude").toLowerCase() === "codex"
-    ? "codex"
-    : "claude";
+function activeProvider(): string {
+  return (process.env.AGENT_PROVIDER ?? "deepagents").toLowerCase();
 }
 
 function defaultsForProvider(): Record<ModelFeature, string | undefined> {

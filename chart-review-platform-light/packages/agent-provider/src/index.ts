@@ -56,11 +56,11 @@ export type AgentEvent =
 
 /** Provider names recognized by the platform. Add new providers here
  *  alongside their lazy import in `buildProvider`. */
-export type ProviderName = "claude" | "codex";
-export const PROVIDER_NAMES: ProviderName[] = ["claude", "codex"];
+export type ProviderName = "deepagents";
+export const PROVIDER_NAMES: ProviderName[] = ["deepagents"];
 
 export function isProviderName(s: unknown): s is ProviderName {
-  return s === "claude" || s === "codex";
+  return s === "deepagents";
 }
 
 /** Input shape for a single agent run. Re-uses ComposeAgentInput so
@@ -89,13 +89,9 @@ export interface AgentProvider {
 
 async function buildProvider(name: ProviderName): Promise<AgentProvider> {
   switch (name) {
-    case "claude": {
-      const { ClaudeAgentProvider } = await import("@chart-review/agent-provider-claude");
-      return new ClaudeAgentProvider();
-    }
-    case "codex": {
-      const { CodexAgentProvider } = await import("@chart-review/agent-provider-codex");
-      return new CodexAgentProvider();
+    case "deepagents": {
+      const { DeepAgentsProvider } = await import("@chart-review/agent-provider-deepagents");
+      return new DeepAgentsProvider();
     }
   }
 }
@@ -106,7 +102,7 @@ async function buildProvider(name: ProviderName): Promise<AgentProvider> {
 let cached: AgentProvider | null = null;
 
 export function defaultProviderName(): ProviderName {
-  const raw = (process.env.AGENT_PROVIDER ?? "claude").toLowerCase();
+  const raw = (process.env.AGENT_PROVIDER ?? "deepagents").toLowerCase();
   if (!isProviderName(raw)) {
     throw new Error(
       `Unknown AGENT_PROVIDER=${raw}. Supported: ${PROVIDER_NAMES.join(", ")}.`,

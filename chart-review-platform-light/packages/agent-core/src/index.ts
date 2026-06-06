@@ -41,11 +41,11 @@ export type AgentEvent =
 
 /** Provider names recognized by the platform. Add new providers here
  *  alongside their package + buildProvider switch case. */
-export type ProviderName = "claude" | "codex";
-export const PROVIDER_NAMES: ProviderName[] = ["claude", "codex"];
+export type ProviderName = "deepagents";
+export const PROVIDER_NAMES: ProviderName[] = ["deepagents"];
 
 export function isProviderName(s: unknown): s is ProviderName {
-  return s === "claude" || s === "codex";
+  return s === "deepagents";
 }
 
 /** Minimal input to run an agent. Providers extend this shape with
