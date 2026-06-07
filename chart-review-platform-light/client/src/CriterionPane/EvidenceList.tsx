@@ -48,6 +48,14 @@ function docTypeLabel(ev: NoteEvidence): string {
   return m ? m[1].replace(/_/g, " ") : "Note";
 }
 
+/** Evidence date — the agent's evidence_date when set, else derived from the
+ *  note id's date prefix (`2024-12-19__…`) so every card shows the date. */
+function evidenceDate(ev: NoteEvidence): string | null {
+  if (ev.evidence_date) return ev.evidence_date;
+  const m = /^(\d{4}-\d{2}-\d{2})/.exec(ev.note_id);
+  return m ? m[1] : null;
+}
+
 interface NoteCardProps {
   ev: NoteEvidence;
   idx: number;
@@ -74,10 +82,10 @@ function NoteEvidenceCard({ ev, idx, onJump, onRemove, onAdd, citerLabel }: Note
         <span className="text-foreground font-medium truncate">
           {docTypeLabel(ev)}
         </span>
-        {ev.evidence_date && (
+        {evidenceDate(ev) && (
           <>
             <span className="text-muted-foreground/70">·</span>
-            <span className="text-muted-foreground">{ev.evidence_date}</span>
+            <span className="text-muted-foreground">{evidenceDate(ev)}</span>
           </>
         )}
         <Pill tone={citerPillTone(label)} className="ml-auto">
