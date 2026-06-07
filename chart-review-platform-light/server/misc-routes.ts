@@ -89,6 +89,25 @@ export const miscRoutes: RouteEntry[] = [
     handler: async () => ({ default_model: modelFor("default") ?? null }),
   },
 
+  // ── /api/deepagents/model ───────────────────────────────────────────
+  //
+  // The TRUE model every agent runs on. Unlike the v2 per-agent model
+  // override, the deepagents sidecar ignores any per-agent model and
+  // resolves a single model from env (see python/.../models.py). This
+  // route mirrors that exact env logic so the UI can show the real model
+  // instead of offering inert choices. Returns the deployment/model name,
+  // never any secret.
+  {
+    method: "GET", pattern: "/api/deepagents/model",
+    handler: async () => {
+      const backend = (process.env.DEEPAGENTS_LLM_BACKEND ?? "azure").toLowerCase();
+      let model: string | null = null;
+      if (backend === "azure") model = process.env.AZURE_OPENAI_DEPLOYMENT ?? null;
+      else if (backend === "vllm") model = process.env.VLLM_MODEL ?? null;
+      return { backend, model };
+    },
+  },
+
   // ── /api/diagnostics/models ─────────────────────────────────────────
   {
     method: "GET", pattern: "/api/diagnostics/models",

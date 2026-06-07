@@ -4,7 +4,11 @@
 //   • interpretation — HOW the agent reads what it finds (default vs skeptical)
 // "Custom prompt" bypasses both axes via role_prompt (free-form override).
 // Fetches presets from GET /api/agent-roles and groups them by axis frontmatter.
-// Fetches env default model from GET /api/agent-roles/default-model.
+//
+// Model is NOT per-agent here: the deepagents sidecar resolves a single model
+// from env (DEEPAGENTS_LLM_BACKEND → Azure deployment / vLLM model) and ignores
+// any per-agent override. So we show the real resolved model once, read-only,
+// fetched from GET /api/deepagents/model — rather than offering inert choices.
 import { useEffect, useMemo, useState } from "react";
 import { authFetch } from "../../auth";
 
@@ -13,7 +17,6 @@ export interface AgentSpecForm {
   search_mode_preset?: string;
   interpretation_preset?: string;
   role_prompt?: string;
-  model?: string;
 }
 
 type Axis = "search_mode" | "interpretation";
@@ -28,15 +31,6 @@ interface AgentConfigPanelProps {
   value: AgentSpecForm[];
   onChange: (v: AgentSpecForm[]) => void;
 }
-
-const QUICK_PICK_MODELS = [
-  "anthropic/claude-haiku-4.5",
-  "anthropic/claude-sonnet-4-6",
-  "gpt-5.2",
-  "gpt-4o",
-  "deepseek/deepseek-v4-pro",
-  "deepseek/deepseek-v4-flash",
-] as const;
 
 const AXIS_LABEL: Record<Axis, string> = {
   search_mode: "Search mode",
@@ -55,7 +49,7 @@ const AXIS_DEFAULT: Record<Axis, string> = {
 
 export function AgentConfigPanel({ value, onChange }: AgentConfigPanelProps) {
   const [presets, setPresets] = useState<RolePreset[]>([]);
-  const [defaultModel, setDefaultModel] = useState<string | null>(null);
+  const [runtimeModel, setRuntimeModel] = useState<{ backend: string; model: string | null } | null>(null);
 
   useEffect(() => {
     authFetch("/api/agent-roles")
@@ -65,10 +59,16 @@ export function AgentConfigPanel({ value, onChange }: AgentConfigPanelProps) {
   }, []);
 
   useEffect(() => {
-    authFetch("/api/agent-roles/default-model")
-      .then((r) => (r.ok ? r.json() : { default_model: null }))
-      .then((d) => setDefaultModel(typeof d.default_model === "string" ? d.default_model : null))
-      .catch(() => setDefaultModel(null));
+    authFetch("/api/deepagents/model")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) =>
+        setRuntimeModel(
+          d && typeof d.backend === "string"
+            ? { backend: d.backend, model: typeof d.model === "string" ? d.model : null }
+            : null,
+        ),
+      )
+      .catch(() => setRuntimeModel(null));
   }, []);
 
   const presetsByAxis = useMemo(() => {
@@ -123,10 +123,6 @@ export function AgentConfigPanel({ value, onChange }: AgentConfigPanelProps) {
     ]);
   }
 
-  const modelPlaceholder = defaultModel
-    ? `(env default: ${defaultModel})`
-    : "(env default)";
-
   return (
     <div className="space-y-3">
       <div>
@@ -143,6 +139,22 @@ export function AgentConfigPanel({ value, onChange }: AgentConfigPanelProps) {
           <span className="font-mono">search_mode</span> ×{" "}
           <span className="font-mono">interpretation</span>.
         </p>
+        {/* Model is deployment-wide, not per-agent: the sidecar reads it from
+            env and ignores any per-agent value. Show the real one, read-only. */}
+        <div className="mt-2 flex items-center gap-1.5 text-[11px]">
+          <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+            Model
+          </span>
+          {runtimeModel ? (
+            <span className="rounded border border-border bg-muted/40 px-1.5 py-0.5 font-mono text-[11px] text-ink">
+              {runtimeModel.backend}
+              {runtimeModel.model ? ` · ${runtimeModel.model}` : ""}
+            </span>
+          ) : (
+            <span className="font-mono text-muted-foreground/70">loading…</span>
+          )}
+          <span className="text-muted-foreground/70">— set in <span className="font-mono">.env</span>, applies to all agents</span>
+        </div>
       </div>
 
       <div className="space-y-2">
@@ -218,43 +230,6 @@ export function AgentConfigPanel({ value, onChange }: AgentConfigPanelProps) {
                   })}
                 </div>
               )}
-
-              <div className="flex flex-col gap-1.5">
-                <input
-                  type="text"
-                  value={spec.model ?? ""}
-                  onChange={(e) => updateSpec(i, { model: e.target.value || undefined })}
-                  placeholder={modelPlaceholder}
-                  className="w-full rounded-md border border-border px-2 py-1 text-[12px] font-mono bg-background placeholder:text-muted-foreground/60"
-                  aria-label={`Model override for ${spec.id}`}
-                />
-                <div className="flex flex-wrap gap-1">
-                  {QUICK_PICK_MODELS.map((m) => (
-                    <button
-                      key={m}
-                      type="button"
-                      onClick={() => updateSpec(i, { model: m })}
-                      className={[
-                        "rounded border px-1.5 py-0.5 text-[10px] font-mono transition-colors",
-                        spec.model === m
-                          ? "border-foreground/40 bg-foreground/10 text-foreground"
-                          : "border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground",
-                      ].join(" ")}
-                    >
-                      {m.split("/").pop()}
-                    </button>
-                  ))}
-                  {spec.model && (
-                    <button
-                      type="button"
-                      onClick={() => updateSpec(i, { model: undefined })}
-                      className="rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground hover:text-destructive transition-colors"
-                    >
-                      clear
-                    </button>
-                  )}
-                </div>
-              </div>
             </div>
           );
         })}

@@ -73,6 +73,7 @@ export function PhaseTry({
   // Agent runtime — derived from /api/runtime when task_kind needs an
   // agent loop (phenotype/adherence). NER skips this — direct LLM.
   const [agentProvider, setAgentProvider] = useState<string | null>(null);
+  const [runtimeModel, setRuntimeModel] = useState<{ backend: string; model: string | null } | null>(null);
   useEffect(() => {
     if (taskKind === "ner") { setAgentProvider(null); return; }
     let cancelled = false;
@@ -83,13 +84,23 @@ export function PhaseTry({
         setAgentProvider(d.agent_provider ?? null);
       })
       .catch(() => { /* swallow */ });
+    authFetch("/api/deepagents/model")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { backend?: string; model?: string | null } | null) => {
+        if (cancelled || !d || typeof d.backend !== "string") return;
+        setRuntimeModel({ backend: d.backend, model: typeof d.model === "string" ? d.model : null });
+      })
+      .catch(() => { /* swallow */ });
     return () => { cancelled = true; };
   }, [taskKind]);
 
+  const modelSuffix = runtimeModel
+    ? ` · ${runtimeModel.backend}${runtimeModel.model ? ` · ${runtimeModel.model}` : ""}`
+    : "";
   const runtimeLabel = agentProvider === "deepagents"
-    ? "deepagents (Python sidecar · tool-using agent loop)"
+    ? `deepagents (Python sidecar · tool-using agent loop)${modelSuffix}`
     : agentProvider
-      ? `agent runtime: ${agentProvider}`
+      ? `agent runtime: ${agentProvider}${modelSuffix}`
       : "agent runtime: (loading…)";
   const [patients, setPatients] = useState<Patient[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
@@ -412,7 +423,6 @@ export function PhaseTry({
               const parts = [
                 s.search_mode_preset,
                 s.interpretation_preset,
-                s.model || "(server default model)",
               ].filter(Boolean);
               return (
                 <div key={s.id} className="truncate">

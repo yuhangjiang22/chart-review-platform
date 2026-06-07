@@ -41,7 +41,7 @@ function specsToApi(specs: AgentSpecForm[]): Array<Record<string, unknown>> {
     if (s.search_mode_preset) out.search_mode_preset = s.search_mode_preset;
     if (s.interpretation_preset) out.interpretation_preset = s.interpretation_preset;
     if (s.role_prompt) out.role_prompt = s.role_prompt;
-    if (s.model) out.model = s.model;
+    // No per-agent model: the deepagents sidecar resolves one model from env.
     return out;
   });
 }
