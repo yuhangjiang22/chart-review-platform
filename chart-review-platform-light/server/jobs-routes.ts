@@ -29,6 +29,8 @@ import { computeTaskDiff } from "./lib/task-diff.js";
 import {
   getRunManifest,
 } from "./lib/infra/batch-run/index.js";
+import { sessionIdForRun } from "./lib/session-reviews.js";
+import { pathFor } from "@chart-review/storage";
 
 // Path resolution — uses the canonical PLATFORM_ROOT from
 // @chart-review/patients (v2's directory), not this file's old default
@@ -175,7 +177,7 @@ export const jobsRoutes: RouteEntry[] = [
       const agentDrafts: { id: string; path: string }[] = [];
       if (fs.existsSync(agentsDir)) {
         for (const f of fs.readdirSync(agentsDir).sort()) {
-          if (f.endsWith(".json")) {
+          if (f.endsWith(".json") && !f.endsWith(".error.json") && !f.endsWith("_transcript.jsonl")) {
             agentDrafts.push({ id: f.replace(/\.json$/, ""), path: path.join(agentsDir, f) });
           }
         }
@@ -188,7 +190,11 @@ export const jobsRoutes: RouteEntry[] = [
       }
 
       const taskId = manifest.task_id;
-      const reviewStatePath = path.join(reviewsRoot(), p.patientId, taskId, "review_state.json");
+      const sid = sessionIdForRun(taskId, p.runId);
+      if (!sid) {
+        throw httpErr(409, `run ${p.runId} has no owning session; cannot import`);
+      }
+      const reviewStatePath = pathFor.reviewState(sid, p.patientId, taskId);
       if (fs.existsSync(reviewStatePath) && !force) {
         const err = httpErr(409, "review_state already exists for this patient×task; pass force:true to overwrite");
         (err as Error & { payload?: unknown }).payload = { ok: false };
