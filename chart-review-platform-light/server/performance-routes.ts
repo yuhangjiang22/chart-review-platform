@@ -88,7 +88,9 @@ export function computePerformance(
       if (!fs.existsSync(agentsDir)) continue;
 
       for (const file of fs.readdirSync(agentsDir)) {
-        if (!file.endsWith(".json") || file.endsWith("_transcript.jsonl")) continue;
+        // Skip transcripts and B1 failure markers (<agent>.error.json) — a
+        // failed agent produced no draft and must not appear in the leaderboard.
+        if (!file.endsWith(".json") || file.endsWith(".error.json") || file.endsWith("_transcript.jsonl")) continue;
         const agentId = file.replace(/\.json$/, "");
         const draft = readJson<{ field_assessments?: FieldAssessment[] }>(path.join(agentsDir, file));
         if (!draft) continue;
