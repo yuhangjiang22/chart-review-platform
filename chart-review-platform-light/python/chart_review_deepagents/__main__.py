@@ -2,7 +2,7 @@
 # Usage: python -m chart_review_deepagents <runspec.json>
 #
 # Run spec shape (written by DeepAgentsProvider):
-#   { "prompt": str, "system_prompt": str, "max_turns": int,
+#   { "prompt": str, "system_prompt": str, "max_turns": int, "model": str|None,
 #     "mcp": { "command": str, "args": [str], "env": {str:str}, "type": "stdio" } }
 #
 # Emits AgentEvent JSONL on stdout (one event per line). All diagnostics
@@ -45,7 +45,7 @@ async def run(spec: dict) -> None:
     async with client.session("chart_review_state") as session:
         tools = await load_mcp_tools(session)
         agent = create_deep_agent(
-            model=make_model(),
+            model=make_model(spec.get("model")),
             tools=tools,
             system_prompt=spec.get("system_prompt", ""),
         )

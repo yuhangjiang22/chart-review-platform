@@ -1,34 +1,33 @@
 # chart_review_deepagents/models.py
-import os
-import sys
+from . import registry
 
 
-def make_model():
-    """Build a LangChain chat model from env. Backend selected by
-    DEEPAGENTS_LLM_BACKEND = azure | vllm. Returns a BaseChatModel
-    that create_deep_agent accepts directly."""
-    backend = os.environ.get("DEEPAGENTS_LLM_BACKEND", "azure").lower()
-    if backend == "azure":
+def make_model(model_key=None):
+    """Build a LangChain chat model for a registry key. When model_key is None,
+    use the registry's default entry. The registry resolves the key to a
+    backend + connection (Azure or vLLM); see registry.py for the contract."""
+    if model_key is None:
+        _, model_key = registry.list_models()
+        if model_key is None:
+            raise ValueError(
+                "no model available — set AZURE_OPENAI_* in .env, or start a "
+                "vLLM server and add it to python/models.json")
+    conn = registry.resolve(model_key)
+    if conn["backend"] == "azure":
         from langchain_openai import AzureChatOpenAI
 
         return AzureChatOpenAI(
-            azure_endpoint=os.environ["AZURE_OPENAI_ENDPOINT"],
-            api_key=os.environ["AZURE_OPENAI_API_KEY"],
-            api_version=os.environ.get("AZURE_OPENAI_API_VERSION", "2024-10-21"),
-            azure_deployment=os.environ["AZURE_OPENAI_DEPLOYMENT"],
+            azure_endpoint=conn["azure_endpoint"],
+            api_key=conn["api_key"],
+            api_version=conn["api_version"],
+            azure_deployment=conn["azure_deployment"],
             temperature=0,
         )
-    if backend == "vllm":
-        from langchain_openai import ChatOpenAI
+    from langchain_openai import ChatOpenAI
 
-        return ChatOpenAI(
-            base_url=os.environ["VLLM_BASE_URL"],
-            api_key=os.environ.get("VLLM_API_KEY", "EMPTY"),
-            model=os.environ["VLLM_MODEL"],
-            temperature=0,
-        )
-    print(
-        f"[deepagents] Unknown DEEPAGENTS_LLM_BACKEND={backend!r} (expected azure|vllm)",
-        file=sys.stderr,
+    return ChatOpenAI(
+        base_url=conn["base_url"],
+        api_key=conn["api_key"],
+        model=conn["model"],
+        temperature=0,
     )
-    raise SystemExit(2)
