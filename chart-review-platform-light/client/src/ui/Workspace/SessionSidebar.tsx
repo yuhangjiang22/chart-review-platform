@@ -232,7 +232,6 @@ export function SessionSidebar({
                         isActive ? "text-ink font-medium" : "text-ink",
                       )}>
                         Run {runNumberOf.get(it.iter_id)}
-                        <span className="ml-1 text-[9px] text-muted-foreground/70">{it.iter_id}</span>
                         {isActive && <span className="ml-1 text-[9px] text-[hsl(var(--sage))] uppercase tracking-[0.1em]">· active</span>}
                       </span>
                       <span
