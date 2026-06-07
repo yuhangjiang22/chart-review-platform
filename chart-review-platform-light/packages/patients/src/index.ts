@@ -26,7 +26,11 @@ function findPlatformRoot(): string {
 export const PLATFORM_ROOT = findPlatformRoot();
 export const CORPUS_ROOT =
   process.env.CHART_REVIEW_CORPUS_ROOT ?? path.join(PLATFORM_ROOT, "corpus");
-export const PATIENTS_ROOT = path.join(CORPUS_ROOT, "patients");
+// CHART_REVIEW_PATIENTS_ROOT lets a caller (e.g. the deploy runner) point note
+// reading straight at a cohort dir laid out as <patient_id>/notes/*.txt, without
+// the corpus/patients nesting. Unset → the default corpus location.
+export const PATIENTS_ROOT =
+  process.env.CHART_REVIEW_PATIENTS_ROOT ?? path.join(CORPUS_ROOT, "patients");
 
 const FILENAME_DATE_RE = /^(\d{4}-\d{2}-\d{2})__([a-z0-9_]+)\.txt$/i;
 
