@@ -38,6 +38,14 @@ describe("listModels", () => {
     expect(def).toBe("llama");
     expect(JSON.stringify(models)).not.toContain("secret");
     expect(models.find((m) => m.id === "llama")!.label).toBe("vllm · meta/Llama");
+    expect(models.find((m) => m.id === "llama")!.available).toBe(true);
+  });
+
+  it("synthesizes vllm default when no file and backend is vllm", () => {
+    const env = { DEEPAGENTS_LLM_BACKEND: "vllm", VLLM_BASE_URL: "http://h:8000/v1", VLLM_MODEL: "meta/Llama" } as NodeJS.ProcessEnv;
+    const { models, default: def } = listModels({ env, modelsPath: path.join(dir, "absent.json") });
+    expect(def).toBe("meta/Llama");
+    expect(models).toEqual([{ id: "meta/Llama", backend: "vllm", label: "vllm · meta/Llama", available: true }]);
   });
 
   it("falls through to synthesis on malformed json", () => {

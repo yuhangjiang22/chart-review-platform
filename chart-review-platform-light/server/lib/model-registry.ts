@@ -6,8 +6,8 @@
 // compute availability, but never returns their values.
 import fs from "node:fs";
 import path from "node:path";
+import { PLATFORM_ROOT } from "@chart-review/patients";
 
-const PLATFORM_ROOT = process.env.CHART_REVIEW_PLATFORM_ROOT ?? process.cwd();
 const DEFAULT_MODELS_PATH = path.join(PLATFORM_ROOT, "python", "models.json");
 
 interface AzureEntry {
@@ -35,8 +35,18 @@ function synthesize(env: NodeJS.ProcessEnv): Registry {
 
 function loadRegistry(env: NodeJS.ProcessEnv, modelsPath: string): Registry {
   try {
-    if (fs.existsSync(modelsPath)) return JSON.parse(fs.readFileSync(modelsPath, "utf8")) as Registry;
-  } catch { /* malformed → fall through to synthesis */ }
+    if (fs.existsSync(modelsPath)) {
+      const parsed = JSON.parse(fs.readFileSync(modelsPath, "utf8"));
+      if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+        throw new Error("models.json root must be a JSON object");
+      }
+      return parsed as Registry;
+    }
+  } catch (err) {
+    console.warn(
+      `[model-registry] could not load ${modelsPath} (${(err as Error).message}) — falling back to env synthesis`,
+    );
+  }
   return synthesize(env);
 }
 
