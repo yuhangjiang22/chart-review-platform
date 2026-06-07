@@ -29,8 +29,15 @@ export const CORPUS_ROOT =
 // CHART_REVIEW_PATIENTS_ROOT lets a caller (e.g. the deploy runner) point note
 // reading straight at a cohort dir laid out as <patient_id>/notes/*.txt, without
 // the corpus/patients nesting. Unset → the default corpus location.
-export const PATIENTS_ROOT =
-  process.env.CHART_REVIEW_PATIENTS_ROOT ?? path.join(CORPUS_ROOT, "patients");
+//
+// patientsRoot() reads the env at CALL time — the deploy runner sets the
+// override at runtime, after this module is already imported, so a frozen const
+// would miss it. PATIENTS_ROOT remains as an import-time snapshot for the
+// server-side consumers (cohorts, deploy-folder) that never set the override.
+export function patientsRoot(): string {
+  return process.env.CHART_REVIEW_PATIENTS_ROOT ?? path.join(CORPUS_ROOT, "patients");
+}
+export const PATIENTS_ROOT = patientsRoot();
 
 const FILENAME_DATE_RE = /^(\d{4}-\d{2}-\d{2})__([a-z0-9_]+)\.txt$/i;
 
@@ -77,7 +84,7 @@ function readIndex(): IndexEntry[] {
 }
 
 function readMeta(patientId: string): CorpusMeta | null {
-  const metaPath = path.join(PATIENTS_ROOT, patientId, "meta.json");
+  const metaPath = path.join(patientsRoot(), patientId, "meta.json");
   if (!fs.existsSync(metaPath)) return null;
   try {
     return JSON.parse(fs.readFileSync(metaPath, "utf-8"));
@@ -87,8 +94,9 @@ function readMeta(patientId: string): CorpusMeta | null {
 }
 
 export function patientDir(patientId: string): string {
-  const candidate = path.resolve(PATIENTS_ROOT, patientId);
-  if (!candidate.startsWith(PATIENTS_ROOT + path.sep)) {
+  const root = patientsRoot();
+  const candidate = path.resolve(root, patientId);
+  if (!candidate.startsWith(root + path.sep)) {
     throw new Error(`invalid patient_id: ${patientId}`);
   }
   if (!fs.existsSync(candidate)) {
@@ -111,8 +119,8 @@ export function listPatients(): PatientSummary[] {
   // who just dropped a private import find it without scrolling past 20+
   // synthetic test patients; index.json order is preserved for the rest.
   const indexIds = index.map((e) => e.patient_id);
-  const scanned = fs.existsSync(PATIENTS_ROOT)
-    ? fs.readdirSync(PATIENTS_ROOT)
+  const scanned = fs.existsSync(patientsRoot())
+    ? fs.readdirSync(patientsRoot())
         .filter((d) => d.startsWith("patient_"))
         .sort()
     : [];
