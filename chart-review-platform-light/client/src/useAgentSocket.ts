@@ -15,10 +15,17 @@ export interface AgentSocketState {
 /**
  * Subscribe to a single patient's chat session over WebSocket.
  * Re-subscribing on patientId change clears local state.
+ *
+ * @param sessionId - Active workspace session id. When provided, the
+ *   initial review-state fetch appends `?session_id=<sid>` so the server
+ *   reads from the session-scoped review root. Pass null when there is no
+ *   active session (the fetch is still attempted; the server will 400, and
+ *   the null state is treated as "not yet loaded").
  */
 export function useAgentSocket(
   patientId: string | null,
   taskId: string | null,
+  sessionId?: string | null,
 ): AgentSocketState {
   const [connected, setConnected] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -34,10 +41,11 @@ export function useAgentSocket(
       setReviewState(null);
       return;
     }
-    authFetch(`/api/reviews/${patientId}/${taskId}`)
+    const qs = sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : "";
+    authFetch(`/api/reviews/${patientId}/${taskId}${qs}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((s) => setReviewState(s));
-  }, [patientId, taskId]);
+  }, [patientId, taskId, sessionId]);
 
   useEffect(() => {
     if (!patientId) return;

@@ -81,6 +81,13 @@ export interface PatientReviewProps {
   /** Navigate back to the patient list (the VALIDATE-phase workspace).
    *  When omitted, the back button is hidden. */
   onBack?: () => void;
+  /** Active workspace session id. Appended as ?session_id=<sid> on all
+   *  review-state reads and writes so they hit the session-scoped root.
+   *  When absent (e.g. legacy patient route without a session), calls are
+   *  made without session_id and the server may return 400 — the caller
+   *  is responsible for ensuring a session is active before opening a
+   *  patient review. */
+  activeSessionId?: string | null;
 }
 
 export function PatientReview(p: PatientReviewProps) {
@@ -527,7 +534,8 @@ export function PatientReview(p: PatientReviewProps) {
                           matched?.rationale ??
                           judgeRec.analysis?.reasoning ??
                           "Applied judge suggestion";
-                        const res = await authFetch(`/api/reviews/${p.patientId}/${p.taskId}/actions`, {
+                        const actionsQs = p.activeSessionId ? `?session_id=${encodeURIComponent(p.activeSessionId)}` : "";
+                        const res = await authFetch(`/api/reviews/${p.patientId}/${p.taskId}/actions${actionsQs}`, {
                           method: "POST",
                           headers: { "Content-Type": "application/json" },
                           body: JSON.stringify({
@@ -555,7 +563,8 @@ export function PatientReview(p: PatientReviewProps) {
                     isLocked={isLocked}
                     derivedView={derivedView}
                     onSubmit={async ({ field_id, answer, evidence, rationale, comment }) => {
-                      const res = await authFetch(`/api/reviews/${p.patientId}/${p.taskId}/actions`, {
+                      const submitQs = p.activeSessionId ? `?session_id=${encodeURIComponent(p.activeSessionId)}` : "";
+                      const res = await authFetch(`/api/reviews/${p.patientId}/${p.taskId}/actions${submitQs}`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
@@ -672,6 +681,7 @@ export function PatientReview(p: PatientReviewProps) {
         isLocked={isLocked}
         reviewState={p.reviewState}
         iterId={iterId}
+        activeSessionId={p.activeSessionId}
         onStateChanged={p.onStateChanged}
       />
     </div>
@@ -1233,6 +1243,7 @@ function ReviewFooter({
   isLocked,
   reviewState,
   iterId,
+  activeSessionId,
   onStateChanged,
 }: {
   patientId: string;
@@ -1243,14 +1254,16 @@ function ReviewFooter({
   isLocked: boolean;
   reviewState: ReviewState | null;
   iterId: string | null;
+  activeSessionId?: string | null;
   onStateChanged: (state: ReviewState) => void;
 }) {
   const [busy, setBusy] = useState(false);
+  const sessionQs = activeSessionId ? `?session_id=${encodeURIComponent(activeSessionId)}` : "";
 
   async function validate() {
     setBusy(true);
     try {
-      const r = await authFetch(`/api/reviews/${patientId}/${taskId}/validate`, {
+      const r = await authFetch(`/api/reviews/${patientId}/${taskId}/validate${sessionQs}`, {
         method: "POST",
       });
       const body = await r.json();
@@ -1265,7 +1278,7 @@ function ReviewFooter({
   async function unvalidate() {
     setBusy(true);
     try {
-      const r = await authFetch(`/api/reviews/${patientId}/${taskId}/uiactions`, {
+      const r = await authFetch(`/api/reviews/${patientId}/${taskId}/uiactions${sessionQs}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

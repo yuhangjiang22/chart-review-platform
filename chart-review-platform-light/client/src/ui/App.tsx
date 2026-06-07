@@ -87,12 +87,26 @@ export function App() {
     [tasks, route.taskId],
   );
 
+  // Active session id for the current task — mirrors the same localStorage
+  // key that Workspace writes (chart-review:active-session:<taskId>) so that
+  // patient-review calls use the session-scoped review root without needing
+  // a prop passed through the full Workspace→App→PatientReview chain.
+  const activeSessionId = useMemo<string | null>(() => {
+    if (!task?.task_id) return null;
+    try {
+      return localStorage.getItem(`chart-review:active-session:${task.task_id}`);
+    } catch {
+      return null;
+    }
+  }, [task?.task_id]);
+
   // Subscribe a single agent socket to whichever patient×task is active.
   // Mirrors how the legacy App lifts useAgentSocket. Until the user picks
   // a patient, patientId is null and the hook stays idle.
   const sock = useAgentSocket(
     authReady && activePatient ? activePatient.patient_id : null,
     task?.task_id ?? null,
+    activeSessionId,
   );
 
   useEffect(() => {
@@ -216,8 +230,9 @@ export function App() {
         );
         if (cancelled) return;
         if (!importRes.ok) continue;
+        const sessionQs = activeSessionId ? `?session_id=${encodeURIComponent(activeSessionId)}` : "";
         const refreshed = await authFetch(
-          `/api/reviews/${encodeURIComponent(patientId)}/${encodeURIComponent(taskId)}`,
+          `/api/reviews/${encodeURIComponent(patientId)}/${encodeURIComponent(taskId)}${sessionQs}`,
         );
         if (refreshed.ok && !cancelled) {
           sock.refreshReviewState(await refreshed.json());
@@ -228,7 +243,7 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [authReady, activePatient, task?.task_id, sock]);
+  }, [authReady, activePatient, task?.task_id, sock, activeSessionId]);
 
   const reviewer = readAuth().reviewer_id ?? (authInfo?.mode === "optional" ? "anonymous" : null);
 
@@ -355,6 +370,7 @@ export function App() {
             noteFocus={noteFocus}
             onJumpToSource={setNoteFocus}
             criterionId={route.criterionId ?? null}
+            activeSessionId={activeSessionId}
             onCriterionChange={(id, opts) =>
               navigate(
                 patientHash(task.task_id, route.patientId!, id ?? undefined),
@@ -409,6 +425,7 @@ export function App() {
         <AuditPage
           taskId={task.task_id}
           onOpenPatient={(pid) => navigate(patientHash(task.task_id, pid))}
+          sessionId={activeSessionId}
         />
       )}
       {route.page === "help" && <HelpPage />}

@@ -25,9 +25,14 @@ interface LockedRow {
 export interface AuditPageProps {
   taskId: string;
   onOpenPatient: (patientId: string) => void;
+  /** Active workspace session id. When provided, review-state reads for
+   *  locked records append ?session_id=<sid> so the server resolves the
+   *  session-scoped path. Omit when no session is active (e.g. the audit
+   *  page is opened before a session is selected). */
+  sessionId?: string | null;
 }
 
-export function AuditPage({ taskId, onOpenPatient }: AuditPageProps) {
+export function AuditPage({ taskId, onOpenPatient, sessionId }: AuditPageProps) {
   const [patients, setPatients] = useState<PatientSummary[]>([]);
   const [filter, setFilter] = useState("");
   // Per-patient lock detail (locked_at / locked_by / sha) is on the
@@ -36,10 +41,11 @@ export function AuditPage({ taskId, onOpenPatient }: AuditPageProps) {
   const [locks, setLocks] = useState<Record<string, LockedRow>>({});
 
   useEffect(() => {
-    authFetch(`/api/patients?task_id=${encodeURIComponent(taskId)}`)
+    const sessionQs = sessionId ? `&session_id=${encodeURIComponent(sessionId)}` : "";
+    authFetch(`/api/patients?task_id=${encodeURIComponent(taskId)}${sessionQs}`)
       .then((r) => r.json())
       .then((list: PatientSummary[]) => setPatients(list));
-  }, [taskId]);
+  }, [taskId, sessionId]);
 
   const lockedIds = useMemo(
     () => patients.filter((p) => p.review_status === "locked").map((p) => p.patient_id),
@@ -51,10 +57,11 @@ export function AuditPage({ taskId, onOpenPatient }: AuditPageProps) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      const reviewQs = sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : "";
       for (const pid of lockedIds) {
         if (locks[pid]) continue;
         try {
-          const rs = await authFetch(`/api/reviews/${pid}/${taskId}`).then((r) => r.json());
+          const rs = await authFetch(`/api/reviews/${pid}/${taskId}${reviewQs}`).then((r) => r.json());
           if (cancelled) return;
           const display = patients.find((p) => p.patient_id === pid)?.display_name;
           setLocks((prev) => ({
@@ -76,7 +83,7 @@ export function AuditPage({ taskId, onOpenPatient }: AuditPageProps) {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lockedIds.join("|"), taskId]);
+  }, [lockedIds.join("|"), taskId, sessionId]);
 
   const rows = useMemo(() => {
     const list = lockedIds
