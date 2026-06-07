@@ -16,7 +16,6 @@ import path from "node:path";
 import type { RouteEntry } from "./router.js";
 import { PLATFORM_ROOT } from "@chart-review/patients";
 import { loadCompiledTask } from "@chart-review/tasks";
-import { listPilotIterations } from "./lib/domain/iter/index.js";
 
 interface FieldAssessment {
   field_id: string;
@@ -48,14 +47,11 @@ function readJson<T>(p: string): T | null {
 }
 
 export function computePerformance(
+  sessionId: string,
   taskId: string,
   primaryCriterionIds: string[],
-  // When set, only score patients whose validated review_state was imported
-  // from a run that belongs to THIS session — so a fresh session (no runs)
-  // shows nothing instead of leaking another session's results.
-  sessionRunIds: Set<string> | null,
 ) {
-  const reviewsDir = path.join(PLATFORM_ROOT, "var", "reviews");
+  const sessionDir = path.join(PLATFORM_ROOT, "var", "reviews", sessionId);
   const runsDir = path.join(PLATFORM_ROOT, "var", "runs");
   const agentCounts: AgentCounts = {};
   const agentIds = new Set<string>();
@@ -66,15 +62,11 @@ export function computePerformance(
     return (agentCounts[agentId][fid] ??= { n_evaluable: 0, n_correct: 0 });
   };
 
-  if (fs.existsSync(reviewsDir)) {
-    for (const pid of fs.readdirSync(reviewsDir)) {
+  if (fs.existsSync(sessionDir)) {
+    for (const pid of fs.readdirSync(sessionDir)) {
       if (pid.startsWith(".")) continue;
-      const state = readJson<ReviewState>(path.join(reviewsDir, pid, taskId, "review_state.json"));
+      const state = readJson<ReviewState>(path.join(sessionDir, pid, taskId, "review_state.json"));
       if (!state) continue;
-      // Only finalized records count. Re-running a session resets review_status
-      // to in_progress, so this means a patient is scored only after you Mark
-      // validated WITHIN the current session — performance is empty until then,
-      // and a prior session's validation doesn't leak into a fresh run.
       if (state.review_status !== "reviewer_validated") continue;
 
       // Human's final answer for each human-decided primary field.
@@ -87,11 +79,10 @@ export function computePerformance(
       const decidedFields = Object.keys(humanFinal);
       if (decidedFields.length === 0) continue;
 
+      // imported_from_run is still needed to locate the run's agent drafts
+      // for per-agent scoring (var/runs/<run>/per_patient/<pid>/agents/).
       const run = state.imported_from_run;
       if (!run) continue;
-      // Session scope: only count this patient if its validated draft came
-      // from one of the session's runs.
-      if (sessionRunIds && !sessionRunIds.has(run)) continue;
       validatedPatients.add(pid);
       const agentsDir = path.join(runsDir, run, "per_patient", pid, "agents");
       if (!fs.existsSync(agentsDir)) continue;
@@ -152,20 +143,13 @@ export const performanceRoutes: RouteEntry[] = [
       const primaryCriterionIds = task.fields.map(
         (f) => (f as { field_id?: string; id?: string }).field_id ?? (f as { id: string }).id,
       );
-      // Scope to a session when ?session_id= is given: the session's runs are
-      // its non-abandoned iters. Empty set (a session with no runs) → no
-      // results, instead of leaking another session's scores.
       const sessionId = query.get("session_id");
-      let sessionRunIds: Set<string> | null = null;
-      if (sessionId) {
-        sessionRunIds = new Set(
-          listPilotIterations(p.taskId)
-            .filter((i) => i.session_id === sessionId && i.state !== "abandoned")
-            .map((i) => i.run_id)
-            .filter(Boolean),
-        );
+      if (!sessionId) {
+        const err = new Error("session_id is required") as Error & { status: number };
+        err.status = 400;
+        throw err;
       }
-      return computePerformance(p.taskId, primaryCriterionIds, sessionRunIds);
+      return computePerformance(sessionId, p.taskId, primaryCriterionIds);
     },
   },
 ];

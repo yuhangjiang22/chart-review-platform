@@ -17,7 +17,7 @@ import path from "node:path";
 import type { RouteEntry } from "./router.js";
 import { PLATFORM_ROOT } from "@chart-review/patients";
 import { loadCompiledTask } from "@chart-review/tasks";
-import { listPilotIterations, getSessionManifest } from "./lib/domain/iter/index.js";
+import { getSessionManifest } from "./lib/domain/iter/index.js";
 import { computePerformance } from "./performance-routes.js";
 
 const RUN_PROMPT_SUMMARY =
@@ -59,17 +59,10 @@ export const exportRoutes: RouteEntry[] = [
       }));
       const primaryCriterionIds = fields.map((f) => f.field_id);
 
-      // Performance, scoped to this session's runs.
-      let sessionRunIds: Set<string> | null = null;
-      if (sessionId) {
-        sessionRunIds = new Set(
-          listPilotIterations(p.taskId)
-            .filter((i) => i.session_id === sessionId && i.state !== "abandoned")
-            .map((i) => i.run_id)
-            .filter(Boolean),
-        );
-      }
-      const performance = computePerformance(p.taskId, primaryCriterionIds, sessionRunIds);
+      // Performance, scoped to this session's review directory.
+      const performance = sessionId
+        ? computePerformance(sessionId, p.taskId, primaryCriterionIds)
+        : { task_id: p.taskId, n_patients: 0, field_ids: primaryCriterionIds, agents: [] };
 
       // Gold answers: validated review_states for the session's cohort.
       const cohort: string[] = (session?.cohort as { patient_ids?: string[] } | undefined)?.patient_ids ?? [];
