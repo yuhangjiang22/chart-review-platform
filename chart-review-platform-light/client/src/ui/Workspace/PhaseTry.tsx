@@ -455,7 +455,7 @@ export function PhaseTry({
 
 // ── Run status (active or completed) ─────────────────────────────────────────
 
-function RunStatusCard({
+export function RunStatusCard({
   iter,
   patientIds,
   onStop,
@@ -474,10 +474,17 @@ function RunStatusCard({
   error: string | null;
 }) {
   const isRunning = iter.state === "running";
-  const isReady = iter.state === "ready_to_validate" || iter.state === "complete";
+  const isFailed = iter.run_status === "failed";
+  const isPartial = iter.run_status === "complete_with_errors";
+  const isReady = !isFailed && (iter.state === "ready_to_validate" || iter.state === "complete");
   const total = iter.n_patients ?? patientIds.length;
   const done = iter.n_complete ?? 0;
+  const failedCount = total - done;
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+
+  // Badge label and variant change based on run outcome.
+  const badgeVariant = isFailed ? "destructive" : isReady ? "validated" : "primary";
+  const badgeLabel = isFailed ? "failed" : isReady ? "ready · validate" : "running";
 
   return (
     <div className="space-y-5">
@@ -486,8 +493,8 @@ function RunStatusCard({
           <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
             Current run
           </span>
-          <Badge variant={isReady ? "validated" : "primary"} className="!text-[10px]">
-            {isReady ? "ready · validate" : "running"}
+          <Badge variant={badgeVariant as any} className="!text-[10px]">
+            {badgeLabel}
           </Badge>
           {iter.provider && (
             <span
@@ -502,37 +509,53 @@ function RunStatusCard({
         </div>
       </header>
 
-      <div className="rounded-md border border-border bg-card p-5 space-y-3">
-        <div className="flex items-baseline justify-between">
-          <span className="font-display text-[15.5px]">
-            {done} / {total} patients drafted
-          </span>
-          <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
-            {pct}%
-          </span>
+      {/* Failed banner — replaces the normal progress card when every agent errored. */}
+      {isFailed ? (
+        <div className="rounded-md border border-destructive/40 bg-destructive/5 px-4 py-3 text-[12.5px] text-destructive">
+          Run failed — all agents errored. See the agent log below.
         </div>
-        <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-          <div
-            className={cn(
-              "h-full transition-all",
-              isReady ? "bg-[hsl(var(--sage))]" : "bg-[hsl(var(--oxblood))]",
-            )}
-            style={{ width: `${pct}%` }}
-          />
+      ) : (
+        <div className="rounded-md border border-border bg-card p-5 space-y-3">
+          <div className="flex items-baseline justify-between">
+            <span className="font-display text-[15.5px]">
+              {done} / {total} patients drafted
+            </span>
+            <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
+              {pct}%
+            </span>
+          </div>
+          {/* Partial-error note: shows drafted/failed breakdown inline. */}
+          {isPartial && (
+            <div className="text-[11.5px] text-muted-foreground">
+              <span className="text-foreground font-medium">{done} drafted</span>
+              {" · "}
+              <span className="text-[hsl(var(--oxblood))] font-medium">{failedCount} failed</span>
+              {" — you can still validate the drafted patients below."}
+            </div>
+          )}
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+            <div
+              className={cn(
+                "h-full transition-all",
+                isReady ? "bg-[hsl(var(--sage))]" : "bg-[hsl(var(--oxblood))]",
+              )}
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+          {patientIds.length > 0 && (
+            <details className="text-[11.5px]">
+              <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                Patient ids ({patientIds.length})
+              </summary>
+              <ul className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-[11px] text-foreground">
+                {patientIds.map((pid) => (
+                  <li key={pid}>{pid}</li>
+                ))}
+              </ul>
+            </details>
+          )}
         </div>
-        {patientIds.length > 0 && (
-          <details className="text-[11.5px]">
-            <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
-              Patient ids ({patientIds.length})
-            </summary>
-            <ul className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-[11px] text-foreground">
-              {patientIds.map((pid) => (
-                <li key={pid}>{pid}</li>
-              ))}
-            </ul>
-          </details>
-        )}
-      </div>
+      )}
 
       {iter.run_id && patientIds.length > 0 && (
         <AgentLogPanel
@@ -567,6 +590,7 @@ function RunStatusCard({
           <RotateCcw size={12} strokeWidth={1.75} />
           {isRunning ? "Override with new config" : "Re-run with new config"}
         </Button>
+        {/* Validate run: shown for complete and complete_with_errors, but NOT for failed. */}
         {isReady && onValidate && (
           <Button size="sm" className="gap-1.5" onClick={onValidate}>
             Validate run
