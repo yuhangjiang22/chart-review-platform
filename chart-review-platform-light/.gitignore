@@ -45,3 +45,7 @@ corpus/patients/patient_private_*/
 # Runtime artifacts written under skill bundles (session manifests, pilot iters)
 .agents/skills/*/sessions/
 .agents/skills/*/pilots/
+
+# Per-deployment model registry (copy from python/models.example.json).
+# Holds per-machine model entries (e.g. vLLM URLs); the template is committed.
+/python/models.json

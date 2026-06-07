@@ -1,0 +1,15 @@
+{
+  "gpt-4o": {
+    "backend": "azure",
+    "deployment": "gpt-4o",
+    "endpoint_env": "AZURE_OPENAI_ENDPOINT",
+    "api_key_env": "AZURE_OPENAI_API_KEY",
+    "api_version_env": "AZURE_OPENAI_API_VERSION",
+    "default": true
+  },
+  "llama-3.3-70b": {
+    "backend": "vllm",
+    "base_url": "http://localhost:8000/v1",
+    "model": "meta-llama/Llama-3.3-70B-Instruct"
+  }
+}
