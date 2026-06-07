@@ -41,10 +41,6 @@ function platformRoot(): string {
   return process.env.CHART_REVIEW_PLATFORM_ROOT
     ?? path.resolve(process.cwd(), "..", "chart-review-platform");
 }
-function reviewsRoot(): string {
-  return process.env.CHART_REVIEW_REVIEWS_ROOT ?? path.join(platformRoot(), "var", "reviews");
-}
-
 function httpErr(status: number, message: string): Error & { status: number } {
   const err = new Error(message) as Error & { status: number };
   err.status = status;
