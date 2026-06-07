@@ -32,6 +32,22 @@ function isOmopEvidence(ev: Evidence): ev is OmopEvidence {
   return ev.source === "omop" || ev.source === "structured";
 }
 
+// Agents cite the same note inconsistently — note_id with or without the `.txt`
+// extension, and doc_type set or omitted. Normalize at render so every card for
+// the same note looks identical regardless of which model phrased it.
+function cleanNoteId(noteId: string): string {
+  return noteId.replace(/\.txt$/i, "");
+}
+
+/** Consistent document-type label: use the agent's doc_type when set, else
+ *  derive it from the note id (`2024-12-19__oncology_progress` → "oncology
+ *  progress"). */
+function docTypeLabel(ev: NoteEvidence): string {
+  if (ev.doc_type) return ev.doc_type;
+  const m = /__(.+?)(?:\.txt)?$/i.exec(ev.note_id);
+  return m ? m[1].replace(/_/g, " ") : "Note";
+}
+
 interface NoteCardProps {
   ev: NoteEvidence;
   idx: number;
@@ -56,7 +72,7 @@ function NoteEvidenceCard({ ev, idx, onJump, onRemove, onAdd, citerLabel }: Note
           {idx + 1}
         </span>
         <span className="text-foreground font-medium truncate">
-          {ev.doc_type ?? "Note"}
+          {docTypeLabel(ev)}
         </span>
         {ev.evidence_date && (
           <>
@@ -102,7 +118,7 @@ function NoteEvidenceCard({ ev, idx, onJump, onRemove, onAdd, citerLabel }: Note
           &ldquo;{ev.verbatim_quote}&rdquo;
         </blockquote>
         <div className="mt-1 text-[10.5px] text-muted-foreground/70 font-mono">
-          offsets [{ev.span_offsets[0]}–{ev.span_offsets[1]}] · {ev.note_id}
+          offsets [{ev.span_offsets[0]}–{ev.span_offsets[1]}] · {cleanNoteId(ev.note_id)}
         </div>
       </button>
     </div>
