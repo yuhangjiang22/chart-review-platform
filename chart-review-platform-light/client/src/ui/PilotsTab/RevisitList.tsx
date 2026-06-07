@@ -24,6 +24,9 @@ interface RevisitsResponse {
 export interface RevisitListProps {
   taskId: string;
   iterId: string;
+  /** Workspace session this iter belongs to. Required so "accept agent answer"
+   *  writes into the session-scoped review state (server enforces session_id). */
+  sessionId?: string | null;
   /** Open the per-field revisit pane for a single (patient, criterion). */
   onReannotate?: (patientId: string, fieldId: string) => void;
 }
@@ -45,7 +48,7 @@ function fmt(v: unknown): string {
 }
 
 export function RevisitList(props: RevisitListProps) {
-  const { taskId, iterId, onReannotate } = props;
+  const { taskId, iterId, sessionId, onReannotate } = props;
   const [data, setData] = useState<RevisitsResponse | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -94,7 +97,8 @@ export function RevisitList(props: RevisitListProps) {
         });
       } else {
         // accept_agent: write the agent's rerun answer as a new reviewer assessment.
-        await authFetch(`/api/reviews/${row.patient_id}/${taskId}/actions`, {
+        const qs = sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : "";
+        await authFetch(`/api/reviews/${row.patient_id}/${taskId}/actions${qs}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

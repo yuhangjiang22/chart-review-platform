@@ -143,6 +143,7 @@ export function IterDetail({
           <RevisitList
             taskId={taskId}
             iterId={p.iter_id}
+            sessionId={p.session_id}
             onReannotate={(patientId, fieldId) => {
               // Hand off to the patient-review surface scoped to this field.
               window.location.hash = patientHash(taskId, patientId, fieldId);
