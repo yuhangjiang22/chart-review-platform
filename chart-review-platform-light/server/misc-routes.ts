@@ -23,6 +23,7 @@ import { listAvailablePresets } from "./lib/agent-specs.js";
 import {
   modelFor, describeAllModels,
 } from "./lib/model-config.js";
+import { listModels } from "./lib/model-registry.js";
 
 function httpErr(status: number, message: string): Error & { status: number } {
   const err = new Error(message) as Error & { status: number };
@@ -89,23 +90,16 @@ export const miscRoutes: RouteEntry[] = [
     handler: async () => ({ default_model: modelFor("default") ?? null }),
   },
 
-  // ── /api/deepagents/model ───────────────────────────────────────────
+  // ── /api/deepagents/models ──────────────────────────────────────────
   //
-  // The TRUE model every agent runs on. Unlike the v2 per-agent model
-  // override, the deepagents sidecar ignores any per-agent model and
-  // resolves a single model from env (see python/.../models.py). This
-  // route mirrors that exact env logic so the UI can show the real model
-  // instead of offering inert choices. Returns the deployment/model name,
-  // never any secret.
+  // The models every agent can run on, with availability. The deepagents
+  // sidecar resolves a per-agent model key through the same registry
+  // (python/chart_review_deepagents/registry.py); this route is the
+  // presence-only reader for the UI picker — it returns labels +
+  // availability + the default key, never any secret value.
   {
-    method: "GET", pattern: "/api/deepagents/model",
-    handler: async () => {
-      const backend = (process.env.DEEPAGENTS_LLM_BACKEND ?? "azure").toLowerCase();
-      let model: string | null = null;
-      if (backend === "azure") model = process.env.AZURE_OPENAI_DEPLOYMENT ?? null;
-      else if (backend === "vllm") model = process.env.VLLM_MODEL ?? null;
-      return { backend, model };
-    },
+    method: "GET", pattern: "/api/deepagents/models",
+    handler: async () => listModels(),
   },
 
   // ── /api/diagnostics/models ─────────────────────────────────────────
