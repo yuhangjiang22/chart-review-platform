@@ -79,16 +79,16 @@ function NoteEvidenceCard({ ev, idx, onJump, onRemove, onAdd, citerLabel }: Note
         <span className="inline-flex items-center justify-center w-5 h-5 rounded font-mono font-semibold text-[10.5px] bg-[hsl(var(--ochre)/0.10)] text-[hsl(var(--ochre))] border border-[hsl(var(--ochre)/0.25)]">
           {idx + 1}
         </span>
-        <span className="text-foreground font-medium truncate">
+        <span className="text-foreground font-medium truncate min-w-0">
           {docTypeLabel(ev)}
         </span>
         {evidenceDate(ev) && (
           <>
-            <span className="text-muted-foreground/70">·</span>
-            <span className="text-muted-foreground">{evidenceDate(ev)}</span>
+            <span className="text-muted-foreground/70 shrink-0">·</span>
+            <span className="text-muted-foreground shrink-0 whitespace-nowrap">{evidenceDate(ev)}</span>
           </>
         )}
-        <Pill tone={citerPillTone(label)} className="ml-auto">
+        <Pill tone={citerPillTone(label)} className="ml-auto shrink-0 whitespace-nowrap">
           {label === "you" ? null : <Icon name="sparkles" size={9} />}
           {label}
         </Pill>
