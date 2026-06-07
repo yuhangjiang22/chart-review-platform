@@ -5,10 +5,9 @@
 // "Custom prompt" bypasses both axes via role_prompt (free-form override).
 // Fetches presets from GET /api/agent-roles and groups them by axis frontmatter.
 //
-// Model is NOT per-agent here: the deepagents sidecar resolves a single model
-// from env (DEEPAGENTS_LLM_BACKEND → Azure deployment / vLLM model) and ignores
-// any per-agent override. So we show the real resolved model once, read-only,
-// fetched from GET /api/deepagents/model — rather than offering inert choices.
+// Model is per-agent: available models are fetched from GET /api/deepagents/models
+// and rendered as a dropdown on each agent card. The sidecar resolves whichever
+// model key the agent selects (undefined → registry default).
 import { useEffect, useMemo, useState } from "react";
 import { authFetch } from "../../auth";
 
@@ -17,6 +16,9 @@ export interface AgentSpecForm {
   search_mode_preset?: string;
   interpretation_preset?: string;
   role_prompt?: string;
+  /** Registry key from /api/deepagents/models. Undefined → the registry
+   *  default (the sidecar resolves it). */
+  model?: string;
 }
 
 type Axis = "search_mode" | "interpretation";
@@ -49,7 +51,11 @@ const AXIS_DEFAULT: Record<Axis, string> = {
 
 export function AgentConfigPanel({ value, onChange }: AgentConfigPanelProps) {
   const [presets, setPresets] = useState<RolePreset[]>([]);
-  const [runtimeModel, setRuntimeModel] = useState<{ backend: string; model: string | null } | null>(null);
+
+  interface ModelInfo { id: string; backend: string; label: string; available: boolean; }
+  const [models, setModels] = useState<ModelInfo[]>([]);
+  const [defaultModelId, setDefaultModelId] = useState<string | null>(null);
+  const [modelsLoaded, setModelsLoaded] = useState(false);
 
   useEffect(() => {
     authFetch("/api/agent-roles")
@@ -59,17 +65,18 @@ export function AgentConfigPanel({ value, onChange }: AgentConfigPanelProps) {
   }, []);
 
   useEffect(() => {
-    authFetch("/api/deepagents/model")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) =>
-        setRuntimeModel(
-          d && typeof d.backend === "string"
-            ? { backend: d.backend, model: typeof d.model === "string" ? d.model : null }
-            : null,
-        ),
-      )
-      .catch(() => setRuntimeModel(null));
+    authFetch("/api/deepagents/models")
+      .then((r) => (r.ok ? r.json() : { models: [], default: null }))
+      .then((d) => {
+        setModels(Array.isArray(d.models) ? d.models : []);
+        setDefaultModelId(typeof d.default === "string" ? d.default : null);
+      })
+      .catch(() => { setModels([]); setDefaultModelId(null); })
+      .finally(() => setModelsLoaded(true));
   }, []);
+
+  const availableModels = useMemo(() => models.filter((m) => m.available), [models]);
+  const noModels = modelsLoaded && availableModels.length === 0;
 
   const presetsByAxis = useMemo(() => {
     const out: Record<Axis, RolePreset[]> = { search_mode: [], interpretation: [] };
@@ -139,22 +146,13 @@ export function AgentConfigPanel({ value, onChange }: AgentConfigPanelProps) {
           <span className="font-mono">search_mode</span> ×{" "}
           <span className="font-mono">interpretation</span>.
         </p>
-        {/* Model is deployment-wide, not per-agent: the sidecar reads it from
-            env and ignores any per-agent value. Show the real one, read-only. */}
-        <div className="mt-2 flex items-center gap-1.5 text-[11px]">
-          <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-            Model
-          </span>
-          {runtimeModel ? (
-            <span className="rounded border border-border bg-muted/40 px-1.5 py-0.5 font-mono text-[11px] text-ink">
-              {runtimeModel.backend}
-              {runtimeModel.model ? ` · ${runtimeModel.model}` : ""}
-            </span>
-          ) : (
-            <span className="font-mono text-muted-foreground/70">loading…</span>
-          )}
-          <span className="text-muted-foreground/70">— set in <span className="font-mono">.env</span>, applies to all agents</span>
-        </div>
+        {noModels && (
+          <div className="mt-2 rounded-md border border-destructive/30 bg-destructive/5 px-2.5 py-1.5 text-[11.5px] text-destructive">
+            No model configured — set <span className="font-mono">AZURE_OPENAI_*</span> in
+            {" "}<span className="font-mono">.env</span>, or start a vLLM server and add it to
+            {" "}<span className="font-mono">python/models.json</span>.
+          </div>
+        )}
       </div>
 
       <div className="space-y-2">
@@ -230,6 +228,26 @@ export function AgentConfigPanel({ value, onChange }: AgentConfigPanelProps) {
                   })}
                 </div>
               )}
+
+              <label className="flex flex-col gap-1">
+                <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                  Model
+                  <span className="ml-1 normal-case tracking-normal text-muted-foreground/70">
+                    — which model this agent runs on
+                  </span>
+                </span>
+                <select
+                  value={spec.model ?? defaultModelId ?? ""}
+                  onChange={(e) => updateSpec(i, { model: e.target.value || undefined })}
+                  disabled={availableModels.length === 0}
+                  className="rounded-md border border-border px-2 py-1 text-[12px] font-mono bg-background"
+                >
+                  {availableModels.length === 0 && <option value="">(no models available)</option>}
+                  {availableModels.map((m) => (
+                    <option key={m.id} value={m.id}>{m.label}</option>
+                  ))}
+                </select>
+              </label>
             </div>
           );
         })}
