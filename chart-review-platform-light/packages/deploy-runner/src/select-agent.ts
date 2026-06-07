@@ -11,6 +11,8 @@ function toSpec(e: AgentConfigEntry): AgentSpec {
     id: e.id,
     ...(e.search_mode_preset ? { search_mode_preset: e.search_mode_preset } : {}),
     ...(e.interpretation_preset ? { interpretation_preset: e.interpretation_preset } : {}),
+    ...(e.role_preset ? { role_preset: e.role_preset } : {}),
+    ...(e.role_version ? { role_version: e.role_version } : {}),
     ...(e.role_prompt ? { role_prompt: e.role_prompt } : {}),
   };
 }

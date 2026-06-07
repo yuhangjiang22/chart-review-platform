@@ -1,3 +1,4 @@
+// packages/deploy-runner/src/load-package.ts
 import fs from "node:fs";
 import path from "node:path";
 
@@ -5,6 +6,11 @@ export interface AgentConfigEntry {
   id: string;
   search_mode_preset?: string;
   interpretation_preset?: string;
+  /** Legacy single-preset slot + its version — preserved so a package whose
+   *  agents used role_preset (not the two-axis style) still deploys with the
+   *  same role framing. */
+  role_preset?: string;
+  role_version?: string;
   role_prompt?: string;
   model?: string;
 }

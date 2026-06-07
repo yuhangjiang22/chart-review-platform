@@ -16,7 +16,7 @@ export interface CollectResult { n_ok: number; n_failed: number; failed_patient_
 
 function csvCell(v: unknown): string {
   const s = v == null ? "" : String(v);
-  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
 export function collectResults(args: CollectArgs): CollectResult {
@@ -44,14 +44,16 @@ export function collectResults(args: CollectArgs): CollectResult {
     ok.push(pid);
   }
 
+  ok.sort();
+  failed.sort();
   fs.writeFileSync(path.join(outDir, "results.csv"), csvRows.join("\n") + "\n");
   fs.writeFileSync(
     path.join(outDir, "run_manifest.json"),
     JSON.stringify({
       ...meta, agent_id: agentId, run_id: runId,
       n_patients: ok.length + failed.length, n_ok: ok.length, n_failed: failed.length,
-      ok_patient_ids: ok.sort(), failed_patient_ids: failed.sort(),
+      ok_patient_ids: ok, failed_patient_ids: failed,
     }, null, 2) + "\n",
   );
-  return { n_ok: ok.length, n_failed: failed.length, failed_patient_ids: failed.sort() };
+  return { n_ok: ok.length, n_failed: failed.length, failed_patient_ids: failed };
 }

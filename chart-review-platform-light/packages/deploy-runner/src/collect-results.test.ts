@@ -9,8 +9,10 @@ let root: string, out: string;
 beforeEach(() => {
   root = fs.mkdtempSync(path.join(os.tmpdir(), "runs-"));
   out = fs.mkdtempSync(path.join(os.tmpdir(), "out-"));
+  process.env.CHART_REVIEW_RUNS_ROOT = path.join(root, "var", "runs");
 });
 afterEach(() => {
+  delete process.env.CHART_REVIEW_RUNS_ROOT;
   fs.rmSync(root, { recursive: true, force: true });
   fs.rmSync(out, { recursive: true, force: true });
 });
@@ -24,7 +26,6 @@ function draft(runId: string, pid: string, agentId: string, fas: unknown[]) {
 
 describe("collectResults", () => {
   it("writes per-patient json + csv + manifest; ok vs failed from status", () => {
-    process.env.CHART_REVIEW_RUNS_ROOT = path.join(root, "var", "runs");
     const runId = "RUN1";
     draft(runId, "p_ok", "agent_1", [
       { field_id: "cancer_type", answer: "adenocarcinoma", confidence: "high", evidence: [] },
@@ -40,7 +41,6 @@ describe("collectResults", () => {
       outDir: out, meta: { package_dir: "/pkg", task_id: "t1", agent_reason: "x",
         model: "gpt-4o", env_model: "gpt-4o", model_mismatch_warning: null, data_dir: "/dd" },
     });
-    delete process.env.CHART_REVIEW_RUNS_ROOT;
 
     expect(r.n_ok).toBe(1);
     expect(r.n_failed).toBe(1);
@@ -58,5 +58,19 @@ describe("collectResults", () => {
     expect(man.n_ok).toBe(1);
     expect(man.failed_patient_ids).toEqual(["p_fail"]);
     expect(man.agent_id).toBe("agent_1");
+  });
+
+  it("treats a 'complete' patient with no draft file on disk as failed", () => {
+    const status = {
+      state: "complete", per_patient: { p_x: { state: "complete" } }, n_complete: 1, n_error: 0,
+    } as any;
+    const r = collectResults({
+      runId: "RUN2", status, agentId: "agent_1", fieldIds: ["cancer_type"],
+      outDir: out, meta: { package_dir: "/pkg", task_id: "t1", agent_reason: "x",
+        model: null, env_model: null, model_mismatch_warning: null, data_dir: "/dd" },
+    });
+    expect(r.n_ok).toBe(0);
+    expect(r.failed_patient_ids).toEqual(["p_x"]);
+    expect(fs.existsSync(path.join(out, "p_x.json"))).toBe(false);
   });
 });

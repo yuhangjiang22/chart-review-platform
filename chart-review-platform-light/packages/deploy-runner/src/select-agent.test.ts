@@ -34,6 +34,12 @@ describe("selectAgent", () => {
     expect(r.spec.id).toBe("agent_1");
   });
 
+  it("ignores null accuracy and picks the agent with a numeric score", () => {
+    const r = selectAgent(cfg, { agents: [
+      { agent_id: "agent_1", avg_accuracy: null }, { agent_id: "agent_2", avg_accuracy: 0.6 }] });
+    expect(r.spec.id).toBe("agent_2");
+  });
+
   it("throws when the override id is not in the package", () => {
     expect(() => selectAgent(cfg, { agents: [] }, "agent_9")).toThrow(/agent_9/);
   });
