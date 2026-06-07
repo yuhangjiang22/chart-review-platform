@@ -54,6 +54,7 @@ import {
 import {
   computeRevisitsForIter, bulkKeepRevisits,
 } from "./lib/derived-adjudications/revisits.js";
+import { sessionReviewsRoot } from "./lib/session-reviews.js";
 
 /** Throw a methodologist-only 403 (or 401 in required-auth mode) when
  *  the caller can't run this endpoint. Inline because the parameterized
@@ -188,11 +189,10 @@ export const pilotReadRoutes: RouteEntry[] = [
         throw err;
       }
       const critique = getPilotCritique(taskId, iterId);
-      const platformRoot =
-        process.env.CHART_REVIEW_PLATFORM_ROOT
-        ?? path.resolve(process.cwd(), "..", "chart-review-platform");
-      const reviewsRootDir =
-        process.env.CHART_REVIEW_REVIEWS_ROOT ?? path.join(platformRoot, "var", "reviews");
+      // Validation status is per session: read from var/reviews/<sessionId>/.
+      // Iters created before session isolation have no session_id → no review
+      // state to find (var/reviews is wiped to the session-scoped layout).
+      const reviewsRootDir = m.session_id ? sessionReviewsRoot(m.session_id) : null;
       const runManifest = getRunManifest(m.run_id);
       const runStatus = getRunStatus(m.run_id);
       const patientIds: string[] =
@@ -204,10 +204,12 @@ export const pilotReadRoutes: RouteEntry[] = [
         const agentDone = perPatient?.state === "complete";
         const errored = perPatient?.state === "error";
         const errorMessage = errored ? (perPatient?.error ?? null) : null;
-        const reviewPath = path.join(reviewsRootDir, pid, taskId, "review_state.json");
+        const reviewPath = reviewsRootDir
+          ? path.join(reviewsRootDir, pid, taskId, "review_state.json")
+          : null;
         let validated = false;
         let reviewerTouched = false;
-        if (fs.existsSync(reviewPath)) {
+        if (reviewPath && fs.existsSync(reviewPath)) {
           try {
             const state = JSON.parse(fs.readFileSync(reviewPath, "utf8")) as {
               review_status?: string;

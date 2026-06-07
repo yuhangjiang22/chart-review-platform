@@ -176,7 +176,7 @@ export function agentTranscriptPath(runId: string, patientId: string, agentId: s
 export function hasAnyAgentDraft(runId: string, patientId: string): boolean {
   const dir = path.join(perPatientDir(runId, patientId), "agents");
   if (!fs.existsSync(dir)) return false;
-  return fs.readdirSync(dir).some((f) => f.endsWith(".json"));
+  return fs.readdirSync(dir).some((f) => f.endsWith(".json") && !f.endsWith(".error.json"));
 }
 
 // ── read helpers ─────────────────────────────────────────────────────────────
@@ -244,7 +244,7 @@ export function readDraft(runId: string, patientId: string): unknown | null {
   if (!fs.existsSync(agentsDir)) return null;
   const agentFiles = fs
     .readdirSync(agentsDir)
-    .filter((f) => f.endsWith(".json"))
+    .filter((f) => f.endsWith(".json") && !f.endsWith(".error.json"))
     .sort();
   if (agentFiles.length === 0) return null;
   try {
