@@ -27,24 +27,37 @@ interface RunSpec {
   prompt: string;
   system_prompt: string;
   max_turns: number;
+  /** Registry key for the model this agent runs on. Resolved by the Python
+   *  sidecar via registry.resolve(); undefined → the registry default. */
+  model?: string;
   mcp: unknown; // the chart_review_state stdio config {type,command,args,env}
 }
 
 const KNOWN_EVENT_TYPES = new Set(["tool_use", "tool_result", "text", "result", "error"]);
 
+/** Build the JSON run spec handed to the Python sidecar. Exported so the
+ *  prompt → spec mapping (including the per-agent model) is unit-testable
+ *  without spawning a subprocess. Returns null when no MCP config is present. */
+export function buildRunSpec(input: AgentRunInput): RunSpec | null {
+  const mcp = (input.mcpServers as Record<string, unknown> | undefined)?.chart_review_state;
+  if (!mcp) return null;
+  const spec: RunSpec = {
+    prompt: input.prompt,
+    system_prompt: input.extraSystemPrompt ?? "",
+    max_turns: input.maxTurns ?? 60,
+    mcp,
+  };
+  if (input.model) spec.model = input.model;
+  return spec;
+}
+
 export class DeepAgentsProvider implements AgentProvider {
   async *run(input: AgentRunInput): AsyncIterable<AgentEvent> {
-    const mcp = (input.mcpServers as Record<string, unknown> | undefined)?.chart_review_state;
-    if (!mcp) {
+    const spec = buildRunSpec(input);
+    if (!spec) {
       yield { type: "error", error: "deepagents provider: no chart_review_state MCP config in mcpServers" };
       return;
     }
-    const spec: RunSpec = {
-      prompt: input.prompt,
-      system_prompt: input.extraSystemPrompt ?? "",
-      max_turns: input.maxTurns ?? 60,
-      mcp,
-    };
     const specPath = path.join(os.tmpdir(), `deepagents-runspec-${process.pid}-${Date.now()}.json`);
     fs.writeFileSync(specPath, JSON.stringify(spec), "utf8");
 
