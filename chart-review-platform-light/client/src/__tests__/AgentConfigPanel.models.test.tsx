@@ -21,9 +21,9 @@ vi.mock("../auth", () => ({
 
 const specs = [{ id: "agent_1", search_mode_preset: "smart-search", interpretation_preset: "default" }];
 
-describe("AgentConfigPanel model picker", () => {
-  beforeEach(() => vi.clearAllMocks());
+beforeEach(() => vi.clearAllMocks());
 
+describe("AgentConfigPanel model picker", () => {
   it("renders a model dropdown with the registry options", async () => {
     render(<AgentConfigPanel value={specs} onChange={() => {}} />);
     await waitFor(() => expect(screen.getByText("vllm · meta/Llama")).toBeInTheDocument());

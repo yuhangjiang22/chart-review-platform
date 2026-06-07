@@ -29,6 +29,13 @@ interface RolePreset {
   axis: Axis | null;
 }
 
+interface ModelInfo {
+  id: string;
+  backend: string;
+  label: string;
+  available: boolean;
+}
+
 interface AgentConfigPanelProps {
   value: AgentSpecForm[];
   onChange: (v: AgentSpecForm[]) => void;
@@ -52,7 +59,6 @@ const AXIS_DEFAULT: Record<Axis, string> = {
 export function AgentConfigPanel({ value, onChange }: AgentConfigPanelProps) {
   const [presets, setPresets] = useState<RolePreset[]>([]);
 
-  interface ModelInfo { id: string; backend: string; label: string; available: boolean; }
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [defaultModelId, setDefaultModelId] = useState<string | null>(null);
   const [modelsLoaded, setModelsLoaded] = useState(false);
