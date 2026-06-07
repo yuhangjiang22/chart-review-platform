@@ -91,13 +91,22 @@ export function App() {
   // key that Workspace writes (chart-review:active-session:<taskId>) so that
   // patient-review calls use the session-scoped review root without needing
   // a prop passed through the full Workspace→App→PatientReview chain.
-  const activeSessionId = useMemo<string | null>(() => {
-    if (!task?.task_id) return null;
-    try {
-      return localStorage.getItem(`chart-review:active-session:${task.task_id}`);
-    } catch {
-      return null;
-    }
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  useEffect(() => {
+    const read = () => {
+      if (!task?.task_id) { setActiveSessionId(null); return; }
+      try {
+        setActiveSessionId(localStorage.getItem(`chart-review:active-session:${task.task_id}`));
+      } catch {
+        setActiveSessionId(null);
+      }
+    };
+    read();
+    // Re-read when Workspace switches the active session within the same task —
+    // localStorage writes don't fire a 'storage' event in the same tab, so
+    // Workspace dispatches a custom 'chart-review:session-changed' event.
+    window.addEventListener("chart-review:session-changed", read);
+    return () => window.removeEventListener("chart-review:session-changed", read);
   }, [task?.task_id]);
 
   // Subscribe a single agent socket to whichever patient×task is active.

@@ -12,6 +12,9 @@ export type IterPhase =
 export interface PilotListing {
   iter_id: string;
   iter_num: number;
+  /** Workspace session this iter belongs to. Used to scope review-state writes
+   *  (e.g. the revisit "accept agent answer" action) to the right session. */
+  session_id?: string;
   state: string;
   /** Computed server-side from manifest + run_status. Older PilotListings
    *  written before this field landed may not have it; UI falls back to

@@ -153,6 +153,13 @@ export function Workspace({
       if (sid) localStorage.setItem(sessionStorageKey, sid);
       else localStorage.removeItem(sessionStorageKey);
     } catch { /* ignore quota errors */ }
+    // App.tsx mirrors the active session from localStorage for the patient-review
+    // surface; notify it so a mid-task session switch isn't read stale.
+    try {
+      window.dispatchEvent(
+        new CustomEvent("chart-review:session-changed", { detail: { taskId, sessionId: sid } }),
+      );
+    } catch { /* no window (tests) */ }
   }
 
   // Sidebar open/closed — persisted per session (so closing on a small
