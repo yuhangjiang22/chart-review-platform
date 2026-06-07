@@ -30,8 +30,8 @@ import { modelFor } from "./lib/model-config.js";
 import { defaultProviderName } from "@chart-review/agent-provider";
 import { pathFor as storagePathFor } from "@chart-review/storage";
 
-function reviewStatePath(patientId: string, taskId: string): string {
-  return storagePathFor.reviewState(patientId, taskId);
+function reviewStatePath(sessionId: string, patientId: string, taskId: string): string {
+  return storagePathFor.reviewState(sessionId, patientId, taskId);
 }
 
 const DEFAULT_TASK_ID =
@@ -127,14 +127,16 @@ export const coreRoutes: RouteEntry[] = [
     method: "GET", pattern: "/api/patients",
     handler: async (_b, _r, _p, query) => {
       const taskId = query.get("task_id");
+      const sessionId = query.get("session_id");
       const patients = listPatients();
-      if (!taskId) return patients;
+      // Without a task_id we can't read review state — return bare list.
+      // Without a session_id there is no per-session scope to read from —
+      // also return the bare list (no flat-path fallback, no crash).
+      if (!taskId || !sessionId) return patients;
       return patients.map((pt) => {
-        // Use the canonical pathFor (resolves to v2's var/reviews/) instead
-        // of this file's ad-hoc reviewsRoot() which still points at v1's
-        // path. NER MCP writes land at the v2 path; without this fix the
-        // derived review_status for NER tasks is always absent.
-        const rsPath = reviewStatePath(pt.patient_id, taskId);
+        // Use the canonical pathFor (resolves to var/reviews/<sessionId>/)
+        // so review state is scoped to the active session.
+        const rsPath = reviewStatePath(sessionId, pt.patient_id, taskId);
         if (!fs.existsSync(rsPath)) return pt;
         try {
           const rs = JSON.parse(fs.readFileSync(rsPath, "utf8")) as {
@@ -144,9 +146,6 @@ export const coreRoutes: RouteEntry[] = [
             span_labels?: Array<{ status?: string }>;
             field_assessments?: unknown[];
           };
-          // NER validation is a manual reviewer decision (POST
-          // /validation), not derived from per-span statuses — so we
-          // just surface whatever the file says.
           return { ...pt, assigned_to: rs.assigned_to, review_status: rs.review_status };
         } catch { return pt; }
       });
