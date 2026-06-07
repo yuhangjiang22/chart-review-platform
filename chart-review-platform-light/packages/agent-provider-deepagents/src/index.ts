@@ -23,7 +23,7 @@ function resolvePythonBin(): string {
   return process.env.DEEPAGENTS_PYTHON ?? "python3";
 }
 
-interface RunSpec {
+export interface RunSpec {
   prompt: string;
   system_prompt: string;
   max_turns: number;

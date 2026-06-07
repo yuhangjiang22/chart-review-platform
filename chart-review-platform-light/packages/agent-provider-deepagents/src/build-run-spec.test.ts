@@ -10,14 +10,17 @@ const base = {
 describe("buildRunSpec", () => {
   it("includes model when input.model is set", () => {
     const spec = buildRunSpec({ ...base, model: "llama-3.3-70b" });
+    expect(spec).not.toBeNull();
     expect(spec!.model).toBe("llama-3.3-70b");
   });
   it("omits model when input.model is absent", () => {
     const spec = buildRunSpec(base);
+    expect(spec).not.toBeNull();
     expect(spec!.model).toBeUndefined();
   });
   it("carries prompt, system prompt, max_turns, mcp", () => {
     const spec = buildRunSpec({ ...base, extraSystemPrompt: "sys", maxTurns: 12 });
+    expect(spec).not.toBeNull();
     expect(spec!.prompt).toBe("hi");
     expect(spec!.system_prompt).toBe("sys");
     expect(spec!.max_turns).toBe(12);
