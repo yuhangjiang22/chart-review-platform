@@ -162,6 +162,34 @@ appear in the session cohort picker automatically.
 
 ---
 
+## Deploy on a larger cohort
+
+After validating a session and exporting its package (PERFORMANCE →
+"Export task package"), run the validated agent on a new cohort headlessly —
+no UI:
+
+```sh
+npm run deploy -- \
+  --package var/exports/<task>/<exportId> \
+  --data-dir /path/to/cohort \   # laid out as <patient_id>/notes/*.txt
+  --out /path/to/results \
+  [--agent agent_2]              # default: best agent by avg_accuracy
+```
+
+It runs a single agent (the best-performing one from the package's
+`performance.json`, or `--agent`) on every patient in `--data-dir`, reusing the
+same prompt, deepagents sidecar, and faithfulness gate as the UI. Outputs:
+
+- `<out>/<patient_id>.json` — the agent's answers + cited evidence (offsets),
+- `<out>/results.csv` — one row per patient, one column per field,
+- `<out>/run_manifest.json` — chosen agent + reason, model, and ok/failed counts.
+
+v1 runs on this platform (the task/skill must be installed) and uses the
+`.env`-configured model — it warns if that differs from the model the package
+was validated on.
+
+---
+
 ## Workflow conventions
 
 - Feature branches (`feat/...`, `fix/...`, `refactor/...`)
