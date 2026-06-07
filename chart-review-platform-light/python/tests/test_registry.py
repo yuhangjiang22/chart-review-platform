@@ -65,3 +65,28 @@ def test_resolve_unknown_key_raises(tmp_path):
     p.write_text(json.dumps({"gpt-4o": {"backend": "azure", "deployment": "gpt-4o"}}))
     with pytest.raises(ValueError, match="unknown model"):
         registry.resolve("nope", env=AZURE_ENV, models_path=p)
+
+
+def test_resolve_azure_missing_env_raises_valueerror(tmp_path):
+    import json
+    p = tmp_path / "models.json"
+    p.write_text(json.dumps({"gpt-4o": {"backend": "azure", "deployment": "gpt-4o"}}))
+    with pytest.raises(ValueError, match="AZURE_OPENAI_API_KEY"):
+        registry.resolve("gpt-4o", env={"AZURE_OPENAI_ENDPOINT": "https://x"}, models_path=p)
+
+
+def test_malformed_models_json_raises_valueerror(tmp_path):
+    p = tmp_path / "models.json"
+    p.write_text("{ not valid json ")
+    with pytest.raises(ValueError, match="malformed models.json"):
+        registry.list_models(env={}, models_path=p)
+
+
+def test_synthesizes_vllm_default_when_no_file(tmp_path):
+    models, default = registry.list_models(
+        env={"DEEPAGENTS_LLM_BACKEND": "vllm", "VLLM_BASE_URL": "http://h:8000/v1",
+             "VLLM_MODEL": "meta/Llama"},
+        models_path=tmp_path / "absent.json")
+    assert default == "meta/Llama"
+    assert models == [{"id": "meta/Llama", "backend": "vllm",
+                       "label": "vllm · meta/Llama", "available": True}]

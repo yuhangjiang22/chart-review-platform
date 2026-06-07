@@ -17,7 +17,10 @@ def _load_raw(models_path):
     path = Path(models_path) if models_path is not None else _DEFAULT_MODELS_PATH
     if path.exists():
         with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
+            try:
+                return json.load(f)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"malformed models.json at {path}: {exc}") from exc
     return None
 
 
@@ -82,9 +85,17 @@ def resolve(key, env=None, models_path=None):
     if entry is None:
         raise ValueError(f"unknown model {key!r} (not in registry)")
     if entry["backend"] == "azure":
+        ep_var = entry.get("endpoint_env", "AZURE_OPENAI_ENDPOINT")
+        key_var = entry.get("api_key_env", "AZURE_OPENAI_API_KEY")
+        endpoint = env.get(ep_var)
+        api_key = env.get(key_var)
+        missing = [v for v, val in ((ep_var, endpoint), (key_var, api_key)) if not val]
+        if missing:
+            raise ValueError(
+                f"model {key!r} requires env var(s) {', '.join(missing)} but they are not set")
         return {"backend": "azure",
-                "azure_endpoint": env[entry.get("endpoint_env", "AZURE_OPENAI_ENDPOINT")],
-                "api_key": env[entry.get("api_key_env", "AZURE_OPENAI_API_KEY")],
+                "azure_endpoint": endpoint,
+                "api_key": api_key,
                 "api_version": env.get(entry.get("api_version_env", "AZURE_OPENAI_API_VERSION"),
                                        "2024-10-21"),
                 "azure_deployment": entry["deployment"]}
