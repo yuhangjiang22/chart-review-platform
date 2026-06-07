@@ -42,9 +42,6 @@ import { PLATFORM_ROOT as V2_PLATFORM_ROOT } from "@chart-review/patients";
 function platformRoot(): string {
   return process.env.CHART_REVIEW_PLATFORM_ROOT ?? V2_PLATFORM_ROOT;
 }
-function reviewsRoot(): string {
-  return process.env.CHART_REVIEW_REVIEWS_ROOT ?? path.join(platformRoot(), "var", "reviews");
-}
 function runsRoot(): string {
   return process.env.CHART_REVIEW_RUNS_ROOT ?? path.join(platformRoot(), "var", "runs");
 }
@@ -177,7 +174,7 @@ export const jobsRoutes: RouteEntry[] = [
       const agentDrafts: { id: string; path: string }[] = [];
       if (fs.existsSync(agentsDir)) {
         for (const f of fs.readdirSync(agentsDir).sort()) {
-          if (f.endsWith(".json") && !f.endsWith(".error.json") && !f.endsWith("_transcript.jsonl")) {
+          if (f.endsWith(".json") && !f.endsWith(".error.json")) {
             agentDrafts.push({ id: f.replace(/\.json$/, ""), path: path.join(agentsDir, f) });
           }
         }
