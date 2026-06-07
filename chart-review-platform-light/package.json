@@ -18,6 +18,7 @@
     "smoke": "tsx examples/smoke.ts",
     "server": "tsx server/index.ts",
     "build:client": "vite build --config config/vite.config.ts",
+    "deploy": "tsx packages/deploy-runner/src/index.ts",
     "typecheck": "node --max-old-space-size=8192 ./node_modules/.bin/tsc --noEmit",
     "test:ui": "playwright test"
   },
