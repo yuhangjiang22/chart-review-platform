@@ -295,7 +295,7 @@ export function generateRunId(now = new Date()): string {
 // .json`. Errors per patient are isolated; the run keeps going.
 
 import { withReviewsRoot } from "@chart-review/domain-review";
-import { runAgent } from "@chart-review/agent-provider";
+import { runAgent, type AgentEvent } from "@chart-review/agent-provider";
 import { modelFor } from "@chart-review/model-config";
 import { atomicWriteJson } from "@chart-review/storage";
 import { buildMcpServersConfig } from "@chart-review/mcp-server-anthropic";
@@ -305,6 +305,24 @@ import { computeTaskSha } from "@chart-review/lock";
 import { guidelineDir, phenotypeSkillDir } from "@chart-review/rubric";
 import { patientDir } from "@chart-review/patients";
 import { resolveRolePrompt, validateAgentSpec } from "@chart-review/agent-specs";
+
+/** Fold one AgentEvent into the running tally for an agent run. Counts
+ *  set_field_assessment writes from the EVENT STREAM (not the SDK PostToolUse
+ *  hook) — the deepagents subprocess provider emits events on stdout and never
+ *  fires the JS hooks, so hook-based counting marked every successful deepagents
+ *  agent as "no writes". The event stream fires for every provider. */
+export function applyAgentEventToTally(
+  tally: { agentError: string | null; writeCount: number },
+  event: AgentEvent,
+): { agentError: string | null; writeCount: number } {
+  if (event.type === "error") {
+    return { ...tally, agentError: event.error ?? "agent error" };
+  }
+  if (event.type === "tool_use" && event.tool_name === "set_field_assessment") {
+    return { ...tally, writeCount: tally.writeCount + 1 };
+  }
+  return tally;
+}
 
 /** Decide whether an agent run succeeded. An agent that emitted an error event,
  *  or that made zero set_field_assessment writes THIS run, did not produce a
@@ -798,15 +816,9 @@ async function runOneAgent(
       patientId, task, sessionId, { onStateUpdate: () => {} },
       { reviewsRoot: scratchRoot, provider: manifest.provider },
     );
-    const countingPost = (input: any) => {
-      if (input?.hook_event_name === "PostToolUse" && input?.tool_name === "set_field_assessment") {
-        writeCount += 1;
-      }
-      return auditHooks.post(input);
-    };
     const sdkHooks: Record<string, Array<{ hooks: any[] }>> = {
       PreToolUse: [{ hooks: [auditHooks.pre] }],
-      PostToolUse: [{ hooks: [countingPost] }],
+      PostToolUse: [{ hooks: [auditHooks.post] }],
     };
     const extraSystem = "You are running unattended in batch mode. There is no human in the "
       + "loop for this patient — produce your draft and stop. Do not ask "
@@ -832,7 +844,9 @@ async function runOneAgent(
       if (event.type === "result" && typeof event.cost_usd === "number") {
         cost = (cost ?? 0) + event.cost_usd;
       }
-      if (event.type === "error") agentError = event.error ?? "agent error";
+      const t = applyAgentEventToTally({ agentError, writeCount }, event);
+      agentError = t.agentError;
+      writeCount = t.writeCount;
     }
   });
 
