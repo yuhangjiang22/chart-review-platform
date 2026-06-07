@@ -13,6 +13,7 @@ import { useEffect, useState, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { ChevronRight, ChevronLeft, FileText, ChevronDown, PanelRightClose } from "lucide-react";
 import { authFetch } from "../../auth";
+import { useDeepagentsModels } from "../../useDeepagentsModels";
 
 interface AgentSpecLite {
   id: string;
@@ -86,6 +87,11 @@ export function SessionSidebar({
       .catch(() => { /* swallow */ });
     return () => { cancelled = true; };
   }, [taskId, activeSessionId]);
+
+  // Resolve an agent's actual model: an un-pinned spec (no model) runs on the
+  // registry default, so show that real model id rather than a "(env default)"
+  // placeholder.
+  const { defaultModelId } = useDeepagentsModels();
 
   // Collapsed: thin right rail with a chevron to expand.
   if (!isOpen) {
@@ -186,7 +192,8 @@ export function SessionSidebar({
                   <div key={s.id} className="leading-[1.35]">
                     <span className="text-muted-foreground">{s.id}:</span>{" "}
                     <span className="break-words">
-                      {[s.search_mode_preset, s.interpretation_preset, s.model || "(env default)"]
+                      {[s.search_mode_preset, s.interpretation_preset,
+                        s.model || defaultModelId || "(no model configured)"]
                         .filter(Boolean).join(" · ")}
                     </span>
                   </div>

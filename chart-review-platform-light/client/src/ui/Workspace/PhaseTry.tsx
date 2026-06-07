@@ -66,7 +66,7 @@ interface PhaseTryProps {
 export function PhaseTry({
   taskId, onAdvanceToValidate, activeSessionId, onOpenNewSession, taskKind, revealRubricNonce,
 }: PhaseTryProps) {
-  const { noModels } = useDeepagentsModels();
+  const { noModels, defaultModelId } = useDeepagentsModels();
 
   // Session manifest — source of truth for cohort + agent_specs.
   // Loaded fresh whenever activeSessionId changes.
@@ -415,7 +415,7 @@ export function PhaseTry({
               const parts = [
                 s.search_mode_preset,
                 s.interpretation_preset,
-                s.model,
+                s.model || defaultModelId,
               ].filter(Boolean);
               return (
                 <div key={s.id} className="truncate">
