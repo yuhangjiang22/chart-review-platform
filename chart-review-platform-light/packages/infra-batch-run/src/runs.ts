@@ -647,6 +647,8 @@ async function runOnePatient(
     }
   }
   maybeWriteLegacyDraft(manifest, patientId);
+  // NOTE: per-patient status is hardcoded "ok" here; rolling the agents'
+  // outcomes up into failed / complete_with_errors is Task B2 (rollupPatientStatus).
   return { status: "ok", cost_usd: totalCost, field_count: totalFieldCount, confidence_summary: mergedConfidence };
 }
 
@@ -758,12 +760,11 @@ async function runOneAgent(
       patientId, task, sessionId, { onStateUpdate: () => {} },
       { reviewsRoot: scratchRoot, provider: manifest.provider },
     );
-    const countingPost = (...args: any[]) => {
-      try {
-        const toolName = (args[0]?.tool_name ?? args[0]?.toolName ?? "") as string;
-        if (toolName === "set_field_assessment") writeCount += 1;
-      } catch { /* counting is best-effort */ }
-      return (auditHooks.post as any)(...args);
+    const countingPost = (input: any) => {
+      if (input?.hook_event_name === "PostToolUse" && input?.tool_name === "set_field_assessment") {
+        writeCount += 1;
+      }
+      return auditHooks.post(input);
     };
     const sdkHooks: Record<string, Array<{ hooks: any[] }>> = {
       PreToolUse: [{ hooks: [auditHooks.pre] }],
