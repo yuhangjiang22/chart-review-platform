@@ -64,17 +64,20 @@ export const exportRoutes: RouteEntry[] = [
         ? computePerformance(sessionId, p.taskId, primaryCriterionIds)
         : { task_id: p.taskId, n_patients: 0, field_ids: primaryCriterionIds, agents: [] };
 
-      // Gold answers: validated review_states for the session's cohort.
+      // Gold answers: validated review_states for the session's cohort, read
+      // from THIS session's review directory (var/reviews/<sessionId>/...).
       const cohort: string[] = (session?.cohort as { patient_ids?: string[] } | undefined)?.patient_ids ?? [];
-      const reviewsDir = path.join(PLATFORM_ROOT, "var", "reviews");
       const gold: Record<string, unknown> = {};
-      for (const pid of cohort) {
-        const rsPath = path.join(reviewsDir, pid, p.taskId, "review_state.json");
-        if (!fs.existsSync(rsPath)) continue;
-        try {
-          const state = JSON.parse(fs.readFileSync(rsPath, "utf8")) as { review_status?: string };
-          if (state.review_status === "reviewer_validated") gold[pid] = state;
-        } catch { /* skip unreadable */ }
+      if (sessionId) {
+        const sessionReviewsDir = path.join(PLATFORM_ROOT, "var", "reviews", sessionId);
+        for (const pid of cohort) {
+          const rsPath = path.join(sessionReviewsDir, pid, p.taskId, "review_state.json");
+          if (!fs.existsSync(rsPath)) continue;
+          try {
+            const state = JSON.parse(fs.readFileSync(rsPath, "utf8")) as { review_status?: string };
+            if (state.review_status === "reviewer_validated") gold[pid] = state;
+          } catch { /* skip unreadable */ }
+        }
       }
 
       const exportedAt = new Date().toISOString();
