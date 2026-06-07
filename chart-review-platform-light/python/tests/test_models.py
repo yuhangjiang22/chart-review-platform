@@ -33,7 +33,6 @@ def test_make_model_unknown_key_raises(monkeypatch, tmp_path):
 
 
 def test_make_model_default_key_uses_synthesized_entry(monkeypatch, tmp_path):
-    import json
     from chart_review_deepagents import models as models_mod
     monkeypatch.setattr("chart_review_deepagents.registry._DEFAULT_MODELS_PATH",
                         tmp_path / "absent.json")
@@ -50,3 +49,20 @@ def test_make_model_default_key_uses_synthesized_entry(monkeypatch, tmp_path):
     monkeypatch.setattr("langchain_openai.AzureChatOpenAI", FakeAzure)
     models_mod.make_model()  # no key → default
     assert captured["azure_deployment"] == "gpt-4o"
+    assert captured["azure_endpoint"] == "https://x"
+    assert captured["api_key"] == "secret"
+    assert captured["temperature"] == 0
+
+
+def test_make_model_no_models_available_raises(monkeypatch, tmp_path):
+    from chart_review_deepagents import models as models_mod
+    # Absent file → synthesis; azure backend but NO endpoint/key → unavailable,
+    # so list_models() returns default None and make_model(None) must raise.
+    monkeypatch.setattr("chart_review_deepagents.registry._DEFAULT_MODELS_PATH",
+                        tmp_path / "absent.json")
+    monkeypatch.setenv("DEEPAGENTS_LLM_BACKEND", "azure")
+    monkeypatch.delenv("AZURE_OPENAI_ENDPOINT", raising=False)
+    monkeypatch.delenv("AZURE_OPENAI_API_KEY", raising=False)
+    monkeypatch.setenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
+    with pytest.raises(ValueError, match="no model available"):
+        models_mod.make_model()
