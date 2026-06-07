@@ -643,16 +643,23 @@ async function driveRun(
   void taskId; // currently unused but reserved for future per-task index
 }
 
-interface OnePatientOutput {
+/** One agent's result for one patient. `status:"error"` means the agent
+ *  errored or made no writes (B1) — no draft was promoted. */
+interface OneAgentOutput {
   status: "ok" | "error";
-  /** Rolled-up per-patient status derived from all agents' outcomes.
-   *  Populated by runOnePatient (B2); used by the driver to record
-   *  the right PerPatientState and derive the run's final RunState. */
-  patient_status: "complete" | "complete_with_errors" | "failed";
   cost_usd?: number;
   field_count?: number;
   confidence_summary?: ConfidenceSummary;
   error?: string;
+}
+
+/** A patient's rolled-up result across all its agents (B2). `patient_status`
+ *  drives the driver's PerPatientState + the run's final RunState. */
+interface OnePatientOutput {
+  patient_status: "complete" | "complete_with_errors" | "failed";
+  cost_usd?: number;
+  field_count?: number;
+  confidence_summary?: ConfidenceSummary;
 }
 
 async function runOnePatient(
@@ -680,15 +687,14 @@ async function runOnePatient(
   }
   maybeWriteLegacyDraft(manifest, patientId);
   const patient_status = rollupPatientStatus(agentOutcomes);
-  const status = patient_status === "complete" ? "ok" : "error";
-  return { status, patient_status, cost_usd: totalCost, field_count: totalFieldCount, confidence_summary: mergedConfidence };
+  return { patient_status, cost_usd: totalCost, field_count: totalFieldCount, confidence_summary: mergedConfidence };
 }
 
 async function runOneAgent(
   manifest: RunManifest,
   patientId: string,
   spec: AgentSpec,
-): Promise<OnePatientOutput> {
+): Promise<OneAgentOutput> {
   const { run_id: runId, task_id: taskId } = manifest;
   const task = loadCompiledTask(taskId);
   if (!task) throw new Error(`task ${taskId} not found at runtime`);
@@ -841,7 +847,7 @@ async function runOneAgent(
       fs.writeFileSync(markerPath, JSON.stringify(
         { agent_id: spec.id, status: "error", error: outcome.error }, null, 2));
     } catch { /* marker is best-effort */ }
-    return { status: "error", patient_status: "failed", error: outcome.error, cost_usd: cost };
+    return { status: "error", error: outcome.error, cost_usd: cost };
   }
 
   // Success: promote the scratch review_state written by the MCP loop.
@@ -876,7 +882,7 @@ async function runOneAgent(
     }
   } catch { /* leave unset */ }
 
-  return { status: "ok", patient_status: "complete", cost_usd: cost, field_count: fieldCount, confidence_summary: confidenceSummary };
+  return { status: "ok", cost_usd: cost, field_count: fieldCount, confidence_summary: confidenceSummary };
 }
 
 /** When a manifest has exactly one agent, also write the agent's draft to the legacy
