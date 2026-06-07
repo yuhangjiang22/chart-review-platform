@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { AgentConfigPanel, type AgentSpecForm } from "../PilotsTab/AgentConfigPanel";
 import { AgentLogPanel } from "./AgentLogPanel";
 import { RubricPanel } from "./RubricPanel";
+import { useDeepagentsModels } from "../../useDeepagentsModels";
 
 interface Patient {
   patient_id: string;
@@ -65,6 +66,8 @@ interface PhaseTryProps {
 export function PhaseTry({
   taskId, onAdvanceToValidate, activeSessionId, onOpenNewSession, taskKind, revealRubricNonce,
 }: PhaseTryProps) {
+  const { noModels } = useDeepagentsModels();
+
   // Session manifest — source of truth for cohort + agent_specs.
   // Loaded fresh whenever activeSessionId changes.
   const [sessionCohort, setSessionCohort] = useState<string[]>([]);
@@ -427,11 +430,19 @@ export function PhaseTry({
 
       {error && <div className="text-[12px] text-[hsl(var(--oxblood))]">{error}</div>}
 
+      {noModels && (
+        <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-[11.5px] text-destructive">
+          No model configured — set <span className="font-mono">AZURE_OPENAI_*</span> in
+          {" "}<span className="font-mono">.env</span>, or start a vLLM server and add it to
+          {" "}<span className="font-mono">python/models.json</span>.
+        </div>
+      )}
+
       <div className="flex justify-end">
         <Button
           size="sm"
           className="gap-1.5"
-          disabled={busy || sessionCohort.length === 0}
+          disabled={busy || sessionCohort.length === 0 || noModels}
           onClick={() => startRun()}
         >
           <Play size={12} strokeWidth={1.75} />

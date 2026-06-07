@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { authFetch } from "../../auth";
 import { cn } from "@/lib/utils";
 import { AgentConfigPanel, type AgentSpecForm } from "../PilotsTab/AgentConfigPanel";
+import { useDeepagentsModels } from "../../useDeepagentsModels";
 
 interface NewSessionDialogProps {
   open: boolean;
@@ -78,6 +79,7 @@ function packageDropdownAnnotation(pkg: PackageItem): string {
 export function NewSessionDialog({
   open, onClose, taskId, onCreated,
 }: NewSessionDialogProps) {
+  const { noModels } = useDeepagentsModels();
   const [name, setName] = useState("");
   const [notes, setNotes] = useState("");
   // Patient list loaded INDEPENDENTLY of any active session — the previous
@@ -362,7 +364,7 @@ export function NewSessionDialog({
             <Button variant="outline" size="sm" onClick={onClose} disabled={submitting}>
               Cancel
             </Button>
-            <Button size="sm" className="gap-1.5" onClick={submit} disabled={submitting}>
+            <Button size="sm" className="gap-1.5" onClick={submit} disabled={submitting || noModels}>
               <Plus size={12} />
               {submitting ? "Creating session…" : "Create session"}
             </Button>

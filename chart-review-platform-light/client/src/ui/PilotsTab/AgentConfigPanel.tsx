@@ -10,6 +10,7 @@
 // model key the agent selects (undefined → registry default).
 import { useEffect, useMemo, useState } from "react";
 import { authFetch } from "../../auth";
+import { useDeepagentsModels } from "../../useDeepagentsModels";
 
 export interface AgentSpecForm {
   id: string;
@@ -27,13 +28,6 @@ interface RolePreset {
   preset_id: string;
   preset_version: string;
   axis: Axis | null;
-}
-
-interface ModelInfo {
-  id: string;
-  backend: string;
-  label: string;
-  available: boolean;
 }
 
 interface AgentConfigPanelProps {
@@ -59,9 +53,7 @@ const AXIS_DEFAULT: Record<Axis, string> = {
 export function AgentConfigPanel({ value, onChange }: AgentConfigPanelProps) {
   const [presets, setPresets] = useState<RolePreset[]>([]);
 
-  const [models, setModels] = useState<ModelInfo[]>([]);
-  const [defaultModelId, setDefaultModelId] = useState<string | null>(null);
-  const [modelsLoaded, setModelsLoaded] = useState(false);
+  const { availableModels, defaultModelId, noModels } = useDeepagentsModels();
 
   useEffect(() => {
     authFetch("/api/agent-roles")
@@ -69,20 +61,6 @@ export function AgentConfigPanel({ value, onChange }: AgentConfigPanelProps) {
       .then((d) => setPresets(Array.isArray(d.presets) ? d.presets : []))
       .catch(() => setPresets([]));
   }, []);
-
-  useEffect(() => {
-    authFetch("/api/deepagents/models")
-      .then((r) => (r.ok ? r.json() : { models: [], default: null }))
-      .then((d) => {
-        setModels(Array.isArray(d.models) ? d.models : []);
-        setDefaultModelId(typeof d.default === "string" ? d.default : null);
-      })
-      .catch(() => { setModels([]); setDefaultModelId(null); })
-      .finally(() => setModelsLoaded(true));
-  }, []);
-
-  const availableModels = useMemo(() => models.filter((m) => m.available), [models]);
-  const noModels = modelsLoaded && availableModels.length === 0;
 
   const presetsByAxis = useMemo(() => {
     const out: Record<Axis, RolePreset[]> = { search_mode: [], interpretation: [] };
