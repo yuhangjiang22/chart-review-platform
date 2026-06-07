@@ -473,10 +473,15 @@ export function RunStatusCard({
   busy: boolean;
   error: string | null;
 }) {
-  const isRunning = iter.state === "running";
+  // Derive readiness/running from the LIVE run status (status.json), not the
+  // persisted iter.state. The manifest state stays "running" after the run
+  // finishes (it only flips on an explicit transition), so keying off it leaves
+  // the card stuck on "running" with no validate affordance even at 100%.
   const isFailed = iter.run_status === "failed";
   const isPartial = iter.run_status === "complete_with_errors";
-  const isReady = !isFailed && (iter.state === "ready_to_validate" || iter.state === "complete");
+  const runDone = iter.run_status === "complete" || iter.run_status === "complete_with_errors";
+  const isReady = !isFailed && (runDone || iter.state === "ready_to_validate" || iter.state === "complete");
+  const isRunning = !isReady && !isFailed;
   const total = iter.n_patients ?? patientIds.length;
   const done = iter.n_complete ?? 0;
   const failedCount = total - done;
