@@ -306,6 +306,20 @@ import { guidelineDir, phenotypeSkillDir } from "@chart-review/rubric";
 import { patientDir } from "@chart-review/patients";
 import { resolveRolePrompt, validateAgentSpec } from "@chart-review/agent-specs";
 
+/** Decide whether an agent run succeeded. An agent that emitted an error event,
+ *  or that made zero set_field_assessment writes THIS run, did not produce a
+ *  draft — promoting the seeded/carried-forward scratch would be a stale-answer
+ *  bug (see the session-isolated-review-state spec). */
+export function classifyAgentOutcome(
+  o: { agentError: string | null; writeCount: number },
+): { status: "ok" } | { status: "error"; error: string } {
+  if (o.agentError) return { status: "error", error: o.agentError };
+  if (o.writeCount === 0) {
+    return { status: "error", error: "agent made no set_field_assessment writes this run" };
+  }
+  return { status: "ok" };
+}
+
 // #47 — env-driven defaults so a deployment can lock in a cost ceiling
 // without code changes. Falls back to sensible bounds for the bench.
 const envInt = (k: string, fallback: number) => {
@@ -604,9 +618,11 @@ async function driveRun(
 }
 
 interface OnePatientOutput {
+  status: "ok" | "error";
   cost_usd?: number;
   field_count?: number;
   confidence_summary?: ConfidenceSummary;
+  error?: string;
 }
 
 async function runOnePatient(
@@ -631,7 +647,7 @@ async function runOnePatient(
     }
   }
   maybeWriteLegacyDraft(manifest, patientId);
-  return { cost_usd: totalCost, field_count: totalFieldCount, confidence_summary: mergedConfidence };
+  return { status: "ok", cost_usd: totalCost, field_count: totalFieldCount, confidence_summary: mergedConfidence };
 }
 
 async function runOneAgent(
@@ -724,6 +740,8 @@ async function runOneAgent(
   const userPrompt = phenotypePrompt;
 
   let cost: number | undefined;
+  let agentError: string | null = null;
+  let writeCount = 0;
   const auditHooks = buildAuditHooks({ patientId, taskId, sessionId });
 
   await withReviewsRoot(scratchRoot, async () => {
@@ -740,9 +758,16 @@ async function runOneAgent(
       patientId, task, sessionId, { onStateUpdate: () => {} },
       { reviewsRoot: scratchRoot, provider: manifest.provider },
     );
+    const countingPost = (...args: any[]) => {
+      try {
+        const toolName = (args[0]?.tool_name ?? args[0]?.toolName ?? "") as string;
+        if (toolName === "set_field_assessment") writeCount += 1;
+      } catch { /* counting is best-effort */ }
+      return (auditHooks.post as any)(...args);
+    };
     const sdkHooks: Record<string, Array<{ hooks: any[] }>> = {
       PreToolUse: [{ hooks: [auditHooks.pre] }],
-      PostToolUse: [{ hooks: [auditHooks.post] }],
+      PostToolUse: [{ hooks: [countingPost] }],
     };
     const extraSystem = "You are running unattended in batch mode. There is no human in the "
       + "loop for this patient — produce your draft and stop. Do not ask "
@@ -768,13 +793,28 @@ async function runOneAgent(
       if (event.type === "result" && typeof event.cost_usd === "number") {
         cost = (cost ?? 0) + event.cost_usd;
       }
+      if (event.type === "error") agentError = event.error ?? "agent error";
     }
   });
 
-  // Phenotype: promote the scratch review_state written by the MCP loop.
+  // Gate the promote on the outcome: an agent that errored or made no
+  // set_field_assessment writes did not produce a draft this run.
+  // Promoting the seeded/carried-forward scratch would be a stale-answer bug.
+  const outcome = classifyAgentOutcome({ agentError, writeCount });
+  if (outcome.status === "error") {
+    // Do NOT promote: a seeded/carried scratch is not this run's output.
+    const markerPath = path.join(ppDir, "agents", `${spec.id}.error.json`);
+    try {
+      fs.writeFileSync(markerPath, JSON.stringify(
+        { agent_id: spec.id, status: "error", error: outcome.error }, null, 2));
+    } catch { /* marker is best-effort */ }
+    return { status: "error", error: outcome.error, cost_usd: cost };
+  }
+
+  // Success: promote the scratch review_state written by the MCP loop.
   const scratchReviewState = path.join(scratchRoot, patientId, taskId, "review_state.json");
   if (!fs.existsSync(scratchReviewState)) {
-    throw new Error(`agent ${spec.id} finished but did not write review_state.json — likely no MCP writes`);
+    throw new Error(`agent ${spec.id} reported writes but no review_state.json — internal error`);
   }
   fs.renameSync(scratchReviewState, agentDraftPath(runId, patientId, spec.id));
 
@@ -803,7 +843,7 @@ async function runOneAgent(
     }
   } catch { /* leave unset */ }
 
-  return { cost_usd: cost, field_count: fieldCount, confidence_summary: confidenceSummary };
+  return { status: "ok", cost_usd: cost, field_count: fieldCount, confidence_summary: confidenceSummary };
 }
 
 /** When a manifest has exactly one agent, also write the agent's draft to the legacy
