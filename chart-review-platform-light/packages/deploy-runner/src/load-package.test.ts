@@ -35,4 +35,9 @@ describe("loadPackage", () => {
     fs.writeFileSync(path.join(dir, "performance.json"), JSON.stringify({ agents: [] }));
     expect(() => loadPackage(dir)).toThrow(/task\.json/);
   });
+  it("throws a clear error when performance.json is missing", () => {
+    fs.writeFileSync(path.join(dir, "task.json"),
+      JSON.stringify({ task_id: "t1", fields: [], agent_config: [{ id: "agent_1" }] }));
+    expect(() => loadPackage(dir)).toThrow(/performance\.json/);
+  });
 });
