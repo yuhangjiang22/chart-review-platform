@@ -493,7 +493,7 @@ export function RunStatusCard({
           <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
             Current run
           </span>
-          <Badge variant={badgeVariant as any} className="!text-[10px]">
+          <Badge variant={badgeVariant} className="!text-[10px]">
             {badgeLabel}
           </Badge>
           {iter.provider && (

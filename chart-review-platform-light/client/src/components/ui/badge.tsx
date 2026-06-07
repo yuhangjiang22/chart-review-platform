@@ -19,6 +19,7 @@ const badgeVariants = cva(
         validated: "border-transparent bg-sage/15 text-sage-foreground text-[hsl(var(--sage))]",
         warning: "border-transparent bg-ochre/15 text-[hsl(var(--ochre))]",
         locked: "border-transparent bg-oxblood text-paper shadow-seal",
+        destructive: "border-transparent bg-destructive/15 text-destructive",
         // Confidence
         "conf-high": "border border-sage/30 bg-sage/10 text-[hsl(var(--sage))]",
         "conf-medium": "border border-ochre/30 bg-ochre/10 text-[hsl(var(--ochre))]",

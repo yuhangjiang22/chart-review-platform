@@ -45,9 +45,10 @@ describe("RunStatusCard — failed run", () => {
         error={null}
       />,
     );
-    // Both the badge ("failed") and the banner ("Run failed — …") should be present.
-    const failedEls = screen.getAllByText(/failed/i);
-    expect(failedEls.length).toBeGreaterThanOrEqual(1);
+    // The status badge says "failed" AND the banner explains why — assert both
+    // distinctly so deleting the banner can't pass on the badge alone.
+    expect(screen.getByText("failed")).toBeInTheDocument();
+    expect(screen.getByText(/all agents errored/i)).toBeInTheDocument();
   });
 
   it("hides the Validate run affordance when run_status is failed", () => {
