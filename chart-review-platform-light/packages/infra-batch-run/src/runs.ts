@@ -320,6 +320,17 @@ export function classifyAgentOutcome(
   return { status: "ok" };
 }
 
+/** Per-patient status from its agents' outcomes:
+ *  all agents failed → "failed"; some failed → "complete_with_errors"; all ok → "complete". */
+export function rollupPatientStatus(
+  outcomes: Array<{ status: "ok" | "error" }>,
+): "complete" | "complete_with_errors" | "failed" {
+  const ok = outcomes.filter((o) => o.status === "ok").length;
+  if (ok === 0) return "failed";
+  if (ok < outcomes.length) return "complete_with_errors";
+  return "complete";
+}
+
 // #47 — env-driven defaults so a deployment can lock in a cost ceiling
 // without code changes. Falls back to sensible bounds for the bench.
 const envInt = (k: string, fallback: number) => {
@@ -565,17 +576,27 @@ async function driveRun(
         const ms = Date.now() - t0;
 
         mutate((s) => {
+          // patient_status drives per-patient state and error counters:
+          //   "failed"               → all agents errored; state="error", only n_error++
+          //   "complete_with_errors" → some agents errored; state="complete", n_complete++ and n_error++
+          //   "complete"             → all agents ok; state="complete", only n_complete++
+          const perState: PerPatientState =
+            out.patient_status === "failed" ? "error" : "complete";
           s.per_patient[pid] = {
-            state: "complete",
+            state: perState,
             started_at: s.per_patient[pid]?.started_at,
             completed_at: new Date().toISOString(),
             duration_ms: ms,
             cost_usd: out.cost_usd,
             field_count: out.field_count,
             confidence_summary: out.confidence_summary,
+            ...(out.patient_status === "failed"
+              ? { error: "all agents failed to produce a draft" }
+              : {}),
           };
           s.n_running = Math.max(0, s.n_running - 1);
-          s.n_complete += 1;
+          if (out.patient_status !== "failed") s.n_complete += 1;
+          if (out.patient_status !== "complete") s.n_error += 1;
           s.total_cost_usd = +(s.total_cost_usd + (out.cost_usd ?? 0)).toFixed(6);
         });
 
@@ -605,11 +626,16 @@ async function driveRun(
   );
 
   // Finalize
+  // If every patient failed (n_complete === 0 and n_error > 0), the run is
+  // "failed". If some patients failed or had partial errors, "complete_with_errors".
+  // Otherwise "complete".
   const finalState: RunState = aborted
     ? "aborted_cost_cap"
-    : status.n_error > 0
-      ? "complete_with_errors"
-      : "complete";
+    : status.n_complete === 0 && status.n_error > 0
+      ? "failed"
+      : status.n_error > 0
+        ? "complete_with_errors"
+        : "complete";
   mutate((s) => {
     s.state = finalState;
     s.completed_at = new Date().toISOString();
@@ -619,6 +645,10 @@ async function driveRun(
 
 interface OnePatientOutput {
   status: "ok" | "error";
+  /** Rolled-up per-patient status derived from all agents' outcomes.
+   *  Populated by runOnePatient (B2); used by the driver to record
+   *  the right PerPatientState and derive the run's final RunState. */
+  patient_status: "complete" | "complete_with_errors" | "failed";
   cost_usd?: number;
   field_count?: number;
   confidence_summary?: ConfidenceSummary;
@@ -633,8 +663,10 @@ async function runOnePatient(
   let totalCost = 0;
   let totalFieldCount = 0;
   let mergedConfidence: ConfidenceSummary | undefined;
+  const agentOutcomes: Array<{ status: "ok" | "error" }> = [];
   for (const spec of specs) {
     const out = await runOneAgent(manifest, patientId, spec);
+    agentOutcomes.push({ status: out.status });
     totalCost += out.cost_usd ?? 0;
     totalFieldCount += out.field_count ?? 0;
     // Combine confidence summaries by summing buckets across agents.
@@ -647,9 +679,9 @@ async function runOnePatient(
     }
   }
   maybeWriteLegacyDraft(manifest, patientId);
-  // NOTE: per-patient status is hardcoded "ok" here; rolling the agents'
-  // outcomes up into failed / complete_with_errors is Task B2 (rollupPatientStatus).
-  return { status: "ok", cost_usd: totalCost, field_count: totalFieldCount, confidence_summary: mergedConfidence };
+  const patient_status = rollupPatientStatus(agentOutcomes);
+  const status = patient_status === "complete" ? "ok" : "error";
+  return { status, patient_status, cost_usd: totalCost, field_count: totalFieldCount, confidence_summary: mergedConfidence };
 }
 
 async function runOneAgent(
@@ -809,7 +841,7 @@ async function runOneAgent(
       fs.writeFileSync(markerPath, JSON.stringify(
         { agent_id: spec.id, status: "error", error: outcome.error }, null, 2));
     } catch { /* marker is best-effort */ }
-    return { status: "error", error: outcome.error, cost_usd: cost };
+    return { status: "error", patient_status: "failed", error: outcome.error, cost_usd: cost };
   }
 
   // Success: promote the scratch review_state written by the MCP loop.
@@ -844,7 +876,7 @@ async function runOneAgent(
     }
   } catch { /* leave unset */ }
 
-  return { status: "ok", cost_usd: cost, field_count: fieldCount, confidence_summary: confidenceSummary };
+  return { status: "ok", patient_status: "complete", cost_usd: cost, field_count: fieldCount, confidence_summary: confidenceSummary };
 }
 
 /** When a manifest has exactly one agent, also write the agent's draft to the legacy
