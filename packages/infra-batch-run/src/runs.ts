@@ -210,6 +210,50 @@ export function classifyAgentOutcome(
   return { status: "ok" };
 }
 
+/** The empty NER draft we synthesize when a NER agent legitimately finds
+ *  ZERO entities. mcp-core-ner only writes review_state.json once a span is
+ *  persisted, so an honest empty result leaves no scratch file. The field
+ *  names/shape mirror what mcp-core-ner's readOrInitState/persistState writes
+ *  for an empty state (span_labels: []). */
+export function emptyNerDraft(patientId: string, taskId: string): {
+  schema_version: string;
+  patient_id: string;
+  task_id: string;
+  task_kind: "ner";
+  review_status: "draft";
+  version: number;
+  updated_at: string;
+  updated_by: "agent";
+  span_labels: [];
+} {
+  return {
+    schema_version: "1",
+    patient_id: patientId,
+    task_id: taskId,
+    task_kind: "ner",
+    review_status: "draft",
+    version: 0,
+    updated_at: new Date().toISOString(),
+    updated_by: "agent",
+    span_labels: [],
+  };
+}
+
+/** Pure decision for the scratch→draft promote seam, given an OK outcome.
+ *  Encodes B1's contract without any fs/mocking:
+ *   - scratch present → "rename" it to the draft path;
+ *   - scratch absent + NER → "synthesize" an empty NER draft (empty-NER-is-valid);
+ *   - scratch absent + phenotype/adherence → "error" (real loud-fail; these are
+ *     only classified ok when writeCount>0, i.e. the scratch WAS written). */
+export function decidePromote(args: {
+  taskKind: TaskKind;
+  scratchExists: boolean;
+}): { kind: "rename" } | { kind: "synthesize-empty-ner" } | { kind: "error" } {
+  if (args.scratchExists) return { kind: "rename" };
+  if (args.taskKind === "ner") return { kind: "synthesize-empty-ner" };
+  return { kind: "error" };
+}
+
 /** Per-patient status from its agents' outcomes:
  *  all agents failed (or no agents) → "failed"; some failed → "complete_with_errors";
  *  all ok → "complete". */
@@ -1249,9 +1293,21 @@ async function runOneAgent(
   // resulting file here — only on a successful outcome.
   if (!isAdherenceTask) {
     const scratchReviewState = path.join(scratchRoot, patientId, taskId, "review_state.json");
-    if (!fs.existsSync(scratchReviewState)) {
-      // Treat a missing scratch state on an otherwise-ok outcome as a
-      // loud-fail too (defensive: shouldn't happen once writes were seen).
+    const decision = decidePromote({ taskKind, scratchExists: fs.existsSync(scratchReviewState) });
+    if (decision.kind === "rename") {
+      fs.renameSync(scratchReviewState, agentDraftPath(runId, patientId, spec.id));
+    } else if (decision.kind === "synthesize-empty-ner") {
+      // Empty-NER-is-valid (session-isolated-review-state spec): a NER agent
+      // that legitimately finds ZERO entities is classified `ok`, but
+      // mcp-core-ner only writes review_state.json once a span is persisted —
+      // so an honest empty result leaves NO scratch file. Synthesize and
+      // promote an empty NER draft instead of force-failing it.
+      atomicWriteJson(agentDraftPath(runId, patientId, spec.id), emptyNerDraft(patientId, taskId));
+    } else {
+      // Phenotype/adherence: a missing scratch on an otherwise-ok outcome is a
+      // real problem (these are only classified `ok` when writeCount>0, which
+      // means the scratch WAS written — so this branch shouldn't trigger for
+      // them). Treat it as a loud-fail.
       writeAgentErrorMarker(
         runId, patientId, taskId, spec.id,
         `agent ${spec.id} finished but did not write review_state.json — likely no MCP writes`,
@@ -1262,7 +1318,6 @@ async function runOneAgent(
         cost_usd: cost,
       };
     }
-    fs.renameSync(scratchReviewState, agentDraftPath(runId, patientId, spec.id));
   }
 
   const scratchChat = path.join(scratchRoot, patientId, taskId, "chat", `${sessionId}.jsonl`);

@@ -45,7 +45,7 @@ function ProviderBadge({ provider }: { provider?: ProviderName }) {
 }
 
 interface PerPatientStatus {
-  state: "pending" | "running" | "complete" | "error";
+  state: "pending" | "running" | "complete" | "complete_with_errors" | "failed" | "error";
   started_at?: string;
   completed_at?: string;
   duration_ms?: number;
@@ -205,8 +205,16 @@ function StatePill({ state }: { state: RunListing["state"] }) {
 
 type Tier = "ready" | "quick" | "deep" | "incomplete";
 
+// `complete_with_errors` still produced a real draft from the agents that
+// succeeded, so it's importable and tiers like `complete`. `failed`/`error`
+// have no draft and stay `incomplete`.
+const IMPORTABLE_STATES: ReadonlyArray<PerPatientStatus["state"]> = [
+  "complete",
+  "complete_with_errors",
+];
+
 function tierFor(ps: PerPatientStatus): Tier {
-  if (ps.state !== "complete") return "incomplete";
+  if (!IMPORTABLE_STATES.includes(ps.state)) return "incomplete";
   const cs = ps.confidence_summary;
   if (!cs) return "quick";
   if (cs.low > 0 || cs.unknown > cs.high + cs.medium) return "deep";
@@ -664,7 +672,7 @@ function TriageQueue({
                         </>
                       )}
                     </span>
-                    {ps.state === "complete" && (
+                    {IMPORTABLE_STATES.includes(ps.state) && (
                       <button
                         onClick={() => onImport(pid)}
                         disabled={importBusy === pid}

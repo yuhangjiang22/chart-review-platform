@@ -88,7 +88,7 @@ function latestRunForTaskWithPatient(taskId: string, patientId: string): string 
   for (const r of runs.sort((a, b) => (b.started_at ?? "").localeCompare(a.started_at ?? ""))) {
     const dir = path.join(runDir(r.run_id), "per_patient", patientId, "agents");
     if (fs.existsSync(dir)) {
-      const hasAgent = fs.readdirSync(dir).some((f) => f.endsWith(".json"));
+      const hasAgent = fs.readdirSync(dir).some((f) => f.endsWith(".json") && !f.endsWith(".error.json"));
       if (hasAgent) return r.run_id;
     }
   }
@@ -100,7 +100,7 @@ function loadAgentDrafts(runId: string, patientId: string): Array<{ agent_id: st
   if (!fs.existsSync(dir)) return [];
   const out: Array<{ agent_id: string; spans: SpanLite[] }> = [];
   for (const f of fs.readdirSync(dir).sort()) {
-    if (!f.endsWith(".json")) continue;
+    if (!f.endsWith(".json") || f.endsWith(".error.json")) continue;
     const agentId = f.replace(/\.json$/, "");
     try {
       const draft = JSON.parse(fs.readFileSync(path.join(dir, f), "utf8")) as {

@@ -207,8 +207,14 @@ export const pilotReadRoutes: RouteEntry[] = [
       const sessionId = m.session_id;
       const patient_status = patientIds.map((pid) => {
         const perPatient = runStatus?.per_patient?.[pid];
-        const agentDone = perPatient?.state === "complete";
-        const errored = perPatient?.state === "error";
+        // `complete_with_errors` still has an importable draft from the
+        // succeeding agents, so it counts as agent-done. `failed`/`error`
+        // are the errored states whose `perPatient.error` we surface.
+        const agentDone =
+          perPatient?.state === "complete"
+          || perPatient?.state === "complete_with_errors";
+        const errored =
+          perPatient?.state === "failed" || perPatient?.state === "error";
         const errorMessage = errored ? (perPatient?.error ?? null) : null;
         const reviewPath = sessionId
           ? path.join(reviewsRootDir, sessionId, pid, taskId, "review_state.json")
