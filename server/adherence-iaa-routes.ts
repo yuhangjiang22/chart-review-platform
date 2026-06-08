@@ -71,8 +71,8 @@ interface ReviewerView {
   validated_rules:     Set<string>;
 }
 
-function readReviewer(pid: string, taskId: string): ReviewerView {
-  const fp = pathFor.reviewState(pid, taskId);
+function readReviewer(sessionId: string, pid: string, taskId: string): ReviewerView {
+  const fp = pathFor.reviewState(sessionId, pid, taskId);
   if (!fs.existsSync(fp)) {
     return {
       question_answers: [], rule_verdicts: [],
@@ -143,15 +143,21 @@ export const adherenceIaaRoutes: RouteEntry[] = [
       if (!pilot) throw httpErr(404, `pilot ${p.iterId} not found`);
       const run = getRunManifest(pilot.run_id);
       if (!run) throw httpErr(404, `run ${pilot.run_id} not found`);
+      // The iteration pins exactly one session. A legacy iter with no
+      // session_id reads NOTHING — empty patient list, zeroed leaderboard —
+      // rather than falling back to the flat review_state path.
+      const sessionId = pilot.session_id;
       const status = getRunStatus(pilot.run_id);
-      const patientIds = status?.per_patient ? Object.keys(status.per_patient) : [];
+      const patientIds = sessionId && status?.per_patient
+        ? Object.keys(status.per_patient)
+        : [];
 
       const agentSpecs = run.agent_specs ?? [{ id: "agent_1", role_preset: "default", role_version: "v1" as const }];
 
       // Pre-load reviewer view per patient (the gold standard, same
       // across all agents).
       const reviewerByPid = new Map<string, ReviewerView>();
-      for (const pid of patientIds) reviewerByPid.set(pid, readReviewer(pid, p.taskId));
+      for (const pid of patientIds) reviewerByPid.set(pid, readReviewer(sessionId!, pid, p.taskId));
 
       // Per-agent leaderboard.
       const perAgent: AgentScoreRow[] = [];

@@ -84,8 +84,8 @@ function wilson95(k: number, n: number): [number, number] | null {
   ];
 }
 
-function readPatientVerdicts(pid: string, taskId: string): PerRuleRow[] {
-  const fp = pathFor.reviewState(pid, taskId);
+function readPatientVerdicts(sessionId: string, pid: string, taskId: string): PerRuleRow[] {
+  const fp = pathFor.reviewState(sessionId, pid, taskId);
   if (!fs.existsSync(fp)) return [];
   try {
     const rs = JSON.parse(fs.readFileSync(fp, "utf8")) as {
@@ -149,14 +149,19 @@ export const adherenceSummaryRoutes: RouteEntry[] = [
       }
       const pilot = getPilotManifest(p.taskId, p.iterId);
       if (!pilot) throw httpErr(404, `pilot ${p.iterId} not found`);
+      // The iteration pins exactly one session. A legacy iter with no
+      // session_id reads NOTHING — empty patient list, empty summary —
+      // rather than falling back to the flat review_state path.
+      const sessionId = pilot.session_id;
       const run = getRunManifest(pilot.run_id);
       const status = getRunStatus(pilot.run_id);
-      const patientIds: string[] =
-        run?.patient_ids
-        ?? (status?.per_patient ? Object.keys(status.per_patient) : []);
+      const patientIds: string[] = sessionId
+        ? (run?.patient_ids
+           ?? (status?.per_patient ? Object.keys(status.per_patient) : []))
+        : [];
 
       const byPatient: PerPatientSummary[] = patientIds.map((pid) =>
-        summarizePatient(pid, readPatientVerdicts(pid, p.taskId)),
+        summarizePatient(pid, readPatientVerdicts(sessionId!, pid, p.taskId)),
       );
 
       const cohortEvaluable = byPatient.reduce((n, s) => n + s.n_evaluable, 0);
@@ -194,7 +199,13 @@ export const adherenceSummaryRoutes: RouteEntry[] = [
       if (task.task_kind !== "adherence") {
         throw httpErr(400, `task ${p.taskId} is not adherence`);
       }
-      const rows = readPatientVerdicts(p.patientId, p.taskId);
+      const pilot = getPilotManifest(p.taskId, p.iterId);
+      if (!pilot) throw httpErr(404, `pilot ${p.iterId} not found`);
+      // Iter pins one session; legacy iter (no session_id) reads NOTHING.
+      const sessionId = pilot.session_id;
+      const rows = sessionId
+        ? readPatientVerdicts(sessionId, p.patientId, p.taskId)
+        : [];
       return { ok: true, ...summarizePatient(p.patientId, rows) };
     },
   },

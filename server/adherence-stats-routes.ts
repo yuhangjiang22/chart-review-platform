@@ -56,8 +56,12 @@ export const adherenceStatsRoutes: RouteEntry[] = [
 
       const manifest = getPilotManifest(p.taskId, p.iterId);
       if (!manifest) throw httpErr(404, `pilot ${p.iterId} not found`);
+      // The iteration pins exactly one session. A legacy iter with no
+      // session_id reads NOTHING — empty patient list, zeroed totals —
+      // rather than falling back to the flat review_state path.
+      const sessionId = manifest.session_id;
       const status = getRunStatus(manifest.run_id);
-      const patientIds = status?.per_patient
+      const patientIds = sessionId && status?.per_patient
         ? Object.keys(status.per_patient)
         : [];
 
@@ -65,7 +69,7 @@ export const adherenceStatsRoutes: RouteEntry[] = [
       const totals = { total: 0, validated: 0, total_rules: 0, validated_rules: 0 };
 
       for (const patientId of patientIds) {
-        const fp = pathFor.reviewState(patientId, p.taskId);
+        const fp = pathFor.reviewState(sessionId!, patientId, p.taskId);
         const stat: AdherenceStat = {
           patient_id: patientId,
           total_questions: totalQuestions,
