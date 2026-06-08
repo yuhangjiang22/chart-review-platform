@@ -21,7 +21,8 @@ import fs from "fs";
 import path from "path";
 import { PLATFORM_ROOT } from "@chart-review/patients";
 import type { AgentSpec } from "@chart-review/agent-specs";
-import { defaultProviderName, type ProviderName } from "@chart-review/agent-provider";
+import { defaultProviderName, type ProviderName, type AgentEvent } from "@chart-review/agent-provider";
+import type { TaskKind } from "@chart-review/tasks";
 
 export type RunState =
   | "running"
@@ -115,6 +116,104 @@ export interface RunListing {
    *  before per-run provider support; readers should display "default"
    *  or fall back to the env-var default in that case. */
   provider?: ProviderName;
+}
+
+// ── loud-fail classification (per task kind) ──────────────────────────────────
+//
+// Generalizes the light platform's "loud-fail on agent error" lesson across
+// v2's 3 task kinds. Writes are counted from the provider-agnostic AgentEvent
+// stream (`type === "tool_use"`), NOT the SDK PostToolUse hook — because the
+// codex subprocess provider never fires JS hooks (exactly the light deepagents
+// lesson: hook-based counting marked every successful subprocess agent as "no
+// writes" → error → no draft). The event stream fires for every provider.
+//
+// Each kind has its own primary write tool, and NER has a special rule: a note
+// with no entities is a valid result, so writeCount === 0 is OK — but ONLY if a
+// completion signal was seen (a `result` event or a `set_review_status` write).
+// Without a completion signal a zero-span run means the agent died/hung before
+// signalling done, which is a loud failure.
+
+/** Running tally folded over an agent run's AgentEvent stream. */
+export interface AgentTally {
+  agentError: string | null;
+  writeCount: number;
+  sawCompletion: boolean;
+}
+
+/** Primary write tool per task kind. A run is expected to call this tool at
+ *  least once (except NER, where zero spans is a valid empty result). */
+const PRIMARY_WRITE_TOOL: Record<TaskKind, string> = {
+  phenotype: "set_field_assessment",
+  adherence: "set_question_answer",
+  ner: "set_span_label",
+};
+
+/** Fold one AgentEvent into the running tally for an agent run.
+ *  - an `error` event records the error message (loud fail).
+ *  - a `result` event (emitted on non-error completion) marks completion.
+ *  - a `tool_use` for the kind's primary write tool increments writeCount;
+ *    a `set_review_status` tool_use also marks completion. */
+export function applyAgentEventToTally(
+  tally: AgentTally,
+  event: AgentEvent,
+  kind: TaskKind,
+): AgentTally {
+  if (event.type === "error") {
+    return { ...tally, agentError: event.error || "agent error" };
+  }
+  if (event.type === "result") {
+    return { ...tally, sawCompletion: true };
+  }
+  if (event.type === "tool_use") {
+    let t = tally;
+    if (event.tool_name === PRIMARY_WRITE_TOOL[kind]) {
+      t = { ...t, writeCount: t.writeCount + 1 };
+    }
+    if (event.tool_name === "set_review_status") {
+      t = { ...t, sawCompletion: true };
+    }
+    return t;
+  }
+  return tally;
+}
+
+/** Decide whether an agent run succeeded, per task kind.
+ *  - ANY kind: an error event → fail.
+ *  - phenotype / adherence: zero primary writes → fail (every leaf
+ *    field/question must be answered).
+ *  - NER: zero spans is OK IF a completion signal was seen (empty result is
+ *    valid); fail only if no completion signal at all.
+ *
+ *  An agent that errored, or that made no primary writes this run (non-NER),
+ *  did not produce a draft — promoting the seeded/carried-forward scratch
+ *  would be a stale-answer bug (see the session-isolated-review-state spec). */
+export function classifyAgentOutcome(
+  o: AgentTally,
+  kind: TaskKind,
+): { status: "ok" } | { status: "error"; error: string } {
+  if (o.agentError) return { status: "error", error: o.agentError };
+  if (kind === "ner") {
+    if (!o.sawCompletion) {
+      return { status: "error", error: "NER agent produced no completion signal this run" };
+    }
+    return { status: "ok" };
+  }
+  if (o.writeCount === 0) {
+    return { status: "error", error: `agent made no ${PRIMARY_WRITE_TOOL[kind]} writes this run` };
+  }
+  return { status: "ok" };
+}
+
+/** Per-patient status from its agents' outcomes:
+ *  all agents failed (or no agents) → "failed"; some failed → "complete_with_errors";
+ *  all ok → "complete". */
+export function rollupPatientStatus(
+  outcomes: Array<{ status: "ok" | "error" }>,
+): "complete" | "complete_with_errors" | "failed" {
+  const ok = outcomes.filter((o) => o.status === "ok").length;
+  if (ok === 0) return "failed";
+  if (ok < outcomes.length) return "complete_with_errors";
+  return "complete";
 }
 
 // ── manifest normalizer ───────────────────────────────────────────────────────
