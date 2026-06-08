@@ -30,17 +30,10 @@ import { writeJsonAtomic } from "@chart-review/fs-atomic";
  *  instead of constructing paths inline so a future cloud-storage
  *  migration can swap the storage scheme in one place. */
 export const pathFor = {
-  /** `<root>/var/reviews/<patient>/<task>/review_state.json` —
-   *  the per-patient ground-truth document the reviewer commits. */
-  reviewState(patientId: string, taskId: string): string {
-    return path.join(
-      PLATFORM_ROOT,
-      "var",
-      "reviews",
-      patientId,
-      taskId,
-      "review_state.json",
-    );
+  /** `<root>/var/reviews/<sessionId>/<patient>/<task>/review_state.json` —
+   *  per-session, per-patient ground truth (sessions never share answers). */
+  reviewState(sessionId: string, patientId: string, taskId: string): string {
+    return path.join(PLATFORM_ROOT, "var", "reviews", sessionId, patientId, taskId, "review_state.json");
   },
 
   /** `<root>/var/runs/<run_id>/per_patient/<patient>/agents/<agent>.json`
