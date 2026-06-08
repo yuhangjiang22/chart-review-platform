@@ -41,9 +41,10 @@ import type { SSEStream } from "./core-routes.js";
 import { isMethodologist, readReviewerFromRequest } from "./auth.js";
 import {
   applyUiAction, loadOrCreate as loadOrCreateReviewState,
-  resetReviewState, ReviewStateError,
+  resetReviewState, ReviewStateError, withReviewsRoot,
   type ReviewState, type UiAction,
 } from "./lib/domain/review/index.js";
+import { sessionReviewsRoot } from "./lib/session-reviews.js";
 import {
   appendAuditEntry, listAuditSessions, readAuditEntries, readFieldHistory,
   readUnitHistory,
@@ -81,6 +82,15 @@ function reviewStateErr(e: unknown): never {
     );
   }
   throw httpErr(400, { ok: false, message: (e as Error).message }, (e as Error).message);
+}
+
+/** Read the workspace session id from the request query. Required for all
+ *  committed-state reads/writes so sessions stay isolated. NOTE: distinct from
+ *  the reviewer/MCP "reviewer__<id>" audit session used in this file. */
+function sessionIdOf(query: URLSearchParams): string {
+  const sid = query.get("session_id");
+  if (!sid) throw httpErr(400, { ok: false, message: "session_id query param is required" });
+  return sid;
 }
 
 // WS broadcaster wired in M7.3.
@@ -129,29 +139,32 @@ export const reviewRoutes: RouteEntry[] = [
   // ── Cluster A — read + copilot helpers ──────────────────────────────
   {
     method: "GET", pattern: "/api/reviews/:patientId/:taskId",
-    handler: async (_b, req, p) => {
-      const task = loadCompiledTask(p.taskId);
-      if (!task) throw httpErr(404, { error: "task not found" });
-      try {
-        const state = loadOrCreateReviewState(p.patientId, task);
-        const reviewerId = readReviewerFromRequest(req);
-        const maturity = getMaturity(p.taskId);
-        if (
-          maturity.calibration_blinded
-          && !isMethodologist(reviewerId)
-          && reviewerId !== "anonymous-reviewer"
-        ) {
-          return {
-            ...state,
-            field_assessments: state.field_assessments.filter(
-              (f) => f.source === "agent" || f.updated_by === reviewerId,
-            ),
-          };
+    handler: async (_b, req, p, query) => {
+      const sid = sessionIdOf(query);
+      return withReviewsRoot(sessionReviewsRoot(sid), async () => {
+        const task = loadCompiledTask(p.taskId);
+        if (!task) throw httpErr(404, { error: "task not found" });
+        try {
+          const state = loadOrCreateReviewState(p.patientId, task);
+          const reviewerId = readReviewerFromRequest(req);
+          const maturity = getMaturity(p.taskId);
+          if (
+            maturity.calibration_blinded
+            && !isMethodologist(reviewerId)
+            && reviewerId !== "anonymous-reviewer"
+          ) {
+            return {
+              ...state,
+              field_assessments: state.field_assessments.filter(
+                (f) => f.source === "agent" || f.updated_by === reviewerId,
+              ),
+            };
+          }
+          return state;
+        } catch (e) {
+          throw httpErr(400, { error: (e as Error).message }, (e as Error).message);
         }
-        return state;
-      } catch (e) {
-        throw httpErr(400, { error: (e as Error).message }, (e as Error).message);
-      }
+      });
     },
   },
 
@@ -219,65 +232,78 @@ export const reviewRoutes: RouteEntry[] = [
   // ── Cluster B — reviewer-side mutations + audit ─────────────────────
   {
     method: "DELETE", pattern: "/api/reviews/:patientId/:taskId",
-    handler: async (_b, _r, p) => {
-      const task = loadCompiledTask(p.taskId);
-      if (!task) throw httpErr(404, { error: "task not found" });
-      try {
-        const state = resetReviewState(p.patientId, task);
-        broadcastReviewStateUpdate(p.patientId, state, p.taskId);
-        return { ok: true, state };
-      } catch (e) {
-        throw httpErr(400, { ok: false, message: (e as Error).message });
-      }
+    handler: async (_b, _r, p, query) => {
+      const sid = sessionIdOf(query);
+      return withReviewsRoot(sessionReviewsRoot(sid), async () => {
+        const task = loadCompiledTask(p.taskId);
+        if (!task) throw httpErr(404, { error: "task not found" });
+        try {
+          const state = resetReviewState(p.patientId, task);
+          broadcastReviewStateUpdate(p.patientId, state, p.taskId);
+          return { ok: true, state };
+        } catch (e) {
+          throw httpErr(400, { ok: false, message: (e as Error).message });
+        }
+      });
     },
   },
 
   {
     method: "POST", pattern: "/api/reviews/:patientId/:taskId/summary",
-    handler: async (body, req, p) => {
+    handler: async (body, req, p, query) => {
+      const sid = sessionIdOf(query);
       const reviewerId = readReviewerFromRequest(req) ?? "anonymous-reviewer";
-      try {
-        return applyReviewerAction(
-          p.patientId, p.taskId, reviewerId,
-          { type: "set_summary", payload: body ?? {} },
-          `keys=${Object.keys(body ?? {}).join(",")}`,
-        );
-      } catch (e) { reviewStateErr(e); }
+      return withReviewsRoot(sessionReviewsRoot(sid), async () => {
+        try {
+          return applyReviewerAction(
+            p.patientId, p.taskId, reviewerId,
+            { type: "set_summary", payload: body ?? {} },
+            `keys=${Object.keys(body ?? {}).join(",")}`,
+          );
+        } catch (e) { reviewStateErr(e); }
+      });
     },
   },
 
   {
     method: "POST", pattern: "/api/reviews/:patientId/:taskId/evidence",
-    handler: async (body, req, p) => {
+    handler: async (body, req, p, query) => {
+      const sid = sessionIdOf(query);
       const reviewerId = readReviewerFromRequest(req) ?? "anonymous-reviewer";
-      try {
-        const result = applyReviewerAction(
-          p.patientId, p.taskId, reviewerId,
-          { type: "select_evidence", payload: (body ?? {}) as never },
-          `category=${(body as { category?: string })?.category ?? "(none)"}`,
-        );
-        return { ...result, evidence_id: result.added_evidence_id };
-      } catch (e) { reviewStateErr(e); }
+      return withReviewsRoot(sessionReviewsRoot(sid), async () => {
+        try {
+          const result = applyReviewerAction(
+            p.patientId, p.taskId, reviewerId,
+            { type: "select_evidence", payload: (body ?? {}) as never },
+            `category=${(body as { category?: string })?.category ?? "(none)"}`,
+          );
+          return { ...result, evidence_id: result.added_evidence_id };
+        } catch (e) { reviewStateErr(e); }
+      });
     },
   },
 
   {
     method: "DELETE", pattern: "/api/reviews/:patientId/:taskId/evidence/:evidenceId",
-    handler: async (_b, req, p) => {
+    handler: async (_b, req, p, query) => {
+      const sid = sessionIdOf(query);
       const reviewerId = readReviewerFromRequest(req) ?? "anonymous-reviewer";
-      try {
-        return applyReviewerAction(
-          p.patientId, p.taskId, reviewerId,
-          { type: "clear_selected_evidence", payload: { evidence_id: p.evidenceId } },
-          `evidence_id=${p.evidenceId}`,
-        );
-      } catch (e) { reviewStateErr(e); }
+      return withReviewsRoot(sessionReviewsRoot(sid), async () => {
+        try {
+          return applyReviewerAction(
+            p.patientId, p.taskId, reviewerId,
+            { type: "clear_selected_evidence", payload: { evidence_id: p.evidenceId } },
+            `evidence_id=${p.evidenceId}`,
+          );
+        } catch (e) { reviewStateErr(e); }
+      });
     },
   },
 
   {
     method: "POST", pattern: "/api/reviews/:patientId/:taskId/encounters",
-    handler: async (body, req, p) => {
+    handler: async (body, req, p, query) => {
+      const sid = sessionIdOf(query);
       const reviewerId = readReviewerFromRequest(req) ?? "anonymous-reviewer";
       const b = (body ?? {}) as {
         kind?: "encounter" | "episode"; date?: string;
@@ -286,64 +312,79 @@ export const reviewRoutes: RouteEntry[] = [
       if (b.kind !== "encounter" && b.kind !== "episode") {
         throw httpErr(400, { ok: false, message: 'body.kind must be "encounter" or "episode"' });
       }
-      try {
-        const result = applyReviewerAction(
-          p.patientId, p.taskId, reviewerId,
-          { type: "add_encounter", payload: { kind: b.kind, date: b.date, label: b.label, note_ids: b.note_ids } },
-          `kind=${b.kind} label=${b.label ?? "(none)"}`,
-        );
-        return { ...result, encounter_id: result.added_encounter_id };
-      } catch (e) { reviewStateErr(e); }
+      const kind = b.kind; // narrowed to "encounter" | "episode" — capture before closure
+      return withReviewsRoot(sessionReviewsRoot(sid), async () => {
+        try {
+          const result = applyReviewerAction(
+            p.patientId, p.taskId, reviewerId,
+            { type: "add_encounter", payload: { kind, date: b.date, label: b.label, note_ids: b.note_ids } },
+            `kind=${kind} label=${b.label ?? "(none)"}`,
+          );
+          return { ...result, encounter_id: result.added_encounter_id };
+        } catch (e) { reviewStateErr(e); }
+      });
     },
   },
 
   {
     method: "DELETE", pattern: "/api/reviews/:patientId/:taskId/encounters/:encounterId",
-    handler: async (_b, req, p) => {
+    handler: async (_b, req, p, query) => {
+      const sid = sessionIdOf(query);
       const reviewerId = readReviewerFromRequest(req) ?? "anonymous-reviewer";
-      try {
-        return applyReviewerAction(
-          p.patientId, p.taskId, reviewerId,
-          { type: "remove_encounter", payload: { encounter_id: p.encounterId } },
-          `encounter_id=${p.encounterId}`,
-        );
-      } catch (e) { reviewStateErr(e); }
+      return withReviewsRoot(sessionReviewsRoot(sid), async () => {
+        try {
+          return applyReviewerAction(
+            p.patientId, p.taskId, reviewerId,
+            { type: "remove_encounter", payload: { encounter_id: p.encounterId } },
+            `encounter_id=${p.encounterId}`,
+          );
+        } catch (e) { reviewStateErr(e); }
+      });
     },
   },
 
   {
     method: "POST", pattern: "/api/reviews/:patientId/:taskId/uiactions",
-    handler: async (body, req, p) => {
+    handler: async (body, req, p, query) => {
+      const sid = sessionIdOf(query);
       const reviewerId = readReviewerFromRequest(req) ?? "anonymous-reviewer";
       const action = body as UiAction | undefined;
       if (!action || !action.type || !("payload" in action)) {
         throw httpErr(400, { ok: false, message: "body must be {type, payload}" });
       }
-      try {
-        return applyReviewerAction(
-          p.patientId, p.taskId, reviewerId, action, "(generic ui_action)",
-        );
-      } catch (e) { reviewStateErr(e); }
+      return withReviewsRoot(sessionReviewsRoot(sid), async () => {
+        try {
+          return applyReviewerAction(
+            p.patientId, p.taskId, reviewerId, action, "(generic ui_action)",
+          );
+        } catch (e) { reviewStateErr(e); }
+      });
     },
   },
 
   {
     method: "GET", pattern: "/api/reviews/:patientId/:taskId/audit",
-    handler: async (_b, _r, p) => {
-      try { return listAuditSessions(p.patientId, p.taskId); }
-      catch (e) { throw httpErr(400, { error: (e as Error).message }); }
+    handler: async (_b, _r, p, query) => {
+      const sid = sessionIdOf(query);
+      return withReviewsRoot(sessionReviewsRoot(sid), async () => {
+        try { return listAuditSessions(p.patientId, p.taskId); }
+        catch (e) { throw httpErr(400, { error: (e as Error).message }); }
+      });
     },
   },
 
   {
     method: "GET", pattern: "/api/reviews/:patientId/:taskId/field-history/:fieldId",
-    handler: async (_b, _r, p) => {
-      try {
-        const entries = readFieldHistory(p.patientId, p.taskId, p.fieldId);
-        return { field_id: p.fieldId, entries };
-      } catch (e) {
-        throw httpErr(400, { error: (e as Error).message });
-      }
+    handler: async (_b, _r, p, query) => {
+      const sid = sessionIdOf(query);
+      return withReviewsRoot(sessionReviewsRoot(sid), async () => {
+        try {
+          const entries = readFieldHistory(p.patientId, p.taskId, p.fieldId);
+          return { field_id: p.fieldId, entries };
+        } catch (e) {
+          throw httpErr(400, { error: (e as Error).message });
+        }
+      });
     },
   },
 
@@ -353,41 +394,50 @@ export const reviewRoutes: RouteEntry[] = [
   // we call it with unitKind="span" so only span events come back.
   {
     method: "GET", pattern: "/api/reviews/:patientId/:taskId/span-history/:spanId",
-    handler: async (_b, _r, p) => {
-      try {
-        const entries = readUnitHistory(p.patientId, p.taskId, p.spanId, "span");
-        return { span_id: p.spanId, entries };
-      } catch (e) {
-        throw httpErr(400, { error: (e as Error).message });
-      }
+    handler: async (_b, _r, p, query) => {
+      const sid = sessionIdOf(query);
+      return withReviewsRoot(sessionReviewsRoot(sid), async () => {
+        try {
+          const entries = readUnitHistory(p.patientId, p.taskId, p.spanId, "span");
+          return { span_id: p.spanId, entries };
+        } catch (e) {
+          throw httpErr(400, { error: (e as Error).message });
+        }
+      });
     },
   },
 
   {
     method: "GET", pattern: "/api/reviews/:patientId/:taskId/audit/:sessionId",
-    handler: async (_b, _r, p) => {
-      try {
-        const entries = readAuditEntries({
-          patientId: p.patientId, taskId: p.taskId, sessionId: p.sessionId,
-        });
-        return { session_id: p.sessionId, entries };
-      } catch (e) {
-        throw httpErr(400, { error: (e as Error).message });
-      }
+    handler: async (_b, _r, p, query) => {
+      const sid = sessionIdOf(query);
+      return withReviewsRoot(sessionReviewsRoot(sid), async () => {
+        try {
+          const entries = readAuditEntries({
+            patientId: p.patientId, taskId: p.taskId, sessionId: p.sessionId,
+          });
+          return { session_id: p.sessionId, entries };
+        } catch (e) {
+          throw httpErr(400, { error: (e as Error).message });
+        }
+      });
     },
   },
 
   {
     method: "POST", pattern: "/api/reviews/:patientId/:taskId/actions",
-    handler: async (body, req, p) => {
+    handler: async (body, req, p, query) => {
+      const sid = sessionIdOf(query);
       const reviewerId = readReviewerFromRequest(req) ?? "anonymous-reviewer";
-      try {
-        return applyReviewerAction(
-          p.patientId, p.taskId, reviewerId,
-          { type: "set_field_assessment", payload: body as never },
-          `field_id=${(body as { field_id?: string })?.field_id ?? "(none)"}`,
-        );
-      } catch (e) { reviewStateErr(e); }
+      return withReviewsRoot(sessionReviewsRoot(sid), async () => {
+        try {
+          return applyReviewerAction(
+            p.patientId, p.taskId, reviewerId,
+            { type: "set_field_assessment", payload: body as never },
+            `field_id=${(body as { field_id?: string })?.field_id ?? "(none)"}`,
+          );
+        } catch (e) { reviewStateErr(e); }
+      });
     },
   },
 
@@ -415,7 +465,8 @@ export const reviewRoutes: RouteEntry[] = [
   // route is the HTTP entrypoint used by the SpanReview UI.
   {
     method: "PATCH", pattern: "/api/reviews/:patientId/:taskId/spans/:spanId",
-    handler: async (body, req, p) => {
+    handler: async (body, req, p, query) => {
+      const sid = sessionIdOf(query);
       const task = loadCompiledTask(p.taskId);
       if (!task) throw httpErr(404, { error: "task not found" });
       if (task.task_kind !== "ner") {
@@ -430,46 +481,48 @@ export const reviewRoutes: RouteEntry[] = [
         throw httpErr(400, { error: "at least one of status, concept_name required" });
       }
       const reviewerId = readReviewerFromRequest(req) ?? "anonymous-reviewer";
-      const state = loadOrCreateReviewState(p.patientId, task);
-      const spans = state.span_labels ?? [];
-      const idx = spans.findIndex((s) => s.span_id === p.spanId);
-      if (idx < 0) throw httpErr(404, { error: `span_id ${p.spanId} not found` });
-      const before = { ...spans[idx]! };
-      if (concept_name !== undefined) spans[idx]!.concept_name = concept_name;
-      // Status is derived from concept_name presence — non-empty maps to
-      // "mapped", empty maps to "novel_candidate". An explicit status in
-      // the body still wins so agent tools / programmatic callers can
-      // override (e.g. set "rejected"), but reviewer concept-name edits
-      // alone keep status in sync.
-      if (status !== undefined) {
-        spans[idx]!.status = status;
-      } else if (concept_name !== undefined) {
-        spans[idx]!.status = concept_name.trim() ? "mapped" : "novel_candidate";
-      }
-      if (override_reason !== undefined) spans[idx]!.override_reason = override_reason;
-      state.span_labels = spans;
-      state.version = (state.version ?? 0) + 1;
-      state.updated_at = new Date().toISOString();
-      state.updated_by = "reviewer";
-      const fp = pathFor.reviewState(p.patientId, p.taskId);
-      fs.mkdirSync(path.dirname(fp), { recursive: true });
-      writeJsonAtomic(fp, state);
-      appendAuditEntry(
-        { patientId: p.patientId, taskId: p.taskId, sessionId: `reviewer__${reviewerId}` },
-        {
-          ts: new Date().toISOString(),
-          session_id: `reviewer__${reviewerId}`,
-          step_type: "ui_action",
-          action_type: "patch_span",
-          source: "reviewer",
-          payload_summary: [
-            status !== undefined ? `status=${before.status ?? "(none)"}→${status}` : null,
-            concept_name !== undefined ? `concept=${before.concept_name}→${concept_name}` : null,
-          ].filter(Boolean).join(" "),
-          payload_span_id: p.spanId,
-        },
-      );
-      return { ok: true, span: spans[idx], version: state.version };
+      return withReviewsRoot(sessionReviewsRoot(sid), async () => {
+        const state = loadOrCreateReviewState(p.patientId, task);
+        const spans = state.span_labels ?? [];
+        const idx = spans.findIndex((s) => s.span_id === p.spanId);
+        if (idx < 0) throw httpErr(404, { error: `span_id ${p.spanId} not found` });
+        const before = { ...spans[idx]! };
+        if (concept_name !== undefined) spans[idx]!.concept_name = concept_name;
+        // Status is derived from concept_name presence — non-empty maps to
+        // "mapped", empty maps to "novel_candidate". An explicit status in
+        // the body still wins so agent tools / programmatic callers can
+        // override (e.g. set "rejected"), but reviewer concept-name edits
+        // alone keep status in sync.
+        if (status !== undefined) {
+          spans[idx]!.status = status;
+        } else if (concept_name !== undefined) {
+          spans[idx]!.status = concept_name.trim() ? "mapped" : "novel_candidate";
+        }
+        if (override_reason !== undefined) spans[idx]!.override_reason = override_reason;
+        state.span_labels = spans;
+        state.version = (state.version ?? 0) + 1;
+        state.updated_at = new Date().toISOString();
+        state.updated_by = "reviewer";
+        const fp = pathFor.reviewState(sid, p.patientId, p.taskId);
+        fs.mkdirSync(path.dirname(fp), { recursive: true });
+        writeJsonAtomic(fp, state);
+        appendAuditEntry(
+          { patientId: p.patientId, taskId: p.taskId, sessionId: `reviewer__${reviewerId}` },
+          {
+            ts: new Date().toISOString(),
+            session_id: `reviewer__${reviewerId}`,
+            step_type: "ui_action",
+            action_type: "patch_span",
+            source: "reviewer",
+            payload_summary: [
+              status !== undefined ? `status=${before.status ?? "(none)"}→${status}` : null,
+              concept_name !== undefined ? `concept=${before.concept_name}→${concept_name}` : null,
+            ].filter(Boolean).join(" "),
+            payload_span_id: p.spanId,
+          },
+        );
+        return { ok: true, span: spans[idx], version: state.version };
+      });
     },
   },
 
@@ -480,39 +533,42 @@ export const reviewRoutes: RouteEntry[] = [
   // returns 404 if the span is not present.
   {
     method: "DELETE", pattern: "/api/reviews/:patientId/:taskId/spans/:spanId",
-    handler: async (_b, req, p) => {
+    handler: async (_b, req, p, query) => {
+      const sid = sessionIdOf(query);
       const task = loadCompiledTask(p.taskId);
       if (!task) throw httpErr(404, { error: "task not found" });
       if (task.task_kind !== "ner") {
         throw httpErr(400, { error: `task ${p.taskId} is not an NER task` });
       }
       const reviewerId = readReviewerFromRequest(req) ?? "anonymous-reviewer";
-      const state = loadOrCreateReviewState(p.patientId, task);
-      const spans = state.span_labels ?? [];
-      const idx = spans.findIndex((s) => s.span_id === p.spanId);
-      if (idx < 0) throw httpErr(404, { error: `span_id ${p.spanId} not found` });
-      const removed = spans[idx]!;
-      spans.splice(idx, 1);
-      state.span_labels = spans;
-      state.version = (state.version ?? 0) + 1;
-      state.updated_at = new Date().toISOString();
-      state.updated_by = "reviewer";
-      const fp = pathFor.reviewState(p.patientId, p.taskId);
-      fs.mkdirSync(path.dirname(fp), { recursive: true });
-      writeJsonAtomic(fp, state);
-      appendAuditEntry(
-        { patientId: p.patientId, taskId: p.taskId, sessionId: `reviewer__${reviewerId}` },
-        {
-          ts: new Date().toISOString(),
-          session_id: `reviewer__${reviewerId}`,
-          step_type: "ui_action",
-          action_type: "delete_span",
-          source: "reviewer",
-          payload_summary: `entity_type=${removed.entity_type} text=${JSON.stringify(removed.text).slice(0, 60)}`,
-          payload_span_id: p.spanId,
-        },
-      );
-      return { ok: true, version: state.version };
+      return withReviewsRoot(sessionReviewsRoot(sid), async () => {
+        const state = loadOrCreateReviewState(p.patientId, task);
+        const spans = state.span_labels ?? [];
+        const idx = spans.findIndex((s) => s.span_id === p.spanId);
+        if (idx < 0) throw httpErr(404, { error: `span_id ${p.spanId} not found` });
+        const removed = spans[idx]!;
+        spans.splice(idx, 1);
+        state.span_labels = spans;
+        state.version = (state.version ?? 0) + 1;
+        state.updated_at = new Date().toISOString();
+        state.updated_by = "reviewer";
+        const fp = pathFor.reviewState(sid, p.patientId, p.taskId);
+        fs.mkdirSync(path.dirname(fp), { recursive: true });
+        writeJsonAtomic(fp, state);
+        appendAuditEntry(
+          { patientId: p.patientId, taskId: p.taskId, sessionId: `reviewer__${reviewerId}` },
+          {
+            ts: new Date().toISOString(),
+            session_id: `reviewer__${reviewerId}`,
+            step_type: "ui_action",
+            action_type: "delete_span",
+            source: "reviewer",
+            payload_summary: `entity_type=${removed.entity_type} text=${JSON.stringify(removed.text).slice(0, 60)}`,
+            payload_span_id: p.spanId,
+          },
+        );
+        return { ok: true, version: state.version };
+      });
     },
   },
 
@@ -522,7 +578,8 @@ export const reviewRoutes: RouteEntry[] = [
   // refuses writes where source[start:end] !== text.
   {
     method: "POST", pattern: "/api/reviews/:patientId/:taskId/spans",
-    handler: async (body, req, p) => {
+    handler: async (body, req, p, query) => {
+      const sid = sessionIdOf(query);
       const task = loadCompiledTask(p.taskId);
       if (!task) throw httpErr(404, { error: "task not found" });
       if (task.task_kind !== "ner") {
@@ -572,49 +629,57 @@ export const reviewRoutes: RouteEntry[] = [
       const hash = createHash("sha256");
       hash.update(`${noteId}|${b.start}|${b.end}|${b.entity_type}`);
       const spanId = hash.digest("hex").slice(0, 16);
+      // Capture narrowed fields before the async closure (TS loses narrowing across closure boundary).
+      const bText = b.text as string;
+      const bAnchor = b.anchor ?? bText;
+      const bStart = b.start as number;
+      const bEnd = b.end as number;
+      const bEntityType = b.entity_type as string;
 
       const reviewerId = readReviewerFromRequest(req) ?? "anonymous-reviewer";
-      const state = loadOrCreateReviewState(p.patientId, task);
-      const spans = state.span_labels ?? [];
-      const existing = spans.findIndex((s) => s.span_id === spanId);
-      const prevProposers = existing >= 0 ? (spans[existing]!.proposed_by ?? []) : [];
-      const nextProposers = prevProposers.includes("reviewer")
-        ? prevProposers
-        : [...prevProposers, "reviewer"];
-      const span: import("@chart-review/platform-types").SpanLabel = {
-        span_id: spanId,
-        note_id: noteId,
-        text: b.text,
-        anchor: b.anchor ?? b.text,
-        start: b.start,
-        end: b.end,
-        entity_type: b.entity_type,
-        concept_name: b.concept_name ?? "",
-        status: b.status ?? (b.concept_name ? "mapped" : "novel_candidate"),
-        proposed_by: nextProposers,
-      };
-      if (existing >= 0) spans[existing] = span;
-      else spans.push(span);
-      state.span_labels = spans;
-      state.version = (state.version ?? 0) + 1;
-      state.updated_at = new Date().toISOString();
-      state.updated_by = "reviewer";
-      const fp = pathFor.reviewState(p.patientId, p.taskId);
-      fs.mkdirSync(path.dirname(fp), { recursive: true });
-      writeJsonAtomic(fp, state);
-      appendAuditEntry(
-        { patientId: p.patientId, taskId: p.taskId, sessionId: `reviewer__${reviewerId}` },
-        {
-          ts: new Date().toISOString(),
-          session_id: `reviewer__${reviewerId}`,
-          step_type: "ui_action",
-          action_type: existing >= 0 ? "update_span" : "create_span",
-          source: "reviewer",
-          payload_summary: `entity_type=${b.entity_type} concept=${b.concept_name ?? "(novel)"} text=${JSON.stringify(b.text).slice(0, 60)}`,
-          payload_span_id: spanId,
-        },
-      );
-      return { ok: true, span, version: state.version, created: existing < 0 };
+      return withReviewsRoot(sessionReviewsRoot(sid), async () => {
+        const state = loadOrCreateReviewState(p.patientId, task);
+        const spans = state.span_labels ?? [];
+        const existing = spans.findIndex((s) => s.span_id === spanId);
+        const prevProposers = existing >= 0 ? (spans[existing]!.proposed_by ?? []) : [];
+        const nextProposers = prevProposers.includes("reviewer")
+          ? prevProposers
+          : [...prevProposers, "reviewer"];
+        const span: import("@chart-review/platform-types").SpanLabel = {
+          span_id: spanId,
+          note_id: noteId,
+          text: bText,
+          anchor: bAnchor,
+          start: bStart,
+          end: bEnd,
+          entity_type: bEntityType,
+          concept_name: b.concept_name ?? "",
+          status: b.status ?? (b.concept_name ? "mapped" : "novel_candidate"),
+          proposed_by: nextProposers,
+        };
+        if (existing >= 0) spans[existing] = span;
+        else spans.push(span);
+        state.span_labels = spans;
+        state.version = (state.version ?? 0) + 1;
+        state.updated_at = new Date().toISOString();
+        state.updated_by = "reviewer";
+        const fp = pathFor.reviewState(sid, p.patientId, p.taskId);
+        fs.mkdirSync(path.dirname(fp), { recursive: true });
+        writeJsonAtomic(fp, state);
+        appendAuditEntry(
+          { patientId: p.patientId, taskId: p.taskId, sessionId: `reviewer__${reviewerId}` },
+          {
+            ts: new Date().toISOString(),
+            session_id: `reviewer__${reviewerId}`,
+            step_type: "ui_action",
+            action_type: existing >= 0 ? "update_span" : "create_span",
+            source: "reviewer",
+            payload_summary: `entity_type=${bEntityType} concept=${b.concept_name ?? "(novel)"} text=${JSON.stringify(bText).slice(0, 60)}`,
+            payload_span_id: spanId,
+          },
+        );
+        return { ok: true, span, version: state.version, created: existing < 0 };
+      });
     },
   },
 
@@ -627,7 +692,8 @@ export const reviewRoutes: RouteEntry[] = [
   // derived (every-note-validated → patient is done).
   {
     method: "POST", pattern: "/api/reviews/:patientId/:taskId/notes/:noteId/validation",
-    handler: async (body, req, p) => {
+    handler: async (body, req, p, query) => {
+      const sid = sessionIdOf(query);
       const task = loadCompiledTask(p.taskId);
       if (!task) throw httpErr(404, { error: "task not found" });
       if (task.task_kind !== "ner") {
@@ -638,32 +704,34 @@ export const reviewRoutes: RouteEntry[] = [
         throw httpErr(400, { error: "validated:boolean required" });
       }
       const reviewerId = readReviewerFromRequest(req) ?? "anonymous-reviewer";
-      const state = loadOrCreateReviewState(p.patientId, task);
-      if (state.review_status === "locked") {
-        throw httpErr(409, { error: "patient is locked; validation cannot be changed" });
-      }
-      const noteId = p.noteId.replace(/\.txt$/, "");
-      const set = new Set(state.validated_notes ?? []);
-      if (validated) set.add(noteId); else set.delete(noteId);
-      state.validated_notes = [...set].sort();
-      state.version = (state.version ?? 0) + 1;
-      state.updated_at = new Date().toISOString();
-      state.updated_by = "reviewer";
-      const fp = pathFor.reviewState(p.patientId, p.taskId);
-      fs.mkdirSync(path.dirname(fp), { recursive: true });
-      writeJsonAtomic(fp, state);
-      appendAuditEntry(
-        { patientId: p.patientId, taskId: p.taskId, sessionId: `reviewer__${reviewerId}` },
-        {
-          ts: new Date().toISOString(),
-          session_id: `reviewer__${reviewerId}`,
-          step_type: "ui_action",
-          action_type: validated ? "mark_note_validated" : "mark_note_unvalidated",
-          source: "reviewer",
-          payload_summary: `note_id=${noteId}`,
-        },
-      );
-      return { ok: true, validated_notes: state.validated_notes, version: state.version };
+      return withReviewsRoot(sessionReviewsRoot(sid), async () => {
+        const state = loadOrCreateReviewState(p.patientId, task);
+        if (state.review_status === "locked") {
+          throw httpErr(409, { error: "patient is locked; validation cannot be changed" });
+        }
+        const noteId = p.noteId.replace(/\.txt$/, "");
+        const set = new Set(state.validated_notes ?? []);
+        if (validated) set.add(noteId); else set.delete(noteId);
+        state.validated_notes = [...set].sort();
+        state.version = (state.version ?? 0) + 1;
+        state.updated_at = new Date().toISOString();
+        state.updated_by = "reviewer";
+        const fp = pathFor.reviewState(sid, p.patientId, p.taskId);
+        fs.mkdirSync(path.dirname(fp), { recursive: true });
+        writeJsonAtomic(fp, state);
+        appendAuditEntry(
+          { patientId: p.patientId, taskId: p.taskId, sessionId: `reviewer__${reviewerId}` },
+          {
+            ts: new Date().toISOString(),
+            session_id: `reviewer__${reviewerId}`,
+            step_type: "ui_action",
+            action_type: validated ? "mark_note_validated" : "mark_note_unvalidated",
+            source: "reviewer",
+            payload_summary: `note_id=${noteId}`,
+          },
+        );
+        return { ok: true, validated_notes: state.validated_notes, version: state.version };
+      });
     },
   },
 ];
