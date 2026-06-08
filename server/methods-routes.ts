@@ -17,6 +17,7 @@ import {
 import { simulateImpact } from "./lib/impact-simulator.js";
 import { runMigration } from "./lib/migration.js";
 import { computeQAStats } from "./lib/qa-panel.js";
+import { sessionReviewsRoot } from "./lib/session-reviews.js";
 
 function platformRoot(): string {
   return process.env.CHART_REVIEW_PLATFORM_ROOT
@@ -39,7 +40,7 @@ export const methodsRoutes: RouteEntry[] = [
   // ── /api/methods/* ──────────────────────────────────────────────────
   {
     method: "POST", pattern: "/api/methods/:taskId/draft",
-    handler: async (body, _req, p) => {
+    handler: async (body, _req, p, query) => {
       const { section, prior_draft, feedback, prior_run_id } = (body ?? {}) as {
         section?: string; prior_draft?: string;
         feedback?: string; prior_run_id?: string;
@@ -47,10 +48,12 @@ export const methodsRoutes: RouteEntry[] = [
       if (section && !VALID_METHODS_SECTIONS.includes(section as MethodsSection)) {
         throw httpErr(400, `section must be one of ${VALID_METHODS_SECTIONS.join(", ")}`);
       }
+      const sid = query.get("session_id");
+      if (!sid) throw httpErr(400, "session_id query param is required");
       try {
         return await draftMethodsSection({
           taskId: p.taskId,
-          reviewsRoot: reviewsRoot(),
+          reviewsRoot: sessionReviewsRoot(sid),
           section: section as MethodsSection | undefined,
           prior_draft: typeof prior_draft === "string" ? prior_draft : undefined,
           feedback: typeof feedback === "string" ? feedback : undefined,
@@ -116,8 +119,10 @@ export const methodsRoutes: RouteEntry[] = [
   // ── /api/qa/:taskId ─────────────────────────────────────────────────
   {
     method: "GET", pattern: "/api/qa/:taskId",
-    handler: async (_b, _r, p) => {
-      try { return await computeQAStats(p.taskId, reviewsRoot()); }
+    handler: async (_b, _r, p, query) => {
+      const sid = query.get("session_id");
+      if (!sid) throw httpErr(400, "session_id query param is required");
+      try { return await computeQAStats(p.taskId, sessionReviewsRoot(sid)); }
       catch (e) { throw httpErr(400, (e as Error).message); }
     },
   },
