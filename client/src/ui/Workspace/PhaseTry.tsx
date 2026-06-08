@@ -438,8 +438,15 @@ function RunStatusCard({
   busy: boolean;
   error: string | null;
 }) {
-  const isRunning = iter.state === "running";
-  const isReady = iter.state === "ready_to_validate" || iter.state === "complete";
+  // Derive readiness/running from the LIVE run status (status.json), not the
+  // persisted iter.state. The manifest state stays "running" after the run
+  // finishes (it only flips on an explicit transition), so keying off it leaves
+  // the card stuck on "running" with no validate affordance even at 100%.
+  const isFailed = iter.run_status === "failed";
+  const isPartial = iter.run_status === "complete_with_errors";
+  const runDone = iter.run_status === "complete" || iter.run_status === "complete_with_errors";
+  const isReady = !isFailed && (runDone || iter.state === "ready_to_validate" || iter.state === "complete");
+  const isRunning = !isReady && !isFailed;
   const total = iter.n_patients ?? patientIds.length;
   const done = iter.n_complete ?? 0;
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
@@ -451,8 +458,15 @@ function RunStatusCard({
           <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
             Current run
           </span>
-          <Badge variant={isReady ? "validated" : "primary"} className="!text-[10px]">
-            {isReady ? "ready · validate" : "running"}
+          <Badge
+            variant={isFailed ? "locked" : isReady ? "validated" : "primary"}
+            className="!text-[10px]"
+          >
+            {isFailed
+              ? "failed"
+              : isReady
+                ? `ready · validate${isPartial ? " · partial" : ""}`
+                : "running"}
           </Badge>
           {iter.provider && (
             <span
@@ -485,7 +499,11 @@ function RunStatusCard({
           <div
             className={cn(
               "h-full transition-all",
-              isReady ? "bg-[hsl(var(--sage))]" : "bg-[hsl(var(--oxblood))]",
+              isFailed
+                ? "bg-[hsl(var(--oxblood))]"
+                : isReady
+                  ? "bg-[hsl(var(--sage))]"
+                  : "bg-[hsl(var(--oxblood))]",
             )}
             style={{ width: `${pct}%` }}
           />
