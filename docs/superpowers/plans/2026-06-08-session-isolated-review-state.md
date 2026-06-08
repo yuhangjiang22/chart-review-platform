@@ -13,6 +13,22 @@
 
 ---
 
+## Discovered during implementation (extra flat-read consumers — fold into Phase 2)
+
+These un-scoped `var/reviews/<pid>/<taskId>/review_state.json` reads were not in the
+original Key-facts list; the P1.4 correctness review surfaced them. Each must be
+session-scoped (resolve session from the relevant manifest; never read the flat path):
+
+- `server/lock-test-routes.ts:121` — `GET /api/lock-test/:taskId/:runId/detail`. Scope
+  via `sessionIdForRun(taskId, runId)` (the finalize handler at ~:96 was already scoped
+  in P1.4). → **Task 2.1 (LOCK).**
+- `server/pilot-routes.ts:208` — `GET /api/pilots/:taskId/:iterId`. Resolve session from
+  the iter manifest's `session_id` (skip the read / report none if legacy).
+- `server/pilot-routes.ts:660` — `GET /api/versions/:taskId/:vTag/cells`. Resolve session
+  from the version/iter manifest; report none if absent.
+
+---
+
 ## Reference map (light → v2)
 
 | Concept | Light file (read as reference) | v2 file (apply to) |
