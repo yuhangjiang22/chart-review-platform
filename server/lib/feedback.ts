@@ -21,12 +21,13 @@ import { runAgent } from "./agent-provider.js";
 import { PLATFORM_ROOT } from "./patients.js";
 import { loadCompiledTask } from "./tasks.js";
 import { guidelineDir } from "./domain/rubric/index.js";
+import { sessionReviewsRoot } from "./session-reviews.js";
 
 const COHORTS_ROOT = path.join(PLATFORM_ROOT, "var", "cohorts");
-const REVIEWS_ROOT = path.join(PLATFORM_ROOT, "var", "reviews");
 
 export interface AnalyzeCohortOptions {
   task_id: string;
+  session_id: string; // active session — scopes the review_state read
   member_ids?: string[]; // optional explicit cohort; otherwise every patient with state
 }
 
@@ -51,14 +52,14 @@ export interface CohortRunListing {
   member_count: number | null;
 }
 
-function findCohortMembers(taskId: string, hint?: string[]): string[] {
+function findCohortMembers(taskId: string, reviewsRoot: string, hint?: string[]): string[] {
   if (hint && hint.length > 0) {
     return hint.filter((id) => /^[a-zA-Z0-9_-]+$/.test(id));
   }
-  if (!fs.existsSync(REVIEWS_ROOT)) return [];
+  if (!fs.existsSync(reviewsRoot)) return [];
   const ids: string[] = [];
-  for (const pid of fs.readdirSync(REVIEWS_ROOT)) {
-    const p = path.join(REVIEWS_ROOT, pid, taskId, "review_state.json");
+  for (const pid of fs.readdirSync(reviewsRoot)) {
+    const p = path.join(reviewsRoot, pid, taskId, "review_state.json");
     if (fs.existsSync(p)) ids.push(pid);
   }
   return ids.sort();
@@ -68,6 +69,12 @@ export async function analyzeCohort(
   opts: AnalyzeCohortOptions,
 ): Promise<CohortAnalysisResult> {
   const startedAt = Date.now();
+
+  // Loud-fail: never fall back to the flat reviews root. The cohort read
+  // must be scoped to a concrete session.
+  if (!opts.session_id) {
+    throw new Error("analyzeCohort requires a session_id to scope the review_state read");
+  }
 
   // Verify the guideline exists
   const task = loadCompiledTask(opts.task_id);
@@ -80,7 +87,8 @@ export async function analyzeCohort(
     };
   }
 
-  const members = findCohortMembers(opts.task_id, opts.member_ids);
+  const reviewsRoot = sessionReviewsRoot(opts.session_id);
+  const members = findCohortMembers(opts.task_id, reviewsRoot, opts.member_ids);
   if (members.length === 0) {
     return {
       ok: false,
@@ -99,7 +107,7 @@ export async function analyzeCohort(
 
   const guidelinePath = guidelineDir(opts.task_id);
   const memberPaths = members.map(
-    (pid) => `reviews/${pid}/${opts.task_id}/review_state.json`,
+    (pid) => `${path.relative(PLATFORM_ROOT, path.join(reviewsRoot, pid, opts.task_id, "review_state.json"))}`,
   );
   const relRunDir = path.relative(PLATFORM_ROOT, runDir);
 

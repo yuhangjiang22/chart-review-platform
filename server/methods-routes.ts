@@ -8,7 +8,6 @@
 //   POST   /api/migration/:taskId/run           — execute migration
 //   GET    /api/qa/:taskId                      — aggregate field-assessment stats
 
-import path from "node:path";
 import type { RouteEntry } from "./router.js";
 import { readReviewerFromRequest } from "./auth.js";
 import {
@@ -18,14 +17,6 @@ import { simulateImpact } from "./lib/impact-simulator.js";
 import { runMigration } from "./lib/migration.js";
 import { computeQAStats } from "./lib/qa-panel.js";
 import { sessionReviewsRoot } from "./lib/session-reviews.js";
-
-function platformRoot(): string {
-  return process.env.CHART_REVIEW_PLATFORM_ROOT
-    ?? path.resolve(process.cwd(), "..", "chart-review-platform");
-}
-function reviewsRoot(): string {
-  return process.env.CHART_REVIEW_REVIEWS_ROOT ?? path.join(platformRoot(), "var", "reviews");
-}
 
 function httpErr(status: number, message: string): Error & { status: number } {
   const err = new Error(message) as Error & { status: number };
@@ -80,28 +71,32 @@ export const methodsRoutes: RouteEntry[] = [
   // ── /api/migration/* ────────────────────────────────────────────────
   {
     method: "POST", pattern: "/api/migration/:taskId/simulate",
-    handler: async (body, _req, p) => {
+    handler: async (body, _req, p, query) => {
       const { from_sha, to_sha } = (body ?? {}) as { from_sha?: string; to_sha?: string };
       if (!from_sha || !to_sha) throw httpErr(400, "from_sha and to_sha required");
+      const sid = query.get("session_id");
+      if (!sid) throw httpErr(400, "session_id query param is required");
       const result = simulateImpact({
-        taskId: p.taskId, fromSha: from_sha, toSha: to_sha, reviewsRoot: reviewsRoot(),
+        taskId: p.taskId, fromSha: from_sha, toSha: to_sha, reviewsRoot: sessionReviewsRoot(sid),
       });
       return { ok: true, ...result };
     },
   },
   {
     method: "POST", pattern: "/api/migration/:taskId/run",
-    handler: async (body, req, p) => {
+    handler: async (body, req, p, query) => {
       const { from_sha, to_sha, patient_ids, dry_run } = (body ?? {}) as {
         from_sha?: string; to_sha?: string;
         patient_ids?: string[]; dry_run?: boolean;
       };
       if (!from_sha || !to_sha) throw httpErr(400, "from_sha and to_sha required");
+      const sid = query.get("session_id");
+      if (!sid) throw httpErr(400, "session_id query param is required");
 
       let pids = patient_ids;
       if (!pids) {
         const sim = simulateImpact({
-          taskId: p.taskId, fromSha: from_sha, toSha: to_sha, reviewsRoot: reviewsRoot(),
+          taskId: p.taskId, fromSha: from_sha, toSha: to_sha, reviewsRoot: sessionReviewsRoot(sid),
         });
         pids = sim.affected.map((a) => a.patient_id);
       }
@@ -110,7 +105,7 @@ export const methodsRoutes: RouteEntry[] = [
       const triggered_by = readReviewerFromRequest(req) ?? "anonymous-reviewer";
       const result = await runMigration({
         taskId: p.taskId, fromSha: from_sha, toSha: to_sha,
-        patientIds: pids, reviewsRoot: reviewsRoot(), triggeredBy: triggered_by,
+        patientIds: pids, reviewsRoot: sessionReviewsRoot(sid), triggeredBy: triggered_by,
       });
       return { ok: true, ...result };
     },

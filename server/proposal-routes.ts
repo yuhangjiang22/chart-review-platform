@@ -37,6 +37,7 @@ import { loadSkillBundle, guidelineDir } from "./lib/domain/rubric/index.js";
 import { REVIEWS_ROOT } from "./lib/domain/review/index.js";
 import { computeTaskSha } from "./lib/lock.js";
 import { notify } from "./lib/notifications.js";
+import { sessionReviewsRoot } from "./lib/session-reviews.js";
 
 /** Structured rejection reasons (#44). Stored on the proposal so
  *  rejections become a queryable critique signal. */
@@ -271,8 +272,10 @@ export const proposalRoutes: RouteEntry[] = [
   // POST /api/rules/:taskId/:ruleId/sample-replay (opt-in LLM)
   {
     method: "POST", pattern: "/api/rules/:taskId/:ruleId/sample-replay",
-    handler: async (body, _req, p) => {
+    handler: async (body, _req, p, query) => {
       const sample_size = (body as { sample_size?: number })?.sample_size ?? 5;
+      const sid = query.get("session_id");
+      if (!sid) throw httpErr(400, "session_id query param is required");
       const proposal = readProposal(p.taskId, p.ruleId);
       if (!proposal) throw httpErr(404, "proposal not found");
       if (!proposal.proposed_edit || proposal.proposed_edit.edit_type !== "guidance_prose_append") {
@@ -286,8 +289,7 @@ export const proposalRoutes: RouteEntry[] = [
         edit: proposal.proposed_edit,
         candidatePatientIds,
         sampleSize: sample_size,
-        reviewsRoot: process.env.CHART_REVIEW_REVIEWS_ROOT
-          ?? path.join(platformRoot, "var", "reviews"),
+        reviewsRoot: sessionReviewsRoot(sid),
         corpusRoot: process.env.CHART_REVIEW_CORPUS_ROOT
           ?? path.join(platformRoot, "corpus"),
       });

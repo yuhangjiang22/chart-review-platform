@@ -39,13 +39,15 @@ export const feedbackRoutes: RouteEntry[] = [
   // POST /api/cohort/analyze — run feedback agent across reviews
   {
     method: "POST", pattern: "/api/cohort/analyze",
-    handler: async (body) => {
+    handler: async (body, _req, _p, query) => {
       const { task_id, member_ids } = (body ?? {}) as {
         task_id?: string; member_ids?: string[];
       };
       if (!task_id) throw httpErr(400, "task_id required");
+      const sid = query.get("session_id");
+      if (!sid) throw httpErr(400, "session_id query param is required");
       try {
-        const result = await analyzeCohort({ task_id, member_ids });
+        const result = await analyzeCohort({ task_id, session_id: sid, member_ids });
         if (!result.ok) throw httpErr(500, (result as { error?: string }).error ?? "analyzeCohort failed", result);
         return result;
       } catch (e) {
