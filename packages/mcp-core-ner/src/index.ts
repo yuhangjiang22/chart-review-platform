@@ -330,9 +330,14 @@ function hashSpan(noteId: string, start: number, end: number, entityType: string
 }
 
 function statePath(session: NerMcpSession): string {
+  // With a scratch reviewsRoot (the per-run agent root passed during batch
+  // runs), spans land in scratch and are promoted to the committed,
+  // session-scoped path later by the run-import. Without one (e.g. the
+  // standalone NER stdio server), write directly to the committed path —
+  // scoped to the session so it never bleeds across sessions.
   const base = session.reviewsRoot
     ? path.join(session.reviewsRoot, session.patientId, session.task.task_id, "review_state.json")
-    : pathFor.reviewState(session.patientId, session.task.task_id);
+    : pathFor.reviewState(session.sessionId, session.patientId, session.task.task_id);
   return base;
 }
 
