@@ -48,7 +48,7 @@ function latestRunWithAgents(taskId: string, patientId: string): string | null {
     .sort((a, b) => (b.started_at ?? "").localeCompare(a.started_at ?? ""));
   for (const r of runs) {
     const dir = path.join(runDir(r.run_id), "per_patient", patientId, "agents");
-    if (fs.existsSync(dir) && fs.readdirSync(dir).some((f) => f.endsWith(".json"))) {
+    if (fs.existsSync(dir) && fs.readdirSync(dir).some((f) => f.endsWith(".json") && !f.endsWith(".error.json"))) {
       return r.run_id;
     }
   }
@@ -108,7 +108,8 @@ export const nerCalibrationRoutes: RouteEntry[] = [
         if (!runIdOrNull) continue;
         const agentsDir = path.join(runDir(runIdOrNull), "per_patient", pid, "agents");
         for (const f of fs.readdirSync(agentsDir).sort()) {
-          if (!f.endsWith(".json")) continue;
+          // Skip loud-fail markers — a `.error.json` is not an agent draft.
+          if (!f.endsWith(".json") || f.endsWith(".error.json")) continue;
           const aid = f.replace(/\.json$/, "");
           const spans = readSpans(path.join(agentsDir, f))
             .filter((s) => validated.has(s.note_id));

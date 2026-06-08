@@ -31,7 +31,13 @@ export type RunState =
   | "aborted_cost_cap"
   | "failed";
 
-export type PerPatientState = "pending" | "running" | "complete" | "error";
+export type PerPatientState =
+  | "pending"
+  | "running"
+  | "complete"
+  | "complete_with_errors"
+  | "failed"
+  | "error";
 
 export interface ConfidenceSummary {
   low: number;
@@ -275,7 +281,7 @@ export function agentTranscriptPath(runId: string, patientId: string, agentId: s
 export function hasAnyAgentDraft(runId: string, patientId: string): boolean {
   const dir = path.join(perPatientDir(runId, patientId), "agents");
   if (!fs.existsSync(dir)) return false;
-  return fs.readdirSync(dir).some((f) => f.endsWith(".json"));
+  return fs.readdirSync(dir).some((f) => f.endsWith(".json") && !f.endsWith(".error.json"));
 }
 
 // ── read helpers ─────────────────────────────────────────────────────────────
@@ -343,7 +349,7 @@ export function readDraft(runId: string, patientId: string): unknown | null {
   if (!fs.existsSync(agentsDir)) return null;
   const agentFiles = fs
     .readdirSync(agentsDir)
-    .filter((f) => f.endsWith(".json"))
+    .filter((f) => f.endsWith(".json") && !f.endsWith(".error.json"))
     .sort();
   if (agentFiles.length === 0) return null;
   try {
@@ -651,17 +657,34 @@ async function driveRun(
         const ms = Date.now() - t0;
 
         mutate((s) => {
+          // patient_status (rolled up from agent outcomes) drives both the
+          // per-patient state and the error counters:
+          //   "complete"             → all agents ok; n_complete++
+          //   "complete_with_errors" → some agents failed; n_complete++ AND n_error++
+          //   "failed"               → all agents failed; n_error++ only
+          const perState: PerPatientState =
+            out.patient_status === "failed"
+              ? "failed"
+              : out.patient_status === "complete_with_errors"
+                ? "complete_with_errors"
+                : "complete";
           s.per_patient[pid] = {
-            state: "complete",
+            state: perState,
             started_at: s.per_patient[pid]?.started_at,
             completed_at: new Date().toISOString(),
             duration_ms: ms,
             cost_usd: out.cost_usd,
             field_count: out.field_count,
             confidence_summary: out.confidence_summary,
+            ...(out.error
+              ? { error: out.error }
+              : out.patient_status === "failed"
+                ? { error: "all agents failed to produce a draft" }
+                : {}),
           };
           s.n_running = Math.max(0, s.n_running - 1);
-          s.n_complete += 1;
+          if (out.patient_status !== "failed") s.n_complete += 1;
+          if (out.patient_status !== "complete") s.n_error += 1;
           s.total_cost_usd = +(s.total_cost_usd + (out.cost_usd ?? 0)).toFixed(6);
         });
 
@@ -690,12 +713,24 @@ async function driveRun(
     }),
   );
 
-  // Finalize
+  // Finalize — derive the run's 3-way state from the final per_patient map:
+  //   aborted                                  → "aborted_cost_cap"
+  //   every patient failed/error (none ok)     → "failed"
+  //   any patient not fully "complete"         → "complete_with_errors"
+  //   all patients "complete"                  → "complete"
+  const patientStates = Object.values(status.per_patient).map((p) => p.state);
+  const anyComplete = patientStates.some(
+    (st) => st === "complete" || st === "complete_with_errors",
+  );
+  const allFailed = patientStates.length > 0 && !anyComplete;
+  const anyNotComplete = patientStates.some((st) => st !== "complete");
   const finalState: RunState = aborted
     ? "aborted_cost_cap"
-    : status.n_error > 0
-      ? "complete_with_errors"
-      : "complete";
+    : allFailed
+      ? "failed"
+      : anyNotComplete
+        ? "complete_with_errors"
+        : "complete";
   mutate((s) => {
     s.state = finalState;
     s.completed_at = new Date().toISOString();
@@ -703,10 +738,26 @@ async function driveRun(
   void taskId; // currently unused but reserved for future per-task index
 }
 
-interface OnePatientOutput {
+/** One agent's result for one patient. `status:"error"` means the agent
+ *  errored, hung, or made no qualifying writes (loud-fail) — no draft was
+ *  promoted; an `agents/<id>.error.json` marker was written instead. */
+interface OneAgentOutput {
+  status: "ok" | "error";
   cost_usd?: number;
   field_count?: number;
   confidence_summary?: ConfidenceSummary;
+  error?: string;
+}
+
+/** A patient's rolled-up result across all its agents. `patient_status`
+ *  drives the driver's PerPatientState + the run's final RunState. */
+interface OnePatientOutput {
+  patient_status: "complete" | "complete_with_errors" | "failed";
+  cost_usd?: number;
+  field_count?: number;
+  confidence_summary?: ConfidenceSummary;
+  /** Combined error string from the failed agents, if any. */
+  error?: string;
 }
 
 async function runOnePatient(
@@ -717,8 +768,12 @@ async function runOnePatient(
   let totalCost = 0;
   let totalFieldCount = 0;
   let mergedConfidence: ConfidenceSummary | undefined;
+  const agentOutcomes: Array<{ status: "ok" | "error" }> = [];
+  const agentErrors: string[] = [];
   for (const spec of specs) {
     const out = await runOneAgent(manifest, patientId, spec);
+    agentOutcomes.push({ status: out.status });
+    if (out.status === "error" && out.error) agentErrors.push(`${spec.id}: ${out.error}`);
     totalCost += out.cost_usd ?? 0;
     totalFieldCount += out.field_count ?? 0;
     // Combine confidence summaries by summing buckets across agents.
@@ -731,14 +786,21 @@ async function runOnePatient(
     }
   }
   maybeWriteLegacyDraft(manifest, patientId);
-  return { cost_usd: totalCost, field_count: totalFieldCount, confidence_summary: mergedConfidence };
+  const patient_status = rollupPatientStatus(agentOutcomes);
+  return {
+    patient_status,
+    cost_usd: totalCost,
+    field_count: totalFieldCount,
+    confidence_summary: mergedConfidence,
+    ...(agentErrors.length > 0 ? { error: agentErrors.join("; ") } : {}),
+  };
 }
 
 async function runOneAgent(
   manifest: RunManifest,
   patientId: string,
   spec: AgentSpec,
-): Promise<OnePatientOutput> {
+): Promise<OneAgentOutput> {
   const { run_id: runId, task_id: taskId } = manifest;
   const task = loadCompiledTask(taskId);
   if (!task) throw new Error(`task ${taskId} not found at runtime`);
@@ -777,6 +839,10 @@ async function runOneAgent(
   // loop, same scratch + audit promotion logic afterwards.
   const isNerTask = task.task_kind === "ner";
   const isAdherenceTask = task.task_kind === "adherence";
+  // task_kind is optional on the compiled task; undefined means the legacy
+  // phenotype default (matches the `else` dispatch branch below). The
+  // loud-fail tally/classifier need a concrete kind.
+  const taskKind: TaskKind = task.task_kind ?? "phenotype";
 
   const phenotypePrompt = [
     `You are running in batch mode. Activate the \`chart-review\` skill.`,
@@ -851,6 +917,12 @@ async function runOneAgent(
   const userPrompt = isNerTask ? "" /* unused — NER loops per-note */ : phenotypePrompt;
 
   let cost: number | undefined;
+  // Loud-fail tally — folded over the AgentEvent stream across ALL runAgent
+  // calls for this agent (NER loops once per note into the SAME tally). The
+  // event stream fires for every provider, unlike the SDK PostToolUse hook
+  // (which never fires for the codex subprocess) — see the comment block at
+  // the top of this file.
+  let tally: AgentTally = { agentError: null, writeCount: 0, sawCompletion: false };
   const auditHooks = buildAuditHooks({ patientId, taskId, sessionId });
 
   await withReviewsRoot(scratchRoot, async () => {
@@ -977,24 +1049,38 @@ async function runOneAgent(
         PostToolUse: [{ hooks: [adhAuditHooks.post] }],
       };
 
-      for await (const event of runAgent({
-        prompt: adherenceUserPrompt,
-        cwd: patientDir(patientId),
-        patientId,
-        taskId,
-        guidelinePath: guidelineDir(taskId),
-        mcpServers: adherenceMcp,
-        hooks: adhSdkHooks,
-        maxTurns: manifest.max_turns_per_patient,
-        permissionMode: "acceptEdits",
-        model: spec.model,
-        provider: manifest.provider,
-        transcriptPath: agentTranscriptPath(runId, patientId, spec.id),
-        extraSystemPrompt: extraAdherenceSystem,
-      })) {
-        if (event.type === "result" && typeof event.cost_usd === "number") {
-          cost = (cost ?? 0) + event.cost_usd;
+      try {
+        for await (const event of runAgent({
+          prompt: adherenceUserPrompt,
+          cwd: patientDir(patientId),
+          patientId,
+          taskId,
+          guidelinePath: guidelineDir(taskId),
+          mcpServers: adherenceMcp,
+          hooks: adhSdkHooks,
+          maxTurns: manifest.max_turns_per_patient,
+          permissionMode: "acceptEdits",
+          model: spec.model,
+          provider: manifest.provider,
+          transcriptPath: agentTranscriptPath(runId, patientId, spec.id),
+          extraSystemPrompt: extraAdherenceSystem,
+        })) {
+          if (event.type === "result" && typeof event.cost_usd === "number") {
+            cost = (cost ?? 0) + event.cost_usd;
+          }
+          tally = applyAgentEventToTally(tally, event, taskKind);
         }
+      } catch (e) {
+        // A THROWN error (transport crash, provider exception) becomes a
+        // loud-fail for this agent rather than crashing the whole run.
+        tally = { ...tally, agentError: (e as Error).message ?? String(e) };
+      }
+
+      // Gate before promoting. On error, do NOT compute/write the draft —
+      // a seeded/carried scratch is not this run's output. The marker +
+      // outcome are produced uniformly after the withReviewsRoot block.
+      if (classifyAgentOutcome(tally, taskKind).status === "error") {
+        return;
       }
 
       // Post-agent: load the committed question_answers from the scratch
@@ -1066,18 +1152,35 @@ async function runOneAgent(
       {
         for (const n of notes) {
           const noteId = n.filename.replace(/\.txt$/, "");
-          const r = await extractSpansDirect({
-            patientId,
-            task,
-            noteId,
-            ontologyPath,
-            reviewsRoot: scratchRoot,
-            sessionId,
-            azureBaseUrl,
-            azureApiKey,
-            model: spec.model,
-            rolePreset: spec.role_preset,
-          });
+          let r: Awaited<ReturnType<typeof extractSpansDirect>>;
+          try {
+            r = await extractSpansDirect({
+              patientId,
+              task,
+              noteId,
+              ontologyPath,
+              reviewsRoot: scratchRoot,
+              sessionId,
+              azureBaseUrl,
+              azureApiKey,
+              model: spec.model,
+              rolePreset: spec.role_preset,
+            });
+          } catch (e) {
+            // A thrown error from the direct-LLM extractor is a loud-fail.
+            tally = { ...tally, agentError: (e as Error).message ?? String(e) };
+            break;
+          }
+          // The NER path doesn't emit AgentEvents (it's a direct per-note LLM
+          // call, not an agent loop). Fold the structured result into the SAME
+          // tally the event-stream kinds use, matching applyAgentEventToTally's
+          // semantics: a returned (non-thrown) note = a completion signal;
+          // spans_written counts as primary writes; r.error = loud-fail.
+          tally = {
+            agentError: r.error ? (r.error || "NER extractor error") : tally.agentError,
+            writeCount: tally.writeCount + (r.spans_written ?? 0),
+            sawCompletion: true,
+          };
           try {
             fs.appendFileSync(transcriptFp, JSON.stringify({
               ts: new Date().toISOString(), type: "text",
@@ -1100,7 +1203,7 @@ async function runOneAgent(
       }
     } else {
       // Phenotype: one agent loop per patient (one combined assessment).
-      {
+      try {
         for await (const event of runAgent({
           prompt: userPrompt,
           cwd: patientDir(patientId),
@@ -1119,18 +1222,45 @@ async function runOneAgent(
           if (event.type === "result" && typeof event.cost_usd === "number") {
             cost = (cost ?? 0) + event.cost_usd;
           }
+          tally = applyAgentEventToTally(tally, event, taskKind);
         }
+      } catch (e) {
+        // A THROWN error becomes a loud-fail for this agent rather than
+        // crashing the whole run.
+        tally = { ...tally, agentError: (e as Error).message ?? String(e) };
       }
     }
   });
 
+  // Loud-fail gate: classify the agent's outcome from the folded tally.
+  // An agent that errored, hung, or made no qualifying writes did NOT produce
+  // a draft this run — promoting the seeded/carried-forward scratch would be a
+  // stale-answer bug (session-isolated-review-state spec). On error we write an
+  // `agents/<id>.error.json` marker and skip BOTH promote sites.
+  const outcome = classifyAgentOutcome(tally, taskKind);
+  if (outcome.status === "error") {
+    writeAgentErrorMarker(runId, patientId, taskId, spec.id, outcome.error);
+    return { status: "error", error: outcome.error, cost_usd: cost };
+  }
+
   // Adherence skips the scratch-state path entirely — the pipeline
-  // writes the draft inline above. NER + phenotype use the scratchRoot
-  // + MCP write loop, and we promote the resulting file here.
+  // writes the draft inline above (gated on the same outcome). NER +
+  // phenotype use the scratchRoot + MCP write loop, and we promote the
+  // resulting file here — only on a successful outcome.
   if (!isAdherenceTask) {
     const scratchReviewState = path.join(scratchRoot, patientId, taskId, "review_state.json");
     if (!fs.existsSync(scratchReviewState)) {
-      throw new Error(`agent ${spec.id} finished but did not write review_state.json — likely no MCP writes`);
+      // Treat a missing scratch state on an otherwise-ok outcome as a
+      // loud-fail too (defensive: shouldn't happen once writes were seen).
+      writeAgentErrorMarker(
+        runId, patientId, taskId, spec.id,
+        `agent ${spec.id} finished but did not write review_state.json — likely no MCP writes`,
+      );
+      return {
+        status: "error",
+        error: `agent ${spec.id} finished but did not write review_state.json — likely no MCP writes`,
+        cost_usd: cost,
+      };
     }
     fs.renameSync(scratchReviewState, agentDraftPath(runId, patientId, spec.id));
   }
@@ -1186,7 +1316,32 @@ async function runOneAgent(
     }
   } catch { /* leave unset */ }
 
-  return { cost_usd: cost, field_count: fieldCount, confidence_summary: confidenceSummary };
+  return { status: "ok", cost_usd: cost, field_count: fieldCount, confidence_summary: confidenceSummary };
+}
+
+/** Write the loud-fail marker for an errored agent: `agents/<id>.error.json`.
+ *  Readers (jobs-routes import enumeration, hasAnyAgentDraft, readDraft) skip
+ *  files ending in `.error.json` so a marker is never mistaken for a draft.
+ *  Best-effort — a failed marker write must not crash the run. */
+function writeAgentErrorMarker(
+  runId: string,
+  patientId: string,
+  taskId: string,
+  agentId: string,
+  error: string,
+): void {
+  try {
+    const dir = path.join(perPatientDir(runId, patientId), "agents");
+    fs.mkdirSync(dir, { recursive: true });
+    atomicWriteJson(path.join(dir, `${agentId}.error.json`), {
+      agent_id: agentId,
+      patient_id: patientId,
+      task_id: taskId,
+      status: "error",
+      error,
+      ts: new Date().toISOString(),
+    });
+  } catch { /* marker is best-effort */ }
 }
 
 /** When a manifest has exactly one agent, also write the agent's draft to the legacy
