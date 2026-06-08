@@ -24,7 +24,7 @@ import { loadCompiledTask } from "./lib/tasks.js";
 import { pathFor } from "@chart-review/storage";
 import { listRuns, runDir } from "@chart-review/infra-batch-run";
 import { computeSpanIaa } from "@chart-review/eval-span-iaa";
-import { PLATFORM_ROOT } from "@chart-review/patients";
+import { sessionReviewsRoot } from "./lib/session-reviews.js";
 import { transitionMaturity, getMaturity } from "@chart-review/maturity";
 import type { SpanLabel } from "@chart-review/platform-types";
 
@@ -34,9 +34,13 @@ function httpErr(status: number, message: string): Error & { status: number } {
   return err;
 }
 
-function reviewsRoot(): string {
-  return process.env.CHART_REVIEW_REVIEWS_ROOT
-    ?? path.join(PLATFORM_ROOT, "var", "reviews");
+/** Resolve the active session from the request query; 400 if absent.
+ *  No review_state read may fall back to the flat path — every read is
+ *  scoped to this session. */
+function sessionIdOf(query: URLSearchParams): string {
+  const sid = query.get("session_id");
+  if (!sid) throw httpErr(400, "session_id query param is required");
+  return sid;
 }
 
 function latestRunWithAgents(taskId: string, patientId: string): string | null {
@@ -61,20 +65,22 @@ function readSpans(p: string): SpanLabel[] {
 export const nerCalibrationRoutes: RouteEntry[] = [
   {
     method: "GET", pattern: "/api/calibrate-ner/:taskId",
-    handler: async (_b, _r, p) => {
+    handler: async (_b, _r, p, query) => {
       const task = loadCompiledTask(p.taskId);
       if (!task) throw httpErr(404, "task not found");
       if (task.task_kind !== "ner") {
         throw httpErr(400, `task ${p.taskId} is not an NER task`);
       }
+      const sid = sessionIdOf(query);
 
-      // Enumerate patients with a review_state.json for this task.
-      const rRoot = reviewsRoot();
+      // Enumerate patients with a review_state.json for this task,
+      // scoped to the active session.
+      const rRoot = sessionReviewsRoot(sid);
       const patientIds: string[] = [];
       if (fs.existsSync(rRoot)) {
         for (const pid of fs.readdirSync(rRoot)) {
           if (!/^[a-zA-Z0-9_-]+$/.test(pid)) continue;
-          const rsp = pathFor.reviewState(pid, p.taskId);
+          const rsp = pathFor.reviewState(sid, pid, p.taskId);
           if (fs.existsSync(rsp)) patientIds.push(pid);
         }
       }
@@ -87,7 +93,7 @@ export const nerCalibrationRoutes: RouteEntry[] = [
       let totalValidatedNotes = 0;
 
       for (const pid of patientIds) {
-        const rs = JSON.parse(fs.readFileSync(pathFor.reviewState(pid, p.taskId), "utf8")) as {
+        const rs = JSON.parse(fs.readFileSync(pathFor.reviewState(sid, pid, p.taskId), "utf8")) as {
           span_labels?: SpanLabel[];
           validated_notes?: string[];
         };
