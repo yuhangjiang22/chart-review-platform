@@ -55,10 +55,14 @@ export const spanStatsRoutes: RouteEntry[] = [
       }
       const manifest = getPilotManifest(p.taskId, p.iterId);
       if (!manifest) throw httpErr(404, `pilot ${p.iterId} not found`);
+      // The iteration pins exactly one session. A legacy iter with no
+      // session_id reads NOTHING — empty patient list, zeroed stats —
+      // rather than falling back to the flat review_state path.
+      const sessionId = manifest.session_id;
       // Patient ids: prefer the run status (live), fall back to the
       // manifest. Same fallback pattern the pilot route uses.
       const status = getRunStatus(manifest.run_id);
-      const patientIds = status?.per_patient
+      const patientIds = sessionId && status?.per_patient
         ? Object.keys(status.per_patient)
         : [];
       const patients: SpanStat[] = [];
@@ -67,7 +71,7 @@ export const spanStatsRoutes: RouteEntry[] = [
         rejected: 0, validated: 0,
       };
       for (const patientId of patientIds) {
-        const fp = pathFor.reviewState(patientId, p.taskId);
+        const fp = pathFor.reviewState(sessionId!, patientId, p.taskId);
         const stat: SpanStat = {
           patient_id: patientId, total: 0, mapped: 0, novel: 0,
           rejected: 0, validated: 0,
