@@ -34,7 +34,6 @@ import {
   type ProposedEdit,
 } from "./lib/domain/proposal/index.js";
 import { loadSkillBundle, guidelineDir } from "./lib/domain/rubric/index.js";
-import { REVIEWS_ROOT } from "./lib/domain/review/index.js";
 import { computeTaskSha } from "./lib/lock.js";
 import { notify } from "./lib/notifications.js";
 import { sessionReviewsRoot } from "./lib/session-reviews.js";
@@ -57,7 +56,9 @@ export const proposalRoutes: RouteEntry[] = [
   // POST /api/rules/:taskId/translate — NL → DSL edit + replay snapshot
   {
     method: "POST", pattern: "/api/rules/:taskId/translate",
-    handler: async (body, _req, p) => {
+    handler: async (body, _req, p, query) => {
+      const sid = query.get("session_id");
+      if (!sid) throw httpErr(400, "session_id query param is required");
       const { nl_rule, override, expected_outcome, created_by } = (body ?? {}) as {
         nl_rule?: string;
         override?: { record_id: string; agent_answer: unknown; reviewer_answer: unknown };
@@ -80,7 +81,7 @@ export const proposalRoutes: RouteEntry[] = [
         taskId: p.taskId,
         fromSha,
         edit: tx.edit,
-        reviewsRoot: REVIEWS_ROOT,
+        reviewsRoot: sessionReviewsRoot(sid),
       });
 
       const proposal: RuleProposal = {
@@ -168,7 +169,9 @@ export const proposalRoutes: RouteEntry[] = [
   // fire reviewer-inbox notification on success
   {
     method: "POST", pattern: "/api/rules/:taskId/:ruleId/accept",
-    handler: async (body, _req, p) => {
+    handler: async (body, _req, p, query) => {
+      const sid = query.get("session_id");
+      if (!sid) throw httpErr(400, "session_id query param is required");
       const { methodologist_edit, methodologist_id } = (body ?? {}) as {
         methodologist_edit?: ProposedEdit;
         methodologist_id?: string;
@@ -191,7 +194,7 @@ export const proposalRoutes: RouteEntry[] = [
             taskId: p.taskId,
             fromSha,
             edit: editToReplay,
-            reviewsRoot: REVIEWS_ROOT,
+            reviewsRoot: sessionReviewsRoot(sid),
           });
           replayDrift = {
             before_flips: before.replay?.flip_count ?? 0,

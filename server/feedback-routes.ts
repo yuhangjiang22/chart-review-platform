@@ -25,7 +25,6 @@ import {
 import {
   loadSkillBundle, guidelineDir,
 } from "./lib/domain/rubric/index.js";
-import { REVIEWS_ROOT } from "./lib/domain/review/index.js";
 import { computeTaskSha } from "./lib/lock.js";
 import { sessionReviewsRoot } from "./lib/session-reviews.js";
 
@@ -89,7 +88,9 @@ export const feedbackRoutes: RouteEntry[] = [
   // pending_methodologist_review state.
   {
     method: "POST", pattern: "/api/cohort/:taskId/runs/:runId/proposals/:proposalId/convert",
-    handler: async (_body, req, p) => {
+    handler: async (_body, req, p, query) => {
+      const sid = query.get("session_id");
+      if (!sid) throw httpErr(400, "session_id query param is required");
       const reviewerId = readReviewerFromRequest(req) ?? "anonymous-reviewer";
 
       const run = readCohortRun(p.taskId, p.runId) as { proposals?: Array<{
@@ -125,11 +126,8 @@ export const feedbackRoutes: RouteEntry[] = [
       if (!tx.ok) return { ok: false, error: tx.error, rule_id: ruleId };
 
       const fromSha = computeTaskSha(guidelineDir(p.taskId));
-      const platformRoot = process.env.CHART_REVIEW_PLATFORM_ROOT
-        ?? path.resolve(process.cwd(), "..", "chart-review-platform");
-      void platformRoot; // unused but documents env precedence
       const replay = await replayRule({
-        taskId: p.taskId, fromSha, edit: tx.edit, reviewsRoot: REVIEWS_ROOT,
+        taskId: p.taskId, fromSha, edit: tx.edit, reviewsRoot: sessionReviewsRoot(sid),
       });
 
       const proposal: RuleProposal = {
