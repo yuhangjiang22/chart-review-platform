@@ -27,6 +27,20 @@ session-scoped (resolve session from the relevant manifest; never read the flat 
 - `server/pilot-routes.ts:660` — `GET /api/versions/:taskId/:vTag/cells`. Resolve session
   from the version/iter manifest; report none if absent.
 
+### Deferred: `locked_from_session` lock provenance (own task)
+
+The spec's "LOCK records the source session" can't land as planned: v2's dedicated lock
+handler (`server/lib/routes-reviewer.ts` `POST /api/reviews/:pid/:tid/lock`, which stamps
+`locked_at`/`locked_by`/`lock_task_sha`) is **dead code** — not mounted (index.ts mounts the
+`RouteEntry[]` registries, not that Express `Router`), and it fabricates a synthetic
+`lock-<ts>` session id. The live lock flows through `/api/reviews/.../uiactions`
+`set_review_status→locked` (already session-scoped by P1.2) but stamps **no** lock
+provenance. So recording `locked_from_session` needs a design decision about where v2's
+live lock provenance lives (revive a lock route, or make the `set_review_status→locked`
+path lock-aware), then add `locked_from_session?: string` to `ReviewState`
+(`packages/domain-review/src/review-state.ts`) + its reducer case. Session is already
+implicit in the per-patient path; this is provenance-only, low urgency.
+
 ---
 
 ## Reference map (light → v2)
