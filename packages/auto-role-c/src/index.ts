@@ -90,7 +90,9 @@ export function shouldAutoRoleC(input: AutoRoleCInput): boolean {
 export async function fireAutoRoleC(input: AutoRoleCInput): Promise<void> {
   const { analyzeCohort } = await import("../../../server/lib/feedback.js" as any);
   const { notifyMethodologists } = await import("../../../server/lib/notifications.js" as any);
-  const result = await analyzeCohort({ task_id: input.taskId });
+  // input.reviewsRoot is the ambient (session-scoped) reviews root passed by
+  // the mutation path — thread it so the cohort read stays inside the session.
+  const result = await analyzeCohort({ task_id: input.taskId, reviewsRoot: input.reviewsRoot });
   notifyMethodologists({
     kind: "auto_role_c",
     message: result.ok

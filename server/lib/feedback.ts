@@ -21,13 +21,16 @@ import { runAgent } from "./agent-provider.js";
 import { PLATFORM_ROOT } from "./patients.js";
 import { loadCompiledTask } from "./tasks.js";
 import { guidelineDir } from "./domain/rubric/index.js";
-import { sessionReviewsRoot } from "./session-reviews.js";
 
 const COHORTS_ROOT = path.join(PLATFORM_ROOT, "var", "cohorts");
 
 export interface AnalyzeCohortOptions {
   task_id: string;
-  session_id: string; // active session — scopes the review_state read
+  /** Session-scoped reviews root (`var/reviews/<sessionId>`). The route
+   *  computes it from the active session_id; the auto-Role-C mutation path
+   *  passes the ambient `reviewsRoot()` override (already the session root).
+   *  Never the flat root. */
+  reviewsRoot: string;
   member_ids?: string[]; // optional explicit cohort; otherwise every patient with state
 }
 
@@ -71,9 +74,9 @@ export async function analyzeCohort(
   const startedAt = Date.now();
 
   // Loud-fail: never fall back to the flat reviews root. The cohort read
-  // must be scoped to a concrete session.
-  if (!opts.session_id) {
-    throw new Error("analyzeCohort requires a session_id to scope the review_state read");
+  // must be scoped to a concrete session's reviews root.
+  if (!opts.reviewsRoot) {
+    throw new Error("analyzeCohort requires a session-scoped reviewsRoot to scope the review_state read");
   }
 
   // Verify the guideline exists
@@ -87,7 +90,7 @@ export async function analyzeCohort(
     };
   }
 
-  const reviewsRoot = sessionReviewsRoot(opts.session_id);
+  const reviewsRoot = opts.reviewsRoot;
   const members = findCohortMembers(opts.task_id, reviewsRoot, opts.member_ids);
   if (members.length === 0) {
     return {

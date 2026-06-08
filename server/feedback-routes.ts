@@ -27,6 +27,7 @@ import {
 } from "./lib/domain/rubric/index.js";
 import { REVIEWS_ROOT } from "./lib/domain/review/index.js";
 import { computeTaskSha } from "./lib/lock.js";
+import { sessionReviewsRoot } from "./lib/session-reviews.js";
 
 function httpErr(status: number, message: string, payload?: unknown): Error & { status: number; payload?: unknown } {
   const err = new Error(message) as Error & { status: number; payload?: unknown };
@@ -47,7 +48,7 @@ export const feedbackRoutes: RouteEntry[] = [
       const sid = query.get("session_id");
       if (!sid) throw httpErr(400, "session_id query param is required");
       try {
-        const result = await analyzeCohort({ task_id, session_id: sid, member_ids });
+        const result = await analyzeCohort({ task_id, reviewsRoot: sessionReviewsRoot(sid), member_ids });
         if (!result.ok) throw httpErr(500, (result as { error?: string }).error ?? "analyzeCohort failed", result);
         return result;
       } catch (e) {
