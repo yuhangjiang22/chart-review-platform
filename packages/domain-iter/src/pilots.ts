@@ -589,9 +589,17 @@ export async function selfCritiquePilot(opts: {
   if (!runManifest) throw new Error(`run not found for pilot: ${pilot.run_id}`);
 
   // Filter to patients whose review_state.json exists (was imported).
-  const patientsWithState = runManifest.patient_ids.filter((pid) =>
-    fs.existsSync(path.join(reviewsRoot(), pid, opts.task_id, "review_state.json")),
-  );
+  // Review state is session-scoped; a legacy pilot with no session_id has
+  // nothing scoped to read, so treat patientsWithState as empty rather
+  // than fall back to the old flat path.
+  const sessionReviewsDir = pilot.session_id
+    ? path.join(reviewsRoot(), pilot.session_id)
+    : null;
+  const patientsWithState = sessionReviewsDir
+    ? runManifest.patient_ids.filter((pid) =>
+        fs.existsSync(path.join(sessionReviewsDir, pid, opts.task_id, "review_state.json")),
+      )
+    : [];
 
   // Locate proposals_seed.json (emitted by emitDerivedArtifactsOnCompletion).
   const seedPath = path.join(pilotIterDir(opts.task_id, opts.iter_id), "proposals_seed.json");
@@ -1088,8 +1096,12 @@ export function pilotIterationStats(taskId: string): PilotIterationStats[] {
         patientIds = rm.patient_ids ?? [];
       } catch { /* skip */ }
     }
-    for (const pid of patientIds) {
-      const rsPath = path.join(reviewsRoot(), pid, taskId, "review_state.json");
+    // Review state is session-scoped. A legacy iter with no session_id has
+    // no scoped review state — it contributes no import/override stats
+    // rather than reading the old flat path.
+    const sessionReviewsDir = m.session_id ? path.join(reviewsRoot(), m.session_id) : null;
+    for (const pid of sessionReviewsDir ? patientIds : []) {
+      const rsPath = path.join(sessionReviewsDir!, pid, taskId, "review_state.json");
       if (!fs.existsSync(rsPath)) continue;
       try {
         const rs = JSON.parse(fs.readFileSync(rsPath, "utf8")) as {

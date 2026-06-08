@@ -464,9 +464,15 @@ export const pilotWriteRoutes: RouteEntry[] = [
           ?? path.resolve(process.cwd(), "..", "chart-review-platform");
         const cohort = readCohortSampling(p.taskId);
         const primaryCriterionIds = readPrimaryCriterionIds(p.taskId);
-        if (cohort && primaryCriterionIds.length > 0) {
+        // Resolve the session from the iteration manifest. A legacy iter
+        // with no session_id has no per-session review state to read —
+        // skip the accuracy compute rather than read the old flat path.
+        const m = getPilotManifest(p.taskId, p.iterId);
+        const sessionId = m?.session_id;
+        if (cohort && primaryCriterionIds.length > 0 && sessionId) {
           const accuracy = computeIterAccuracy({
             rootDir: platformRoot,
+            sessionId,
             taskId: p.taskId,
             iterId: p.iterId,
             cohortKind: "dev",

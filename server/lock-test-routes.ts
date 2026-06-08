@@ -15,6 +15,7 @@ import {
   readLockTestManifest, writeLockTestManifest,
 } from "./lib/lock-test.js";
 import { readCohortSampling } from "./lib/domain/cohort/index.js";
+import { sessionIdForRun } from "./lib/session-reviews.js";
 import {
   readPrimaryCriterionIds, computeIterAccuracy,
 } from "./lib/domain/iter/index.js";
@@ -86,8 +87,15 @@ export const lockTestRoutes: RouteEntry[] = [
       if (!cohort) throw httpErr(400, "no_cohort");
 
       const primaryCriterionIds = readPrimaryCriterionIds(p.taskId);
+      // Accuracy reads per-session review state. Resolve the session from
+      // the agent batch-run this lock-test kicked off. If we can't resolve
+      // a session there is nothing scoped to read — fail loudly rather
+      // than read the old flat path.
+      const sessionId = m.agent_run_id ? sessionIdForRun(p.taskId, m.agent_run_id) : null;
+      if (!sessionId) throw httpErr(400, "no_session_for_lock_test");
       const accuracy = computeIterAccuracy({
         rootDir,
+        sessionId,
         taskId: p.taskId,
         iterId: p.runId,
         cohortKind: "lock",

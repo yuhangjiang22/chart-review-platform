@@ -23,6 +23,7 @@ export interface IterAccuracy {
 
 export interface ComputeIterAccuracyArgs {
   rootDir: string;
+  sessionId: string;
   taskId: string;
   iterId: string;
   cohortKind: "dev" | "lock";
@@ -53,7 +54,7 @@ export function computeIterAccuracy(args: ComputeIterAccuracyArgs): IterAccuracy
   let overrides = 0;
 
   for (const pid of args.patientIds) {
-    const reviewPath = path.join(args.rootDir, "reviews", pid, args.taskId, "review_state.json");
+    const reviewPath = path.join(args.rootDir, "reviews", args.sessionId, pid, args.taskId, "review_state.json");
     if (!fs.existsSync(reviewPath)) continue;
     const state: ReviewState = JSON.parse(fs.readFileSync(reviewPath, "utf8"));
     for (const fa of state.field_assessments ?? []) {
