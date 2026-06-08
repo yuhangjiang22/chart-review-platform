@@ -56,8 +56,8 @@ function reviewsRootPath(): string {
   return process.env.CHART_REVIEW_REVIEWS_ROOT ?? path.join(PLATFORM_ROOT, "var", "reviews");
 }
 
-function readReviewState(taskId: string, patientId: string): PerPatientReviewState | null {
-  const fp = path.join(reviewsRootPath(), patientId, taskId, "review_state.json");
+function readReviewState(sessionId: string, taskId: string, patientId: string): PerPatientReviewState | null {
+  const fp = path.join(reviewsRootPath(), sessionId, patientId, taskId, "review_state.json");
   if (!fs.existsSync(fp)) return null;
   try {
     return JSON.parse(fs.readFileSync(fp, "utf8"));
@@ -76,8 +76,8 @@ function readAgentDraft(runDir: string, patientId: string, agentId: string): Age
   }
 }
 
-function listPatientsWithReviews(taskId: string): string[] {
-  const root = reviewsRootPath();
+function listPatientsWithReviews(sessionId: string, taskId: string): string[] {
+  const root = path.join(reviewsRootPath(), sessionId);
   if (!fs.existsSync(root)) return [];
   const out: string[] = [];
   for (const patientId of fs.readdirSync(root)) {
@@ -104,12 +104,16 @@ export function computeRevisitsForIter(args: {
   const manifest = getPilotManifest(taskId, iterId);
   const runDirAbs = manifest ? computeRunDir(manifest.run_id) : null;
 
-  const patients = listPatientsWithReviews(taskId);
+  // Review state is session-scoped. The iter's session is fixed by its
+  // manifest; a legacy iter with no session_id has nothing scoped to read,
+  // so report no revisits rather than reading the old flat path.
+  const sessionId = manifest?.session_id ?? null;
+  const patients = sessionId ? listPatientsWithReviews(sessionId, taskId) : [];
   const rows: RevisitRow[] = [];
   const changedFieldIds = new Set<string>();
 
   for (const patientId of patients) {
-    const state = readReviewState(taskId, patientId);
+    const state = readReviewState(sessionId!, taskId, patientId);
     if (!state?.field_assessments) continue;
     const agentDraft = runDirAbs ? readAgentDraft(runDirAbs, patientId, "agent_1") : null;
 
@@ -146,6 +150,9 @@ export function computeRevisitsForIter(args: {
 }
 
 export interface BulkKeepArgs {
+  /** Session the iter belongs to. Required — review_state is session-scoped
+   *  and must never be written at the flat path. */
+  sessionId: string;
   taskId: string;
   fieldId: string;
   patientIds?: string[];        // when omitted, applies to every patient with a stale record
@@ -157,15 +164,15 @@ export interface BulkKeepResult {
 }
 
 export async function bulkKeepRevisits(args: BulkKeepArgs): Promise<BulkKeepResult> {
-  const { taskId, fieldId, patientIds } = args;
+  const { sessionId, taskId, fieldId, patientIds } = args;
   const currentHashes = snapshotCriterionHashesSync(taskId);
   const currentHash = currentHashes[fieldId];
   if (!currentHash) return { bumped: 0 };
 
-  const candidates = patientIds ?? listPatientsWithReviews(taskId);
+  const candidates = patientIds ?? listPatientsWithReviews(sessionId, taskId);
   let bumped = 0;
   for (const patientId of candidates) {
-    const fp = path.join(reviewsRootPath(), patientId, taskId, "review_state.json");
+    const fp = path.join(reviewsRootPath(), sessionId, patientId, taskId, "review_state.json");
     if (!fs.existsSync(fp)) continue;
     let state: PerPatientReviewState;
     try {

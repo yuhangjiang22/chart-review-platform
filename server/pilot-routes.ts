@@ -200,15 +200,22 @@ export const pilotReadRoutes: RouteEntry[] = [
         runManifest?.patient_ids
         ?? readCohortSampling(taskId)?.dev_patient_ids
         ?? [];
+      // Review state is session-scoped; the iter's session is fixed by its
+      // manifest. A legacy iter with no session_id has nothing scoped to read,
+      // so each patient keeps its non-review defaults rather than reading the
+      // old flat path.
+      const sessionId = m.session_id;
       const patient_status = patientIds.map((pid) => {
         const perPatient = runStatus?.per_patient?.[pid];
         const agentDone = perPatient?.state === "complete";
         const errored = perPatient?.state === "error";
         const errorMessage = errored ? (perPatient?.error ?? null) : null;
-        const reviewPath = path.join(reviewsRootDir, pid, taskId, "review_state.json");
+        const reviewPath = sessionId
+          ? path.join(reviewsRootDir, sessionId, pid, taskId, "review_state.json")
+          : null;
         let validated = false;
         let reviewerTouched = false;
-        if (fs.existsSync(reviewPath)) {
+        if (reviewPath && fs.existsSync(reviewPath)) {
           try {
             const state = JSON.parse(fs.readFileSync(reviewPath, "utf8")) as {
               review_status?: string;
@@ -556,7 +563,22 @@ export const pilotWriteRoutes: RouteEntry[] = [
         throw err;
       }
       const reviewerId = readReviewerFromRequest(req) ?? "anonymous-reviewer";
+      // Review state is session-scoped and bulk-keep is a write; resolve the
+      // iter's session from its manifest. A legacy iter with no session_id has
+      // nowhere safe to write — fail loudly rather than writing the flat path.
+      const m = getPilotManifest(p.taskId, p.iterId);
+      if (!m) {
+        const err = new Error("pilot iteration not found") as Error & { status: number };
+        err.status = 404;
+        throw err;
+      }
+      if (!m.session_id) {
+        const err = new Error("no_session_for_iter") as Error & { status: number };
+        err.status = 409;
+        throw err;
+      }
       const result = await bulkKeepRevisits({
+        sessionId: m.session_id,
         taskId: p.taskId,
         fieldId: field_id,
         patientIds: Array.isArray(patient_ids) ? patient_ids : undefined,
@@ -644,6 +666,11 @@ export const versionsRoutes: RouteEntry[] = [
         ?? path.resolve(process.cwd(), "..", "chart-review-platform");
       const reviewsRootDir = process.env.CHART_REVIEW_REVIEWS_ROOT
         ?? path.join(platformRoot, "var", "reviews");
+      // Review state is session-scoped; the iter's session is fixed by its
+      // manifest. A legacy iter with no session_id has nothing scoped to read,
+      // so every cell reports its unvalidated default rather than reading the
+      // old flat path.
+      const sessionId = manifest.session_id;
       const cells: Array<{
         patient_id: string;
         field_id: string;
@@ -657,8 +684,10 @@ export const versionsRoutes: RouteEntry[] = [
           captured_against_schema_hash?: string;
         }> = {};
         try {
-          const rsPath = path.join(reviewsRootDir, patientId, p.taskId, "review_state.json");
-          if (fs.existsSync(rsPath)) {
+          const rsPath = sessionId
+            ? path.join(reviewsRootDir, sessionId, patientId, p.taskId, "review_state.json")
+            : null;
+          if (rsPath && fs.existsSync(rsPath)) {
             const rs = JSON.parse(fs.readFileSync(rsPath, "utf8")) as {
               field_assessments?: Array<{
                 field_id: string; source: string; answer?: unknown;
