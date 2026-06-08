@@ -121,10 +121,22 @@ export const lockTestRoutes: RouteEntry[] = [
       const reviewsRootDir = process.env.CHART_REVIEW_REVIEWS_ROOT
         ?? path.join(rootDir, "var", "reviews");
 
+      // Per-patient progress reads session-scoped review state. Resolve the
+      // session from the agent batch-run this lock-test kicked off. If we
+      // can't resolve a session there is nothing scoped to read — report
+      // "not started" for every patient rather than fall back to the old
+      // flat path. This is a read-only progress GET, so reporting
+      // "not started" when there's no session is correct and non-fatal.
+      const sessionId = manifest.agent_run_id
+        ? sessionIdForRun(p.taskId, manifest.agent_run_id)
+        : null;
+
       const patients = cohort.lock_patient_ids.map((pid) => {
-        const reviewPath = path.join(reviewsRootDir, pid, p.taskId, "review_state.json");
+        const notStarted = { patient_id: pid, oracle_done: false, in_progress: false, agent_done: false };
+        if (!sessionId) return notStarted;
+        const reviewPath = path.join(reviewsRootDir, sessionId, pid, p.taskId, "review_state.json");
         if (!fs.existsSync(reviewPath)) {
-          return { patient_id: pid, oracle_done: false, in_progress: false, agent_done: false };
+          return notStarted;
         }
         const state = JSON.parse(fs.readFileSync(reviewPath, "utf8"));
         const reviewerTouched = (state.field_assessments ?? []).some((fa: any) => fa.source === "reviewer");
