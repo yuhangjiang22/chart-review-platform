@@ -37,13 +37,22 @@ import type { RouteEntry } from "./router.js";
 import { isMethodologist, readReviewerFromRequest } from "./auth.js";
 import { loadCompiledTask } from "./lib/tasks.js";
 import { guidelineDir } from "./lib/domain/rubric/index.js";
-import { mutate as mutateReviewState } from "@chart-review/domain-review";
+import { mutate as mutateReviewState, withReviewsRoot } from "@chart-review/domain-review";
+import { sessionReviewsRoot } from "./lib/session-reviews.js";
 import {
   loadAdherenceSkill,
   type QuestionDefinition,
 } from "@chart-review/pipeline-extract-adherence";
 import type { RuleDefinition } from "@chart-review/rule-engine";
 import type { QuestionAnswer, RuleVerdict, AttributionCategory } from "@chart-review/platform-types";
+
+/** Workspace session id from the query — required for committed-state writes so
+ *  sessions stay isolated (distinct from the reviewer/MCP audit session). */
+function sessionIdOf(query: URLSearchParams): string {
+  const sid = query.get("session_id");
+  if (!sid) throw httpErr(400, "session_id query param is required");
+  return sid;
+}
 
 function httpErr(status: number, message: string): Error & { status: number } {
   const err = new Error(message) as Error & { status: number };
@@ -169,7 +178,9 @@ export const adherenceRoutes: RouteEntry[] = [
 
   {
     method: "POST", pattern: "/api/reviews/:patientId/:taskId/adherence/question-answer",
-    handler: async (body, req, p) => {
+    handler: async (body, req, p, query) => {
+      const sid = sessionIdOf(query);
+      return withReviewsRoot(sessionReviewsRoot(sid), async () => {
       const task = adherenceTaskOrFail(p.taskId);
       const reviewerId = readReviewerFromRequest(req);
       const b = (body ?? {}) as Partial<QuestionAnswer> & { question_id?: string };
@@ -207,12 +218,15 @@ export const adherenceRoutes: RouteEntry[] = [
       });
       void reviewerId;
       return { ok: true, version: result.version };
+      });
     },
   },
 
   {
     method: "POST", pattern: "/api/reviews/:patientId/:taskId/adherence/rule-verdict",
-    handler: async (body, req, p) => {
+    handler: async (body, req, p, query) => {
+      const sid = sessionIdOf(query);
+      return withReviewsRoot(sessionReviewsRoot(sid), async () => {
       const task = adherenceTaskOrFail(p.taskId);
       const reviewerId = readReviewerFromRequest(req);
       const b = (body ?? {}) as {
@@ -246,6 +260,7 @@ export const adherenceRoutes: RouteEntry[] = [
       });
       void reviewerId;
       return { ok: true, version: result.version };
+      });
     },
   },
 ];
