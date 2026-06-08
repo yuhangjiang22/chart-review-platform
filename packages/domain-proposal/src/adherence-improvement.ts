@@ -33,13 +33,12 @@ function proposalsRoot(): string {
   return process.env.CHART_REVIEW_PROPOSALS_ROOT
     ?? path.join(PLATFORM_ROOT, "var", "proposals");
 }
-function reviewsRoot(): string {
-  return process.env.CHART_REVIEW_REVIEWS_ROOT
-    ?? path.join(PLATFORM_ROOT, "var", "reviews");
-}
 
 export interface ImproveAdherenceTaskOptions {
   task_id: string;
+  /** Session-scoped reviews root (e.g. sessionReviewsRoot(sid) → <root>/var/reviews/<sessionId>).
+   *  review_state.json is read at <reviewsRoot>/<pid>/<task_id>/review_state.json. Never the flat path. */
+  reviewsRoot: string;
   patient_ids: string[];
   /** Optional: focus the analysis on a single question_id. */
   focus_question_id?: string;
@@ -107,8 +106,8 @@ function sameAnswer(a: unknown, b: unknown): boolean {
   return JSON.stringify(normalize(a)) === JSON.stringify(normalize(b));
 }
 
-function buildPerPatientDiff(taskId: string, patientId: string): PerPatientDiff | null {
-  const rsPath = path.join(reviewsRoot(), patientId, taskId, "review_state.json");
+function buildPerPatientDiff(taskId: string, patientId: string, reviewsRoot: string): PerPatientDiff | null {
+  const rsPath = path.join(reviewsRoot, patientId, taskId, "review_state.json");
   if (!fs.existsSync(rsPath)) return null;
   let rs: {
     question_answers?: QuestionAnswerLite[];
@@ -206,7 +205,7 @@ export async function improveAdherenceTask(
         error: `invalid patient_id: ${pid}`, duration_ms: 0,
       };
     }
-    const d = buildPerPatientDiff(opts.task_id, pid);
+    const d = buildPerPatientDiff(opts.task_id, pid, opts.reviewsRoot);
     if (!d) missing.push(pid); else diffs.push(d);
   }
   if (missing.length > 0) {

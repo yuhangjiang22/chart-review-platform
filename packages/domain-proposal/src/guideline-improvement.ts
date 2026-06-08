@@ -22,13 +22,12 @@ function proposalsRoot(): string {
   return process.env.CHART_REVIEW_PROPOSALS_ROOT ?? path.join(PLATFORM_ROOT, "var", "proposals");
 }
 
-function reviewsRoot(): string {
-  return process.env.CHART_REVIEW_REVIEWS_ROOT ?? path.join(PLATFORM_ROOT, "var", "reviews");
-}
-
 export interface ImproveGuidelineOptions {
   guideline_id: string;
-  /** Patient ids to analyze. Each must have a review_state.json under reviews/<pid>/<guideline_id>/. */
+  /** Session-scoped reviews root (e.g. sessionReviewsRoot(sid) → <root>/var/reviews/<sessionId>).
+   *  review_state.json is read at <reviewsRoot>/<pid>/<guideline_id>/review_state.json. Never the flat path. */
+  reviewsRoot: string;
+  /** Patient ids to analyze. Each must have a review_state.json under <reviewsRoot>/<pid>/<guideline_id>/. */
   patient_ids: string[];
   /** Optional: focus the analysis on a single criterion (e.g., 'pathology_lung_primary'). */
   focus_criterion?: string;
@@ -102,7 +101,7 @@ export async function improveGuideline(
         duration_ms: 0,
       };
     }
-    const rsPath = path.join(reviewsRoot(), pid, opts.guideline_id, "review_state.json");
+    const rsPath = path.join(opts.reviewsRoot, pid, opts.guideline_id, "review_state.json");
     if (!fs.existsSync(rsPath)) missing.push(pid);
     else reviewStatePaths.push(path.relative(PLATFORM_ROOT, rsPath));
   }

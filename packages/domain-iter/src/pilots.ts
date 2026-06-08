@@ -633,6 +633,7 @@ export async function selfCritiquePilot(opts: {
   try {
     result = await improveGuideline({
       guideline_id: opts.task_id,
+      reviewsRoot: sessionReviewsDir ?? "",  // legacy iter with no session → empty → fn's existsSync guard reads nothing
       patient_ids: patientsWithState,  // may be empty; that's OK if seedHasGaps is true
       focus_criterion: opts.focus_criterion,
       proposals_seed_file: seedExists ? seedPath : undefined,

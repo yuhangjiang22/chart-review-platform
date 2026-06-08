@@ -25,13 +25,12 @@ function proposalsRoot(): string {
   return process.env.CHART_REVIEW_PROPOSALS_ROOT
     ?? path.join(PLATFORM_ROOT, "var", "proposals");
 }
-function reviewsRoot(): string {
-  return process.env.CHART_REVIEW_REVIEWS_ROOT
-    ?? path.join(PLATFORM_ROOT, "var", "reviews");
-}
 
 export interface ImproveNerTaskOptions {
   task_id: string;
+  /** Session-scoped reviews root (e.g. sessionReviewsRoot(sid) → <root>/var/reviews/<sessionId>).
+   *  review_state.json is read at <reviewsRoot>/<pid>/<task_id>/review_state.json. Never the flat path. */
+  reviewsRoot: string;
   patient_ids: string[];
   /** Optional: focus the analysis on a single entity_type (e.g. "Dementia"). */
   focus_entity_type?: string;
@@ -175,10 +174,10 @@ function computeDiff(
   return { deleted_by_reviewer, added_by_reviewer, concept_name_edited };
 }
 
-function buildPerPatientDiff(taskId: string, patientId: string): PerPatientDiff | null {
+function buildPerPatientDiff(taskId: string, patientId: string, reviewsRoot: string): PerPatientDiff | null {
   const runIdOrNull = latestRunForTaskWithPatient(taskId, patientId);
   const agent_drafts = runIdOrNull ? loadAgentDrafts(runIdOrNull, patientId) : [];
-  const rsPath = path.join(reviewsRoot(), patientId, taskId, "review_state.json");
+  const rsPath = path.join(reviewsRoot, patientId, taskId, "review_state.json");
   if (!fs.existsSync(rsPath)) return null;
   const rs = JSON.parse(fs.readFileSync(rsPath, "utf8")) as {
     span_labels?: Array<{ [k: string]: unknown }>;
@@ -226,7 +225,7 @@ export async function improveNerTask(
         error: `invalid patient_id: ${pid}`, duration_ms: 0,
       };
     }
-    const d = buildPerPatientDiff(opts.task_id, pid);
+    const d = buildPerPatientDiff(opts.task_id, pid, opts.reviewsRoot);
     if (!d) missing.push(pid); else diffs.push(d);
   }
   if (missing.length > 0) {

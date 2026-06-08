@@ -58,13 +58,11 @@ import {
   MATURITY_STATES, type MaturityState,
 } from "./lib/maturity.js";
 import { forkLockedToDraft } from "./lib/authoring.js";
+import { sessionReviewsRoot } from "./lib/session-reviews.js";
 
 function platformRoot(): string {
   return process.env.CHART_REVIEW_PLATFORM_ROOT
     ?? path.resolve(process.cwd(), "..", "chart-review-platform");
-}
-function reviewsRoot(): string {
-  return process.env.CHART_REVIEW_REVIEWS_ROOT ?? path.join(platformRoot(), "var", "reviews");
 }
 function proposalsRoot(): string {
   return process.env.CHART_REVIEW_PROPOSALS_ROOT ?? path.join(platformRoot(), "var", "proposals");
@@ -185,7 +183,7 @@ export const guidelineRoutes: RouteEntry[] = [
 
   {
     method: "POST", pattern: "/api/guideline-improvement/:taskId",
-    handler: async (body, _r, p) => {
+    handler: async (body, _r, p, query) => {
       const { patient_ids, focus_criterion, focus_entity_type, focus_question_id } = (body ?? {}) as {
         patient_ids?: string[];
         focus_criterion?: string;
@@ -195,6 +193,9 @@ export const guidelineRoutes: RouteEntry[] = [
       if (!Array.isArray(patient_ids) || patient_ids.length === 0) {
         throw httpErr(400, "patient_ids[] required (non-empty)");
       }
+      const sid = query.get("session_id");
+      if (!sid) throw httpErr(400, "session_id query param is required");
+      const reviewsRoot = sessionReviewsRoot(sid);
       // task_kind dispatch:
       //   - NER → span-shaped driver, proposals patch entity-type-guidance YAMLs
       //   - adherence → question/rule-shaped driver, proposals patch
@@ -204,20 +205,20 @@ export const guidelineRoutes: RouteEntry[] = [
       try {
         if (task?.task_kind === "ner") {
           const result = await improveNerTask({
-            task_id: p.taskId, patient_ids, focus_entity_type,
+            task_id: p.taskId, patient_ids, focus_entity_type, reviewsRoot,
           });
           if (!result.ok) throw httpErr(500, (result as { error?: string }).error ?? "improveNerTask failed", result);
           return result;
         }
         if (task?.task_kind === "adherence") {
           const result = await improveAdherenceTask({
-            task_id: p.taskId, patient_ids, focus_question_id,
+            task_id: p.taskId, patient_ids, focus_question_id, reviewsRoot,
           });
           if (!result.ok) throw httpErr(500, (result as { error?: string }).error ?? "improveAdherenceTask failed", result);
           return result;
         }
         const result = await improveGuideline({
-          guideline_id: p.taskId, patient_ids, focus_criterion,
+          guideline_id: p.taskId, patient_ids, focus_criterion, reviewsRoot,
         });
         if (!result.ok) throw httpErr(500, (result as { error?: string }).error ?? "improveGuideline failed", result);
         return result;
@@ -230,8 +231,10 @@ export const guidelineRoutes: RouteEntry[] = [
 
   {
     method: "GET", pattern: "/api/guideline-improvement/:taskId/cell-count",
-    handler: async (_b, _r, p) => {
-      const root = reviewsRoot();
+    handler: async (_b, _r, p, query) => {
+      const sid = query.get("session_id");
+      if (!sid) throw httpErr(400, "session_id query param is required");
+      const root = sessionReviewsRoot(sid);
       let validated = 0;
       let total = 0;
       if (!fs.existsSync(root)) return { validated, total };
