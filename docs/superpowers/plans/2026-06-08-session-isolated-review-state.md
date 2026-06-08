@@ -43,7 +43,15 @@ justified out-of-scope. Session source per consumer:
 - `server/methods-routes.ts:26` + `server/lib/methods-drafter.ts:118` — POST /api/methods/:taskId/draft
 - `packages/version-archive/src/index.ts:121` — listVersions→countRecordsForSha (post-lock record counts)
 
-**MUST-SCOPE but INHERENTLY CROSS-SESSION (no single natural session — decision needed; see checkpoint):**
+**DECISION (2026-06-08, user):** Option 3 — scope ALL live consumers to the active session
+(after migration the flat path is empty, so deferring would silently break these features;
+per-session also matches the app's session-based UX). Iteration-bound → `manifest.session_id`.
+Task-level/cross-session → required `session_id` query param (the active session). Exception:
+**drift-detector** rides the domain-review overridable `reviewsRoot()` (already inside
+`withReviewsRoot` during a mutation) — no query param, just stop using its own flat root.
+regression-gate resolves the **prior-iteration's** session from that iter's manifest.
+
+**MUST-SCOPE but INHERENTLY CROSS-SESSION (now scoped to active session per the decision):**
 - `server/lib/assignment.ts:166` — getReviewerQueue (reviewer inbox; task-global today)
 - `packages/domain-iter/src/regression-gate.ts:63` — checkRegression ground truth (prior-iter)
 - `server/lib/impact-simulator.ts:53` + `server/proposal-routes.ts:290`→`packages/domain-proposal/src/rule-replay.ts:61` — rule-impact replay (pre-lock, rules are global)
