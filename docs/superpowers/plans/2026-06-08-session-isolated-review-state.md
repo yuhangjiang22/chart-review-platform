@@ -27,6 +27,36 @@ session-scoped (resolve session from the relevant manifest; never read the flat 
 - `server/pilot-routes.ts:660` — `GET /api/versions/:taskId/:vTag/cells`. Resolve session
   from the version/iter manifest; report none if absent.
 
+### Full Phase-2 consumer audit (thorough sweep — supersedes the partial Key-facts list)
+
+A read-only exploration classified EVERY remaining flat `var/reviews/<pid>/<taskId>/review_state.json`
+read/write. The original plan listed ~6; the real surface is ~12 live consumers + several
+justified out-of-scope. Session source per consumer:
+
+**MUST-SCOPE — iteration-bound (session = pilot/iter `manifest.session_id`; legacy→read nothing):**
+- `server/pilot-routes.ts:208` — GET /api/pilots/:taskId/:iterId
+- `server/pilot-routes.ts:660` — GET /api/versions/:taskId/:vTag/cells
+- `server/lib/derived-adjudications/revisits.ts:60` (read) + `:168` (write) — pilot revisits (GET + bulk-keep)
+
+**MUST-SCOPE — publication/task-summary (session = active session via required `session_id` query param):**
+- `server/lib/qa-panel.ts:75` — GET /api/qa/:taskId (also feeds methods-drafter)
+- `server/methods-routes.ts:26` + `server/lib/methods-drafter.ts:118` — POST /api/methods/:taskId/draft
+- `packages/version-archive/src/index.ts:121` — listVersions→countRecordsForSha (post-lock record counts)
+
+**MUST-SCOPE but INHERENTLY CROSS-SESSION (no single natural session — decision needed; see checkpoint):**
+- `server/lib/assignment.ts:166` — getReviewerQueue (reviewer inbox; task-global today)
+- `packages/domain-iter/src/regression-gate.ts:63` — checkRegression ground truth (prior-iter)
+- `server/lib/impact-simulator.ts:53` + `server/proposal-routes.ts:290`→`packages/domain-proposal/src/rule-replay.ts:61` — rule-impact replay (pre-lock, rules are global)
+- `server/lib/feedback.ts:26/61` — cohort-analyze findCohortMembers
+- `packages/drift-detector/src/index.ts:61` — embedded in EVERY state mutation via `review-state.ts`; should ride the domain-review overridable `reviewsRoot()` (already inside `withReviewsRoot` during mutations) rather than its own flat root — verify.
+
+**OUT-OF-SCOPE (justified — different root or frozen snapshot; leave flat):**
+- `packages/domain-bundle/src/bundle-export.ts:184/416` — copies into a self-contained export bundle (reproducibility snapshot, frozen).
+- `server/lib/deployment-kappa.ts` — reads `cohorts/<id>/sample/validations/...`, the deployment-cohort root, not committed reviews.
+- `server/lib/guideline-calibration.ts` — replays audit trails, not review_state.json.
+- `packages/audit-trail/src/index.ts` — chat logs at `reviews/<pid>/<task>/chat/<session_id>.jsonl`; already session-scoped by design.
+- `server/lib/methodologist.ts:64` — dead v1 Express router, not mounted.
+
 ### Deferred: `locked_from_session` lock provenance (own task)
 
 The spec's "LOCK records the source session" can't land as planned: v2's dedicated lock
