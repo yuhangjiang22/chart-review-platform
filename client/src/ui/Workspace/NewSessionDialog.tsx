@@ -98,6 +98,10 @@ export function NewSessionDialog({
   const [agentSpecs, setAgentSpecs] = useState<AgentSpecForm[]>(DEFAULT_AGENT_SPECS);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Signalled by AgentConfigPanel once the model registry loads. A session
+  // with no runnable model can't run, so submit is gated on this. Starts
+  // null ("not yet known") so we don't block before the registry resolves.
+  const [modelsAvailable, setModelsAvailable] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (!open) {
@@ -105,6 +109,7 @@ export function NewSessionDialog({
       setAgentSpecs(DEFAULT_AGENT_SPECS);
       setSelectedPackageId("");
       setSubmitting(false); setError(null);
+      setModelsAvailable(null);
     }
   }, [open]);
 
@@ -184,6 +189,10 @@ export function NewSessionDialog({
     if (!name.trim()) { setError("name is required"); return; }
     if (selected.size === 0) { setError("pick at least one patient"); return; }
     if (agentSpecs.length === 0) { setError("at least one agent is required"); return; }
+    if (modelsAvailable === false) {
+      setError("no model is available for the active provider — configure config/models.json or set the provider's API key before starting a session");
+      return;
+    }
 
     setSubmitting(true); setError(null);
     const patientIds = [...selected];
@@ -359,7 +368,11 @@ export function NewSessionDialog({
               3 · Agents ({agentSpecs.length})
             </label>
             <div className="mt-1">
-              <AgentConfigPanel value={agentSpecs} onChange={setAgentSpecs} />
+              <AgentConfigPanel
+                value={agentSpecs}
+                onChange={setAgentSpecs}
+                onModelsAvailable={setModelsAvailable}
+              />
             </div>
           </div>
 
@@ -385,7 +398,15 @@ export function NewSessionDialog({
             <Button variant="outline" size="sm" onClick={onClose} disabled={submitting}>
               Cancel
             </Button>
-            <Button size="sm" className="gap-1.5" onClick={submit} disabled={submitting}>
+            <Button
+              size="sm"
+              className="gap-1.5"
+              onClick={submit}
+              disabled={submitting || modelsAvailable === false}
+              title={modelsAvailable === false
+                ? "No model is available for the active provider — configure a model before starting a session"
+                : undefined}
+            >
               <Plus size={12} />
               {submitting ? "Creating session + starting iter…" : "Start session"}
             </Button>

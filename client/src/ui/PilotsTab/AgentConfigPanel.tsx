@@ -4,15 +4,23 @@
 //   • interpretation — HOW the agent reads what it finds (default vs skeptical)
 // "Custom prompt" bypasses both axes via role_prompt (free-form override).
 // Fetches presets from GET /api/agent-roles and groups them by axis frontmatter.
-// Fetches env default model from GET /api/agent-roles/default-model.
+//
+// Model is per-agent and registry-backed: the available models come from
+// GET /api/models (the honest picker source). Each agent gets a <select>
+// populated from that registry; unavailable models are greyed/disabled; when
+// no model is available the picker is replaced by a config message and the
+// parent is signalled (onModelsAvailable) so it can disable session creation.
 import { useEffect, useMemo, useState } from "react";
 import { authFetch } from "../../auth";
+import { useModelRegistry } from "../../useModelRegistry";
 
 export interface AgentSpecForm {
   id: string;
   search_mode_preset?: string;
   interpretation_preset?: string;
   role_prompt?: string;
+  /** The model STRING (registry entry's `model`) this agent runs on. Undefined
+   *  → the registry default's model string (the picker seeds it on mount). */
   model?: string;
 }
 
@@ -27,16 +35,11 @@ interface RolePreset {
 interface AgentConfigPanelProps {
   value: AgentSpecForm[];
   onChange: (v: AgentSpecForm[]) => void;
+  /** Signalled after the model registry loads: true if at least one model is
+   *  available for the active provider. The parent gates session creation on
+   *  this (a session with no runnable model can't run). */
+  onModelsAvailable?: (hasAvailable: boolean) => void;
 }
-
-const QUICK_PICK_MODELS = [
-  "anthropic/claude-haiku-4.5",
-  "anthropic/claude-sonnet-4-6",
-  "gpt-5.2",
-  "gpt-4o",
-  "deepseek/deepseek-v4-pro",
-  "deepseek/deepseek-v4-flash",
-] as const;
 
 const AXIS_LABEL: Record<Axis, string> = {
   search_mode: "Search mode",
@@ -53,9 +56,12 @@ const AXIS_DEFAULT: Record<Axis, string> = {
   interpretation: "default",
 };
 
-export function AgentConfigPanel({ value, onChange }: AgentConfigPanelProps) {
+export function AgentConfigPanel({ value, onChange, onModelsAvailable }: AgentConfigPanelProps) {
   const [presets, setPresets] = useState<RolePreset[]>([]);
-  const [defaultModel, setDefaultModel] = useState<string | null>(null);
+
+  const {
+    models, defaultModel, activeProvider, loaded, availableModels, noModels,
+  } = useModelRegistry();
 
   useEffect(() => {
     authFetch("/api/agent-roles")
@@ -64,12 +70,21 @@ export function AgentConfigPanel({ value, onChange }: AgentConfigPanelProps) {
       .catch(() => setPresets([]));
   }, []);
 
+  // Signal the parent whether any model is runnable, so it can gate session
+  // creation. Fire only after the registry resolves to avoid a false "ok"
+  // flash during loading.
   useEffect(() => {
-    authFetch("/api/agent-roles/default-model")
-      .then((r) => (r.ok ? r.json() : { default_model: null }))
-      .then((d) => setDefaultModel(typeof d.default_model === "string" ? d.default_model : null))
-      .catch(() => setDefaultModel(null));
-  }, []);
+    if (loaded) onModelsAvailable?.(availableModels.length > 0);
+  }, [loaded, availableModels.length, onModelsAvailable]);
+
+  // Seed any spec missing a model with the registry default's model string, so
+  // a fresh agent card isn't blank. Runs once the default resolves.
+  useEffect(() => {
+    if (!defaultModel) return;
+    if (value.some((s) => s.model == null)) {
+      onChange(value.map((s) => (s.model == null ? { ...s, model: defaultModel } : s)));
+    }
+  }, [defaultModel, value, onChange]);
 
   const presetsByAxis = useMemo(() => {
     const out: Record<Axis, RolePreset[]> = { search_mode: [], interpretation: [] };
@@ -123,10 +138,6 @@ export function AgentConfigPanel({ value, onChange }: AgentConfigPanelProps) {
     ]);
   }
 
-  const modelPlaceholder = defaultModel
-    ? `(env default: ${defaultModel})`
-    : "(env default)";
-
   return (
     <div className="space-y-3">
       <div>
@@ -143,6 +154,16 @@ export function AgentConfigPanel({ value, onChange }: AgentConfigPanelProps) {
           <span className="font-mono">search_mode</span> ×{" "}
           <span className="font-mono">interpretation</span>.
         </p>
+        {noModels && (
+          <div className="mt-2 rounded-md border border-destructive/30 bg-destructive/5 px-2.5 py-1.5 text-[11.5px] text-destructive">
+            No models configured for the active provider (
+            <span className="font-mono">{activeProvider}</span>). Add{" "}
+            <span className="font-mono">config/models.json</span> or set the
+            provider's API key (
+            <span className="font-mono">AZURE_OPENAI_API_KEY</span> for codex /{" "}
+            <span className="font-mono">ANTHROPIC_API_KEY</span> for claude).
+          </div>
+        )}
       </div>
 
       <div className="space-y-2">
@@ -219,42 +240,30 @@ export function AgentConfigPanel({ value, onChange }: AgentConfigPanelProps) {
                 </div>
               )}
 
-              <div className="flex flex-col gap-1.5">
-                <input
-                  type="text"
-                  value={spec.model ?? ""}
-                  onChange={(e) => updateSpec(i, { model: e.target.value || undefined })}
-                  placeholder={modelPlaceholder}
-                  className="w-full rounded-md border border-border px-2 py-1 text-[12px] font-mono bg-background placeholder:text-muted-foreground/60"
-                  aria-label={`Model override for ${spec.id}`}
-                />
-                <div className="flex flex-wrap gap-1">
-                  {QUICK_PICK_MODELS.map((m) => (
-                    <button
-                      key={m}
-                      type="button"
-                      onClick={() => updateSpec(i, { model: m })}
-                      className={[
-                        "rounded border px-1.5 py-0.5 text-[10px] font-mono transition-colors",
-                        spec.model === m
-                          ? "border-foreground/40 bg-foreground/10 text-foreground"
-                          : "border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground",
-                      ].join(" ")}
-                    >
-                      {m.split("/").pop()}
-                    </button>
-                  ))}
-                  {spec.model && (
-                    <button
-                      type="button"
-                      onClick={() => updateSpec(i, { model: undefined })}
-                      className="rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground hover:text-destructive transition-colors"
-                    >
-                      clear
-                    </button>
+              <label className="flex flex-col gap-1">
+                <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                  Model
+                  <span className="ml-1 normal-case tracking-normal text-muted-foreground/70">
+                    — which model this agent runs on
+                  </span>
+                </span>
+                <select
+                  value={spec.model ?? defaultModel ?? ""}
+                  onChange={(e) => updateSpec(i, { model: e.target.value })}
+                  disabled={models.length === 0}
+                  className="rounded-md border border-border px-2 py-1 text-[12px] font-mono bg-background disabled:opacity-50"
+                  aria-label={`Model for ${spec.id}`}
+                >
+                  {models.length === 0 && (
+                    <option value="">(no models configured)</option>
                   )}
-                </div>
-              </div>
+                  {models.map((m) => (
+                    <option key={m.id} value={m.model} disabled={!m.available}>
+                      {m.label}{m.available ? "" : " — (backend not active)"}
+                    </option>
+                  ))}
+                </select>
+              </label>
             </div>
           );
         })}
