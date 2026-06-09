@@ -1,15 +1,10 @@
 // NewSessionDialog — modal for starting a new session.
 //
-// Single end-to-end flow: name → cohort → agent config → submit.
-// Submit is atomic from the user's perspective: it creates the session
-// manifest AND kicks off the first iter (POST /api/pilots/:taskId with
-// session_id) so the methodologist lands in a usable workspace
-// immediately.
-//
-// If the iter-start fails after session creation succeeds, the session
-// is left in place (no iters) and the dialog shows an error; the user
-// can retry the iter via "Run again" later without re-creating the
-// session.
+// Flow: name → cohort → agent config → submit. Submit creates the session
+// manifest ONLY — it does NOT start a run. The methodologist reviews the
+// locked cohort/agent/model config and explicitly starts the first iter from
+// the TRY phase ("Start iter", POST /api/pilots/:taskId), so no agent tokens
+// are spent until they choose to run.
 
 import { useState, useEffect } from "react";
 import { Plus } from "lucide-react";
@@ -233,29 +228,10 @@ export function NewSessionDialog({
       const sessionBody = await r1.json() as { session: { session_id: string } };
       const sessionId = sessionBody.session.session_id;
 
-      // 2. Kick off the first iter for this session. Cohort + agents come
-      // from the session (strict lock); we only pass session_id + notes.
-      const r2 = await authFetch(`/api/pilots/${encodeURIComponent(taskId)}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          session_id: sessionId,
-          notes: notes.trim() || undefined,
-        }),
-      });
-      if (!r2.ok) {
-        const body = await r2.json().catch(() => ({}));
-        // Session is created but first iter failed. Surface the error;
-        // the methodologist can manually start an iter later.
-        setError(
-          `Session created (id ${sessionId}) but starting the first iter failed: `
-          + (body?.error ?? `HTTP ${r2.status}`)
-          + ". The session is usable; click 'Run again' on DECIDE to retry.",
-        );
-        // Still call onCreated so the parent switches to this session.
-        onCreated(sessionId);
-        return;
-      }
+      // Session created — do NOT auto-start a run. The methodologist reviews
+      // the cohort / agent / model config and then explicitly starts the first
+      // iter from the TRY phase ("Start iter"), so no tokens are spent until
+      // they choose to run.
       onCreated(sessionId);
       onClose();
     } catch (e) {
@@ -271,8 +247,9 @@ export function NewSessionDialog({
         <DialogHeader>
           <DialogTitle>Start a new session</DialogTitle>
           <DialogDescription>
-            A session locks a cohort + agent config. The first iter starts automatically once
-            you submit; subsequent iters in this session reuse the same cohort.
+            A session locks a cohort + agent config. Creating it does NOT start a run —
+            go to TRY and click “Start iter” when you’re ready. All iters in this session
+            reuse the same cohort.
           </DialogDescription>
         </DialogHeader>
 
