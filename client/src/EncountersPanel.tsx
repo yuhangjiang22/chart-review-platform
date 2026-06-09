@@ -7,6 +7,7 @@
 import { useState } from "react";
 import type { ReviewState } from "./types";
 import { authFetch } from "./auth";
+import { withSession } from "./active-session";
 
 export interface EncountersPanelProps {
   patientId: string;
@@ -42,7 +43,7 @@ export function EncountersPanel({
       if (note_ids.length > 0) body.note_ids = note_ids;
 
       const r = await authFetch(
-        `/api/reviews/${patientId}/${taskId}/encounters`,
+        withSession(`/api/reviews/${patientId}/${taskId}/encounters`),
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -71,7 +72,7 @@ export function EncountersPanel({
     setError(null);
     try {
       const r = await authFetch(
-        `/api/reviews/${patientId}/${taskId}/encounters/${encounterId}`,
+        withSession(`/api/reviews/${patientId}/${taskId}/encounters/${encounterId}`),
         { method: "DELETE" },
       );
       const j = await r.json();

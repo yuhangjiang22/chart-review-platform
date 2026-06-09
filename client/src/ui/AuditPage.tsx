@@ -7,6 +7,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { History, Lock, Search } from "lucide-react";
 import { authFetch } from "../auth";
+import { withSession } from "../active-session";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,7 +37,7 @@ export function AuditPage({ taskId, onOpenPatient }: AuditPageProps) {
   const [locks, setLocks] = useState<Record<string, LockedRow>>({});
 
   useEffect(() => {
-    authFetch(`/api/patients?task_id=${encodeURIComponent(taskId)}`)
+    authFetch(withSession(`/api/patients?task_id=${encodeURIComponent(taskId)}`))
       .then((r) => r.json())
       .then((list: PatientSummary[]) => setPatients(list));
   }, [taskId]);
@@ -54,7 +55,7 @@ export function AuditPage({ taskId, onOpenPatient }: AuditPageProps) {
       for (const pid of lockedIds) {
         if (locks[pid]) continue;
         try {
-          const rs = await authFetch(`/api/reviews/${pid}/${taskId}`).then((r) => r.json());
+          const rs = await authFetch(withSession(`/api/reviews/${pid}/${taskId}`)).then((r) => r.json());
           if (cancelled) return;
           const display = patients.find((p) => p.patient_id === pid)?.display_name;
           setLocks((prev) => ({

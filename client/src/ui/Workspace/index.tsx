@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { authFetch } from "../../auth";
+import { setActiveSessionGlobal, withSession } from "../../active-session";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 import {
@@ -193,12 +194,18 @@ export function Workspace({
   const [sessions, setSessions] = useState<SessionListItem[]>([]);
   const sessionStorageKey = `chart-review:active-session:${taskId}`;
   const [activeSessionId, setActiveSessionIdState] = useState<string | null>(() => {
-    try { return localStorage.getItem(sessionStorageKey); } catch { return null; }
+    let initial: string | null = null;
+    try { initial = localStorage.getItem(sessionStorageKey); } catch { initial = null; }
+    // Seed the module-level holder so scattered fetch() callers can scope
+    // review-state requests from the very first render (no prop-threading).
+    setActiveSessionGlobal(initial);
+    return initial;
   });
   const [newSessionOpen, setNewSessionOpen] = useState(false);
 
   function setActiveSessionId(sid: string | null) {
     setActiveSessionIdState(sid);
+    setActiveSessionGlobal(sid);
     try {
       if (sid) localStorage.setItem(sessionStorageKey, sid);
       else localStorage.removeItem(sessionStorageKey);
@@ -300,7 +307,7 @@ export function Workspace({
     setIsImproving(true);
     setImproveProposalCount(undefined);
     try {
-      const r = await authFetch(`/api/guideline-improvement/${encodeURIComponent(taskId)}`, {
+      const r = await authFetch(withSession(`/api/guideline-improvement/${encodeURIComponent(taskId)}`, activeSessionId), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ patient_ids: cohortPids }),

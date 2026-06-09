@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { authFetch } from "./auth";
+import { withSession } from "./active-session";
 import { Pill } from "./atoms";
 
 interface SessionSummary {
@@ -49,7 +50,7 @@ export function AuditView({ patientId, taskId }: { patientId: string; taskId: st
     if (!patientId || !taskId) return;
     setActiveSession(null);
     setEntries([]);
-    authFetch(`/api/reviews/${patientId}/${taskId}/audit`)
+    authFetch(withSession(`/api/reviews/${patientId}/${taskId}/audit`))
       .then((r) => r.json())
       .then((s: SessionSummary[]) => {
         setSessions(s);
@@ -60,7 +61,7 @@ export function AuditView({ patientId, taskId }: { patientId: string; taskId: st
   useEffect(() => {
     if (!activeSession) return;
     setLoadingEntries(true);
-    authFetch(`/api/reviews/${patientId}/${taskId}/audit/${activeSession}`)
+    authFetch(withSession(`/api/reviews/${patientId}/${taskId}/audit/${activeSession}`))
       .then((r) => r.json())
       .then((d: { entries: AuditEntry[] }) => setEntries(d.entries ?? []))
       .finally(() => setLoadingEntries(false));

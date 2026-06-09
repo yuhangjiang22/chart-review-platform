@@ -22,6 +22,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight, Info, Lock, ShieldCheck } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { authFetch } from "../auth";
+import { withSession } from "../active-session";
 import type {
   CompiledField,
   Evidence,
@@ -390,7 +391,7 @@ export function PatientReview(p: PatientReviewProps) {
   const [iterId, setIterId] = useState<string | null>(p.iterId ?? null);
   useEffect(() => {
     let cancelled = false;
-    authFetch(`/api/reviews/${p.patientId}/${p.taskId}/derived-adjudications`)
+    authFetch(withSession(`/api/reviews/${p.patientId}/${p.taskId}/derived-adjudications`))
       .then((r) => r.json())
       .then((data: { ok: boolean; records?: DerivedAdjudication[]; iter_id?: string | null }) => {
         if (cancelled || !data.ok) return;
@@ -527,7 +528,7 @@ export function PatientReview(p: PatientReviewProps) {
                           matched?.rationale ??
                           judgeRec.analysis?.reasoning ??
                           "Applied judge suggestion";
-                        await authFetch(`/api/reviews/${p.patientId}/${p.taskId}/actions`, {
+                        await authFetch(withSession(`/api/reviews/${p.patientId}/${p.taskId}/actions`), {
                           method: "POST",
                           headers: { "Content-Type": "application/json" },
                           body: JSON.stringify({
@@ -551,7 +552,7 @@ export function PatientReview(p: PatientReviewProps) {
                     isLocked={isLocked}
                     derivedView={derivedView}
                     onSubmit={async ({ field_id, answer, evidence, rationale, comment }) => {
-                      await authFetch(`/api/reviews/${p.patientId}/${p.taskId}/actions`, {
+                      await authFetch(withSession(`/api/reviews/${p.patientId}/${p.taskId}/actions`), {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
@@ -1236,7 +1237,7 @@ function ReviewFooter({
   async function validate() {
     setBusy(true);
     try {
-      const r = await authFetch(`/api/reviews/${patientId}/${taskId}/validate`, {
+      const r = await authFetch(withSession(`/api/reviews/${patientId}/${taskId}/validate`), {
         method: "POST",
       });
       const body = await r.json();
@@ -1250,7 +1251,7 @@ function ReviewFooter({
     if (!confirm("Lock this record? This is irreversible — no further writes will be accepted.")) return;
     setBusy(true);
     try {
-      const r = await authFetch(`/api/reviews/${patientId}/${taskId}/lock`, {
+      const r = await authFetch(withSession(`/api/reviews/${patientId}/${taskId}/lock`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ iter_id: iterId ?? undefined }),
@@ -1265,7 +1266,7 @@ function ReviewFooter({
   async function unvalidate() {
     setBusy(true);
     try {
-      await authFetch(`/api/reviews/${patientId}/${taskId}/uiactions`, {
+      await authFetch(withSession(`/api/reviews/${patientId}/${taskId}/uiactions`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

@@ -22,6 +22,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft, Check, X, ChevronDown, ChevronRight, Download, CheckCircle2, Circle } from "lucide-react";
 import { authFetch } from "../auth";
+import { withSession } from "../active-session";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -75,7 +76,7 @@ export function SpanReview({ patientId, patientDisplay, taskId, onBack }: SpanRe
     setLoading(true);
     try {
       const r = await authFetch(
-        `/api/reviews/${encodeURIComponent(patientId)}/${encodeURIComponent(taskId)}`,
+        withSession(`/api/reviews/${encodeURIComponent(patientId)}/${encodeURIComponent(taskId)}`),
       );
       if (!r.ok) {
         setError(`load failed: ${r.status}`);
@@ -113,7 +114,7 @@ export function SpanReview({ patientId, patientDisplay, taskId, onBack }: SpanRe
   ): Promise<void> {
     try {
       const r = await authFetch(
-        `/api/reviews/${encodeURIComponent(patientId)}/${encodeURIComponent(taskId)}/spans/${encodeURIComponent(spanId)}`,
+        withSession(`/api/reviews/${encodeURIComponent(patientId)}/${encodeURIComponent(taskId)}/spans/${encodeURIComponent(spanId)}`),
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -138,7 +139,7 @@ export function SpanReview({ patientId, patientDisplay, taskId, onBack }: SpanRe
   async function setNoteValidation(noteId: string, validated: boolean): Promise<void> {
     try {
       const r = await authFetch(
-        `/api/reviews/${encodeURIComponent(patientId)}/${encodeURIComponent(taskId)}/notes/${encodeURIComponent(noteId)}/validation`,
+        withSession(`/api/reviews/${encodeURIComponent(patientId)}/${encodeURIComponent(taskId)}/notes/${encodeURIComponent(noteId)}/validation`),
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -162,7 +163,7 @@ export function SpanReview({ patientId, patientDisplay, taskId, onBack }: SpanRe
   async function deleteSpan(spanId: string): Promise<void> {
     try {
       const r = await authFetch(
-        `/api/reviews/${encodeURIComponent(patientId)}/${encodeURIComponent(taskId)}/spans/${encodeURIComponent(spanId)}`,
+        withSession(`/api/reviews/${encodeURIComponent(patientId)}/${encodeURIComponent(taskId)}/spans/${encodeURIComponent(spanId)}`),
         { method: "DELETE" },
       );
       if (!r.ok) {
@@ -749,7 +750,7 @@ function NewSpanPopover({
     setError(null);
     try {
       const r = await authFetch(
-        `/api/reviews/${encodeURIComponent(patientId)}/${encodeURIComponent(taskId)}/spans`,
+        withSession(`/api/reviews/${encodeURIComponent(patientId)}/${encodeURIComponent(taskId)}/spans`),
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },

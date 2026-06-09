@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowRight, Play, Square, RotateCcw, Shuffle } from "lucide-react";
 import { authFetch } from "../../auth";
+import { withSession } from "../../active-session";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -167,7 +168,7 @@ export function PhaseTry({
     let cancelled = false;
     (async () => {
       const [pr, iters, sr] = await Promise.all([
-        authFetch("/api/patients").then((r) => (r.ok ? r.json() : [])),
+        authFetch(withSession("/api/patients", activeSessionId)).then((r) => (r.ok ? r.json() : [])),
         authFetch(`/api/pilots/${encodeURIComponent(taskId)}`)
           .then((r) => (r.ok ? r.json() : []))
           .catch(() => [] as IterListing[]),

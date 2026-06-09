@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { authFetch } from "../auth";
+import { withSession } from "../active-session";
 import type { CompiledField, ReviewState } from "../types";
 
 export interface WorkflowBarProps {
@@ -50,13 +51,13 @@ export function WorkflowBar({
     if (!confirm("Accept ALL remaining agent drafts as-is?")) return;
     setBusy(true);
     try {
-      await authFetch(`/api/reviews/${patientId}/${taskId}/bulk-accept`, { method: "POST" });
+      await authFetch(withSession(`/api/reviews/${patientId}/${taskId}/bulk-accept`), { method: "POST" });
     } finally { setBusy(false); }
   }
   async function validate() {
     setBusy(true);
     try {
-      const r = await authFetch(`/api/reviews/${patientId}/${taskId}/validate`, { method: "POST" });
+      const r = await authFetch(withSession(`/api/reviews/${patientId}/${taskId}/validate`), { method: "POST" });
       const body = await r.json();
       if (!body.ok) alert(`Cannot validate yet:\n${JSON.stringify(body.gate_results, null, 2)}`);
     } finally { setBusy(false); }
@@ -65,7 +66,7 @@ export function WorkflowBar({
     if (!confirm("Lock this record? This is irreversible — no further writes will be accepted.")) return;
     setBusy(true);
     try {
-      const r = await authFetch(`/api/reviews/${patientId}/${taskId}/lock`, { method: "POST" });
+      const r = await authFetch(withSession(`/api/reviews/${patientId}/${taskId}/lock`), { method: "POST" });
       const body = await r.json();
       if (!body.ok) alert(`Lock failed:\n${body.error ?? "Unknown error"}`);
     } finally { setBusy(false); }
@@ -73,7 +74,7 @@ export function WorkflowBar({
   async function unvalidate() {
     setBusy(true);
     try {
-      await authFetch(`/api/reviews/${patientId}/${taskId}/uiactions`, {
+      await authFetch(withSession(`/api/reviews/${patientId}/${taskId}/uiactions`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

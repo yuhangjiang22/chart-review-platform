@@ -6,6 +6,7 @@
 
 import { useState, useEffect } from "react";
 import { authFetch } from "../../auth";
+import { withSession } from "../../active-session";
 
 interface PerEntityType {
   entity_type: string;
@@ -49,7 +50,7 @@ export function NerCalibrationFigure({ taskId }: { taskId: string }) {
     if (loading) return;
     setLoading(true);
     setError(null);
-    authFetch(`/api/calibrate-ner/${encodeURIComponent(taskId)}`)
+    authFetch(withSession(`/api/calibrate-ner/${encodeURIComponent(taskId)}`))
       .then(async (r) => {
         if (!r.ok) {
           const body = await r.json().catch(() => ({}));

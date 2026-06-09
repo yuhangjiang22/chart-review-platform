@@ -21,6 +21,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronRight, ChevronDown } from "lucide-react";
 import { authFetch } from "../auth";
+import { withSession } from "../active-session";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { NoteViewer } from "../NoteViewer";
@@ -133,7 +134,7 @@ export function AdherenceReview(props: AdherenceReviewProps) {
 
   const refreshState = useCallback(async () => {
     const r = await authFetch(
-      `/api/reviews/${encodeURIComponent(patientId)}/${encodeURIComponent(taskId)}`,
+      withSession(`/api/reviews/${encodeURIComponent(patientId)}/${encodeURIComponent(taskId)}`),
     );
     if (r.ok) {
       const next = await r.json() as ReviewState;
@@ -148,7 +149,7 @@ export function AdherenceReview(props: AdherenceReviewProps) {
     setBusy(`q:${qid}`);
     try {
       const r = await authFetch(
-        `/api/reviews/${encodeURIComponent(patientId)}/${encodeURIComponent(taskId)}/adherence/question-answer`,
+        withSession(`/api/reviews/${encodeURIComponent(patientId)}/${encodeURIComponent(taskId)}/adherence/question-answer`),
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -175,7 +176,7 @@ export function AdherenceReview(props: AdherenceReviewProps) {
     setBusy(`r:${rid}`);
     try {
       const r = await authFetch(
-        `/api/reviews/${encodeURIComponent(patientId)}/${encodeURIComponent(taskId)}/adherence/rule-verdict`,
+        withSession(`/api/reviews/${encodeURIComponent(patientId)}/${encodeURIComponent(taskId)}/adherence/rule-verdict`),
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },

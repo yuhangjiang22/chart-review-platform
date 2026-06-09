@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { authFetch, whoami } from "./auth";
+import { withSession } from "./active-session";
 import { MethodologistTokenPanel } from "./MethodologistTokenPanel";
 import { AssignmentPanel } from "./AssignmentPanel";
 import { MigrationPanel } from "./MigrationPanel";
@@ -93,7 +94,7 @@ export function Studio({ taskId, taskIds, onClose, reviewerOptions }: Props) {
     );
     if (!nl || !nl.trim()) return;
     try {
-      const r = await authFetch(`/api/rules/${tid}/translate`, {
+      const r = await authFetch(withSession(`/api/rules/${tid}/translate`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ nl_rule: nl.trim() }),
@@ -494,7 +495,7 @@ function CohortPanel({ taskId }: { taskId: string | null }) {
       .map((s) => s.trim())
       .filter(Boolean);
     try {
-      const r = await authFetch("/api/cohort/analyze", {
+      const r = await authFetch(withSession("/api/cohort/analyze"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

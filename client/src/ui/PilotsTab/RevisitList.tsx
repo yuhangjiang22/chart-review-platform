@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { authFetch } from "../../auth";
+import { withSession } from "../../active-session";
 
 interface RevisitRow {
   field_id: string;
@@ -94,7 +95,7 @@ export function RevisitList(props: RevisitListProps) {
         });
       } else {
         // accept_agent: write the agent's rerun answer as a new reviewer assessment.
-        await authFetch(`/api/reviews/${row.patient_id}/${taskId}/actions`, {
+        await authFetch(withSession(`/api/reviews/${row.patient_id}/${taskId}/actions`), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

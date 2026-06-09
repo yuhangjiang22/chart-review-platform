@@ -2,6 +2,7 @@
 // Triggered from CriterionPane when the reviewer wants to generalise their override into a rule.
 import { useState } from "react";
 import { authFetch } from "./auth";
+import { withSession } from "./active-session";
 import type { RuleProposal } from "./types";
 import { RuleReviewPreview } from "./RuleReviewPreview";
 
@@ -24,7 +25,7 @@ export function InlineProposeRuleModal(props: Props) {
   async function translate() {
     setBusy(true);
     setError(null);
-    const r = await authFetch(`/api/rules/${props.taskId}/translate`, {
+    const r = await authFetch(withSession(`/api/rules/${props.taskId}/translate`), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

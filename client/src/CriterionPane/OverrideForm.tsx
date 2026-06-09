@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { CompiledField, FieldAssessment, EditReason } from "../types";
 import { authFetch } from "../auth";
+import { withSession } from "../active-session";
 import { postSseJson } from "../sse";
 
 interface ProgressEvent {
@@ -152,7 +153,7 @@ export function OverrideForm({
       } catch {
         /* keep as string */
       }
-      await authFetch(`/api/reviews/${patientId}/${taskId}/actions`, {
+      await authFetch(withSession(`/api/reviews/${patientId}/${taskId}/actions`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

@@ -22,6 +22,7 @@ import { ChatPanel } from "../ChatPanel";
 import { CriterionPane } from "../CriterionPane";
 import { NoteViewer } from "../NoteViewer";
 import { useFocusedField } from "../focused-field";
+import { withSession } from "../active-session";
 import { WorkflowBar } from "./WorkflowBar";
 import { EncountersPanel } from "../EncountersPanel";
 import type { CompiledField, NoteFocus, ReviewState } from "../types";
@@ -534,7 +535,7 @@ function PreLockBody({ patientId, taskId }: { patientId: string; taskId: string 
     let cancelled = false;
     (async () => {
       try {
-        const r = await fetch(`/api/reviews/${patientId}/${taskId}/prelock-summary`, {
+        const r = await fetch(withSession(`/api/reviews/${patientId}/${taskId}/prelock-summary`), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
         });

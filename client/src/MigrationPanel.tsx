@@ -1,6 +1,7 @@
 // app/client/src/MigrationPanel.tsx
 import { useState, useEffect } from "react";
 import { authFetch } from "./auth";
+import { withSession } from "./active-session";
 import type { VersionEntry, ImpactResult } from "./types";
 import { Pill } from "./atoms";
 
@@ -23,7 +24,7 @@ export function MigrationPanel({ taskIds }: { taskIds: string[] }) {
   async function simulate() {
     if (!fromSha || !toSha) return;
     setBusy(true);
-    const r = await authFetch(`/api/migration/${taskId}/simulate`, {
+    const r = await authFetch(withSession(`/api/migration/${taskId}/simulate`), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ from_sha: fromSha, to_sha: toSha }),
@@ -38,7 +39,7 @@ export function MigrationPanel({ taskIds }: { taskIds: string[] }) {
     if (!impact) return;
     if (!confirm(`Migrate ${impact.affected.length} records from ${fromSha.slice(0, 8)} to ${toSha.slice(0, 8)}? This archives the locked records and reopens them.`)) return;
     setBusy(true);
-    const r = await authFetch(`/api/migration/${taskId}/run`, {
+    const r = await authFetch(withSession(`/api/migration/${taskId}/run`), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

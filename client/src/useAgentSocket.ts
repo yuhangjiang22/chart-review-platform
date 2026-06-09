@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChatMessage, ReviewState, ServerEvent } from "./types";
 import { authFetch, buildWsUrl } from "./auth";
+import { withSession } from "./active-session";
 
 export interface AgentSocketState {
   connected: boolean;
@@ -34,7 +35,7 @@ export function useAgentSocket(
       setReviewState(null);
       return;
     }
-    authFetch(`/api/reviews/${patientId}/${taskId}`)
+    authFetch(withSession(`/api/reviews/${patientId}/${taskId}`))
       .then((r) => (r.ok ? r.json() : null))
       .then((s) => setReviewState(s));
   }, [patientId, taskId]);

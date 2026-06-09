@@ -7,6 +7,7 @@
 import { useEffect, useState } from "react";
 import type { CompiledField, FieldAssessment, ReviewState } from "./types";
 import { authFetch } from "./auth";
+import { withSession } from "./active-session";
 import { Pill, ConfidenceBadge, StatusIcon, KbdHint, Icon } from "./atoms";
 import { Markdown } from "./markdown";
 import { OverrideForm } from "./CriterionPane/OverrideForm";
@@ -55,7 +56,7 @@ function FieldHistory({
   >([]);
   useEffect(() => {
     if (!open) return;
-    authFetch(`/api/reviews/${patientId}/${taskId}/field-history/${fieldId}`)
+    authFetch(withSession(`/api/reviews/${patientId}/${taskId}/field-history/${fieldId}`))
       .then((r) => r.json())
       .then((b) => setEntries(b.entries ?? []))
       .catch(() => setEntries([]));
@@ -144,7 +145,7 @@ export function CriterionPane(props: CriterionPaneProps) {
         const current = props.assessment as (typeof props.assessment & { flagged?: boolean }) | undefined;
         const nowFlagged = !(current?.flagged ?? false);
         await authFetch(
-          `/api/reviews/${props.patientId}/${props.taskId}/actions`,
+          withSession(`/api/reviews/${props.patientId}/${props.taskId}/actions`),
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },

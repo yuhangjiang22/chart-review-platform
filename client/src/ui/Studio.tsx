@@ -28,6 +28,7 @@ import {
   TimerReset,
 } from "lucide-react";
 import { authFetch } from "../auth";
+import { withSession } from "../active-session";
 import { RuleReviewPreview } from "../RuleReviewPreview";
 import { Markdown } from "../markdown";
 import type { ProposedEdit, RuleProposal } from "../types";
@@ -704,7 +705,7 @@ function RuleControls({
   async function accept(edit?: ProposedEdit) {
     setBusy(true);
     try {
-      const r = await authFetch(`/api/rules/${taskId}/${ruleId}/accept`, {
+      const r = await authFetch(withSession(`/api/rules/${taskId}/${ruleId}/accept`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ methodologist_id: reviewerId, methodologist_edit: edit }),
@@ -1052,7 +1053,7 @@ function MethodsDrafterDialog({
         body.feedback = feedback.trim();
         body.prior_run_id = latest.provenance.run_id;
       }
-      const r = await authFetch(`/api/methods/${taskId}/draft`, {
+      const r = await authFetch(withSession(`/api/methods/${taskId}/draft`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),

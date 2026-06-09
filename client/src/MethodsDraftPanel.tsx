@@ -1,6 +1,7 @@
 // app/client/src/MethodsDraftPanel.tsx
 import { useEffect, useState } from "react";
 import { Markdown } from "./markdown";
+import { withSession } from "./active-session";
 import { Pill, Icon } from "./atoms";
 
 interface RunListing {
@@ -60,7 +61,7 @@ export function MethodsDraftPanel({ taskId, token, onClose }: { taskId: string; 
         body_in.feedback = feedback.trim();
         body_in.prior_run_id = provenance?.run_id;
       }
-      const r = await fetch(`/api/methods/${taskId}/draft`, {
+      const r = await fetch(withSession(`/api/methods/${taskId}/draft`), {
         method: "POST",
         headers: { ...auth, "Content-Type": "application/json" },
         body: JSON.stringify(body_in),

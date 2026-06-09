@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { authFetch } from "../../auth";
+import { withSession } from "../../active-session";
 import { Button } from "@/components/ui/button";
 
 export function CohortCurationModal({
@@ -18,7 +19,7 @@ export function CohortCurationModal({
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    authFetch("/api/patients")
+    authFetch(withSession("/api/patients"))
       .then((r) => (r.ok ? r.json() : []))
       .then((rows: any[]) => setAllPatients(rows.map((r) => r.patient_id)));
   }, []);

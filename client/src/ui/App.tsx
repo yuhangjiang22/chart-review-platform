@@ -8,6 +8,7 @@ import { authFetch, clearAuth, logout as authLogout, readAuth, whoami, type Whoa
 import { LoginGate } from "../LoginGate";
 import type { CompiledField, NoteFocus, PatientSummary } from "../types";
 import { useAgentSocket } from "../useAgentSocket";
+import { withSession } from "../active-session";
 import { AppShell } from "./AppShell";
 import { QueueView } from "./QueueView";
 import { PatientReview } from "./PatientReview";
@@ -111,7 +112,7 @@ export function App() {
       const [runtimeBody, taskList, patientList] = await Promise.all([
         authFetch("/api/runtime").then((r) => (r.ok ? r.json() : null)),
         authFetch("/api/tasks").then((r) => (r.ok ? r.json() : [])),
-        authFetch("/api/patients").then((r) => (r.ok ? r.json() : [])),
+        authFetch(withSession("/api/patients")).then((r) => (r.ok ? r.json() : [])),
       ]);
       if (cancelled) return;
       const compiledTasks = taskList as TaskSummary[];

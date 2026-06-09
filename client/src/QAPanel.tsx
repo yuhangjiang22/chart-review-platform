@@ -1,6 +1,7 @@
 // app/client/src/QAPanel.tsx
 import { useEffect, useState } from "react";
 import { authFetch } from "./auth";
+import { withSession } from "./active-session";
 import type { QAStats } from "./types";
 import { QAPanelCards } from "./QAPanelCards";
 
@@ -9,7 +10,7 @@ export function QAPanel({ taskId }: { taskId: string }) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    authFetch(`/api/qa/${taskId}`)
+    authFetch(withSession(`/api/qa/${taskId}`))
       .then((r) => (r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`)))
       .then(setStats)
       .catch((e) => setError(String(e)));

@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { authFetch } from "../../auth";
+import { withSession } from "../../active-session";
 import { cn } from "@/lib/utils";
 import { AgentConfigPanel, type AgentSpecForm } from "../PilotsTab/AgentConfigPanel";
 
@@ -152,7 +153,7 @@ export function NewSessionDialog({
       } catch { /* fall through */ }
       if (ids.length === 0) {
         try {
-          const r = await authFetch("/api/patients");
+          const r = await authFetch(withSession("/api/patients"));
           if (r.ok) {
             const list = await r.json() as Array<{ patient_id: string }>;
             ids = Array.isArray(list) ? list.map((p) => p.patient_id) : [];
