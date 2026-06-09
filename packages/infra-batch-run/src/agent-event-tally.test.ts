@@ -16,6 +16,51 @@ function fold(events: AgentEvent[], kind: TaskKind): AgentTally {
   return events.reduce((t, e) => applyAgentEventToTally(t, e, kind), start);
 }
 
+// The REAL provider shape: both the Claude Agent SDK and the codex provider
+// emit MCP tool calls prefixed `mcp__<server>__<tool>` (codex can double it).
+// The original tally matched only the bare name, so it counted 0 writes and
+// wrongly failed every phenotype/adherence run on claude/codex. These pin the
+// prefix-normalized match (verified against a real codex adherence transcript:
+// `mcp__chart_review_adherence__set_question_answer`).
+describe("applyAgentEventToTally — MCP-prefixed tool names (real provider shape)", () => {
+  it("counts a codex/Claude MCP-prefixed adherence write", () => {
+    const t = fold([
+      { type: "tool_use", tool_name: "mcp__chart_review_adherence__list_questions", tool_input: {} },
+      { type: "tool_use", tool_name: "mcp__chart_review_adherence__set_question_answer", tool_input: { question_id: "q1" } },
+      { type: "tool_use", tool_name: "mcp__chart_review_adherence__set_question_answer", tool_input: { question_id: "q2" } },
+      { type: "tool_use", tool_name: "mcp__chart_review_adherence__set_review_status", tool_input: { status: "complete" } },
+    ], "adherence");
+    expect(t.writeCount).toBe(2);
+    expect(t.sawCompletion).toBe(true);
+    expect(classifyAgentOutcome(t, "adherence")).toEqual({ status: "ok" });
+  });
+
+  it("counts an MCP-prefixed phenotype write", () => {
+    const t = fold([
+      { type: "tool_use", tool_name: "mcp__chart_review_state__set_field_assessment", tool_input: { field_id: "cancer_type" } },
+    ], "phenotype");
+    expect(t.writeCount).toBe(1);
+    expect(classifyAgentOutcome(t, "phenotype")).toEqual({ status: "ok" });
+  });
+
+  it("counts an MCP-prefixed NER write and tolerates a doubled prefix", () => {
+    const t = fold([
+      { type: "tool_use", tool_name: "mcp__chart_review_ner__set_span_label", tool_input: {} },
+      { type: "tool_use", tool_name: "mcp__mcp__chart_review_ner____set_review_status", tool_input: {} },
+    ], "ner");
+    expect(t.writeCount).toBe(1);
+    expect(t.sawCompletion).toBe(true);
+  });
+
+  it("still ignores a prefixed non-write tool", () => {
+    const t = fold([
+      { type: "tool_use", tool_name: "mcp__codex__list_mcp_resources", tool_input: {} },
+    ], "adherence");
+    expect(t.writeCount).toBe(0);
+    expect(t.sawCompletion).toBe(false);
+  });
+});
+
 describe("applyAgentEventToTally", () => {
   it("counts the kind's primary write tool (phenotype: set_field_assessment)", () => {
     const events: AgentEvent[] = [

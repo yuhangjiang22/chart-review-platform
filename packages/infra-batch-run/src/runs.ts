@@ -157,11 +157,25 @@ const PRIMARY_WRITE_TOOL: Record<TaskKind, string> = {
   ner: "set_span_label",
 };
 
+/** Strip the MCP server prefix from a `tool_use` name. Both the Claude Agent
+ *  SDK and the codex provider expose MCP tools as `mcp__<server>__<tool>`
+ *  (codex can even double the prefix, e.g. `mcp__mcp__<server>____<tool>`), so
+ *  the actual tool name is the segment after the LAST `__`. Bare names (no
+ *  `__`) pass through unchanged. Without this, the per-kind write match below
+ *  never fires for the real providers — counting 0 writes and wrongly failing
+ *  every phenotype/adherence run on claude/codex. */
+export function baseToolName(name: string): string {
+  const i = name.lastIndexOf("__");
+  return i >= 0 ? name.slice(i + 2) : name;
+}
+
 /** Fold one AgentEvent into the running tally for an agent run.
  *  - an `error` event records the error message (loud fail).
  *  - a `result` event (emitted on non-error completion) marks completion.
  *  - a `tool_use` for the kind's primary write tool increments writeCount;
- *    a `set_review_status` tool_use also marks completion. */
+ *    a `set_review_status` tool_use also marks completion.
+ *  Tool names are normalized via `baseToolName` so the MCP prefix the
+ *  providers add (`mcp__<server>__…`) doesn't defeat the match. */
 export function applyAgentEventToTally(
   tally: AgentTally,
   event: AgentEvent,
@@ -174,11 +188,12 @@ export function applyAgentEventToTally(
     return { ...tally, sawCompletion: true };
   }
   if (event.type === "tool_use") {
+    const base = baseToolName(event.tool_name);
     let t = tally;
-    if (event.tool_name === PRIMARY_WRITE_TOOL[kind]) {
+    if (base === PRIMARY_WRITE_TOOL[kind]) {
       t = { ...t, writeCount: t.writeCount + 1 };
     }
-    if (event.tool_name === "set_review_status") {
+    if (base === "set_review_status") {
       t = { ...t, sawCompletion: true };
     }
     return t;
