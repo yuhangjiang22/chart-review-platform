@@ -22,6 +22,7 @@ import {
   modelFor, describeAllModels,
 } from "./lib/model-config.js";
 import { readCodexProviderConfig } from "./lib/codex-config.js";
+import { loadModelRegistry } from "./lib/model-registry.js";
 
 function httpErr(status: number, message: string): Error & { status: number } {
   const err = new Error(message) as Error & { status: number };
@@ -86,6 +87,16 @@ export const miscRoutes: RouteEntry[] = [
   {
     method: "GET", pattern: "/api/agent-roles/default-model",
     handler: async () => ({ default_model: modelFor("default") ?? null }),
+  },
+
+  // ── /api/models ─────────────────────────────────────────────────────
+  // Registry-backed list of models that exist for this deployment, each
+  // flagged `available` (api_key_env present AND backend === active
+  // provider). The honest picker source for AgentConfigPanel. Presence-only:
+  // ResolvedModel carries no secrets (id/backend/model/label/available).
+  {
+    method: "GET", pattern: "/api/models",
+    handler: async () => loadModelRegistry(),
   },
 
   // ── /api/diagnostics/models ─────────────────────────────────────────
