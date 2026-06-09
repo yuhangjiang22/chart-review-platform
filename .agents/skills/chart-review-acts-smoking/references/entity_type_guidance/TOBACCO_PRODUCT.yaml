@@ -1,0 +1,37 @@
+entity_type: TOBACCO_PRODUCT
+guidance: |
+  Tag the tobacco/nicotine product noun itself (the thing consumed), not the
+  verb of using it — "smokes cigarettes" tags "cigarettes", not "smokes". Map
+  to the most-specific child: cigarette/cigs -> Cigarette; cigar/cigars ->
+  Cigar; pipe -> Pipe; chewing tobacco/snuff/dip -> Smokeless_Tobacco;
+  vape/vaping/e-cigarette/electronic cigarette -> Vaping; a nicotine patch or
+  gum named AS A PRODUCT the patient uses -> Nicotine_Replacement; bare
+  "tobacco"/"nicotine" with no product form -> Unknown; a real product that
+  fits no child -> Other (or novel_candidate if outside the list entirely).
+  Only tag products tied to the patient — products in family history, generic
+  screening criteria, or educational text are tagged under NON_PATIENT_CONTEXT,
+  not here.
+exemplars:
+  - "cigarettes"
+  - "cigar"
+  - "chewing tobacco"
+  - "vapes"
+  - "e-cigarette"
+  - "nicotine patch"
+negative_examples:
+  - phrase: "started varenicline for smoking cessation"
+    reason: "varenicline (Chantix) is a cessation drug, not a tobacco/nicotine product — tag under CESSATION_INTERVENTION"
+  - phrase: "30 pack-years of cigarettes"
+    reason: "tag only the 'cigarettes' product token here; '30 pack-years' is a PACK_YEAR span, not a product"
+  - phrase: "father smoked a pipe"
+    reason: "product belongs to a family member, not the patient — tag under NON_PATIENT_CONTEXT"
+edge_cases:
+  - pattern: "patient uses a nicotine patch to manage cravings"
+    correct: "tag 'nicotine patch' but decide by role — as the named product the patient uses it is Nicotine_Replacement; if framed purely as a prescribed cessation treatment it is CESSATION_INTERVENTION instead"
+    reason: "patch/gum straddle product vs. cessation-treatment; the surrounding clause decides which entity_type owns the span"
+  - pattern: "history of tobacco use"
+    correct: "tag 'tobacco' -> Unknown (no specific product form named)"
+    reason: "bare 'tobacco'/'nicotine' lacks a product form, so it maps to the Unknown child rather than guessing Cigarette"
+  - pattern: "smokes 1 ppd"
+    correct: "do NOT create a TOBACCO_PRODUCT span — no product noun is present"
+    reason: "the verb 'smokes' is not a product; amount-only mentions have no product token to tag"

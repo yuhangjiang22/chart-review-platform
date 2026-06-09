@@ -1,0 +1,26 @@
+entity_type: FREQUENCY
+guidance: |
+  Tag spans expressing a qualitative smoking frequency for the patient — how
+  often, not how much. Map to the most-specific child: "daily" -> Daily,
+  "occasionally" -> Occasional, "social smoker" -> Social, "intermittent" ->
+  Intermittent. Quantitative amounts ("10 cigarettes/day") belong under AMOUNT,
+  and rate-as-packs ("1 ppd") under PACK_PER_DAY — not here. Only tag when the
+  frequency describes the patient's own use; family-history or generic
+  screening-criteria frequency goes under NON_PATIENT_CONTEXT instead.
+exemplars:
+  - "daily"
+  - "occasionally"
+  - "social smoker"
+  - "intermittent"
+negative_examples:
+  - phrase: "10 cigarettes per day"
+    reason: "quantitative amount -> AMOUNT, not a qualitative frequency"
+  - phrase: "1 ppd"
+    reason: "packs-per-day rate -> PACK_PER_DAY, not FREQUENCY"
+edge_cases:
+  - pattern: "smokes daily, about 10 cigarettes per day"
+    correct: "tag 'daily' as FREQUENCY (Daily) AND '10 cigarettes per day' as AMOUNT"
+    reason: "one clause carries both a qualitative frequency and a separate quantitative amount; split them across the two entity_types"
+  - pattern: "mother was a social smoker"
+    correct: "tag 'social smoker' under NON_PATIENT_CONTEXT, not FREQUENCY"
+    reason: "frequency describes a family member, so it is not a patient smoking fact"

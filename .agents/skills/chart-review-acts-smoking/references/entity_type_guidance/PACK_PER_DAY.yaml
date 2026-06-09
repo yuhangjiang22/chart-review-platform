@@ -1,0 +1,28 @@
+entity_type: PACK_PER_DAY
+guidance: |
+  Tag spans that express the patient's smoking rate in packs per day, whether
+  numeric ("1 ppd", "0.5 ppd") or spelled out ("one pack per day", "half
+  pack/day"). All such spans map to the single child Packs_Per_Day_Mention;
+  do the actual ppd arithmetic and normalization downstream, not here. Only
+  tag rates that describe the patient — a packs/day figure in a family-history
+  line or copied screening-criteria text belongs under NON_PATIENT_CONTEXT.
+exemplars:
+  - "1 ppd"
+  - "one pack per day"
+  - "half pack/day"
+  - "2 packs per day"
+  - "0.5 ppd"
+negative_examples:
+  - phrase: "10 cigarettes per day"
+    reason: "amount expressed in cigarettes, not packs — tag as AMOUNT"
+  - phrase: "30 pack-years"
+    reason: "cumulative exposure in pack-years — tag as PACK_YEAR"
+  - phrase: "daily"
+    reason: "qualitative frequency with no pack quantity — tag as FREQUENCY"
+edge_cases:
+  - pattern: "smoked 1 ppd x 20 years"
+    correct: "tag '1 ppd' as PACK_PER_DAY and 'x 20 years' separately as SMOKING_DURATION"
+    reason: "rate and duration are distinct entity types even when adjacent in one phrase"
+  - pattern: "father smoked 1 pack/day"
+    correct: "tag the whole family-history mention as NON_PATIENT_CONTEXT, not PACK_PER_DAY"
+    reason: "the rate describes a family member, so it is not a patient smoking fact"

@@ -1,0 +1,28 @@
+task_type: ner
+task_kind: ner
+manual_version: 0.1
+source_document_sha: sha256:acts-smoking-ner-2026-06-09
+status: draft
+review_unit: patient
+overview_prose: >-
+  ACTS smoking-history NER task. Extract smoking-related entity spans from a
+  patient's notes and normalize each to a concept_name in the ACTS smoking
+  ontology (12 entity-type subtrees: SMOKING_STATUS, TOBACCO_PRODUCT,
+  PACK_YEAR, PACK_PER_DAY, AMOUNT, SMOKING_DURATION, SMOKING_START, QUIT_TIME,
+  FREQUENCY, NEGATION_OR_DENIAL, CESSATION_INTERVENTION, NON_PATIENT_CONTEXT).
+  Patient-specific mentions only; family history, screening guidelines, and
+  copied boilerplate are tagged NON_PATIENT_CONTEXT rather than dropped.
+  OUT OF SCOPE for this NER task (see SKILL.md "Out of scope"): numeric value
+  normalization (ppd / cigarettes-per-day / pack-year arithmetic), pack-year
+  derivation, screening-eligibility thresholds (>=30 pack-years, quit within
+  15 years), per-span subject/certainty/temporality attributes, and relation
+  extraction. Those belong in a downstream adherence/phenotype task that
+  consumes these spans.
+final_output: span_labels
+phases:
+  - author
+  - try
+  - validate
+  - decide
+  - lock
+ontology_pin: acts@0.1

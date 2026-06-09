@@ -1,0 +1,134 @@
+{
+  "SMOKING_STATUS": {
+    "root_id": "00000",
+    "root_iri": "https://example.org/ACTS#smoking_status",
+    "n_concepts": 5,
+    "concepts": [
+      {"id": "00000", "label": "SMOKING_STATUS", "parent_id": null, "parent_label": null, "depth": 0},
+      {"id": "00001", "label": "Current", "parent_id": "00000", "parent_label": "SMOKING_STATUS", "depth": 1},
+      {"id": "00002", "label": "Former", "parent_id": "00000", "parent_label": "SMOKING_STATUS", "depth": 1},
+      {"id": "00003", "label": "Never", "parent_id": "00000", "parent_label": "SMOKING_STATUS", "depth": 1},
+      {"id": "00004", "label": "Unknown", "parent_id": "00000", "parent_label": "SMOKING_STATUS", "depth": 1}
+    ]
+  },
+  "TOBACCO_PRODUCT": {
+    "root_id": "01000",
+    "root_iri": "https://example.org/ACTS#tobacco_product",
+    "n_concepts": 9,
+    "concepts": [
+      {"id": "01000", "label": "TOBACCO_PRODUCT", "parent_id": null, "parent_label": null, "depth": 0},
+      {"id": "01001", "label": "Cigarette", "parent_id": "01000", "parent_label": "TOBACCO_PRODUCT", "depth": 1},
+      {"id": "01002", "label": "Cigar", "parent_id": "01000", "parent_label": "TOBACCO_PRODUCT", "depth": 1},
+      {"id": "01003", "label": "Pipe", "parent_id": "01000", "parent_label": "TOBACCO_PRODUCT", "depth": 1},
+      {"id": "01004", "label": "Smokeless_Tobacco", "parent_id": "01000", "parent_label": "TOBACCO_PRODUCT", "depth": 1},
+      {"id": "01005", "label": "Vaping", "parent_id": "01000", "parent_label": "TOBACCO_PRODUCT", "depth": 1},
+      {"id": "01006", "label": "Nicotine_Replacement", "parent_id": "01000", "parent_label": "TOBACCO_PRODUCT", "depth": 1},
+      {"id": "01007", "label": "Other", "parent_id": "01000", "parent_label": "TOBACCO_PRODUCT", "depth": 1},
+      {"id": "01008", "label": "Unknown", "parent_id": "01000", "parent_label": "TOBACCO_PRODUCT", "depth": 1}
+    ]
+  },
+  "PACK_YEAR": {
+    "root_id": "02000",
+    "root_iri": "https://example.org/ACTS#pack_year",
+    "n_concepts": 2,
+    "concepts": [
+      {"id": "02000", "label": "PACK_YEAR", "parent_id": null, "parent_label": null, "depth": 0},
+      {"id": "02001", "label": "Pack_Year_Mention", "parent_id": "02000", "parent_label": "PACK_YEAR", "depth": 1}
+    ]
+  },
+  "PACK_PER_DAY": {
+    "root_id": "03000",
+    "root_iri": "https://example.org/ACTS#pack_per_day",
+    "n_concepts": 2,
+    "concepts": [
+      {"id": "03000", "label": "PACK_PER_DAY", "parent_id": null, "parent_label": null, "depth": 0},
+      {"id": "03001", "label": "Packs_Per_Day_Mention", "parent_id": "03000", "parent_label": "PACK_PER_DAY", "depth": 1}
+    ]
+  },
+  "AMOUNT": {
+    "root_id": "04000",
+    "root_iri": "https://example.org/ACTS#amount",
+    "n_concepts": 2,
+    "concepts": [
+      {"id": "04000", "label": "AMOUNT", "parent_id": null, "parent_label": null, "depth": 0},
+      {"id": "04001", "label": "Cigarettes_Per_Day_Mention", "parent_id": "04000", "parent_label": "AMOUNT", "depth": 1}
+    ]
+  },
+  "SMOKING_DURATION": {
+    "root_id": "05000",
+    "root_iri": "https://example.org/ACTS#smoking_duration",
+    "n_concepts": 2,
+    "concepts": [
+      {"id": "05000", "label": "SMOKING_DURATION", "parent_id": null, "parent_label": null, "depth": 0},
+      {"id": "05001", "label": "Duration_Years", "parent_id": "05000", "parent_label": "SMOKING_DURATION", "depth": 1}
+    ]
+  },
+  "SMOKING_START": {
+    "root_id": "06000",
+    "root_iri": "https://example.org/ACTS#smoking_start",
+    "n_concepts": 3,
+    "concepts": [
+      {"id": "06000", "label": "SMOKING_START", "parent_id": null, "parent_label": null, "depth": 0},
+      {"id": "06001", "label": "Start_Year", "parent_id": "06000", "parent_label": "SMOKING_START", "depth": 1},
+      {"id": "06002", "label": "Start_Age", "parent_id": "06000", "parent_label": "SMOKING_START", "depth": 1}
+    ]
+  },
+  "QUIT_TIME": {
+    "root_id": "07000",
+    "root_iri": "https://example.org/ACTS#quit_time",
+    "n_concepts": 4,
+    "concepts": [
+      {"id": "07000", "label": "QUIT_TIME", "parent_id": null, "parent_label": null, "depth": 0},
+      {"id": "07001", "label": "Quit_Year", "parent_id": "07000", "parent_label": "QUIT_TIME", "depth": 1},
+      {"id": "07002", "label": "Quit_Age", "parent_id": "07000", "parent_label": "QUIT_TIME", "depth": 1},
+      {"id": "07003", "label": "Relative_Quit_Time", "parent_id": "07000", "parent_label": "QUIT_TIME", "depth": 1}
+    ]
+  },
+  "FREQUENCY": {
+    "root_id": "08000",
+    "root_iri": "https://example.org/ACTS#frequency",
+    "n_concepts": 5,
+    "concepts": [
+      {"id": "08000", "label": "FREQUENCY", "parent_id": null, "parent_label": null, "depth": 0},
+      {"id": "08001", "label": "Daily", "parent_id": "08000", "parent_label": "FREQUENCY", "depth": 1},
+      {"id": "08002", "label": "Occasional", "parent_id": "08000", "parent_label": "FREQUENCY", "depth": 1},
+      {"id": "08003", "label": "Social", "parent_id": "08000", "parent_label": "FREQUENCY", "depth": 1},
+      {"id": "08004", "label": "Intermittent", "parent_id": "08000", "parent_label": "FREQUENCY", "depth": 1}
+    ]
+  },
+  "NEGATION_OR_DENIAL": {
+    "root_id": "09000",
+    "root_iri": "https://example.org/ACTS#negation_or_denial",
+    "n_concepts": 3,
+    "concepts": [
+      {"id": "09000", "label": "NEGATION_OR_DENIAL", "parent_id": null, "parent_label": null, "depth": 0},
+      {"id": "09001", "label": "Denies_Smoking", "parent_id": "09000", "parent_label": "NEGATION_OR_DENIAL", "depth": 1},
+      {"id": "09002", "label": "No_Tobacco_Use", "parent_id": "09000", "parent_label": "NEGATION_OR_DENIAL", "depth": 1}
+    ]
+  },
+  "CESSATION_INTERVENTION": {
+    "root_id": "10000",
+    "root_iri": "https://example.org/ACTS#cessation_intervention",
+    "n_concepts": 6,
+    "concepts": [
+      {"id": "10000", "label": "CESSATION_INTERVENTION", "parent_id": null, "parent_label": null, "depth": 0},
+      {"id": "10001", "label": "Nicotine_Replacement_Therapy", "parent_id": "10000", "parent_label": "CESSATION_INTERVENTION", "depth": 1},
+      {"id": "10002", "label": "Varenicline", "parent_id": "10000", "parent_label": "CESSATION_INTERVENTION", "depth": 1},
+      {"id": "10003", "label": "Bupropion", "parent_id": "10000", "parent_label": "CESSATION_INTERVENTION", "depth": 1},
+      {"id": "10004", "label": "Cessation_Counseling", "parent_id": "10000", "parent_label": "CESSATION_INTERVENTION", "depth": 1},
+      {"id": "10005", "label": "Other_Cessation", "parent_id": "10000", "parent_label": "CESSATION_INTERVENTION", "depth": 1}
+    ]
+  },
+  "NON_PATIENT_CONTEXT": {
+    "root_id": "11000",
+    "root_iri": "https://example.org/ACTS#non_patient_context",
+    "n_concepts": 5,
+    "concepts": [
+      {"id": "11000", "label": "NON_PATIENT_CONTEXT", "parent_id": null, "parent_label": null, "depth": 0},
+      {"id": "11001", "label": "Family_History", "parent_id": "11000", "parent_label": "NON_PATIENT_CONTEXT", "depth": 1},
+      {"id": "11002", "label": "Guideline_Or_Screening_Criteria", "parent_id": "11000", "parent_label": "NON_PATIENT_CONTEXT", "depth": 1},
+      {"id": "11003", "label": "Educational_Text", "parent_id": "11000", "parent_label": "NON_PATIENT_CONTEXT", "depth": 1},
+      {"id": "11004", "label": "Copied_Boilerplate", "parent_id": "11000", "parent_label": "NON_PATIENT_CONTEXT", "depth": 1}
+    ]
+  }
+}

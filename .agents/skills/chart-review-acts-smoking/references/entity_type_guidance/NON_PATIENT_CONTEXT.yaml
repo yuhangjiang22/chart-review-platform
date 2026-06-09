@@ -1,0 +1,33 @@
+entity_type: NON_PATIENT_CONTEXT
+guidance: |
+  Tag smoking/tobacco text that does NOT describe the patient's own use — this
+  is how non-patient mentions are preserved rather than dropped. Pick the child
+  by source: a relative's use or "family history of smoking" -> Family_History;
+  copied USPSTF / lung-screening eligibility text ("adults 50-80 with >=20
+  pack-year history...") -> Guideline_Or_Screening_Criteria; patient-education
+  leaflet wording -> Educational_Text; templated/boilerplate smoking lines ->
+  Copied_Boilerplate. If the same span clearly describes the patient, it is NOT
+  this type — tag it under the matching patient entity_type (SMOKING_STATUS,
+  PACK_YEAR, etc.) instead.
+exemplars:
+  - "father smoked"
+  - "family history of smoking"
+  - "adults 50-80 with >=20 pack-year history"
+  - "screening recommended for current or former smokers who quit within 15 years"
+  - "smoking increases your risk of lung cancer and heart disease"
+  - "Tobacco use: ___ (templated)"
+negative_examples:
+  - phrase: "patient is a former smoker, quit 2010"
+    reason: "describes the patient directly — tag under SMOKING_STATUS / QUIT_TIME, not here"
+  - phrase: "denies tobacco use"
+    reason: "patient-specific denial — tag under NEGATION_OR_DENIAL, not as non-patient context"
+edge_cases:
+  - pattern: "Patient meets lung screening criteria: >=20 pack-year history, age 55"
+    correct: "tag the copied criteria clause as Guideline_Or_Screening_Criteria, but tag the patient's own '20 pack-year' / 'age 55' facts under their patient entity_types if stated as the patient's"
+    reason: "boilerplate eligibility text and a patient-specific restatement can co-occur; only the generic criteria text is non-patient"
+  - pattern: "Family hx: mother smoked 1 ppd x 40 years"
+    correct: "tag the whole maternal-smoking span as Family_History (NON_PATIENT_CONTEXT)"
+    reason: "the ppd and duration here belong to a family member, not the patient, so they are not PACK_PER_DAY/SMOKING_DURATION patient facts"
+  - pattern: "Smoking cessation counseling provided per protocol smart-phrase"
+    correct: "if a generic templated line with no patient-specific detail, tag as Copied_Boilerplate"
+    reason: "boilerplate template text is preserved here rather than mistaken for a real CESSATION_INTERVENTION delivered to this patient"

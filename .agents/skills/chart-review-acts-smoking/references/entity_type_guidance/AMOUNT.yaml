@@ -1,0 +1,28 @@
+entity_type: AMOUNT
+guidance: |
+  Tag a smoking-amount span only when the amount is expressed as a count of
+  cigarettes (or other discrete units) over time rather than as packs/day —
+  e.g. "10 cigarettes per day", "5 cigarettes daily". Map every such span to
+  Cigarettes_Per_Day_Mention (the only child); use "novel_candidate" only if
+  the unit is genuinely not cigarette-count and nothing fits. Tag only amounts
+  describing the patient's own smoking; amounts in family history, guideline
+  text, or other non-patient context belong under NON_PATIENT_CONTEXT instead.
+exemplars:
+  - "10 cigarettes per day"
+  - "5 cigarettes daily"
+  - "smokes 10 cigarettes a day"
+  - "20 cigs/day"
+negative_examples:
+  - phrase: "1 ppd"
+    reason: "expressed as packs per day — tag under PACK_PER_DAY, not AMOUNT"
+  - phrase: "half pack/day"
+    reason: "packs-per-day phrasing — belongs to PACK_PER_DAY"
+  - phrase: "30 pack-years"
+    reason: "cumulative exposure in pack-years — belongs to PACK_YEAR"
+edge_cases:
+  - pattern: "smokes about a dozen cigarettes a day"
+    correct: "tag the full amount span 'a dozen cigarettes a day' as AMOUNT -> Cigarettes_Per_Day_Mention"
+    reason: "non-numeric cigarette count is still an AMOUNT; numeric normalization is out of scope for this NER layer"
+  - pattern: "10 cigarettes/day (~0.5 ppd)"
+    correct: "tag '10 cigarettes/day' as AMOUNT; tag '0.5 ppd' separately as PACK_PER_DAY"
+    reason: "the two phrasings are distinct spans/entity_types even when describing the same habit"

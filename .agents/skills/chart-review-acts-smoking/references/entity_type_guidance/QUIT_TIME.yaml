@@ -1,0 +1,33 @@
+entity_type: QUIT_TIME
+guidance: |
+  Tag spans stating when the patient stopped smoking/using tobacco. Pick the
+  concept_name by how the quit time is expressed: a calendar year -> Quit_Year
+  ("quit in 2010"); the patient's age at quitting -> Quit_Age ("stopped smoking
+  at age 60"); a relative/elapsed-time expression -> Relative_Quit_Time ("quit 5
+  years ago"). A quit mention almost always co-occurs with SMOKING_STATUS=Former,
+  but tag only the time expression here, not the cessation verb itself. Only tag
+  when the quit describes the patient; family-member or guideline quit mentions
+  go under NON_PATIENT_CONTEXT instead.
+exemplars:
+  - "quit in 2010"
+  - "stopped smoking at age 60"
+  - "quit 5 years ago"
+  - "quit smoking 10 years ago"
+  - "stopped tobacco in 1998"
+negative_examples:
+  - phrase: "quit smoking"
+    reason: "states cessation but gives no time — this is SMOKING_STATUS=Former, no QUIT_TIME span"
+  - phrase: "patient's father quit smoking in 2005"
+    reason: "the quit is about a family member, so it belongs under NON_PATIENT_CONTEXT"
+  - phrase: "started smoking at age 18"
+    reason: "this is a start time (SMOKING_START), not a quit time"
+edge_cases:
+  - pattern: "former smoker, quit 2015"
+    correct: "tag '2015' as QUIT_TIME -> Quit_Year (anchor='quit 2015'); 'former smoker' is a separate SMOKING_STATUS span"
+    reason: "the year is the quit-time payload even though it sits next to a status phrase"
+  - pattern: "smoked until 5 years ago"
+    correct: "tag '5 years ago' as QUIT_TIME -> Relative_Quit_Time"
+    reason: "'until <relative time>' marks the cessation point relative to the visit"
+  - pattern: "quit at 60, restarted at 65"
+    correct: "tag '60' (anchor='quit at 60') as Quit_Age; the restart age is not a quit time"
+    reason: "only the cessation age maps here; a resumption time is not QUIT_TIME"

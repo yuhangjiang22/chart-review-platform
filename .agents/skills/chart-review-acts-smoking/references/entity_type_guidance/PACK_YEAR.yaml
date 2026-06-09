@@ -1,0 +1,30 @@
+entity_type: PACK_YEAR
+guidance: |
+  Tag a span when it expresses total smoking exposure in pack-years — the
+  full value-bearing phrase including the number and the pack-year unit
+  ("30 pack-years", "30 PY", "30-pack-year history"). Map every such span to
+  the single child Pack_Year_Mention; the numeric value itself is NOT stored
+  by NER, so include the unit words in the span rather than just the digits.
+  Only tag pack-year exposure that describes the patient; pack-year figures in
+  family history or generic screening-eligibility text belong under
+  NON_PATIENT_CONTEXT, not here.
+exemplars:
+  - "30 pack-years"
+  - "30 PY"
+  - "30-pack-year history"
+  - "smoking history of 45 pack years"
+  - "20 pack-year smoking history"
+negative_examples:
+  - phrase: "1 ppd"
+    reason: "packs-per-day rate, not cumulative pack-years — tag under PACK_PER_DAY"
+  - phrase: "smoked for 30 years"
+    reason: "duration in years only, no pack quantity — tag under SMOKING_DURATION"
+  - phrase: "30 lung-cancer screening pack-year threshold per USPSTF criteria"
+    reason: "generic screening-eligibility criterion, not the patient's exposure — tag under NON_PATIENT_CONTEXT"
+edge_cases:
+  - pattern: "30 PY"
+    correct: "tag the whole token '30 PY' (anchor='30 PY') as Pack_Year_Mention"
+    reason: "PY is the abbreviation for pack-years; include the unit so the span is unambiguous"
+  - pattern: "1 ppd x 30 years (30 pack-years)"
+    correct: "tag only '30 pack-years' here; '1 ppd' is PACK_PER_DAY and '30 years' is SMOKING_DURATION"
+    reason: "one sentence can hold three distinct entity types — tag each span under its own type"

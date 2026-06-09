@@ -1,0 +1,34 @@
+entity_type: CESSATION_INTERVENTION
+guidance: |
+  Tag spans naming a tobacco/nicotine cessation treatment, medication, counseling,
+  or program. Pick the concept_name by product class: "nicotine patch/gum/lozenge/
+  NRT" -> Nicotine_Replacement_Therapy; "varenicline/Chantix" -> Varenicline;
+  "bupropion/Zyban/Wellbutrin" prescribed for cessation -> Bupropion; "smoking
+  cessation counseling/program/quit-line" -> Cessation_Counseling; anything else
+  cessation-directed -> Other_Cessation. Only tag interventions aimed at the
+  patient's own quit attempt; cessation advice in family history, generic guideline
+  text, or educational handouts is NON_PATIENT_CONTEXT, not this type.
+exemplars:
+  - "nicotine patch"
+  - "varenicline"
+  - "smoking cessation counseling"
+  - "Chantix"
+  - "nicotine gum"
+  - "referred to smoking cessation program"
+negative_examples:
+  - phrase: "denies tobacco use"
+    reason: "this is a denial of smoking (NEGATION_OR_DENIAL), not a cessation treatment"
+  - phrase: "quit in 2010"
+    reason: "this records when the patient stopped (QUIT_TIME); it names no intervention"
+  - phrase: "counseled patient on diet and exercise"
+    reason: "counseling unrelated to tobacco cessation — do not tag here"
+edge_cases:
+  - pattern: "bupropion 150mg for depression"
+    correct: "do NOT tag as Bupropion cessation; bupropion here treats depression, not smoking"
+    reason: "the same drug maps to Bupropion only when the context is cessation-directed"
+  - pattern: "we discussed nicotine replacement options with the patient's husband, also a smoker"
+    correct: "tag under NON_PATIENT_CONTEXT, not CESSATION_INTERVENTION"
+    reason: "the intervention concerns a family member, not the patient"
+  - pattern: "started on NRT and quit-line referral"
+    correct: "two spans — 'NRT' -> Nicotine_Replacement_Therapy and 'quit-line referral' -> Cessation_Counseling"
+    reason: "distinct interventions map to distinct concept_name children"

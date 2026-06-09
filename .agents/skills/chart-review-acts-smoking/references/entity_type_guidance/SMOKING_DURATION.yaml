@@ -1,0 +1,30 @@
+entity_type: SMOKING_DURATION
+guidance: |
+  Tag a span that states how long the patient smoked — a length of time
+  spanning the smoking period, e.g. "for 20 years", "smoked x 30 years".
+  The only concept_name child is Duration_Years, so map every qualifying
+  span there (use "novel_candidate" only if the span is a true duration but
+  cannot be expressed in years). Do NOT tag pack-year totals here (those are
+  PACK_YEAR) or time-since-quit phrases (those are QUIT_TIME). Tag only when
+  the duration describes the patient's own smoking; durations in family
+  history or screening criteria belong under NON_PATIENT_CONTEXT.
+exemplars:
+  - "for 20 years"
+  - "smoked x 30 years"
+  - "smoked for 25 years"
+  - "30-year smoking history"
+  - "x 40 yrs"
+negative_examples:
+  - phrase: "30 pack-years"
+    reason: "combines rate and duration into one exposure measure — tag as PACK_YEAR, not a pure duration"
+  - phrase: "quit 5 years ago"
+    reason: "time elapsed since cessation, not length of smoking — tag as QUIT_TIME"
+  - phrase: "started smoking at age 18"
+    reason: "a start point, not a span of duration — tag as SMOKING_START"
+edge_cases:
+  - pattern: "smoked 1 ppd x 30 years"
+    correct: "tag '1 ppd' as PACK_PER_DAY and 'x 30 years' as SMOKING_DURATION separately"
+    reason: "rate and duration are distinct facts; only the year-span is the duration"
+  - pattern: "30-pack-year history over 30 years"
+    correct: "tag '30-pack-year' as PACK_YEAR and 'over 30 years' as SMOKING_DURATION"
+    reason: "pack-year total and the elapsed years are two different entity types even when co-located"

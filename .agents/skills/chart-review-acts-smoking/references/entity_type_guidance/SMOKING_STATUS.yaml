@@ -1,0 +1,31 @@
+entity_type: SMOKING_STATUS
+guidance: |
+  Tag a status assertion about whether the patient currently smokes, formerly
+  smoked, never smoked, or has an unclear status. Map to the most-specific
+  child: "current/active smoker" -> Current; "former/ex-smoker", "quit
+  smoking" -> Former; "never smoker/smoked", "denies smoking", "no tobacco
+  use" -> Never; genuinely unclear or self-conflicting statements -> Unknown.
+  Only tag when the assertion is about the patient — family-history or
+  guideline/screening status belongs under NON_PATIENT_CONTEXT instead.
+exemplars:
+  - "current smoker"
+  - "former smoker"
+  - "never smoked"
+  - "ex-smoker"
+  - "active smoker"
+  - "denies tobacco use"
+negative_examples:
+  - phrase: "father was a heavy smoker"
+    reason: "status describes a family member, not the patient — tag under NON_PATIENT_CONTEXT"
+  - phrase: "eligible if patient is a current or former smoker"
+    reason: "generic screening-eligibility criteria, not a patient assertion — tag under NON_PATIENT_CONTEXT"
+edge_cases:
+  - pattern: "denies smoking / no tobacco use"
+    correct: "tag as SMOKING_STATUS -> Never AND separately tag the same span as NEGATION_OR_DENIAL"
+    reason: "an explicit denial is both a Never status and a denial mention; the two entity_types co-occur on the span"
+  - pattern: "former smoker per intake, but reports smoking 1 ppd today"
+    correct: "tag the status span(s) as SMOKING_STATUS -> Unknown"
+    reason: "self-conflicting current vs former assertions resolve to Unknown rather than guessing one"
+  - pattern: "quit smoking in 2010"
+    correct: "tag 'quit smoking' as SMOKING_STATUS -> Former (the QUIT_TIME '2010' is a separate span)"
+    reason: "a cessation statement asserts Former status; the temporal value is handled by QUIT_TIME, not here"

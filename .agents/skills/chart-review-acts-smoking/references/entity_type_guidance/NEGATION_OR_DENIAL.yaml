@@ -1,0 +1,29 @@
+entity_type: NEGATION_OR_DENIAL
+guidance: |
+  Tag spans that are an explicit denial or negation of the patient's
+  tobacco/smoking use. Map a denial framed around smoking ("denies smoking",
+  "no history of smoking") to Denies_Smoking, and a denial framed around
+  tobacco generally ("no tobacco use", "denies tobacco") to No_Tobacco_Use;
+  use novel_candidate only when neither child fits. Only tag denials about the
+  patient — denials in family history or generic screening text belong to
+  NON_PATIENT_CONTEXT, not here.
+exemplars:
+  - "denies smoking"
+  - "denies tobacco use"
+  - "no tobacco use"
+  - "no history of smoking"
+  - "never smoked"
+negative_examples:
+  - phrase: "former smoker"
+    reason: "a SMOKING_STATUS phrase, not an explicit denial — tag under SMOKING_STATUS"
+  - phrase: "family denies any tobacco use"
+    reason: "denial is about a family member, not the patient — tag under NON_PATIENT_CONTEXT"
+  - phrase: "screening excludes never-smokers"
+    reason: "generic eligibility criteria, not a patient-specific denial — tag under NON_PATIENT_CONTEXT"
+edge_cases:
+  - pattern: "patient denies smoking; never smoker"
+    correct: "tag 'denies smoking' as NEGATION_OR_DENIAL=Denies_Smoking AND 'never smoker' as SMOKING_STATUS=never"
+    reason: "denial and status co-occur; each token gets its own span under its own entity_type"
+  - pattern: "never smoked"
+    correct: "tag as NEGATION_OR_DENIAL=Denies_Smoking when phrased as a denial of the act"
+    reason: "an explicit denial of ever smoking reads as a denial here, even though it overlaps the SMOKING_STATUS=never concept"

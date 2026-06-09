@@ -1,0 +1,29 @@
+entity_type: SMOKING_START
+guidance: |
+  Tag the span that states when the patient began smoking — either a calendar
+  year or an age. Pick the concept_name child by the form of the span: a
+  calendar year ("since 1980") maps to Start_Year, while an age ("started
+  smoking at age 18") maps to Start_Age. Only tag start-of-smoking facts about
+  the patient; a start year/age in family history, in generic screening
+  criteria, or otherwise not about this patient is NON_PATIENT_CONTEXT, not
+  SMOKING_START.
+exemplars:
+  - "started smoking at age 18"
+  - "since 1980"
+  - "began smoking when he was 16"
+  - "smoking since age 20"
+  - "started in 1995"
+negative_examples:
+  - phrase: "quit in 2010"
+    reason: "this is a cessation year, not a start — tag under QUIT_TIME"
+  - phrase: "smoked x 30 years"
+    reason: "this is a duration of smoking, not a start point — tag under SMOKING_DURATION"
+  - phrase: "father started smoking at age 14"
+    reason: "start age describes a family member, not the patient — tag under NON_PATIENT_CONTEXT"
+edge_cases:
+  - pattern: "smoking since 1980 (started at age 18)"
+    correct: "tag '1980' as Start_Year AND 'age 18' as Start_Age (two spans)"
+    reason: "the same onset is stated in two forms; each form maps to its matching child"
+  - pattern: "started smoking in his teens"
+    correct: "tag 'in his teens' as Start_Age"
+    reason: "an approximate age-range onset is still an age form, so it maps to Start_Age not Start_Year"
