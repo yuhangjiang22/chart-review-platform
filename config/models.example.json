@@ -1,0 +1,5 @@
+{
+  "gpt-5.2":   { "backend": "codex",  "model": "gpt-5.2",                    "label": "GPT-5.2 (Azure)", "api_key_env": "AZURE_OPENAI_API_KEY", "default": true },
+  "gpt-4o":    { "backend": "codex",  "model": "gpt-4o",                     "label": "GPT-4o (Azure)",  "api_key_env": "AZURE_OPENAI_API_KEY" },
+  "haiku-4.5": { "backend": "claude", "model": "anthropic/claude-haiku-4.5", "label": "Claude Haiku 4.5","api_key_env": "ANTHROPIC_API_KEY" }
+}

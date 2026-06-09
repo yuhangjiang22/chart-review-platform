@@ -20,6 +20,10 @@ var/
 .codex/skills/.system/
 .codex/sessions/
 
+# Per-deployment model registry. The committed template is
+# config/models.example.json; the live file is per-machine.
+config/models.json
+
 # Per-machine env (paths + provider defaults). Check in .env.example
 # instead to document the contract.
 .env
