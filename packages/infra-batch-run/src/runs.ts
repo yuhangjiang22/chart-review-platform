@@ -115,6 +115,9 @@ export interface RunListing {
   label?: string;
   state: RunState;
   started_at: string;
+  /** Patients in this run's cohort. Consumers (e.g. the NER span-review
+   *  import picker) filter runs by whether they include a given patient. */
+  patient_ids: string[];
   n_patients: number;
   n_complete: number;
   n_error: number;
@@ -366,6 +369,7 @@ export function listRuns(filter?: { task_id?: string }): RunListing[] {
       label: m.label,
       state: s.state,
       started_at: m.started_at,
+      patient_ids: m.patient_ids,
       n_patients: s.n_patients,
       n_complete: s.n_complete,
       n_error: s.n_error,
