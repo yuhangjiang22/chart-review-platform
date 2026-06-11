@@ -164,6 +164,12 @@ export function AdherenceReview(props: AdherenceReviewProps) {
   // → refresh) reliably loses the race to this pane's own review fetch, so
   // on first open we'd render empty otherwise.
   const seedAttemptedRef = useRef(false);
+  // Cancellation token for the refreshState seed chain. The driving effect
+  // owns it: it bumps the token on (re)run and on cleanup, so a switch to
+  // another patient mid-flight makes every captured token stale and every
+  // setState in refreshState a no-op — preventing setState-after-unmount AND
+  // the new patient's state being clobbered by the old fetch resolving late.
+  const refreshTokenRef = useRef(0);
 
   // session_id is required on every review call; build the query suffix once.
   const sessionQs = activeSessionId ? `?session_id=${encodeURIComponent(activeSessionId)}` : "";
@@ -194,17 +200,20 @@ export function AdherenceReview(props: AdherenceReviewProps) {
     return () => { cancelled = true; };
   }, [taskId]);
 
-  const refreshState = useCallback(async () => {
+  const refreshState = useCallback(async (token: number = refreshTokenRef.current) => {
+    const live = () => refreshTokenRef.current === token;
     try {
       const r = await authFetch(
         `/api/reviews/${encodeURIComponent(patientId)}/${encodeURIComponent(taskId)}${sessionQs}`,
       );
+      if (!live()) return;
       if (!r.ok) {
         setError(`review load failed: ${r.status}`);
         setState(null);
         return;
       }
       const body = (await r.json()) as AdherenceReviewState;
+      if (!live()) return;
       setState(body);
       setError(null);
       // Seed-on-empty: the agent's question_answers live in the run draft
@@ -223,6 +232,7 @@ export function AdherenceReview(props: AdherenceReviewProps) {
         const runsRes = await authFetch(
           `/api/runs?task_id=${encodeURIComponent(taskId)}&session_id=${encodeURIComponent(activeSessionId)}`,
         );
+        if (!live()) return;
         const runs: Array<{ run_id: string }> = runsRes.ok ? await runsRes.json() : [];
         for (const run of runs) {
           const imp = await authFetch(
@@ -233,19 +243,27 @@ export function AdherenceReview(props: AdherenceReviewProps) {
               body: JSON.stringify({ force: true }),
             },
           );
+          if (!live()) return;
           if (imp.ok) {
-            await refreshState();
+            await refreshState(token);
             return;
           }
         }
       }
     } catch (e) {
+      if (!live()) return;
       setError(`review load error: ${(e as Error).message}`);
       setState(null);
     }
   }, [patientId, taskId, sessionQs, activeSessionId]);
 
-  useEffect(() => { void refreshState(); }, [refreshState]);
+  useEffect(() => {
+    const token = ++refreshTokenRef.current;
+    void refreshState(token);
+    // Bump the token on cleanup so any in-flight refreshState for this run
+    // stops calling setState (unmount + patient/task switch both trigger this).
+    return () => { refreshTokenRef.current++; };
+  }, [refreshState]);
 
   const answersByQid = useMemo(() => {
     const m = new Map<string, QuestionAnswer>();
@@ -370,12 +388,21 @@ export function AdherenceReview(props: AdherenceReviewProps) {
 
   const tiers = Object.keys(meta.questions_by_tier).map(Number).sort((a, b) => a - b);
   const totalQuestions = tiers.reduce((s, t) => s + (meta.questions_by_tier[t]?.length ?? 0), 0);
+  // Clamp the validated numerator to questions that actually exist in the
+  // current framework. Stale validated qids (e.g. from a prior framework
+  // version) would otherwise make "N / M validated" read N > M.
+  const frameworkQids = new Set(
+    tiers.flatMap((t) => (meta.questions_by_tier[t] ?? []).map((q) => q.question_id)),
+  );
+  const validatedQuestionsInFramework = [...validatedQuestions].filter((qid) =>
+    frameworkQids.has(qid),
+  ).length;
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <Header patientDisplay={patientDisplay} taskId={taskId} onBack={onBack} />
       <div className="px-4 py-2 border-b border-border bg-muted/30 text-[12px] text-muted-foreground flex gap-4">
-        <span>Questions: {validatedQuestions.size} / {totalQuestions} validated</span>
+        <span>Questions: {validatedQuestionsInFramework} / {totalQuestions} validated</span>
         <span>Rules: {validatedRules.size} / {meta.rules.length} adjudicated</span>
       </div>
 
@@ -504,14 +531,26 @@ function QuestionRow({
       );
     }
     if (isEnum) {
+      const opts = schema!.enum!;
       return (
         <select
           value={draft === null ? "" : String(draft)}
-          onChange={(e) => setDraft(e.target.value === "" ? null : e.target.value)}
+          onChange={(e) => {
+            // The <option> value is a string, but a numeric/boolean enum
+            // (answer_schema.enum:[1,2,3]) must keep its original type so it
+            // compares equal to the agent's typed answer — otherwise the
+            // agree-chip, "= Ax" source label, and isCurrent highlight all
+            // falsely show disagreement. Recover the original-typed option by
+            // matching String(opt) === the selected string.
+            const sel = e.target.value;
+            if (sel === "") { setDraft(null); return; }
+            const orig = opts.find((opt) => String(opt) === sel);
+            setDraft(orig === undefined ? sel : orig);
+          }}
           className="border border-border rounded px-1.5 py-0.5 text-[12px] bg-background w-full max-w-[140px]"
         >
           <option value="">—</option>
-          {schema!.enum!.map((opt) => (
+          {opts.map((opt) => (
             <option key={String(opt)} value={String(opt)}>{String(opt)}</option>
           ))}
         </select>
@@ -747,24 +786,31 @@ function RuleRow({
     rationale: string | undefined,
   ) => void;
 }) {
-  const [draftV, setDraftV] = useState<RuleVerdict["verdict"]>(verdict?.verdict ?? "NON_CONCORDANT");
+  // An un-adjudicated rule (no engine verdict) must NOT pre-select
+  // NON_CONCORDANT — that would show the attribution/rationale sub-row and let
+  // "Accept" POST a NON_CONCORDANT verdict the engine never asserted. Default
+  // to a neutral "" sentinel ("— select verdict —") so nothing is written
+  // until the reviewer actually picks a verdict.
+  type DraftVerdict = RuleVerdict["verdict"] | "";
+  const [draftV, setDraftV] = useState<DraftVerdict>(verdict?.verdict ?? "");
   const [draftA, setDraftA] = useState<AttributionCategory | undefined>(verdict?.attribution);
   const [draftR, setDraftR] = useState<string>(verdict?.rationale ?? "");
   useEffect(() => {
-    setDraftV(verdict?.verdict ?? "NON_CONCORDANT");
+    setDraftV(verdict?.verdict ?? "");
     setDraftA(verdict?.attribution);
     setDraftR(verdict?.rationale ?? "");
   }, [verdict?.verdict, verdict?.attribution, verdict?.rationale]);
 
   const dirty =
-    (verdict?.verdict ?? "NON_CONCORDANT") !== draftV
+    (verdict?.verdict ?? "") !== draftV
     || (verdict?.attribution ?? undefined) !== draftA
     || (verdict?.rationale ?? "") !== draftR;
 
   const verdictColor =
     draftV === "CONCORDANT" ? "text-emerald-700 border-emerald-300"
     : draftV === "EXCLUDED" ? "text-muted-foreground border-border"
-    : "text-[hsl(var(--oxblood))] border-[hsl(var(--oxblood))]/40";
+    : draftV === "NON_CONCORDANT" ? "text-[hsl(var(--oxblood))] border-[hsl(var(--oxblood))]/40"
+    : "text-muted-foreground border-border";
 
   return (
     <div className="px-3 py-2 text-[12px] space-y-1.5">
@@ -856,9 +902,10 @@ function RuleRow({
         <div className="flex flex-col items-end gap-1 min-w-[7rem]">
           <select
             value={draftV}
-            onChange={(e) => setDraftV(e.target.value as RuleVerdict["verdict"])}
+            onChange={(e) => setDraftV(e.target.value as DraftVerdict)}
             className={cn("border rounded px-1.5 py-0.5 bg-background text-[12px]", verdictColor)}
           >
+            <option value="">— select verdict —</option>
             <option value="CONCORDANT">CONCORDANT</option>
             <option value="NON_CONCORDANT">NON_CONCORDANT</option>
             <option value="EXCLUDED">EXCLUDED</option>
@@ -888,8 +935,13 @@ function RuleRow({
         <Button
           size="sm"
           variant={dirty ? "default" : "outline"}
-          disabled={busy}
-          onClick={() => onSave(draftV, draftA, draftR || undefined)}
+          // Disable until the reviewer picks a real verdict, so an
+          // un-adjudicated rule never POSTs a verdict the engine never asserted.
+          disabled={busy || draftV === ""}
+          onClick={() => {
+            if (draftV === "") return;
+            onSave(draftV, draftA, draftR || undefined);
+          }}
         >
           {dirty ? "Save" : validated ? "✓ Accepted" : "Accept"}
         </Button>
