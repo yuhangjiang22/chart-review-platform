@@ -83,6 +83,11 @@ interface NerJudgeRecord {
     agent_correctness: string;
     classification_hint: string;
     judge_confidence: "low" | "medium" | "high";
+    evidence_pointers?: {
+      note_id?: string;
+      what_to_look_for?: string;
+      offsets?: number[];
+    }[];
   };
   error?: string;
 }
@@ -140,7 +145,13 @@ export function PhaseJudge({
 
   const hasResults = !!status.generatedAt;
   const isNer = taskKind === "ner" || status.taskKindFromFile === "ner";
-  const unitLabelPlural = isNer ? "spans" : "cells";
+  const unitLabelPlural = isNer ? "records" : "cells";
+  // The NER card list below renders ALL records (including failed ones with
+  // no `analysis`), but `cells_analyzed` counts analyzed-minus-failed. Drive
+  // the NER button/summary off the rendered record count so the visible cards
+  // and the label agree; phenotype keeps reporting analyzed cells.
+  const nerRecords = Array.isArray(status.analyses) ? status.analyses : [];
+  const judgeCount = isNer ? nerRecords.length : (status.cellsAnalyzed ?? 0);
 
   return (
     <div className="pt-2 space-y-4">
@@ -189,7 +200,7 @@ export function PhaseJudge({
             ) : hasResults ? (
               <>
                 <Sparkles size={12} strokeWidth={1.75} />
-                Re-run judge ({status.cellsAnalyzed ?? 0} {unitLabelPlural})
+                Re-run judge ({judgeCount} {unitLabelPlural})
               </>
             ) : (
               <>
@@ -213,9 +224,9 @@ export function PhaseJudge({
           <div className="mt-3 text-[11px] text-muted-foreground border-t border-border/50 pt-2">
             <div>
               <span className="font-medium text-foreground">
-                {status.cellsAnalyzed ?? 0}
+                {judgeCount}
               </span>{" "}
-              {unitLabelPlural} analyzed
+              {isNer ? "records" : `${unitLabelPlural} analyzed`}
               {status.cellsFailed ? (
                 <>
                   {" · "}
@@ -238,15 +249,23 @@ export function PhaseJudge({
       </div>
 
       {/* NER-specific: render inline analysis cards. Phenotype tasks
-       *  rely on PatientReview's per-criterion advisory pane instead. */}
-      {isNer && hasResults && Array.isArray(status.analyses) && status.analyses.length > 0 && (
+       *  rely on PatientReview's per-criterion advisory pane instead. Gate on
+       *  the FILE's own task_kind discriminator (taskKindFromFile), not just
+       *  the parent prop: a stale phenotype-shaped judge_analyses.json served
+       *  while the task is NER would otherwise try to render span cards off
+       *  records that have no span_id. */}
+      {status.taskKindFromFile === "ner" && hasResults && nerRecords.length > 0 && (
         <div className="space-y-2">
           <div className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
             Per-span analyses
           </div>
-          {status.analyses.map((rec) => (
+          {nerRecords.map((rec) => (
             <NerJudgeCard
-              key={`${rec.patient_id}::${rec.span_id}`}
+              // A single (patient_id, span_id) legitimately yields multiple
+              // records: a disagreement row AND a single-agent novel_candidate,
+              // or multiple agent-pairs in a 3+ agent run. Disambiguate the
+              // React key by kind + agent ids so cards aren't dropped.
+              key={`${rec.patient_id}::${rec.span_id}::${rec.kind}::${rec.agent_a?.agent_id ?? ""}::${rec.agent_b?.agent_id ?? ""}`}
               record={rec}
               onOpenSpan={onOpenSpan}
             />
@@ -283,7 +302,7 @@ function NerJudgeCard({
         {open ? <ChevronDown className="size-3.5 mt-0.5" /> : <ChevronRight className="size-3.5 mt-0.5" />}
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-2 flex-wrap">
-            <span className="font-mono text-[11px]">{record.span_id.slice(0, 10)}</span>
+            <span className="font-mono text-[11px]">{(record.span_id ?? "").slice(0, 10)}</span>
             <span className="text-muted-foreground">·</span>
             <span>{record.entity_type}</span>
             <span className="text-muted-foreground">·</span>
@@ -318,6 +337,29 @@ function NerJudgeCard({
                 {"  ·  "}classification: <span className="font-mono">{a.classification_hint}</span>
                 {"  ·  "}confidence: <span className="font-mono">{a.judge_confidence}</span>
               </div>
+              {/* Evidence pointers — the most actionable field for the
+               *  reviewer: where in the note to look. Guarded against a
+               *  missing / non-array / empty `[]` value. */}
+              {Array.isArray(a.evidence_pointers) && a.evidence_pointers.length > 0 && (
+                <div className="pt-1 space-y-0.5">
+                  <div className="text-[10.5px] uppercase tracking-[0.12em] text-muted-foreground">
+                    Evidence pointers
+                  </div>
+                  <ul className="space-y-0.5">
+                    {a.evidence_pointers.map((ep, i) => (
+                      <li key={i} className="text-[11px] leading-snug">
+                        {ep.note_id && (
+                          <span className="font-mono text-[10.5px] text-muted-foreground">{ep.note_id}: </span>
+                        )}
+                        {ep.what_to_look_for && <span>{ep.what_to_look_for}</span>}
+                        {Array.isArray(ep.offsets) && ep.offsets.length > 0 && (
+                          <span className="font-mono text-[10.5px] text-muted-foreground"> [{ep.offsets.join(",")}]</span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           )}
           {onOpenSpan && (
