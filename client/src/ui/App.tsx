@@ -12,6 +12,7 @@ import { AppShell } from "./AppShell";
 import { QueueView } from "./QueueView";
 import { PatientReview } from "./PatientReview";
 import { SpanReview } from "./SpanReview";
+import { AdherenceReview } from "./AdherenceReview";
 import { CommandPalette, type PaletteAction } from "./CommandPalette";
 import { Studio } from "./Studio";
 import { Workspace } from "./Workspace";
@@ -387,11 +388,24 @@ export function App() {
       {route.page === "patient" && task && route.patientId &&
         // task_kind dispatch — each kind has its own reviewer pane:
         //   ner       → SpanReview (span-validation table, grouped by note)
+        //   adherence → AdherenceReview (tier-grouped question framework +
+        //               rule verdicts)
         //   phenotype → PatientReview (criterion-row UI)
         // The TaskSummary's task_type is the raw meta.yaml field; the
-        // server tags NER tasks with task_type:"ner" (mirrors v2).
+        // server tags NER tasks with task_type:"ner" and adherence tasks
+        // with task_type:"adherence" (mirrors v2).
         (task.task_type === "ner" ? (
           <SpanReview
+            patientId={route.patientId}
+            patientDisplay={activePatient?.display_name ?? route.patientId}
+            taskId={task.task_id}
+            activeSessionId={activeSessionId}
+            onBack={() =>
+              navigate(studioHash(task.task_id, lastStudioSubTabRef.current ?? "validate"))
+            }
+          />
+        ) : task.task_type === "adherence" ? (
+          <AdherenceReview
             patientId={route.patientId}
             patientDisplay={activePatient?.display_name ?? route.patientId}
             taskId={task.task_id}
