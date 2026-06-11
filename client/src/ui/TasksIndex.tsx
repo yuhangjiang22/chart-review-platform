@@ -8,7 +8,7 @@
 //
 // Clicking a row navigates into Studio at `#/studio/<task-id>`.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowRight, BookOpen, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -19,7 +19,7 @@ export interface TaskListing {
   id: string;
   field_count: number;
   task_type?: string;
-  manual_version?: string;
+  manual_version?: string | number;
 }
 
 export interface TasksIndexProps {
@@ -32,8 +32,8 @@ export interface TasksIndexProps {
 // task_type (the server tags NER tasks "ner"; everything else is a
 // phenotype rubric). KIND_ORDER fixes the tab order; KIND_META carries the
 // human label + the one-line blurb shown under the active tab.
-type TaskKind = "phenotype" | "ner";
-const KIND_ORDER: TaskKind[] = ["phenotype", "ner"];
+type TaskKind = "phenotype" | "ner" | "adherence";
+const KIND_ORDER: TaskKind[] = ["phenotype", "ner", "adherence"];
 const KIND_META: Record<TaskKind, { label: string; blurb: string }> = {
   phenotype: {
     label: "Phenotype",
@@ -43,9 +43,15 @@ const KIND_META: Record<TaskKind, { label: string; blurb: string }> = {
     label: "Entity extraction",
     blurb: "Named-entity recognition. Reviewer accepts/rejects agent-proposed spans, each mapped to an ontology concept.",
   },
+  adherence: {
+    label: "Adherence",
+    blurb: "Guideline concordance. Reviewer adjudicates tier-grouped question answers and rule verdicts.",
+  },
 };
 function kindOf(task: TaskListing): TaskKind {
-  return task.task_type === "ner" ? "ner" : "phenotype";
+  if (task.task_type === "ner") return "ner";
+  if (task.task_type === "adherence") return "adherence";
+  return "phenotype";
 }
 
 export function TasksIndex({ tasks, onOpen, onCreateTask }: TasksIndexProps) {
@@ -54,8 +60,21 @@ export function TasksIndex({ tasks, onOpen, onCreateTask }: TasksIndexProps) {
   // list with no needless chrome.
   const presentKinds = KIND_ORDER.filter((k) => tasks.some((t) => kindOf(t) === k));
   const [activeKind, setActiveKind] = useState<TaskKind>(presentKinds[0] ?? "phenotype");
-  // Guard against the active tab vanishing (e.g. tasks reloaded): fall back
-  // to the first present kind.
+  // If the active tab vanishes across a reload (e.g. the last task of a kind
+  // is removed), snap the selection back to the first present kind so the
+  // stale `activeKind` doesn't leave the index showing an empty list. Keyed
+  // on stable primitives (a joined string + the first kind) rather than the
+  // freshly-allocated `presentKinds` array, so the effect doesn't re-run on
+  // every render.
+  const presentKindsKey = presentKinds.join(",");
+  const firstKind = presentKinds[0];
+  useEffect(() => {
+    if (!presentKindsKey.split(",").filter(Boolean).includes(activeKind) && firstKind) {
+      setActiveKind(firstKind);
+    }
+  }, [presentKindsKey, firstKind, activeKind]);
+  // Guard the current render too — useEffect runs after paint, so derive the
+  // shown kind defensively for this pass.
   const shownKind = presentKinds.includes(activeKind) ? activeKind : (presentKinds[0] ?? "phenotype");
   const visibleTasks = tasks.filter((t) => kindOf(t) === shownKind);
   const showTabs = presentKinds.length > 1;
@@ -111,11 +130,13 @@ export function TasksIndex({ tasks, onOpen, onCreateTask }: TasksIndexProps) {
         </div>
       )}
 
-      <p className="mb-5 text-[12.5px] leading-relaxed text-muted-foreground">
-        {KIND_META[shownKind].blurb}
-      </p>
+      {tasks.length > 0 && (
+        <p className="mb-5 text-[12.5px] leading-relaxed text-muted-foreground">
+          {KIND_META[shownKind].blurb}
+        </p>
+      )}
 
-      {!showTabs && <Separator className="mb-5" />}
+      {!showTabs && tasks.length > 0 && <Separator className="mb-5" />}
 
       {tasks.length === 0 ? (
         <Card>
@@ -141,9 +162,15 @@ export function TasksIndex({ tasks, onOpen, onCreateTask }: TasksIndexProps) {
 }
 
 function TaskRow({ task, onOpen }: { task: TaskListing; onOpen: (taskId: string) => void }) {
-  // NER tasks have no criteria fields, so "0 fields" is misleading — describe
-  // the task nature instead. Phenotype tasks show their criterion count.
-  const unitLabel = kindOf(task) === "ner" ? "entity extraction" : `${task.field_count} fields`;
+  // NER and adherence tasks have no criteria fields, so "0 fields" is
+  // misleading — describe the task nature instead. Phenotype tasks show their
+  // criterion count (singular "field" for exactly one; undefined-guarded).
+  const kind = kindOf(task);
+  const count = task.field_count ?? 0;
+  const unitLabel =
+    kind === "ner" ? "entity extraction"
+    : kind === "adherence" ? "guideline concordance"
+    : `${count} field${count === 1 ? "" : "s"}`;
   return (
     <li className="list-none">
       <button
@@ -159,9 +186,9 @@ function TaskRow({ task, onOpen }: { task: TaskListing; onOpen: (taskId: string)
           <div className="flex min-w-0 flex-1 flex-col">
             <div className="flex items-baseline gap-2">
               <code className="truncate font-mono text-[13px] text-ink">{task.id}</code>
-              {task.manual_version && (
+              {task.manual_version != null && (
                 <Badge variant="outline" className="!text-[10px] tabular-nums">
-                  v{task.manual_version}
+                  v{String(task.manual_version)}
                 </Badge>
               )}
             </div>
