@@ -301,6 +301,7 @@ import { atomicWriteJson } from "@chart-review/storage";
 import { buildMcpServersConfig } from "@chart-review/mcp-server-anthropic";
 import { buildAuditHooks } from "@chart-review/audit-trail";
 import { loadCompiledTask, type CompiledTask } from "@chart-review/tasks";
+import type { QuestionAnswer, RuleVerdict } from "@chart-review/platform-types";
 import { computeTaskSha } from "@chart-review/lock";
 import { guidelineDir, phenotypeSkillDir } from "@chart-review/rubric";
 import { patientDir, listNotes } from "@chart-review/patients";
@@ -326,7 +327,14 @@ export function applyAgentEventToTally(
   if (event.type === "error") {
     return { ...tally, agentError: event.error ?? "agent error" };
   }
-  if (event.type === "tool_use" && event.tool_name === "set_field_assessment") {
+  // Primary write tools per task kind: phenotype commits via
+  // set_field_assessment, adherence via set_question_answer. Each run uses
+  // exactly one, so counting both is safe (the other never fires).
+  if (
+    event.type === "tool_use" &&
+    (event.tool_name === "set_field_assessment" ||
+      event.tool_name === "set_question_answer")
+  ) {
     return { ...tally, writeCount: tally.writeCount + 1 };
   }
   return tally;
@@ -792,6 +800,7 @@ async function runOneAgent(
   if (!task) throw new Error(`task ${taskId} not found at runtime`);
 
   const isNerTask = task.task_kind === "ner";
+  const isAdherenceTask = task.task_kind === "adherence";
 
   const ppDir = perPatientDir(runId, patientId);
   fs.mkdirSync(path.join(ppDir, "agents"), { recursive: true });
@@ -883,6 +892,11 @@ async function runOneAgent(
   // fail. `nerCompleted` records that the per-note loop ran to the end without a
   // thrown/returned error, so we can treat an honest empty result as `ok`.
   let nerCompleted = false;
+  // Adherence writes its own draft inline (question_answers + rule_verdicts)
+  // rather than promoting the scratch review_state, so the post-loop promote
+  // block must skip it. `adherenceDraftWritten` records that the inline draft
+  // was produced on a successful outcome.
+  let adherenceDraftWritten = false;
   const auditHooks = buildAuditHooks({ patientId, taskId, sessionId });
 
   await withReviewsRoot(scratchRoot, async () => {
@@ -965,6 +979,202 @@ async function runOneAgent(
       return;
     }
 
+    if (isAdherenceTask) {
+      // Adherence: agent loop via the stdio MCP server's adherence tools.
+      // The agent commits one QuestionAnswer per question through
+      // set_question_answer; after the loop the platform runs the
+      // deterministic rule engine over the collected answers to produce
+      // rule_verdicts (no LLM judge in concur's MVP). Mirrors the phenotype
+      // agent-loop, NOT the NER direct-LLM path.
+      //
+      // The MCP config is the SAME stdio subprocess phenotype uses, but we
+      // restrict the exposed tools to the adherence surface via the
+      // CHART_REVIEW_MCP_TOOLS allowlist injected on the subprocess env. The
+      // stdio server only registers the adherence write/read tools when the
+      // task is task_kind:"adherence" AND the tool is in the allowlist.
+      const adherenceTools = [
+        "list_questions",
+        "read_question",
+        "set_question_answer",
+        "get_adherence_state",
+        "list_notes",
+        "read_note",
+        "read_notes",
+        "search_notes",
+        "list_structured_data",
+        "read_structured_data",
+        "set_review_status",
+      ].join(",");
+      const adherenceMcp = buildMcpServersConfig(
+        patientId, task, sessionId, { onStateUpdate: () => {} },
+        { reviewsRoot: scratchRoot, provider: manifest.provider },
+      ) as Record<string, { env?: Record<string, string> }>;
+      // Inject the per-run tool allowlist into the subprocess env so only the
+      // adherence tools are exposed (phenotype's set_field_assessment etc. stay
+      // hidden). buildMcpServersConfig spreads process.env, so we override the
+      // single key on the returned config rather than mutating process.env.
+      for (const cfg of Object.values(adherenceMcp)) {
+        cfg.env = { ...(cfg.env ?? {}), CHART_REVIEW_MCP_TOOLS: adherenceTools };
+      }
+
+      const adherenceUserPrompt = [
+        `Adherence chart review for patient \`${patientId}\` on task \`${taskId}\`.`,
+        "",
+        `--- Role framing ---`,
+        rolePrompt,
+        `--- End role framing ---`,
+        "",
+        "FIRST ACTIONS — do these IMMEDIATELY before any reasoning. Do NOT call",
+        "any generic discovery tool — the catalog you need is in your tool list.",
+        "",
+        "Step 1: call `list_questions` (no args) to see every question_id, its",
+        "        tier / answer_schema / retrieval_hints. Each question's hint",
+        "        tells you WHERE to look (OMOP structured table vs notes).",
+        "Step 2: call `list_structured_data` (no args) ONCE to see which OMOP",
+        "        tables this patient has and their row counts. Then call",
+        "        `read_structured_data({table})` for EACH non-empty table the",
+        "        questions reference — typically drugs, measurements, encounters,",
+        "        observations, conditions, procedures. If a table is missing or",
+        "        empty, fall back to the notes — do NOT fail.",
+        "Step 3: call `list_notes` (no args) to see filenames, then read them",
+        "        with `read_notes({filenames:[...]})` (one note per call) OR use",
+        "        `search_notes({keyword})` to jump to a phrase (ACT, action plan,",
+        "        fluticasone, spirometry, …) returning filename + offset + snippet.",
+        "Step 4: For each question from step 1, call `set_question_answer({",
+        "        question_id, answer, confidence, evidence, reasoning})` exactly",
+        "        once. Use structured data when the question's retrieval_hints",
+        "        say 'STRUCTURED FIRST' — that's the source of truth; notes are",
+        "        the fallback. The platform coerces `answer` to the question's",
+        "        schema; pass `null` when the chart doesn't support an answer.",
+        "        Every NOTE evidence quote is faithfulness-checked — quote the",
+        "        text VERBATIM from the note (use read_note to confirm). A quote",
+        "        not found in the note is rejected; do not invent quotes.",
+        "Step 5: After every question has been answered, call",
+        "        `set_review_status({status:'complete'})`. The platform runs the",
+        "        rule engine afterwards — you DO NOT compute rule verdicts yourself.",
+        "",
+        "Active tools (use ONLY these — in the recommended call order):",
+        "  - list_questions          (catalog of questions, call once)",
+        "  - list_structured_data    (catalog of OMOP tables, call ONCE)",
+        "  - read_structured_data    (read one table by name; per non-empty table)",
+        "  - list_notes              (catalog of notes, call once)",
+        "  - search_notes            (keyword search across notes)",
+        "  - read_note / read_notes  (read a note's text)",
+        "  - set_question_answer     (call N times, one per question_id)",
+        "  - set_review_status       (call once at the very end)",
+        "Read-only escape hatches:",
+        "  - read_question(question_id)   (one question's full definition)",
+        "  - get_adherence_state          (what you've already committed)",
+        "",
+        "Do NOT use any other tool. No shell commands, no file IO, no resource",
+        "discovery. Emit a brief one-line summary at the end and stop.",
+      ].join("\n");
+
+      const extraAdherenceSystem =
+        "You are running unattended in batch mode. There is no human in the "
+        + "loop for this patient — commit every question answer through the MCP "
+        + "tools and stop. Do not ask clarifying questions; pick the most "
+        + "defensible answer with the evidence available.";
+
+      const adhSdkHooks: Record<string, Array<{ hooks: any[] }>> = {
+        PreToolUse: [{ hooks: [auditHooks.pre] }],
+        PostToolUse: [{ hooks: [auditHooks.post] }],
+      };
+
+      try {
+        for await (const event of runAgent({
+          prompt: adherenceUserPrompt,
+          cwd: patientDir(patientId),
+          patientId,
+          taskId,
+          guidelinePath: guidelineDir(taskId),
+          mcpServers: adherenceMcp as Record<string, unknown>,
+          hooks: adhSdkHooks,
+          maxTurns: manifest.max_turns_per_patient,
+          permissionMode: "acceptEdits",
+          model: spec.model,
+          provider: manifest.provider,
+          transcriptPath: agentTranscriptPath(runId, patientId, spec.id),
+          extraSystemPrompt: extraAdherenceSystem,
+        })) {
+          if (event.type === "result" && typeof event.cost_usd === "number") {
+            cost = (cost ?? 0) + event.cost_usd;
+          }
+          const t = applyAgentEventToTally({ agentError, writeCount }, event);
+          agentError = t.agentError;
+          writeCount = t.writeCount;
+        }
+      } catch (e) {
+        // A THROWN error (transport crash, provider exception) is a loud-fail
+        // for this agent rather than crashing the whole run.
+        agentError = (e as Error).message ?? String(e);
+      }
+
+      // Gate before computing/writing the draft: an agent that errored or made
+      // no set_question_answer writes did not produce a draft this run.
+      if (classifyAgentOutcome({ agentError, writeCount }).status === "error") {
+        return;
+      }
+
+      // Post-agent: load the committed question_answers from the scratch
+      // review_state, run the deterministic rule engine (eligibility gate
+      // included), and write BOTH question_answers + rule_verdicts into the
+      // per-agent draft (mirrors the phenotype promote, but inline since the
+      // verdicts are computed here, not by the agent).
+      const { evaluateAllRules } = await import("@chart-review/rule-engine");
+      const { loadAdherenceSkill } = await import(
+        "@chart-review/pipeline-extract-adherence"
+      );
+      const skill = loadAdherenceSkill(taskId);
+      const scratchStateFp = path.join(scratchRoot, patientId, taskId, "review_state.json");
+      let questionAnswers: QuestionAnswer[] = [];
+      if (fs.existsSync(scratchStateFp)) {
+        try {
+          const state = JSON.parse(fs.readFileSync(scratchStateFp, "utf8")) as {
+            question_answers?: QuestionAnswer[];
+          };
+          questionAnswers = state.question_answers ?? [];
+        } catch { /* leave empty */ }
+      }
+      // Eligibility gate — if the conventional `R-T0-Eligible` rule resolves
+      // to EXCLUDED, every rule becomes EXCLUDED.
+      const eligibilityRule = skill.rules.find((r) => r.rule_id === "R-T0-Eligible");
+      let auditExcluded = false;
+      if (eligibilityRule) {
+        const eligV = await evaluateAllRules([eligibilityRule], questionAnswers);
+        auditExcluded = eligV[0]?.verdict === "EXCLUDED";
+      }
+      const ruleVerdicts: RuleVerdict[] = auditExcluded
+        ? skill.rules.map((r) => ({
+            rule_id: r.rule_id,
+            verdict: "EXCLUDED" as const,
+            supporting_questions: r.supporting_questions,
+            source: "rule_engine" as const,
+            ts: new Date().toISOString(),
+          }))
+        : await evaluateAllRules(skill.rules, questionAnswers);
+
+      const draftFp = agentDraftPath(runId, patientId, spec.id);
+      fs.mkdirSync(path.dirname(draftFp), { recursive: true });
+      atomicWriteJson(draftFp, {
+        schema_version: "1",
+        patient_id: patientId,
+        task_id: taskId,
+        task_kind: "adherence",
+        review_status: "draft",
+        version: 1,
+        updated_at: new Date().toISOString(),
+        updated_by: "agent",
+        field_assessments: [],
+        question_answers: questionAnswers,
+        rule_verdicts: ruleVerdicts,
+        adherence_excluded: auditExcluded || undefined,
+        lock_task_sha: manifest.guideline_sha,
+      });
+      adherenceDraftWritten = true;
+      return;
+    }
+
     // Transport (in-process vs subprocess) is selected by the
     // MCP_TRANSPORT env var. The default is in-process for backward
     // compat; set MCP_TRANSPORT=subprocess to spawn the standalone
@@ -1039,18 +1249,28 @@ async function runOneAgent(
   }
 
   // Success: promote the scratch review_state written by the MCP/extract loop.
-  const scratchReviewState = path.join(scratchRoot, patientId, taskId, "review_state.json");
-  if (!fs.existsSync(scratchReviewState)) {
-    if (isNerTask) {
-      // Empty-NER-is-valid: mcp-core-ner only writes review_state.json once a
-      // span is persisted, so an honest zero-entity result leaves NO scratch
-      // file. Synthesize and promote an empty NER draft rather than failing.
-      atomicWriteJson(agentDraftPath(runId, patientId, spec.id), emptyNerDraft(patientId, taskId));
-    } else {
-      throw new Error(`agent ${spec.id} reported writes but no review_state.json — internal error`);
+  //
+  // Adherence is the exception — its branch already wrote the final draft
+  // inline (question_answers + the rule-engine's rule_verdicts), gated on the
+  // same outcome. There is no separate scratch-to-draft promote for it.
+  if (isAdherenceTask) {
+    if (!adherenceDraftWritten) {
+      throw new Error(`agent ${spec.id} (adherence) finished ok but wrote no draft — internal error`);
     }
   } else {
-    fs.renameSync(scratchReviewState, agentDraftPath(runId, patientId, spec.id));
+    const scratchReviewState = path.join(scratchRoot, patientId, taskId, "review_state.json");
+    if (!fs.existsSync(scratchReviewState)) {
+      if (isNerTask) {
+        // Empty-NER-is-valid: mcp-core-ner only writes review_state.json once a
+        // span is persisted, so an honest zero-entity result leaves NO scratch
+        // file. Synthesize and promote an empty NER draft rather than failing.
+        atomicWriteJson(agentDraftPath(runId, patientId, spec.id), emptyNerDraft(patientId, taskId));
+      } else {
+        throw new Error(`agent ${spec.id} reported writes but no review_state.json — internal error`);
+      }
+    } else {
+      fs.renameSync(scratchReviewState, agentDraftPath(runId, patientId, spec.id));
+    }
   }
 
   const scratchChat = path.join(scratchRoot, patientId, taskId, "chat", `${sessionId}.jsonl`);
@@ -1066,8 +1286,23 @@ async function runOneAgent(
     const draft = JSON.parse(fs.readFileSync(agentDraftPath(runId, patientId, spec.id), "utf8")) as {
       field_assessments?: Array<{ confidence?: "low" | "medium" | "high" }>;
       span_labels?: unknown[];
+      question_answers?: Array<{ confidence?: number }>;
     };
-    if (isNerTask) {
+    if (isAdherenceTask) {
+      // For adherence, `field_count` reflects "answers produced" — a non-zero
+      // progress indicator for the status panel. Bucket the numeric confidence
+      // (0..1) into low/medium/high, same affordance phenotype tasks get.
+      fieldCount = draft.question_answers?.length;
+      if (draft.question_answers) {
+        confidenceSummary = { low: 0, medium: 0, high: 0, unknown: 0 };
+        for (const a of draft.question_answers) {
+          if (a.confidence == null) confidenceSummary.unknown++;
+          else if (a.confidence < 0.5) confidenceSummary.low++;
+          else if (a.confidence < 0.8) confidenceSummary.medium++;
+          else confidenceSummary.high++;
+        }
+      }
+    } else if (isNerTask) {
       // For NER, `field_count` semantically becomes "span count" — a non-zero
       // progress indicator for the status panel. Spans don't carry confidence.
       fieldCount = draft.span_labels?.length;
