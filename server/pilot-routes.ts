@@ -214,6 +214,7 @@ export const pilotReadRoutes: RouteEntry[] = [
           : null;
         let validated = false;
         let reviewerTouched = false;
+        let statusInProgress = false;
         if (reviewPath && fs.existsSync(reviewPath)) {
           try {
             const state = JSON.parse(fs.readFileSync(reviewPath, "utf8")) as {
@@ -226,11 +227,16 @@ export const pilotReadRoutes: RouteEntry[] = [
               state.review_status === "reviewer_validated"
               || state.review_status === "locked";
             reviewerTouched = (state.field_assessments ?? []).some((fa) => fa.source === "reviewer");
+            // NER/adherence record reviewer progress via review_status
+            // ("in_progress" on partial validation), not field_assessments
+            // (which are [] for the new kinds). Honor that so a partially
+            // validated NER/adherence patient still shows the in-progress chip.
+            statusInProgress = state.review_status === "in_progress";
           } catch { /* ignore */ }
         }
         return {
           patient_id: pid, agent_done: agentDone, oracle_done: validated,
-          in_progress: reviewerTouched && !validated,
+          in_progress: statusInProgress || (reviewerTouched && !validated),
           agent_running: agentRunning,
           errored, error_message: errorMessage,
         };
