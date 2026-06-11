@@ -214,6 +214,20 @@ function buildUserPrompt(input: JudgeInput): string {
     "Now read the chart + criterion + edge cases, form your own opinion, and",
     "emit the strict-JSON analysis inside <JUDGE_ANALYSIS> sentinels. No",
     "preamble, no markdown, no commentary outside the sentinels.",
+    "",
+    "OUTPUT SCHEMA — use these EXACT field names (the platform validates them;",
+    "do NOT rename to judge_answer/judge_rationale or omit any field):",
+    "<JUDGE_ANALYSIS>",
+    "{",
+    '  "suggested_answer": <the answer you believe correct — a value from the criterion\'s answer_schema, or null if truly ambiguous>,',
+    '  "reasoning": "<2-4 sentences, quoting evidence where possible>",',
+    '  "evidence_pointers": [ { "note_id": "<file>", "what_to_look_for": "<phrase>", "offsets": [start,end] } ],',
+    '  "agent_correctness": "agent_a" | "agent_b" | "neither" | "both" | "n_a",',
+    '  "classification_hint": "guideline_gap" | "agent_a_error" | "agent_b_error" | "true_ambiguity" | "n_a",',
+    '  "judge_confidence": "low" | "medium" | "high"',
+    "}",
+    "</JUDGE_ANALYSIS>",
+    "evidence_pointers may be an empty array []. Every other field is required.",
   );
   return lines.join("\n");
 }
