@@ -1,0 +1,17 @@
+# T0 — Eligibility gate. A patient must satisfy R-T0-Eligible to enter
+# the adherence audit at all.
+
+rules:
+  - rule_id: R-T0-Eligible
+    description: >-
+      Patient is in scope for the adherence audit: asthma diagnosis
+      documented, age >= 12 (matching the 2020 Focused Update SMART/LAMA
+      population scope), and at least 2 outpatient/specialty notes
+      available to assess longitudinal care.
+    naepp_source: >-
+      EPR-3 p.40-43 (asthma diagnosis criteria); 2020 Focused Update
+      Recs 13-16 p.84-95 (ages 12+); platform methodology requirement
+      for >= 2 longitudinal notes.
+    verdict_if: "T0-AsthmaDx == true and T0-AgeOk == true and T0-LookbackHasNotes == true"
+    excluded_if: "T0-AsthmaDx != true or T0-AgeOk != true or T0-LookbackHasNotes != true"
+    supporting_questions: [T0-AsthmaDx, T0-AgeOk, T0-LookbackHasNotes]
