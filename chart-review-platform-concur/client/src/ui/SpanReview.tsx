@@ -230,26 +230,6 @@ export function SpanReview({ patientId, patientDisplay, taskId, onBack, activeSe
     }
   }
 
-  async function deleteSpan(spanId: string): Promise<void> {
-    try {
-      const r = await authFetch(
-        `/api/reviews/${encodeURIComponent(patientId)}/${encodeURIComponent(taskId)}/spans/${encodeURIComponent(spanId)}${sessionQs}`,
-        { method: "DELETE" },
-      );
-      if (!r.ok) {
-        const body = (await r.json().catch(() => ({ error: r.statusText }))) as {
-          error?: string;
-          payload?: { error?: string };
-        };
-        setError(body.payload?.error ?? body.error ?? `delete failed: ${r.status}`);
-        return;
-      }
-      await refresh();
-    } catch (e) {
-      setError(`delete error: ${(e as Error).message}`);
-    }
-  }
-
   const spans = state?.span_labels ?? [];
   const byNote = new Map<string, SpanLabel[]>();
   for (const s of spans) {
@@ -406,7 +386,6 @@ export function SpanReview({ patientId, patientDisplay, taskId, onBack, activeSe
                         span={s}
                         disabled={loading || isLocked}
                         onPatch={(patch) => patchSpan(s.span_id, patch)}
-                        onDelete={() => deleteSpan(s.span_id)}
                       />
                     ))}
                   </tbody>
@@ -420,11 +399,10 @@ export function SpanReview({ patientId, patientDisplay, taskId, onBack, activeSe
   );
 }
 
-function SpanRow({ span, disabled, onPatch, onDelete }: {
+function SpanRow({ span, disabled, onPatch }: {
   span: SpanLabel;
   disabled?: boolean;
   onPatch: (patch: { status?: SpanLabel["status"]; concept_name?: string }) => void;
-  onDelete: () => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(span.concept_name);
@@ -491,12 +469,6 @@ function SpanRow({ span, disabled, onPatch, onDelete }: {
             disabled={disabled || status === "rejected"}
             title="Reject this span (status → rejected)"
           ><X className="size-3" /></Button>
-          <Button
-            size="sm" variant="ghost"
-            onClick={onDelete}
-            disabled={disabled}
-            title="Delete this span entirely"
-          ><X className="size-3 text-[hsl(var(--oxblood))]" /></Button>
         </div>
       </td>
     </tr>
