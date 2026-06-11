@@ -14,6 +14,7 @@ final_output: span_labels
 phases:
   - author
   - try
+  - judge
   - validate
   - decide
   - lock
