@@ -451,11 +451,27 @@ function buildSpanJudgePrompt(input: JudgeSpanInput): string {
   lines.push(
     "",
     "Now read the note + ontology guidance, form your own opinion, and emit",
-    "the strict-JSON analysis inside <JUDGE_ANALYSIS> sentinels. The schema",
-    "is the NER-flavored one from the chart-review-ner-judge skill — note that",
-    "`suggested_concept_name`, `suggested_entity_type`, and `suggested_status`",
-    "replace the cell-shaped `suggested_answer`. No preamble, no markdown,",
-    "no commentary outside the sentinels.",
+    "the strict-JSON analysis inside <JUDGE_ANALYSIS> sentinels. No preamble,",
+    "no markdown, no commentary outside the sentinels.",
+    "",
+    "OUTPUT SCHEMA — use these EXACT field names (the platform validates them).",
+    "This is the NER-flavored schema: `suggested_concept_name`,",
+    "`suggested_entity_type`, and `suggested_status` REPLACE the cell-shaped",
+    "`suggested_answer` — do NOT emit `suggested_answer`. Do not rename any",
+    "field or omit any required field:",
+    "<JUDGE_ANALYSIS>",
+    "{",
+    '  "suggested_concept_name": "<canonical concept_name from the ontology, or your best candidate label if status is novel_candidate>",',
+    '  "suggested_entity_type": "<the entity_type root this span belongs under>",',
+    '  "suggested_status": "mapped" | "novel_candidate" | "rejected",',
+    '  "reasoning": "<2-4 sentences, quoting evidence where possible>",',
+    '  "evidence_pointers": [ { "note_id": "<file>", "what_to_look_for": "<phrase>", "offsets": [start,end] } ],',
+    '  "agent_correctness": "agent_a" | "agent_b" | "neither" | "both" | "n_a",',
+    '  "classification_hint": "guideline_gap" | "agent_a_error" | "agent_b_error" | "true_ambiguity" | "novel_concept_candidate" | "n_a",',
+    '  "judge_confidence": "low" | "medium" | "high"',
+    "}",
+    "</JUDGE_ANALYSIS>",
+    "evidence_pointers may be an empty array []. Every other field is required.",
   );
   return lines.join("\n");
 }
@@ -533,6 +549,24 @@ export async function judgeSpan(input: JudgeSpanInput): Promise<JudgeSpanOutput>
   const cwd = patientDir(input.patientId);
   const guidelinePath = phenotypeSkillDir(input.taskId);
 
+  // The deepagents provider always requires a chart_review_state MCP config
+  // (it spawns the stdio server to serve the chart). The NER judge is
+  // read-only — it reads the note + ontology via the MCP tools and never
+  // commits — so point it at a throwaway scratch reviewsRoot (any set_*
+  // write the judge might make is discarded). Without this, the provider
+  // rejects the run. Mirrors judgeCell's block, keyed by span_id.
+  const task = loadCompiledTask(input.taskId);
+  const judgeScratch = path.join(
+    PLATFORM_ROOT, "var", "_judge_scratch", `${input.patientId}-${input.span_id}`,
+  );
+  const mcpServers = task
+    ? buildMcpServersConfig(
+        input.patientId, task, `judge-${input.patientId}-${input.span_id}`,
+        { onStateUpdate: () => {} },
+        { reviewsRoot: judgeScratch, provider: input.provider },
+      )
+    : undefined;
+
   let resultText = "";
   let cost: number | undefined;
 
@@ -543,6 +577,7 @@ export async function judgeSpan(input: JudgeSpanInput): Promise<JudgeSpanOutput>
       patientId: input.patientId,
       taskId: input.taskId,
       guidelinePath,
+      mcpServers,
       phi: isPhiPatient(input.patientId),
       maxTurns: 24,
       model: judgeModel(),
