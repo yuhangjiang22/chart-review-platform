@@ -1,0 +1,20 @@
+task_type: ner
+task_kind: ner
+manual_version: 0.1
+source_document_sha: sha256:bso-ad-vendored-2026-05-13
+status: draft
+review_unit: patient
+overview_prose: >-
+  BSO-AD ontology NER task. Extract entity spans from patient notes and
+  normalize each to a canonical concept_name from the BSO-AD ontology (9
+  entity-type subtrees, ~660 concepts). Output is per-(patient, task, note)
+  span lists with reviewer-validated status. The ontology is vendored at
+  references/ontology/concepts.json — this skill is lock-self-contained.
+final_output: span_labels
+phases:
+  - author
+  - try
+  - validate
+  - decide
+  - lock
+ontology_pin: bso-ad@0.1
