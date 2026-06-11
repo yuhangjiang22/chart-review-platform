@@ -1,0 +1,21 @@
+{
+  "name": "@chart-review/pipeline-extract-adherence",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Adherence skill-loader. Reads references/{questions,rules,attribution.yaml} from a chart-review-<taskId> bundle and returns the tier-grouped question framework + RuleDefinitions consumed by the agent run-loop (infra-batch-run) and the deterministic rule-engine. The direct-LLM extractor + OMOP verifier are intentionally omitted in concur — adherence runs the agentic MCP loop (set_question_answer), not direct extraction.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "dependencies": {
+    "@chart-review/platform-types": "*",
+    "@chart-review/rubric": "*",
+    "@chart-review/rule-engine": "*",
+    "yaml": "^2.6.0"
+  }
+}
