@@ -1,0 +1,28 @@
+{
+  "name": "@chart-review/infra-batch-run",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Batch-run primitive: drives the chart-review agent across N patients. Manages runs/<run_id>/{manifest.json,status.json,per_patient/*/audit.jsonl}. Per-patient scratch dirs let agents write incrementally without touching the canonical reviews/ tree.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": { "types": "./src/index.ts", "default": "./src/index.ts" },
+    "./runs": { "types": "./src/runs.ts", "default": "./src/runs.ts" }
+  },
+  "dependencies": {
+    "@chart-review/agent-specs": "*",
+    "@chart-review/agent-provider": "*",
+    "@chart-review/audit-trail": "*",
+    "@chart-review/domain-review": "*",
+    "@chart-review/lock": "*",
+    "@chart-review/mcp-server-anthropic": "*",
+    "@chart-review/model-config": "*",
+    "@chart-review/patients": "*",
+    "@chart-review/pipeline-extract-ner": "*",
+    "@chart-review/rubric": "*",
+    "@chart-review/rule-engine": "*",
+    "@chart-review/storage": "*",
+    "@chart-review/tasks": "*"
+  }
+}
