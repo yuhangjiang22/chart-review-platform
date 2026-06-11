@@ -50,7 +50,8 @@ import {
   readUnitHistory,
 } from "./lib/audit-trail.js";
 import { loadCompiledTask } from "./lib/tasks.js";
-import { deriveNerReviewStatus } from "./lib/review-completion.js";
+import { deriveNerReviewStatus, deriveAdherenceReviewStatus } from "./lib/review-completion.js";
+import { loadAdherenceSkill } from "@chart-review/pipeline-extract-adherence";
 import { pathFor } from "@chart-review/storage";
 import { writeJsonAtomic } from "@chart-review/fs-atomic";
 import { getMaturity } from "./lib/maturity.js";
@@ -457,22 +458,45 @@ export const reviewRoutes: RouteEntry[] = [
         const task = loadCompiledTask(p.taskId);
         if (!task) throw httpErr(404, { ok: false, error: `task ${p.taskId} not found` });
         const state = loadOrCreateReviewState(p.patientId, task);
-        const fieldId = (f: { field_id?: string; id?: string }) => f.field_id ?? f.id;
-        const leafFields = (task.fields as Array<{ derivation?: unknown; field_id?: string; id?: string }>)
-          .filter((f) => !f.derivation);
-        const faOf = (f: { field_id?: string; id?: string }) =>
-          state.field_assessments.find((x) => x.field_id === fieldId(f));
-        const all_terminal = leafFields.every((f) => {
-          const fa = faOf(f);
-          return !!fa && (fa.status === "approved" || fa.status === "overridden" || fa.status === "not_applicable");
-        });
-        const every_leaf_touched_or_bulk_accepted = leafFields.every((f) => faOf(f)?.source === "reviewer");
-        const alerts_dismissed = !((state as { cross_criterion_alerts?: Array<{ severity?: string }> })
-          .cross_criterion_alerts ?? []).some((a) => a.severity === "error");
-        const faithfulness_pass = true; // enforced at write time
-        const gate_results = { all_terminal, faithfulness_pass, alerts_dismissed, every_leaf_touched_or_bulk_accepted };
-        const all_passed = all_terminal && every_leaf_touched_or_bulk_accepted && alerts_dismissed && faithfulness_pass;
-        if (!all_passed) return { ok: false, gate_results };
+
+        // Kind-aware gate. NER/adherence tasks have task.fields=[], which
+        // makes the phenotype leaf-field gates (all_terminal /
+        // every_leaf_touched_or_bulk_accepted) vacuously true — so the old
+        // path would flip reviewer_validated with zero review. Gate the new
+        // kinds on their per-unit completion derivations instead.
+        let gate_results: Record<string, boolean>;
+        if (task.task_kind === "ner") {
+          const ner_notes_complete = deriveNerReviewStatus(state) === "reviewer_validated";
+          gate_results = { ner_notes_complete };
+          if (!ner_notes_complete) return { ok: false, gate_results };
+        } else if (task.task_kind === "adherence") {
+          const skill = loadAdherenceSkill(p.taskId);
+          const questionIds: string[] = [];
+          for (const [, qs] of skill.questions_by_tier) for (const q of qs) questionIds.push(q.question_id);
+          const ruleIds = skill.rules.map((r) => r.rule_id);
+          const adherence_units_complete =
+            deriveAdherenceReviewStatus(state, { questionIds, ruleIds }) === "reviewer_validated";
+          gate_results = { adherence_units_complete };
+          if (!adherence_units_complete) return { ok: false, gate_results };
+        } else {
+          // phenotype — existing leaf-field gate, unchanged.
+          const fieldId = (f: { field_id?: string; id?: string }) => f.field_id ?? f.id;
+          const leafFields = (task.fields as Array<{ derivation?: unknown; field_id?: string; id?: string }>)
+            .filter((f) => !f.derivation);
+          const faOf = (f: { field_id?: string; id?: string }) =>
+            state.field_assessments.find((x) => x.field_id === fieldId(f));
+          const all_terminal = leafFields.every((f) => {
+            const fa = faOf(f);
+            return !!fa && (fa.status === "approved" || fa.status === "overridden" || fa.status === "not_applicable");
+          });
+          const every_leaf_touched_or_bulk_accepted = leafFields.every((f) => faOf(f)?.source === "reviewer");
+          const alerts_dismissed = !((state as { cross_criterion_alerts?: Array<{ severity?: string }> })
+            .cross_criterion_alerts ?? []).some((a) => a.severity === "error");
+          const faithfulness_pass = true; // enforced at write time
+          gate_results = { all_terminal, faithfulness_pass, alerts_dismissed, every_leaf_touched_or_bulk_accepted };
+          const all_passed = all_terminal && every_leaf_touched_or_bulk_accepted && alerts_dismissed && faithfulness_pass;
+          if (!all_passed) return { ok: false, gate_results };
+        }
         const result = applyUiAction(p.patientId, task, "reviewer", reviewerId, {
           type: "set_review_status",
           payload: { review_status: "reviewer_validated", updated_by: reviewerId },
