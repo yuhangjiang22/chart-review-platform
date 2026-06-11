@@ -1,0 +1,24 @@
+entity_type: Element_Relevant_to_Food
+guidance: |
+  Tag food security and dietary pattern mentions. This subtree is very
+  small (9 concepts) — most clinical notes will yield ZERO spans here.
+  Only tag when the note explicitly addresses access to food or
+  dietary structure; do not tag mentions of food in dietary recall
+  ("ate breakfast") or medication routing ("take with food").
+exemplars:
+  - "food insecurity"
+  - "uses food bank"
+  - "skips meals"
+  - "Mediterranean diet"
+  - "vegetarian"
+negative_examples:
+  - phrase: "take with food"
+    reason: "medication administration instruction, not a food-pattern fact"
+  - phrase: "patient ate breakfast"
+    reason: "dietary recall, not a structural pattern"
+  - phrase: "NPO after midnight"
+    reason: "perioperative instruction, not a food-security fact"
+edge_cases:
+  - pattern: "unable to afford groceries"
+    correct: "tag as food insecurity (anchor must include the affordability phrasing)"
+    reason: "indirect phrasing, but maps to a specific food-security concept"
