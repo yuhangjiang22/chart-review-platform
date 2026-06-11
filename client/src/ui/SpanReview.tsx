@@ -98,6 +98,11 @@ export function SpanReview({ patientId, patientDisplay, taskId, onBack, activeSe
   // We self-seed once: if the fetch comes back with no spans AND the state
   // was never imported, pull the latest session run's draft in ourselves.
   const seedAttemptedRef = useRef(false);
+  // Cancellation token for the recursive refresh() seed chain. The driving
+  // effect owns it: bumped on (re)run and on cleanup, so switching patients
+  // mid-flight makes captured tokens stale → every setState in refresh()
+  // becomes a no-op (no setState-after-unmount, no cross-patient clobber).
+  const refreshTokenRef = useRef(0);
 
   // session_id is required on every review call; build the query suffix
   // once. `&` form is unused here since none of these URLs carry another
@@ -110,18 +115,21 @@ export function SpanReview({ patientId, patientDisplay, taskId, onBack, activeSe
     setExpanded(new Set());
   }, [patientId, taskId]);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (token: number = refreshTokenRef.current) => {
+    const live = () => refreshTokenRef.current === token;
     setLoading(true);
     try {
       const r = await authFetch(
         `/api/reviews/${encodeURIComponent(patientId)}/${encodeURIComponent(taskId)}${sessionQs}`,
       );
+      if (!live()) return;
       if (!r.ok) {
         setError(`load failed: ${r.status}`);
         setState(null);
         return;
       }
       const body = (await r.json()) as SpanReviewState;
+      if (!live()) return;
       setState(body);
       setError(null);
       // Seed-on-empty: the agent's NER spans live in the run draft until
@@ -140,6 +148,7 @@ export function SpanReview({ patientId, patientDisplay, taskId, onBack, activeSe
         const runsRes = await authFetch(
           `/api/runs?task_id=${encodeURIComponent(taskId)}&session_id=${encodeURIComponent(activeSessionId)}`,
         );
+        if (!live()) return;
         const runs: Array<{ run_id: string }> = runsRes.ok ? await runsRes.json() : [];
         for (const run of runs) {
           const imp = await authFetch(
@@ -150,8 +159,9 @@ export function SpanReview({ patientId, patientDisplay, taskId, onBack, activeSe
               body: JSON.stringify({ force: true }),
             },
           );
+          if (!live()) return;
           if (imp.ok) {
-            await refresh();
+            await refresh(token);
             return;
           }
         }
@@ -159,24 +169,36 @@ export function SpanReview({ patientId, patientDisplay, taskId, onBack, activeSe
       // Expand the first note by default ONCE per (patient, task) so the
       // initial render isn't a wall of collapsed headers. After that, the
       // user's expanded/collapsed choices win — including collapsing
-      // everything.
+      // everything. Expand the SORTED-first note (min note_id), matching the
+      // order the notes render in (noteIds[0]) — not body.span_labels[0],
+      // which is raw array order and may differ.
       if (
         !didAutoExpandRef.current
         && body.span_labels
         && body.span_labels.length > 0
       ) {
-        setExpanded(new Set([body.span_labels[0]!.note_id]));
+        const firstNote = body.span_labels
+          .map((s) => s.note_id)
+          .sort()[0]!;
+        setExpanded(new Set([firstNote]));
         didAutoExpandRef.current = true;
       }
     } catch (e) {
+      if (!live()) return;
       setError(`load error: ${(e as Error).message}`);
       setState(null);
     } finally {
-      setLoading(false);
+      if (live()) setLoading(false);
     }
   }, [patientId, taskId, sessionQs, activeSessionId]);
 
-  useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => {
+    const token = ++refreshTokenRef.current;
+    void refresh(token);
+    // Bump the token on cleanup so any in-flight refresh() for this run stops
+    // calling setState (unmount + patient/task switch both trigger this).
+    return () => { refreshTokenRef.current++; };
+  }, [refresh]);
 
   async function patchSpan(
     spanId: string,
@@ -380,9 +402,11 @@ export function SpanReview({ patientId, patientDisplay, taskId, onBack, activeSe
                     </tr>
                   </thead>
                   <tbody>
-                    {noteSpans.map((s) => (
+                    {noteSpans.map((s, idx) => (
                       <SpanRow
-                        key={s.span_id}
+                        // Spans with an empty/missing span_id would collide on
+                        // key — fall back to a stable note_id:start:end:idx.
+                        key={s.span_id || `${s.note_id}:${s.start}:${s.end}:${idx}`}
                         span={s}
                         disabled={loading || isLocked}
                         onPatch={(patch) => patchSpan(s.span_id, patch)}
@@ -406,7 +430,13 @@ function SpanRow({ span, disabled, onPatch }: {
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(span.concept_name);
-  useEffect(() => { setDraft(span.concept_name); }, [span.concept_name]);
+  // Only resync the draft from props when NOT editing. A background refresh()
+  // (e.g. Accept/Reject on another row) re-fetches the whole span list and
+  // re-renders every SpanRow; without this guard it would overwrite the
+  // user's in-progress concept_name edit.
+  useEffect(() => {
+    if (!editing) setDraft(span.concept_name);
+  }, [span.concept_name, editing]);
   const status = span.status ?? "mapped";
   return (
     <tr className="border-t border-border/40 hover:bg-muted/20 align-top">
@@ -427,8 +457,14 @@ function SpanRow({ span, disabled, onPatch }: {
             />
             <Button
               size="sm" variant="ghost"
-              onClick={() => { onPatch({ concept_name: draft }); setEditing(false); }}
-              disabled={disabled}
+              onClick={() => {
+                // Never save an empty concept_name — trim and bail on blank.
+                const v = draft.trim();
+                if (!v) return;
+                onPatch({ concept_name: v });
+                setEditing(false);
+              }}
+              disabled={disabled || draft.trim() === ""}
               title="Save"
             ><Check className="size-3" /></Button>
             <Button
@@ -571,12 +607,17 @@ function NoteContextSnippet({ patientId, noteId, spans }: {
       <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
         note · {noteId} · context
       </div>
-      {spans.map((s) => {
-        const from = Math.max(0, s.start - CONTEXT_PAD);
-        const to = Math.min(text.length, s.end + CONTEXT_PAD);
-        const before = text.slice(from, s.start);
-        const hit = text.slice(s.start, s.end);
-        const after = text.slice(s.end, to);
+      {spans.map((s, idx) => {
+        // Clamp raw offsets before slicing: a negative `start` would slice
+        // from the end of the string, and out-of-bounds / start>end would
+        // mis-highlight. a = clamped start, b = clamped end (>= a).
+        const a = Math.max(0, Math.min(s.start, text.length));
+        const b = Math.max(a, Math.min(s.end, text.length));
+        const from = Math.max(0, a - CONTEXT_PAD);
+        const to = Math.min(text.length, b + CONTEXT_PAD);
+        const before = text.slice(from, a);
+        const hit = text.slice(a, b);
+        const after = text.slice(b, to);
         const status = s.status ?? "mapped";
         const cls =
           status === "mapped" ? "bg-green-200/70 text-green-950"
@@ -584,7 +625,7 @@ function NoteContextSnippet({ patientId, noteId, spans }: {
           : "bg-amber-200/70 text-amber-950";
         return (
           <pre
-            key={s.span_id}
+            key={s.span_id || `${s.note_id}:${s.start}:${s.end}:${idx}`}
             className="whitespace-pre-wrap font-mono text-[11px] leading-relaxed"
             title={`${s.entity_type} → ${s.concept_name || "(novel)"} [${s.start},${s.end})`}
           >
