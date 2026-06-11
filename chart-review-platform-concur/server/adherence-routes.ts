@@ -30,6 +30,7 @@ import { mutate as mutateReviewState, withReviewsRoot } from "./lib/domain/revie
 import { sessionReviewsRoot } from "./lib/session-reviews.js";
 import { loadCompiledTask } from "./lib/tasks.js";
 import { loadAdherenceSkill } from "@chart-review/pipeline-extract-adherence";
+import { deriveAdherenceReviewStatus } from "./lib/review-completion.js";
 import type {
   QuestionAnswer, RuleVerdict, AttributionCategory,
 } from "@chart-review/platform-types";
@@ -108,6 +109,9 @@ export const adherenceRoutes: RouteEntry[] = [
             ok: false, message: `question ${b.question_id} not found in task ${p.taskId}`,
           });
         }
+        const questionIds: string[] = [];
+        for (const [, qs] of skill.questions_by_tier) for (const q of qs) questionIds.push(q.question_id);
+        const ruleIds = skill.rules.map((r) => r.rule_id);
         const result = mutateReviewState(p.patientId, task, "reviewer", (state) => {
           state.task_kind = "adherence";
           const qa = state.question_answers ?? [];
@@ -129,6 +133,12 @@ export const adherenceRoutes: RouteEntry[] = [
           const validated = new Set(state.validated_questions ?? []);
           validated.add(b.question_id!);
           state.validated_questions = [...validated];
+          // Maintain review_status so the patient shows validated OUTSIDE this
+          // pane once every question + rule is validated (see review-completion).
+          if (state.review_status !== "locked") {
+            const derived = deriveAdherenceReviewStatus(state, { questionIds, ruleIds });
+            if (derived) state.review_status = derived;
+          }
         });
         return { ok: true, version: result.version };
       });
@@ -152,6 +162,10 @@ export const adherenceRoutes: RouteEntry[] = [
         if (b.verdict !== "CONCORDANT" && b.verdict !== "NON_CONCORDANT" && b.verdict !== "EXCLUDED") {
           throw httpErr(400, { ok: false, message: "verdict must be CONCORDANT | NON_CONCORDANT | EXCLUDED" });
         }
+        const skill = loadAdherenceSkill(p.taskId);
+        const questionIds: string[] = [];
+        for (const [, qs] of skill.questions_by_tier) for (const q of qs) questionIds.push(q.question_id);
+        const ruleIds = skill.rules.map((r) => r.rule_id);
         const result = mutateReviewState(p.patientId, task, "reviewer", (state) => {
           state.task_kind = "adherence";
           const verdicts = state.rule_verdicts ?? [];
@@ -170,6 +184,10 @@ export const adherenceRoutes: RouteEntry[] = [
           const validated = new Set(state.validated_rules ?? []);
           validated.add(b.rule_id!);
           state.validated_rules = [...validated];
+          if (state.review_status !== "locked") {
+            const derived = deriveAdherenceReviewStatus(state, { questionIds, ruleIds });
+            if (derived) state.review_status = derived;
+          }
         });
         return { ok: true, version: result.version };
       });
