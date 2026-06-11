@@ -509,7 +509,14 @@ export function Workspace({
             taskId={taskId}
             iterId={validateIter.iter_id}
             onSkipToValidate={() => setPhase("VALIDATE")}
-            taskKind={taskKind}
+            // NER tasks render per-span judge cards; phenotype falls back to
+            // PatientReview's per-criterion advisory pane. The shared
+            // `taskKind` always resolves to "phenotype" (light fork), so
+            // branch on the raw task_type here instead.
+            taskKind={task?.task_type === "ner" ? "ner" : "phenotype"}
+            // Opening a patient renders SpanReview for NER tasks (see App.tsx
+            // task_kind dispatch); deep-linking to the exact span is best-effort.
+            onOpenSpan={(pid) => onOpenPatient?.(pid)}
           />
         )}
         {activePhase === "JUDGE" && activeSessionId && !validateIter && (
