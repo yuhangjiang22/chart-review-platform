@@ -1,0 +1,24 @@
+{
+  "name": "@chart-review/pipeline-extract-ner",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Direct-LLM NER extractor for NER (named-entity recognition) tasks. One LLM call per note identifies candidate spans (identification pass), then a per-span call maps each to an ontology concept (normalization pass); spans are written to review_state.json via the mcp-core-ner disk-write helpers. The MVP runs this batch path (no NER MCP server). Transport is provider-pluggable via llm-call.ts (OpenRouter chat-completions or Azure Responses).",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "dependencies": {
+    "@chart-review/agent-specs": "*",
+    "@chart-review/patients": "*",
+    "@chart-review/platform-types": "*",
+    "@chart-review/tasks": "*",
+    "@chart-review/rubric": "*",
+    "@chart-review/ontology": "*",
+    "@chart-review/mcp-core-ner": "*"
+  }
+}
