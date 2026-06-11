@@ -61,6 +61,10 @@ interface SpanReviewState {
   span_labels?: SpanLabel[];
   validated_notes?: string[];
   review_status?: string;
+  /** Set by the run-import step to the run_id whose drafts seeded this state.
+   *  Used as the guard for seed-on-empty: a state that was already imported
+   *  (even if the reviewer later cleared every span) is never re-seeded. */
+  imported_from_run?: string;
 }
 
 export interface SpanReviewProps {
@@ -85,6 +89,15 @@ export function SpanReview({ patientId, patientDisplay, taskId, onBack, activeSe
   // collapse-to-empty (refresh's `expanded.size === 0` guard would
   // pop the note back open whenever the user closed the last open one).
   const didAutoExpandRef = useRef(false);
+  // Track whether we've already attempted to seed the review state from a
+  // completed agent run for this patient × task. The agent's NER spans live
+  // in the run draft (var/runs/.../agents/agent_1.json) until imported into
+  // the session review state; App.tsx auto-imports on patient-open, but its
+  // 3-call chain (list runs → import → refresh) reliably loses the race to
+  // this pane's single review fetch, so on first open we'd render empty.
+  // We self-seed once: if the fetch comes back with no spans AND the state
+  // was never imported, pull the latest session run's draft in ourselves.
+  const seedAttemptedRef = useRef(false);
 
   // session_id is required on every review call; build the query suffix
   // once. `&` form is unused here since none of these URLs carry another
@@ -93,6 +106,7 @@ export function SpanReview({ patientId, patientDisplay, taskId, onBack, activeSe
 
   useEffect(() => {
     didAutoExpandRef.current = false;
+    seedAttemptedRef.current = false;
     setExpanded(new Set());
   }, [patientId, taskId]);
 
@@ -110,6 +124,38 @@ export function SpanReview({ patientId, patientDisplay, taskId, onBack, activeSe
       const body = (await r.json()) as SpanReviewState;
       setState(body);
       setError(null);
+      // Seed-on-empty: the agent's NER spans live in the run draft until
+      // imported into the session review state. If the state is empty AND
+      // was never imported, pull the latest session run's draft in ourselves
+      // (once), then re-render. Guarded by `imported_from_run` so a reviewer
+      // who deliberately cleared every span isn't re-seeded, and by
+      // `seedAttemptedRef` so a genuinely empty run doesn't loop.
+      if (
+        (!body.span_labels || body.span_labels.length === 0)
+        && !body.imported_from_run
+        && activeSessionId
+        && !seedAttemptedRef.current
+      ) {
+        seedAttemptedRef.current = true;
+        const runsRes = await authFetch(
+          `/api/runs?task_id=${encodeURIComponent(taskId)}&session_id=${encodeURIComponent(activeSessionId)}`,
+        );
+        const runs: Array<{ run_id: string }> = runsRes.ok ? await runsRes.json() : [];
+        for (const run of runs) {
+          const imp = await authFetch(
+            `/api/runs/${encodeURIComponent(run.run_id)}/patients/${encodeURIComponent(patientId)}/import`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ force: true }),
+            },
+          );
+          if (imp.ok) {
+            await refresh();
+            return;
+          }
+        }
+      }
       // Expand the first note by default ONCE per (patient, task) so the
       // initial render isn't a wall of collapsed headers. After that, the
       // user's expanded/collapsed choices win — including collapsing
@@ -128,7 +174,7 @@ export function SpanReview({ patientId, patientDisplay, taskId, onBack, activeSe
     } finally {
       setLoading(false);
     }
-  }, [patientId, taskId, sessionQs]);
+  }, [patientId, taskId, sessionQs, activeSessionId]);
 
   useEffect(() => { void refresh(); }, [refresh]);
 
