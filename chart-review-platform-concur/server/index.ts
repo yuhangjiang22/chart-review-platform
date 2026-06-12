@@ -84,6 +84,7 @@ import { phasesRoutes } from "./phases-routes.js";
 import { scaffoldRoutes } from "./scaffold-routes.js";
 import { rubricRoutes } from "./rubric-routes.js";
 import { exportRoutes } from "./export-routes.js";
+import { refineRoutes } from "./refine-routes.js";
 import { attachWebSocketServer, registerBroadcasters } from "./ws.js";
 import {
   isBuilderPath, delegateBuilder,
@@ -235,6 +236,7 @@ const paramRouter = makeRouter([
   ...scaffoldRoutes,
   ...rubricRoutes,
   ...exportRoutes,
+  ...refineRoutes,
 ]);
 
 // ── http plumbing ───────────────────────────────────────────────────
