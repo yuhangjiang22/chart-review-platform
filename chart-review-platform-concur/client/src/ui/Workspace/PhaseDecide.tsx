@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
-import { Download } from "lucide-react";
+import { Fragment, useEffect, useState } from "react";
+import { Download, Sparkles, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { authFetch } from "../../auth";
+import { RefineProposalCard } from "./RefineProposalCard";
 
 // Performance report (light platform DECIDE phase).
 //
@@ -26,6 +27,34 @@ interface PerformanceReport {
   n_patients: number;
   field_ids: string[];
   agents: AgentPerf[];
+}
+
+// ── Refinement candidate shapes (GET /api/refine/:taskId/:iterId/candidates) ──
+// Attributed disagreement clusters per field. The phenotype branch fetches
+// these alongside the performance report so the agent-vs-human matrix can
+// surface a per-field refinement entry point right where the disagreement is
+// shown (PERFORMANCE is where the methodologist sees the gaps; refinement used
+// to be buried in the AUTHOR phase). Only the counts + field_id are needed
+// here — the full cluster (examples, judge reasoning) is fetched by
+// RefineProposalCard when the methodologist clicks "Propose rule".
+interface RefineClusterSummary {
+  field_id: string;
+  n_guideline_gap: number;
+  n_true_ambiguity: number;
+  n_agent_error: number;
+  n_unjudged: number;
+}
+interface CandidatesResponse {
+  task_id: string;
+  iter_id: string;
+  n_validated_patients: number;
+  clusters: RefineClusterSummary[];
+}
+
+/** Refinable (guideline-gap + true-ambiguity) disagreement count — the subset
+ *  the refiner is allowed to act on. > 0 ⇒ a "Propose rule" button is offered. */
+function refinableCount(c: RefineClusterSummary): number {
+  return c.n_guideline_gap + c.n_true_ambiguity;
 }
 
 // ── NER performance shapes (GET /api/calibrate-ner/:taskId) ──────────────────
@@ -138,6 +167,14 @@ export function PhaseDecide({ taskId, activeSessionId, iterId, taskKind }: Phase
   const [adhReport, setAdhReport] = useState<AdherenceIaaReport | null>(null);
   const [state, setState] = useState<"loading" | "error" | "ready">("loading");
 
+  // Phenotype-only: attributed disagreement clusters keyed by field_id, fetched
+  // alongside the performance report so each <100% matrix row can offer an
+  // inline refinement entry point. Empty for NER/adherence (and when no
+  // iter/session pins a judged run).
+  const [clustersByField, setClustersByField] = useState<Record<string, RefineClusterSummary>>({});
+  // Which field's RefineProposalCard is currently expanded inline (null = none).
+  const [refineField, setRefineField] = useState<string | null>(null);
+
   // Export the validated task package (rubric + agent config + performance +
   // gold answers) to var/exports/ so it can be re-run on a larger cohort.
   const [exporting, setExporting] = useState(false);
@@ -230,6 +267,29 @@ export function PhaseDecide({ taskId, activeSessionId, iterId, taskKind }: Phase
       .catch(() => {
         if (!cancelled) setState("error");
       });
+
+    // In parallel, fetch the attributed disagreement clusters so the matrix can
+    // offer per-field refinement. Best-effort + non-gating: a failure (or no
+    // judged run) just means no refine affordance, never a perf-report error.
+    // Requires both an iter (to pin the judged run) and a session.
+    setClustersByField({});
+    setRefineField(null);
+    if (iterId && activeSessionId) {
+      authFetch(
+        `/api/refine/${encodeURIComponent(taskId)}/${encodeURIComponent(iterId)}/candidates` +
+          `?session_id=${encodeURIComponent(activeSessionId)}`,
+      )
+        .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+        .then((d: CandidatesResponse) => {
+          if (cancelled) return;
+          const map: Record<string, RefineClusterSummary> = {};
+          for (const c of d.clusters ?? []) map[c.field_id] = c;
+          setClustersByField(map);
+        })
+        .catch(() => {
+          /* no clusters → no refine affordance; report still renders */
+        });
+    }
     return () => {
       cancelled = true;
     };
@@ -250,6 +310,18 @@ export function PhaseDecide({ taskId, activeSessionId, iterId, taskKind }: Phase
   // field_id -> agent_id -> PerField, for matrix lookup
   const cell = (agent: AgentPerf, fid: string) =>
     agent.per_field.find((c) => c.field_id === fid);
+
+  // A field has a disagreement worth surfacing a refine affordance for when any
+  // agent scored below 100% on it (the matrix shows the gap) OR the judge
+  // attributed a cluster to it. 100% / no-cluster fields get no affordance.
+  const fieldHasDisagreement = (fid: string): boolean => {
+    if (clustersByField[fid]) return true;
+    if (!report) return false;
+    return report.agents.some((a) => {
+      const c = cell(a, fid);
+      return c != null && c.accuracy != null && c.accuracy < 1;
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -590,25 +662,98 @@ export function PhaseDecide({ taskId, activeSessionId, iterId, taskKind }: Phase
                     {a.agent_id}
                   </th>
                 ))}
+                {/* Refinement entry column — only meaningful once a judged iter
+                    has attributed disagreements. Kept narrow + right-aligned. */}
+                <th className="py-2 pl-2 font-medium text-right w-px whitespace-nowrap" />
               </tr>
             </thead>
             <tbody>
-              {report.field_ids.map((fid) => (
-                <tr key={fid} className="border-b border-border/30">
-                  <td className="py-2 pr-4 font-mono text-[12px]">{fid}</td>
-                  {report.agents.map((a) => {
-                    const c = cell(a, fid);
-                    return (
-                      <td key={a.agent_id} className="py-2 pr-4 tabular-nums">
-                        {pct(c?.accuracy ?? null)}
-                        <span className="ml-1.5 text-[11px] text-muted-foreground">
-                          ({c?.n_correct ?? 0}/{c?.n_evaluable ?? 0})
-                        </span>
+              {report.field_ids.map((fid) => {
+                const cluster = clustersByField[fid];
+                const showRefine = fieldHasDisagreement(fid);
+                const canPropose = cluster != null && refinableCount(cluster) > 0;
+                const expanded = refineField === fid;
+                const totalCols = report.agents.length + 2;
+                return (
+                  <Fragment key={fid}>
+                    <tr className="border-b border-border/30">
+                      <td className="py-2 pr-4 font-mono text-[12px]">{fid}</td>
+                      {report.agents.map((a) => {
+                        const c = cell(a, fid);
+                        return (
+                          <td key={a.agent_id} className="py-2 pr-4 tabular-nums">
+                            {pct(c?.accuracy ?? null)}
+                            <span className="ml-1.5 text-[11px] text-muted-foreground">
+                              ({c?.n_correct ?? 0}/{c?.n_evaluable ?? 0})
+                            </span>
+                          </td>
+                        );
+                      })}
+                      <td className="py-2 pl-2 text-right whitespace-nowrap">
+                        {showRefine && (
+                          <button
+                            type="button"
+                            onClick={() => setRefineField(expanded ? null : fid)}
+                            className={cn(
+                              "inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10.5px] transition-colors",
+                              expanded
+                                ? "border-[hsl(var(--sage))]/60 bg-[hsl(var(--sage))]/8 text-foreground"
+                                : "border-border/60 text-muted-foreground hover:text-foreground hover:border-border",
+                            )}
+                            aria-expanded={expanded}
+                          >
+                            {canPropose ? (
+                              <>
+                                <Sparkles size={10} strokeWidth={1.75} />
+                                Refine
+                              </>
+                            ) : (
+                              <>
+                                <Info size={10} strokeWidth={1.75} />
+                                Why?
+                              </>
+                            )}
+                          </button>
+                        )}
                       </td>
-                    );
-                  })}
-                </tr>
-              ))}
+                    </tr>
+                    {expanded && showRefine && (
+                      <tr className="border-b border-border/30">
+                        <td colSpan={totalCols} className="py-2 pl-2 pr-2">
+                          {canPropose ? (
+                            // Reuse the AUTHOR-phase proposal card in single-field
+                            // mode: it generates ②gap/③rule/④held-out for just this
+                            // field and renders Apply/Edit/Reject inline.
+                            <RefineProposalCard
+                              taskId={taskId}
+                              iterId={iterId as string}
+                              sessionId={activeSessionId as string}
+                              initialFieldId={fid}
+                            />
+                          ) : (
+                            <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-[11.5px] text-muted-foreground leading-relaxed">
+                              {cluster && cluster.n_agent_error > 0 ? (
+                                <>
+                                  Model error — the rubric was clear; the agent simply
+                                  got it wrong on {cluster.n_agent_error}{" "}
+                                  {cluster.n_agent_error === 1 ? "case" : "cases"}. No
+                                  rubric change needed.
+                                </>
+                              ) : (
+                                <>
+                                  Not judged yet — run JUDGE on this iteration to attribute
+                                  the disagreement (guideline gap vs. model error) before
+                                  refining.
+                                </>
+                              )}
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
               <tr className="font-medium">
                 <td className="py-2 pr-4">Overall (avg)</td>
                 {report.agents.map((a) => (
@@ -616,13 +761,17 @@ export function PhaseDecide({ taskId, activeSessionId, iterId, taskKind }: Phase
                     {pct(a.avg_accuracy)}
                   </td>
                 ))}
+                <td className="py-2 pl-2" />
               </tr>
             </tbody>
           </table>
 
           <p className="text-[11px] text-muted-foreground">
             Agreement = fraction of validated patients where that agent's answer
-            matched your final answer for the field.
+            matched your final answer for the field. Where the agent and you
+            disagreed, <strong>Refine</strong> proposes a rubric rule (when the
+            judge attributed a guideline gap); <strong>Why?</strong> explains a
+            disagreement the rubric doesn't need to change for.
           </p>
         </div>
       )}

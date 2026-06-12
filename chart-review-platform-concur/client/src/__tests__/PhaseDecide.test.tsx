@@ -157,16 +157,76 @@ function adhReport(overrides: Record<string, unknown> = {}) {
   };
 }
 
+// Refinement candidates fixture (GET /api/refine/:taskId/:iterId/candidates).
+// Attributed disagreement clusters per field — what the phenotype matrix reads
+// to decide per row: a Propose-rule button (refinable gap), a Why? note
+// (agent_error / unjudged), or nothing (no cluster).
+function candResponse(clusters: Array<Record<string, unknown>> = []) {
+  return {
+    task_id: "cancer-diagnosis",
+    iter_id: "i1",
+    n_validated_patients: 3,
+    clusters,
+  };
+}
+function cluster(fieldId: string, counts: Partial<Record<
+  "n_guideline_gap" | "n_true_ambiguity" | "n_agent_error" | "n_unjudged",
+  number
+>> = {}) {
+  return {
+    field_id: fieldId,
+    n_guideline_gap: 0,
+    n_true_ambiguity: 0,
+    n_agent_error: 0,
+    n_unjudged: 0,
+    ...counts,
+  };
+}
+// Minimal proposal card (POST .../propose) — enough for RefineProposalCard to
+// render its ①②③ sections inline. Held-out (④) omitted on purpose.
+function proposalCard(fieldId: string) {
+  return {
+    field_id: fieldId,
+    criterion_def: "def",
+    examples: [
+      {
+        patient_id: "p1",
+        agent_id: "agent_default",
+        note_id: "n1",
+        excerpt: "metastatic disease in the liver",
+        offsets: [0, 5],
+        agent_answer: "no",
+        reviewer_answer: "yes",
+        classification_hint: "guideline_gap",
+        judge_reasoning: null,
+      },
+    ],
+    gap_summary: "The rubric does not say how to count liver mets.",
+    proposed_rule_text: "Count any distant organ involvement as metastasis.",
+    rationale: "Resolves the failure class.",
+  };
+}
+
 // Default mock impl: route by URL fragment. Tests pass per-branch bodies.
 function setupMocks(opts: {
   performance?: unknown | (() => ReturnType<typeof okJson>);
   ner?: unknown | (() => ReturnType<typeof okJson>);
   adherence?: unknown | (() => ReturnType<typeof okJson>);
+  candidates?: unknown | (() => ReturnType<typeof okJson>);
+  propose?: (url: string, init?: RequestInit) => ReturnType<typeof okJson>;
   export?: (url: string, init?: RequestInit) => ReturnType<typeof okJson>;
 } = {}) {
   mockAuthFetch.mockImplementation((url: string, init?: RequestInit) => {
     if (url.includes("/api/export/") && init?.method === "POST") {
       return opts.export ? opts.export(url, init) : okJson({ ok: true, dir: "var/exports/x", n_gold_patients: 3 });
+    }
+    if (url.includes("/propose") && init?.method === "POST") {
+      return opts.propose ? opts.propose(url, init) : okJson(proposalCard("has_distant_metastasis"));
+    }
+    if (url.includes("/candidates")) {
+      return typeof opts.candidates === "function"
+        ? (opts.candidates as any)()
+        : okJson(opts.candidates ?? candResponse());
     }
     if (url.includes("/api/calibrate-ner/")) {
       return typeof opts.ner === "function" ? (opts.ner as any)() : okJson(opts.ner ?? nerReport());
@@ -292,6 +352,164 @@ describe("phenotype branch", () => {
     render(<PhaseDecide taskId="cancer-diagnosis" activeSessionId="sess-1" />);
     await waitFor(() => screen.getByText(/No validated patients yet/i));
     expect(screen.queryByText("cancer_type")).not.toBeInTheDocument();
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════
+// 2b. Per-field refinement entry (phenotype matrix) — the PERFORMANCE-page
+//     self-refinement affordance keyed off the attributed disagreement
+//     clusters fetched alongside the performance report.
+// ════════════════════════════════════════════════════════════════════════
+describe("per-field refinement affordance", () => {
+  // The default perfReport has cancer_type < 100% (agent_skeptical 0.6667) and
+  // has_distant_metastasis < 100% (agent_default 0.6667), so BOTH rows can carry
+  // an affordance. Tests that target one field scope to its <tr> via the
+  // matrix-only fixture below (one disagreeing field) or `within(row)`.
+
+  /** A perf report where only has_distant_metastasis disagrees (cancer_type is
+   *  100% for both agents → no affordance on its row). Lets a test assert on a
+   *  single field's affordance unambiguously. */
+  function singleGapPerf() {
+    return perfReport({
+      agents: [
+        {
+          agent_id: "agent_default",
+          avg_accuracy: 0.83,
+          per_field: [
+            { field_id: "cancer_type", n_evaluable: 3, n_correct: 3, accuracy: 1.0 },
+            { field_id: "has_distant_metastasis", n_evaluable: 3, n_correct: 2, accuracy: 0.6667 },
+          ],
+        },
+        {
+          agent_id: "agent_skeptical",
+          avg_accuracy: 1.0,
+          per_field: [
+            { field_id: "cancer_type", n_evaluable: 3, n_correct: 3, accuracy: 1.0 },
+            { field_id: "has_distant_metastasis", n_evaluable: 3, n_correct: 3, accuracy: 1.0 },
+          ],
+        },
+      ],
+    });
+  }
+  /** The <tr> whose first cell is `fid`. */
+  function rowFor(fid: string): HTMLElement {
+    return screen.getByText(fid).closest("tr") as HTMLElement;
+  }
+
+  it("fetches /candidates with session_id + iter when phenotype + both present", async () => {
+    setupMocks({
+      candidates: candResponse([cluster("has_distant_metastasis", { n_guideline_gap: 2 })]),
+    });
+    render(<PhaseDecide taskId="cancer-diagnosis" activeSessionId="sess-1" iterId="i1" />);
+    await waitFor(() => expect(getsTo("/candidates").length).toBeGreaterThan(0));
+    const url = getsTo("/candidates")[0];
+    expect(url).toContain("/api/refine/cancer-diagnosis/i1/candidates");
+    expect(url).toContain("session_id=sess-1");
+  });
+
+  it("does NOT fetch /candidates when iterId is absent", async () => {
+    setupMocks();
+    render(<PhaseDecide taskId="cancer-diagnosis" activeSessionId="sess-1" />);
+    await waitFor(() => screen.getByText("cancer_type"));
+    expect(getsTo("/candidates")).toHaveLength(0);
+  });
+
+  it("a <100% field with a guideline-gap cluster gets a 'Refine' (Propose rule) affordance", async () => {
+    setupMocks({
+      candidates: candResponse([cluster("has_distant_metastasis", { n_guideline_gap: 2 })]),
+    });
+    render(<PhaseDecide taskId="cancer-diagnosis" activeSessionId="sess-1" iterId="i1" />);
+    await waitFor(() => screen.getByText("has_distant_metastasis"));
+    // Refine button present (refinable gap > 0).
+    await waitFor(() => expect(screen.getByRole("button", { name: /Refine/i })).toBeInTheDocument());
+  });
+
+  it("clicking 'Refine' POSTs /propose for that field and renders the RefineProposalCard inline", async () => {
+    setupMocks({
+      candidates: candResponse([cluster("has_distant_metastasis", { n_guideline_gap: 2 })]),
+      propose: () => okJson(proposalCard("has_distant_metastasis")),
+    });
+    render(<PhaseDecide taskId="cancer-diagnosis" activeSessionId="sess-1" iterId="i1" />);
+    const btn = await screen.findByRole("button", { name: /Refine/i });
+    fireEvent.click(btn);
+
+    // POST went to /propose with the field_id in the body.
+    await waitFor(() => expect(postsTo("/propose").length).toBe(1));
+    const { url, init } = postsTo("/propose")[0];
+    expect(url).toContain("/api/refine/cancer-diagnosis/i1/propose");
+    expect(url).toContain("session_id=sess-1");
+    expect(JSON.parse(init!.body as string)).toEqual({ field_id: "has_distant_metastasis" });
+
+    // The proposal card renders its ③ rule text + Apply control inline.
+    await waitFor(() => screen.getByText(/Count any distant organ involvement/i));
+    expect(screen.getByText(/does not say how to count liver mets/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Apply$/i })).toBeInTheDocument();
+  });
+
+  it("a field whose only attribution is agent_error renders the 'model error' note (Why?), NO propose button", async () => {
+    setupMocks({
+      performance: singleGapPerf(),
+      candidates: candResponse([cluster("has_distant_metastasis", { n_agent_error: 2 })]),
+    });
+    render(<PhaseDecide taskId="cancer-diagnosis" activeSessionId="sess-1" iterId="i1" />);
+    await waitFor(() => screen.getByText("has_distant_metastasis"));
+    // Only has_distant_metastasis disagrees → exactly one affordance, and it's a
+    // "Why?" control (agent_error is not refinable), not "Refine".
+    const btn = await screen.findByRole("button", { name: /Why\?/i });
+    expect(screen.queryByRole("button", { name: /Refine/i })).not.toBeInTheDocument();
+    fireEvent.click(btn);
+    await waitFor(() => screen.getByText(/Model error/i));
+    expect(screen.getByText(/No rubric change needed/i)).toBeInTheDocument();
+    // No propose call, no Apply button.
+    expect(postsTo("/propose")).toHaveLength(0);
+    expect(screen.queryByRole("button", { name: /^Apply$/i })).not.toBeInTheDocument();
+  });
+
+  it("a field whose only attribution is unjudged renders the 'run JUDGE' note (Why?), NO propose button", async () => {
+    setupMocks({
+      performance: singleGapPerf(),
+      candidates: candResponse([cluster("has_distant_metastasis", { n_unjudged: 2 })]),
+    });
+    render(<PhaseDecide taskId="cancer-diagnosis" activeSessionId="sess-1" iterId="i1" />);
+    const btn = await screen.findByRole("button", { name: /Why\?/i });
+    fireEvent.click(btn);
+    await waitFor(() => screen.getByText(/Not judged yet/i));
+    expect(postsTo("/propose")).toHaveLength(0);
+  });
+
+  it("a 100% field with no cluster gets NO refine affordance", async () => {
+    // singleGapPerf has cancer_type at 100% (both agents) and no cluster.
+    setupMocks({
+      performance: singleGapPerf(),
+      candidates: candResponse([cluster("has_distant_metastasis", { n_guideline_gap: 2 })]),
+    });
+    render(<PhaseDecide taskId="cancer-diagnosis" activeSessionId="sess-1" iterId="i1" />);
+    await waitFor(() => screen.getByText("cancer_type"));
+    // cancer_type row carries no Refine/Why? control…
+    await waitFor(() => expect(screen.getByRole("button", { name: /Refine/i })).toBeInTheDocument());
+    expect(within(rowFor("cancer_type")).queryByRole("button")).not.toBeInTheDocument();
+    // …and there is exactly one affordance overall (on has_distant_metastasis).
+    expect(screen.queryAllByRole("button", { name: /Refine|Why\?/i })).toHaveLength(1);
+  });
+
+  it("a <100% field with NO cluster (candidates failed / unjudged-absent) still gets a 'Why?' affordance", async () => {
+    // candidates returns no clusters at all; the matrix still shows the gap.
+    setupMocks({ performance: singleGapPerf(), candidates: candResponse([]) });
+    render(<PhaseDecide taskId="cancer-diagnosis" activeSessionId="sess-1" iterId="i1" />);
+    // has_distant_metastasis is <100% → Why? (no attribution → unjudged note).
+    const btn = await screen.findByRole("button", { name: /Why\?/i });
+    fireEvent.click(btn);
+    await waitFor(() => screen.getByText(/Not judged yet/i));
+  });
+
+  it("candidates fetch failing does not break the performance matrix", async () => {
+    setupMocks({ candidates: () => errJson(500) });
+    render(<PhaseDecide taskId="cancer-diagnosis" activeSessionId="sess-1" iterId="i1" />);
+    // Matrix still renders.
+    await waitFor(() => screen.getByText("has_distant_metastasis"));
+    expect(screen.getByText("cancer_type")).toBeInTheDocument();
+    // No crash, no propose button auto-rendered.
+    expect(screen.queryByRole("button", { name: /^Apply$/i })).not.toBeInTheDocument();
   });
 });
 
