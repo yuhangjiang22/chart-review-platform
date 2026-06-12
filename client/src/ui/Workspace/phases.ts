@@ -12,6 +12,7 @@
 // maturity-to-done-phases mapping all derive from PHASE_DEFS.
 
 export type Phase =
+  | "AUTHOR"
   | "TRY"
   | "JUDGE"
   | "VALIDATE"
@@ -37,6 +38,7 @@ export interface PhaseDef {
  *  is "added" or "removed" or "reordered" — all derived structures
  *  (PHASE_ORDER, PHASE_LABEL, PHASE_SLUG_TO_ID, etc.) follow. */
 export const PHASE_DEFS: PhaseDef[] = [
+  { id: "AUTHOR", label: "Author", slug: "author", group: "iter" },
   { id: "TRY", label: "Try", slug: "try", group: "iter" },
   { id: "JUDGE", label: "Judge", slug: "judge", group: "iter", optional: true },
   { id: "VALIDATE", label: "Validate", slug: "validate", group: "iter" },
@@ -61,7 +63,7 @@ export const PHASE_SLUG_TO_ID: Record<string, Phase> = Object.fromEntries(
   PHASE_DEFS.map((p) => [p.slug, p.id]),
 );
 
-/** Iter-cycle phases (TRY → VALIDATE → DECIDE). Derived. */
+/** Iter-cycle phases (AUTHOR → TRY → VALIDATE → DECIDE). Derived. */
 export const ITER_PHASES: Phase[] = PHASE_DEFS.filter((p) => p.group === "iter").map(
   (p) => p.id,
 );
