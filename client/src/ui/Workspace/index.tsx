@@ -15,6 +15,7 @@ import { WorkspaceSettings } from "./WorkspaceSettings";
 import { taskKindFromTaskType } from "./task-kind-registry";
 import { PhaseTry } from "./PhaseTry";
 import { RubricPanel } from "./RubricPanel";
+import { RefineProposalCard } from "./RefineProposalCard";
 import { PhaseValidate } from "./PhaseValidate";
 import { PhaseJudge } from "./PhaseJudge";
 import { PhaseDecide } from "./PhaseDecide";
@@ -516,6 +517,17 @@ export function Workspace({
                   used in TRY). It has no read-only mode in this fork, so it
                   isn't gated on isMethodologist here — matching TRY. */}
               <RubricPanel taskId={taskId} alwaysOpen />
+              {/* Self-refinement (S2): surface transparent proposal cards built
+                  from the agent-vs-you disagreements on the active validated +
+                  judged iter. Only shown when a session + iter exist — refinement
+                  needs validated patients to learn from. */}
+              {activeSessionId && activeIter && (
+                <RefineProposalCard
+                  taskId={taskId}
+                  iterId={activeIter.iter_id}
+                  sessionId={activeSessionId}
+                />
+              )}
               <div className="flex justify-end">
                 <Button onClick={() => setPhase("TRY")} className="gap-1.5">
                   Try on patients →
