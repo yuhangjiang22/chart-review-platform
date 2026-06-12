@@ -525,7 +525,16 @@ export function Workspace({
         {activePhase === "DECIDE" && activeSessionId && (
           <>
             {runTabs}
-            <PhaseDecide taskId={taskId} activeSessionId={activeSessionId} iterId={viewIter?.iter_id ?? null} />
+            <PhaseDecide
+              taskId={taskId}
+              activeSessionId={activeSessionId}
+              iterId={viewIter?.iter_id ?? null}
+              // NER scores spans (per-entity-type F1 via /api/calibrate-ner);
+              // phenotype scores fields. The shared `taskKind` always resolves
+              // to "phenotype" in this fork, so branch on the raw task_type
+              // here (same as PhaseJudge above).
+              taskKind={task?.task_type === "ner" ? "ner" : "phenotype"}
+            />
           </>
         )}
       </main>
