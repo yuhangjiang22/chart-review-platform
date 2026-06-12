@@ -138,23 +138,36 @@ export const nerCalibrationRoutes: RouteEntry[] = [
       }> = [];
 
       for (const [aid, spans] of [...agentSpans.entries()].sort()) {
-        // computeSpanIaa(a, b) treats a as the predictions and b as
-        // the gold — we pass agent spans first, reviewer spans second.
+        // We pass agent spans as A, reviewer (gold) as B. NOTE:
+        // computeSpanIaa defines precision/recall with A as the REFERENCE
+        // and B as the hypothesis (its `fp = miss_only_b`), which is the
+        // opposite of what we want here — so report.precision/recall come
+        // out swapped for "agent vs gold". We recompute from the raw counts
+        // with the AGENT as the hypothesis: a span only the agent has
+        // (miss_only_a) is a false positive; a gold span the agent missed
+        // (miss_only_b) is a false negative. F1 is symmetric so macro_f1 and
+        // tuple_kappa are unaffected. (miss_only_a = agent-only,
+        // miss_only_b = reviewer-only — the UI labels these directly.)
         const report = computeSpanIaa(spans, reviewerSpans);
         agents.push({
           agent_id: aid,
           macro_f1: report.macro_f1,
           tuple_kappa: report.tuple_kappa,
-          per_entity_type: report.per_entity_type.map((m) => ({
-            entity_type: m.entity_type,
-            agree: m.agree,
-            soft_or_boundary: m.soft_or_boundary,
-            miss_only_a: m.miss_only_a,
-            miss_only_b: m.miss_only_b,
-            precision: m.precision,
-            recall: m.recall,
-            f1: m.f1,
-          })),
+          per_entity_type: report.per_entity_type.map((m) => {
+            const fp = m.miss_only_a + m.soft_or_boundary; // agent proposed, not in gold
+            const fn = m.miss_only_b + m.soft_or_boundary; // gold the agent missed
+            const precision = m.agree + fp > 0 ? m.agree / (m.agree + fp) : 0;
+            const recall = m.agree + fn > 0 ? m.agree / (m.agree + fn) : 0;
+            const f1 = precision + recall > 0 ? (2 * precision * recall) / (precision + recall) : 0;
+            return {
+              entity_type: m.entity_type,
+              agree: m.agree,
+              soft_or_boundary: m.soft_or_boundary,
+              miss_only_a: m.miss_only_a,
+              miss_only_b: m.miss_only_b,
+              precision, recall, f1,
+            };
+          }),
           n_spans: spans.length,
         });
       }
