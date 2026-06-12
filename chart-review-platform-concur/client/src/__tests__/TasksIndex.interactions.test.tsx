@@ -1,18 +1,21 @@
 // @vitest-environment jsdom
 //
-// TasksIndex EXHAUSTIVE control-interaction tests.
+// TasksIndex EXHAUSTIVE control-interaction tests (v2 design).
 //
-// Exercises every interactive control in TasksIndex.tsx in multiple
-// situations:
+// Exercises every interactive control in TasksIndex.tsx:
 //   - the "Create new task" button (empty + populated libraries)
 //   - per-task-row buttons (each calls onOpen with the exact id; phenotype,
 //     ner, adherence rows)
-//   - the per-kind tab buttons (filtering, counts, active styling, blurb
-//     switching, presence/absence, stale-active-tab fallback)
+//   - the per-kind tab buttons (always-on 3 tabs, counts, active styling,
+//     blurb switching, localStorage persistence + default)
 //
-// Conventions follow client/src/__tests__/TasksIndex.kinds.test.tsx and
-// Library.test.tsx: jsdom env, fireEvent.click, vi.fn() callbacks,
-// jest-dom matchers, cleanup() after each.
+// v2 design notes:
+//   - All three tabs (Phenotype / NER / Adherence) always render with a count
+//     pill, regardless of which kinds have tasks.
+//   - The active tab persists in localStorage["tasks-index-active-kind"];
+//     phenotype is the default. We clear localStorage after each test.
+//   - Active tab styling is a foreground underline (border-foreground +
+//     text-foreground), not oxblood.
 
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, cleanup, within, fireEvent } from "@testing-library/react";
@@ -21,14 +24,15 @@ expect.extend(matchers);
 
 afterEach(() => {
   cleanup();
+  localStorage.clear();
 });
 
 import { TasksIndex, type TaskListing } from "../ui/TasksIndex";
 
-// Blurb fragments (verbatim slices of KIND_META[*].blurb in TasksIndex.tsx).
+// Verbatim slices of TABS[*].blurb in TasksIndex.tsx.
 const PHENOTYPE_BLURB = /Per-criterion adjudication/i;
-const NER_BLURB = /Named-entity recognition/i;
-const ADHERENCE_BLURB = /Guideline concordance\. Reviewer adjudicates tier-grouped/i;
+const NER_BLURB = /Span extraction against an ontology/i;
+const ADHERENCE_BLURB = /Question-and-rule chart review/i;
 
 // The grid <ol> holds the task rows; query rows from there so the tab
 // buttons (which also have role=button) never get confused for task rows.
@@ -43,18 +47,11 @@ function visibleTaskIds(): string[] {
   return Array.from(document.querySelectorAll("ol code")).map((el) => el.textContent ?? "");
 }
 
-// Tab buttons live in the bordered tab strip directly above the grid; they
-// are the buttons that carry a kind label. We resolve them by accessible
-// name (label + count text concatenate into the name).
-function phenotypeTab() {
-  return screen.getByRole("button", { name: /^phenotype/i });
-}
-function nerTab() {
-  return screen.getByRole("button", { name: /^entity extraction/i });
-}
-function adherenceTab() {
-  return screen.getByRole("button", { name: /^adherence/i });
-}
+// Tab buttons concatenate label + count into their accessible name; anchor on
+// the label so each resolves uniquely.
+const phenotypeTab = () => screen.getByRole("button", { name: /^phenotype/i });
+const nerTab = () => screen.getByRole("button", { name: /^ner/i });
+const adherenceTab = () => screen.getByRole("button", { name: /^adherence/i });
 
 const PHENO_A: TaskListing = { id: "cancer-diagnosis", field_count: 4, task_type: "phenotype_validation" };
 const PHENO_B: TaskListing = { id: "sepsis-3", field_count: 2, task_type: "phenotype_validation" };
@@ -72,8 +69,6 @@ describe("TasksIndex — Create new task button", () => {
     const btn = screen.getByRole("button", { name: /create new task/i });
     fireEvent.click(btn);
     expect(onCreateTask).toHaveBeenCalledTimes(1);
-    // onCreateTask is wired directly as onClick, so React hands it the
-    // synthetic click event; the contract that matters is "called once".
   });
 
   it("fires onCreateTask once per click, with TASKS PRESENT, and does not call onOpen", () => {
@@ -89,12 +84,12 @@ describe("TasksIndex — Create new task button", () => {
     expect(onOpen).not.toHaveBeenCalled();
   });
 
-  it("the empty-state still exposes a working Create button (clickable from the 'No tasks yet' card view)", () => {
+  it("the empty state still exposes a working Create button (exactly one Create button)", () => {
     const onCreateTask = vi.fn();
     render(<TasksIndex tasks={[]} onOpen={() => {}} onCreateTask={onCreateTask} />);
 
     // Empty card present.
-    expect(screen.getByText(/no tasks yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/no phenotype tasks yet/i)).toBeInTheDocument();
     // Exactly one Create button (topbar action only).
     const btns = screen.getAllByRole("button", { name: /create new task/i });
     expect(btns).toHaveLength(1);
@@ -118,11 +113,11 @@ describe("TasksIndex — task row click → onOpen", () => {
     expect(onOpen).toHaveBeenCalledWith("cancer-diagnosis");
   });
 
-  it("calls onOpen with the exact id for an NER row (clicked from its own tab)", () => {
+  it("calls onOpen with the exact id for an NER row (clicked from the NER tab)", () => {
     const onOpen = vi.fn();
     render(<TasksIndex tasks={[PHENO_A, NER_A]} onOpen={onOpen} onCreateTask={() => {}} />);
 
-    // NER tab not active by default (phenotype is first) → switch to it.
+    // NER tab not active by default (phenotype is the default) → switch to it.
     fireEvent.click(nerTab());
     const rows = taskRowButtons();
     expect(rows).toHaveLength(1);
@@ -132,7 +127,7 @@ describe("TasksIndex — task row click → onOpen", () => {
     expect(onOpen).toHaveBeenCalledWith("bso-ad-ner");
   });
 
-  it("calls onOpen with the exact id for an ADHERENCE row (clicked from its own tab)", () => {
+  it("calls onOpen with the exact id for an ADHERENCE row (clicked from the Adherence tab)", () => {
     const onOpen = vi.fn();
     render(<TasksIndex tasks={[PHENO_A, ADH_A]} onOpen={onOpen} onCreateTask={() => {}} />);
 
@@ -160,30 +155,31 @@ describe("TasksIndex — task row click → onOpen", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 3a. Tab switching — full 3-kind mix
+// 3. Always-on three tabs + counts
 // ---------------------------------------------------------------------------
-describe("TasksIndex — tab switching (3 kinds present)", () => {
+describe("TasksIndex — always-on three tabs (3-kind mix)", () => {
   const tasks = [PHENO_A, PHENO_B, NER_A, ADH_A]; // pheno 2 / ner 1 / adh 1
 
-  it("renders all three tabs with correct counts (Phenotype 2 / Entity extraction 1 / Adherence 1)", () => {
+  it("renders all three tabs with correct counts (Phenotype 2 / NER 1 / Adherence 1)", () => {
     render(<TasksIndex tasks={tasks} onOpen={() => {}} onCreateTask={() => {}} />);
     expect(within(phenotypeTab()).getByText("2")).toBeInTheDocument();
     expect(within(nerTab()).getByText("1")).toBeInTheDocument();
     expect(within(adherenceTab()).getByText("1")).toBeInTheDocument();
   });
 
-  it("defaults to the Phenotype tab: shows only phenotype rows, phenotype blurb, and Phenotype is active", () => {
+  it("defaults to the Phenotype tab: only phenotype rows, phenotype blurb, Phenotype active", () => {
     render(<TasksIndex tasks={tasks} onOpen={() => {}} onCreateTask={() => {}} />);
     expect(visibleTaskIds().sort()).toEqual(["cancer-diagnosis", "sepsis-3"]);
     expect(screen.queryByText("bso-ad-ner")).not.toBeInTheDocument();
     expect(screen.queryByText("asthma-adherence")).not.toBeInTheDocument();
     expect(screen.getByText(PHENOTYPE_BLURB)).toBeInTheDocument();
-    // Active styling: active tab carries the text-ink class (others muted).
-    expect(phenotypeTab().className).toContain("text-ink");
-    expect(nerTab().className).not.toContain("text-ink");
+    // Active styling: foreground underline (border-foreground), not oxblood.
+    expect(phenotypeTab().className).toContain("border-foreground");
+    expect(phenotypeTab().className).not.toContain("oxblood");
+    expect(nerTab().className).not.toContain("border-foreground");
   });
 
-  it("clicking the Entity-extraction tab filters to ONLY the ner row, swaps the blurb, and moves active styling", () => {
+  it("clicking the NER tab filters to ONLY the ner row, swaps the blurb, moves active styling", () => {
     render(<TasksIndex tasks={tasks} onOpen={() => {}} onCreateTask={() => {}} />);
     fireEvent.click(nerTab());
     expect(visibleTaskIds()).toEqual(["bso-ad-ner"]);
@@ -191,8 +187,8 @@ describe("TasksIndex — tab switching (3 kinds present)", () => {
     expect(screen.queryByText("asthma-adherence")).not.toBeInTheDocument();
     expect(screen.getByText(NER_BLURB)).toBeInTheDocument();
     expect(screen.queryByText(PHENOTYPE_BLURB)).not.toBeInTheDocument();
-    expect(nerTab().className).toContain("text-ink");
-    expect(phenotypeTab().className).not.toContain("text-ink");
+    expect(nerTab().className).toContain("border-foreground");
+    expect(phenotypeTab().className).not.toContain("border-foreground");
   });
 
   it("clicking the Adherence tab filters to ONLY the adherence row and swaps the blurb", () => {
@@ -202,7 +198,7 @@ describe("TasksIndex — tab switching (3 kinds present)", () => {
     expect(screen.queryByText("cancer-diagnosis")).not.toBeInTheDocument();
     expect(screen.queryByText("bso-ad-ner")).not.toBeInTheDocument();
     expect(screen.getByText(ADHERENCE_BLURB)).toBeInTheDocument();
-    expect(adherenceTab().className).toContain("text-ink");
+    expect(adherenceTab().className).toContain("border-foreground");
   });
 
   it("switching back and forth re-filters each time (pheno → ner → adherence → pheno)", () => {
@@ -213,92 +209,90 @@ describe("TasksIndex — tab switching (3 kinds present)", () => {
     expect(visibleTaskIds()).toEqual(["asthma-adherence"]);
     fireEvent.click(phenotypeTab());
     expect(visibleTaskIds().sort()).toEqual(["cancer-diagnosis", "sepsis-3"]);
-    expect(phenotypeTab().className).toContain("text-ink");
+    expect(phenotypeTab().className).toContain("border-foreground");
   });
 });
 
 // ---------------------------------------------------------------------------
-// 3b. Tab switching — exactly 2 kinds
+// 4. Always-on tabs even when some kinds are empty
 // ---------------------------------------------------------------------------
-describe("TasksIndex — tab switching (2 kinds present)", () => {
-  it("renders exactly two tabs (phenotype + ner), no adherence tab", () => {
-    render(<TasksIndex tasks={[PHENO_A, NER_A]} onOpen={() => {}} onCreateTask={() => {}} />);
+describe("TasksIndex — tabs always present regardless of kinds", () => {
+  it("only phenotype tasks → all three tabs render (NER 0 / Adherence 0)", () => {
+    render(<TasksIndex tasks={[PHENO_A, PHENO_B]} onOpen={() => {}} onCreateTask={() => {}} />);
     expect(phenotypeTab()).toBeInTheDocument();
     expect(nerTab()).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /^adherence/i })).not.toBeInTheDocument();
+    expect(adherenceTab()).toBeInTheDocument();
+    expect(within(phenotypeTab()).getByText("2")).toBeInTheDocument();
+    expect(within(nerTab()).getByText("0")).toBeInTheDocument();
+    expect(within(adherenceTab()).getByText("0")).toBeInTheDocument();
   });
 
-  it("switching from phenotype to ner filters the grid and back-switching restores it", () => {
-    render(<TasksIndex tasks={[PHENO_A, NER_A]} onOpen={() => {}} onCreateTask={() => {}} />);
-    // Default phenotype.
+  it("zero tasks → all three tabs render, every count 0, phenotype default + empty card", () => {
+    render(<TasksIndex tasks={[]} onOpen={() => {}} onCreateTask={() => {}} />);
+    expect(within(phenotypeTab()).getByText("0")).toBeInTheDocument();
+    expect(within(nerTab()).getByText("0")).toBeInTheDocument();
+    expect(within(adherenceTab()).getByText("0")).toBeInTheDocument();
+    expect(phenotypeTab().className).toContain("border-foreground");
+    expect(screen.getByText(/no phenotype tasks yet/i)).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 5. localStorage persistence + default
+// ---------------------------------------------------------------------------
+describe("TasksIndex — active-tab persistence", () => {
+  it("defaults to the Phenotype tab when no localStorage value is set", () => {
+    render(<TasksIndex tasks={[PHENO_A, NER_A, ADH_A]} onOpen={() => {}} onCreateTask={() => {}} />);
+    expect(phenotypeTab().className).toContain("border-foreground");
     expect(visibleTaskIds()).toEqual(["cancer-diagnosis"]);
+  });
+
+  it("a pre-set localStorage value selects that tab on mount (ner)", () => {
+    localStorage.setItem("tasks-index-active-kind", "ner");
+    render(<TasksIndex tasks={[PHENO_A, NER_A, ADH_A]} onOpen={() => {}} onCreateTask={() => {}} />);
+    expect(nerTab().className).toContain("border-foreground");
+    expect(phenotypeTab().className).not.toContain("border-foreground");
+    expect(visibleTaskIds()).toEqual(["bso-ad-ner"]);
+  });
+
+  it("clicking a tab updates localStorage", () => {
+    render(<TasksIndex tasks={[PHENO_A, NER_A, ADH_A]} onOpen={() => {}} onCreateTask={() => {}} />);
+    expect(localStorage.getItem("tasks-index-active-kind")).toBe("phenotype");
+    fireEvent.click(adherenceTab());
+    expect(localStorage.getItem("tasks-index-active-kind")).toBe("adherence");
     fireEvent.click(nerTab());
-    expect(visibleTaskIds()).toEqual(["bso-ad-ner"]);
-    expect(screen.getByText(NER_BLURB)).toBeInTheDocument();
-    fireEvent.click(phenotypeTab());
-    expect(visibleTaskIds()).toEqual(["cancer-diagnosis"]);
-    expect(screen.getByText(PHENOTYPE_BLURB)).toBeInTheDocument();
+    expect(localStorage.getItem("tasks-index-active-kind")).toBe("ner");
   });
 });
 
 // ---------------------------------------------------------------------------
-// 3c. Tab switching — single kind (no tabs)
+// 6. Empty state per kind
 // ---------------------------------------------------------------------------
-describe("TasksIndex — single kind (no tab bar)", () => {
-  it("renders NO tab bar, shows all rows, and shows that kind's blurb (phenotype)", () => {
-    render(<TasksIndex tasks={[PHENO_A, PHENO_B]} onOpen={() => {}} onCreateTask={() => {}} />);
-    // No kind tab buttons.
-    expect(screen.queryByRole("button", { name: /^phenotype/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /^entity extraction/i })).not.toBeInTheDocument();
-    // All rows shown.
-    expect(visibleTaskIds().sort()).toEqual(["cancer-diagnosis", "sepsis-3"]);
-    // Phenotype blurb shown.
-    expect(screen.getByText(PHENOTYPE_BLURB)).toBeInTheDocument();
+describe("TasksIndex — empty state per kind", () => {
+  it("an empty kind (others present) shows 'No … tasks yet' + the 'Switch tabs' hint", () => {
+    render(<TasksIndex tasks={[PHENO_A]} onOpen={() => {}} onCreateTask={() => {}} />);
+    fireEvent.click(nerTab());
+    expect(taskRowButtons()).toHaveLength(0);
+    expect(screen.getByText("No ner tasks yet.")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Switch tabs to see tasks of other kinds, or create a new one\./i),
+    ).toBeInTheDocument();
   });
 
-  it("single NER kind: no tabs, ner blurb shown", () => {
-    render(<TasksIndex tasks={[NER_A]} onOpen={() => {}} onCreateTask={() => {}} />);
-    expect(screen.queryByRole("button", { name: /^entity extraction/i })).not.toBeInTheDocument();
-    expect(screen.getByText(NER_BLURB)).toBeInTheDocument();
-    expect(visibleTaskIds()).toEqual(["bso-ad-ner"]);
-  });
-
-  it("single ADHERENCE kind: no tabs, adherence blurb shown", () => {
-    render(<TasksIndex tasks={[ADH_A]} onOpen={() => {}} onCreateTask={() => {}} />);
-    expect(screen.queryByRole("button", { name: /^adherence/i })).not.toBeInTheDocument();
-    expect(screen.getByText(ADHERENCE_BLURB)).toBeInTheDocument();
-    expect(visibleTaskIds()).toEqual(["asthma-adherence"]);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// 3d. Zero tasks — empty card, no tabs, no blurb, Create still works
-// ---------------------------------------------------------------------------
-describe("TasksIndex — zero tasks (empty state)", () => {
-  it("shows the empty card, no tabs, NO kind-blurb, and a working Create button", () => {
+  it("zero tasks total → 'No phenotype tasks yet' + the Create hint, no rows, Create works", () => {
     const onCreateTask = vi.fn();
     render(<TasksIndex tasks={[]} onOpen={() => {}} onCreateTask={onCreateTask} />);
 
-    // Empty card.
-    expect(screen.getByText(/no tasks yet/i)).toBeInTheDocument();
-    // No tab buttons of any kind.
-    expect(screen.queryByRole("button", { name: /^phenotype/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /^entity extraction/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /^adherence/i })).not.toBeInTheDocument();
-    // No kind blurb above the empty card (blurb is gated on tasks.length > 0).
-    expect(screen.queryByText(PHENOTYPE_BLURB)).not.toBeInTheDocument();
-    expect(screen.queryByText(NER_BLURB)).not.toBeInTheDocument();
-    expect(screen.queryByText(ADHERENCE_BLURB)).not.toBeInTheDocument();
-    // No task rows.
+    expect(screen.getByText("No phenotype tasks yet.")).toBeInTheDocument();
+    expect(screen.getByText(/to draft your first one\./i)).toBeInTheDocument();
     expect(taskRowButtons()).toHaveLength(0);
-    // Create works.
     fireEvent.click(screen.getByRole("button", { name: /create new task/i }));
     expect(onCreateTask).toHaveBeenCalledTimes(1);
   });
 });
 
 // ---------------------------------------------------------------------------
-// 4. Counts equal the rows shown when that tab is active
+// 7. Counts equal the rows shown when that tab is active
 // ---------------------------------------------------------------------------
 describe("TasksIndex — tab counts match visible row counts", () => {
   it("each tab's count equals the number of rows shown when that tab is active", () => {
@@ -331,7 +325,7 @@ describe("TasksIndex — tab counts match visible row counts", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 5. Card subtitle per kind
+// 8. Card subtitle per kind
 // ---------------------------------------------------------------------------
 describe("TasksIndex — card subtitle per kind", () => {
   it("phenotype with count 4 → '4 fields' (plural)", () => {
@@ -351,14 +345,18 @@ describe("TasksIndex — card subtitle per kind", () => {
     expect(screen.queryByText("1 fields")).not.toBeInTheDocument();
   });
 
-  it("ner → 'entity extraction'", () => {
+  it("ner row → NO subtitle (no 'field(s)' text)", () => {
     render(<TasksIndex tasks={[NER_A]} onOpen={() => {}} onCreateTask={() => {}} />);
-    expect(screen.getByText("entity extraction")).toBeInTheDocument();
+    fireEvent.click(nerTab());
+    expect(screen.getByText("bso-ad-ner")).toBeInTheDocument();
+    expect(screen.queryByText(/\bfields?\b/)).not.toBeInTheDocument();
   });
 
-  it("adherence → 'guideline concordance'", () => {
+  it("adherence row → NO subtitle (no 'field(s)' text)", () => {
     render(<TasksIndex tasks={[ADH_A]} onOpen={() => {}} onCreateTask={() => {}} />);
-    expect(screen.getByText("guideline concordance")).toBeInTheDocument();
+    fireEvent.click(adherenceTab());
+    expect(screen.getByText("asthma-adherence")).toBeInTheDocument();
+    expect(screen.queryByText(/\bfields?\b/)).not.toBeInTheDocument();
   });
 
   it("phenotype with field_count UNDEFINED → '0 fields' (never 'undefined fields')", () => {
@@ -377,29 +375,29 @@ describe("TasksIndex — card subtitle per kind", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 6. manual_version badge
+// 9. manual_version badge
 // ---------------------------------------------------------------------------
 describe("TasksIndex — manual_version badge", () => {
   it("string version → renders 'v<value>'", () => {
     render(
       <TasksIndex
-        tasks={[{ id: "x", field_count: 3, task_type: "phenotype_validation", manual_version: "2.1" }]}
+        tasks={[{ id: "x", field_count: 3, task_type: "phenotype_validation", manual_version: "0.3" }]}
         onOpen={() => {}}
         onCreateTask={() => {}}
       />,
     );
-    expect(screen.getByText("v2.1")).toBeInTheDocument();
+    expect(screen.getByText("v0.3")).toBeInTheDocument();
   });
 
-  it("numeric version → renders 'v<value>'", () => {
+  it("numeric version 0.1 → renders 'v0.1'", () => {
     render(
       <TasksIndex
-        tasks={[{ id: "x", field_count: 3, task_type: "phenotype_validation", manual_version: 5 }]}
+        tasks={[{ id: "x", field_count: 3, task_type: "phenotype_validation", manual_version: 0.1 }]}
         onOpen={() => {}}
         onCreateTask={() => {}}
       />,
     );
-    expect(screen.getByText("v5")).toBeInTheDocument();
+    expect(screen.getByText("v0.1")).toBeInTheDocument();
   });
 
   it("numeric version 0 (falsy) → still renders 'v0' (uses != null, not truthiness)", () => {
@@ -417,63 +415,5 @@ describe("TasksIndex — manual_version badge", () => {
     render(<TasksIndex tasks={[PHENO_A]} onOpen={() => {}} onCreateTask={() => {}} />);
     expect(screen.queryByText(/^v/)).not.toBeInTheDocument();
     expect(screen.queryByText("vundefined")).not.toBeInTheDocument();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// 7. Stale active tab — fallback when the active kind vanishes across rerender
-// ---------------------------------------------------------------------------
-describe("TasksIndex — stale active tab fallback", () => {
-  it("active NER tab vanishing leaves the view on Phenotype, not an empty NER grid", () => {
-    const { rerender } = render(
-      <TasksIndex tasks={[PHENO_A, NER_A]} onOpen={() => {}} onCreateTask={() => {}} />,
-    );
-    // Activate NER.
-    fireEvent.click(nerTab());
-    expect(visibleTaskIds()).toEqual(["bso-ad-ner"]);
-
-    // Re-render the SAME instance with ONLY phenotype tasks (ner kind gone).
-    rerender(<TasksIndex tasks={[PHENO_A]} onOpen={() => {}} onCreateTask={() => {}} />);
-
-    // Must NOT show an empty NER grid — falls back to phenotype.
-    expect(visibleTaskIds()).toEqual(["cancer-diagnosis"]);
-    // Single kind now → no tab bar.
-    expect(screen.queryByRole("button", { name: /^entity extraction/i })).not.toBeInTheDocument();
-    // Phenotype blurb shown (the fallback kind's blurb).
-    expect(screen.getByText(PHENOTYPE_BLURB)).toBeInTheDocument();
-  });
-
-  it("re-adding tasks after a fallback does NOT auto-jump to a stale tab; phenotype stays active", () => {
-    const { rerender } = render(
-      <TasksIndex tasks={[PHENO_A, NER_A]} onOpen={() => {}} onCreateTask={() => {}} />,
-    );
-    fireEvent.click(nerTab());
-    expect(visibleTaskIds()).toEqual(["bso-ad-ner"]);
-
-    // Collapse to phenotype only → fallback to phenotype.
-    rerender(<TasksIndex tasks={[PHENO_A]} onOpen={() => {}} onCreateTask={() => {}} />);
-    expect(visibleTaskIds()).toEqual(["cancer-diagnosis"]);
-
-    // Re-add an NER task. The view must stay on phenotype (the effect snapped
-    // activeKind to phenotype), not auto-jump back to the previously-clicked
-    // NER tab.
-    rerender(<TasksIndex tasks={[PHENO_A, NER_A]} onOpen={() => {}} onCreateTask={() => {}} />);
-    expect(visibleTaskIds()).toEqual(["cancer-diagnosis"]);
-    expect(phenotypeTab().className).toContain("text-ink");
-    expect(nerTab().className).not.toContain("text-ink");
-  });
-
-  it("active tab that REMAINS present is preserved across an unrelated rerender", () => {
-    const { rerender } = render(
-      <TasksIndex tasks={[PHENO_A, NER_A, ADH_A]} onOpen={() => {}} onCreateTask={() => {}} />,
-    );
-    fireEvent.click(adherenceTab());
-    expect(visibleTaskIds()).toEqual(["asthma-adherence"]);
-
-    // Add another phenotype task — adherence kind still present, so the
-    // active adherence selection must survive.
-    rerender(<TasksIndex tasks={[PHENO_A, PHENO_B, NER_A, ADH_A]} onOpen={() => {}} onCreateTask={() => {}} />);
-    expect(visibleTaskIds()).toEqual(["asthma-adherence"]);
-    expect(adherenceTab().className).toContain("text-ink");
   });
 });
