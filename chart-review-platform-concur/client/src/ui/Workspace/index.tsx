@@ -530,10 +530,19 @@ export function Workspace({
               activeSessionId={activeSessionId}
               iterId={viewIter?.iter_id ?? null}
               // NER scores spans (per-entity-type F1 via /api/calibrate-ner);
-              // phenotype scores fields. The shared `taskKind` always resolves
-              // to "phenotype" in this fork, so branch on the raw task_type
-              // here (same as PhaseJudge above).
-              taskKind={task?.task_type === "ner" ? "ner" : "phenotype"}
+              // adherence scores per-agent question/rule agreement vs the
+              // reviewer (via /api/pilots/:taskId/:iterId/adherence-iaa, which
+              // takes the same viewIter iterId — falls back to the validate
+              // iter when no run tab is selected); phenotype scores fields. The
+              // shared `taskKind` always resolves to "phenotype" in this fork,
+              // so branch on the raw task_type here (same as PhaseJudge above).
+              taskKind={
+                task?.task_type === "ner"
+                  ? "ner"
+                  : task?.task_type === "adherence"
+                  ? "adherence"
+                  : "phenotype"
+              }
             />
           </>
         )}

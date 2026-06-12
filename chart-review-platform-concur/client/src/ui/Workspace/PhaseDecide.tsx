@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { authFetch } from "../../auth";
 
 // Performance report (light platform DECIDE phase).
@@ -56,6 +57,45 @@ interface NerCalibrationReport {
   agents: NerAgentReport[];
 }
 
+// ── Adherence performance shapes (GET /api/pilots/:taskId/:iterId/adherence-iaa) ─
+// Per-agent question/rule agreement vs the reviewer's validated answers.
+// Mirrors the server route's response (server/adherence-iaa-routes.ts).
+interface AdherenceAgentScore {
+  agent_id: string;
+  role_preset?: string;
+  question_score: { correct: number; total: number; match_rate: number; kappa: number | null };
+  rule_score: { concordant: number; total: number; match_rate: number; kappa: number | null };
+  question_disagreements: Array<{
+    patient_id: string;
+    question_id: string;
+    agent_answer: unknown;
+    reviewer_answer: unknown;
+    confidence?: number;
+  }>;
+  rule_disagreements: Array<{
+    patient_id: string;
+    rule_id: string;
+    agent_verdict: string;
+    reviewer_verdict: string;
+  }>;
+}
+interface AdherenceInterAgent {
+  agent_a: string;
+  agent_b: string;
+  question_agreement_rate: number;
+  rule_agreement_rate: number;
+  question_kappa: number | null;
+  rule_kappa: number | null;
+}
+interface AdherenceIaaReport {
+  ok: boolean;
+  task_id: string;
+  iter_id: string;
+  n_patients: number;
+  per_agent: AdherenceAgentScore[];
+  inter_agent: AdherenceInterAgent | null;
+}
+
 function pct(x: number | null): string {
   return x == null ? "—" : `${(x * 100).toFixed(0)}%`;
 }
@@ -63,6 +103,12 @@ function pct(x: number | null): string {
 function fmtNum(n: number | null | undefined): string {
   if (n === null || n === undefined || Number.isNaN(n)) return "—";
   return n.toFixed(2);
+}
+
+function scoreColor(matchRate: number): string {
+  if (matchRate >= 0.9) return "text-emerald-700";
+  if (matchRate >= 0.7) return "text-amber-700";
+  return "text-[hsl(var(--oxblood))]";
 }
 
 export interface PhaseDecideProps {
@@ -74,17 +120,22 @@ export interface PhaseDecideProps {
    *  session's latest run. */
   iterId?: string | null;
   /** Task kind. NER tasks score spans (per-entity-type F1 + tuple-κ) via
-   *  /api/calibrate-ner; everything else uses the phenotype field×agent
-   *  matrix from /api/performance. The shared workspace `taskKind` always
-   *  resolves to "phenotype" in this fork, so the caller branches on the
-   *  raw task_type and threads "ner" here (same as PhaseJudge). */
-  taskKind?: "phenotype" | "ner";
+   *  /api/calibrate-ner; adherence tasks score per-agent question/rule
+   *  agreement vs the reviewer's validated answers via
+   *  /api/pilots/:taskId/:iterId/adherence-iaa; everything else uses the
+   *  phenotype field×agent matrix from /api/performance. The shared
+   *  workspace `taskKind` always resolves to "phenotype" in this fork, so
+   *  the caller branches on the raw task_type and threads "ner" /
+   *  "adherence" here (same as PhaseJudge). */
+  taskKind?: "phenotype" | "ner" | "adherence";
 }
 
 export function PhaseDecide({ taskId, activeSessionId, iterId, taskKind }: PhaseDecideProps) {
   const isNer = taskKind === "ner";
+  const isAdherence = taskKind === "adherence";
   const [report, setReport] = useState<PerformanceReport | null>(null);
   const [nerReport, setNerReport] = useState<NerCalibrationReport | null>(null);
+  const [adhReport, setAdhReport] = useState<AdherenceIaaReport | null>(null);
   const [state, setState] = useState<"loading" | "error" | "ready">("loading");
 
   // Export the validated task package (rubric + agent config + performance +
@@ -136,6 +187,35 @@ export function PhaseDecide({ taskId, activeSessionId, iterId, taskKind }: Phase
       };
     }
 
+    if (isAdherence) {
+      // Adherence tasks score each agent's drafted answers/verdicts against
+      // the reviewer's validated answers. The iter pins the session, so no
+      // session_id query param is needed (matching the server route). Without
+      // an iter there's nothing to score yet.
+      if (!iterId) {
+        setAdhReport(null);
+        setState("ready");
+        return () => {
+          cancelled = true;
+        };
+      }
+      authFetch(
+        `/api/pilots/${encodeURIComponent(taskId)}/${encodeURIComponent(iterId)}/adherence-iaa`,
+      )
+        .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+        .then((d: AdherenceIaaReport) => {
+          if (cancelled) return;
+          setAdhReport(d);
+          setState("ready");
+        })
+        .catch(() => {
+          if (!cancelled) setState("error");
+        });
+      return () => {
+        cancelled = true;
+      };
+    }
+
     const params = new URLSearchParams();
     if (activeSessionId) params.set("session_id", activeSessionId);
     if (iterId) params.set("iter_id", iterId);
@@ -153,10 +233,19 @@ export function PhaseDecide({ taskId, activeSessionId, iterId, taskKind }: Phase
     return () => {
       cancelled = true;
     };
-  }, [taskId, activeSessionId, iterId, isNer]);
+  }, [taskId, activeSessionId, iterId, isNer, isAdherence]);
 
   const hasData = !!report && report.n_patients > 0 && report.agents.length > 0;
   const nerHasData = !!nerReport && nerReport.n_validated_notes > 0 && nerReport.agents.length > 0;
+  // Adherence has a leaderboard once any agent has been scored against the
+  // reviewer (question_score.total > 0 or rule_score.total > 0). With no
+  // reviewer-validated answers yet, every total is 0 → empty state.
+  const adhHasData =
+    !!adhReport &&
+    adhReport.per_agent.length > 0 &&
+    adhReport.per_agent.some(
+      (a) => a.question_score.total > 0 || a.rule_score.total > 0,
+    );
 
   // field_id -> agent_id -> PerField, for matrix lookup
   const cell = (agent: AgentPerf, fid: string) =>
@@ -195,6 +284,8 @@ export function PhaseDecide({ taskId, activeSessionId, iterId, taskKind }: Phase
         <p className="text-[12.5px] text-muted-foreground">
           {isNer
             ? "F1 between each agent's drafted spans and your validated spans, scoped to notes you marked validated, per entity type."
+            : isAdherence
+            ? "Match rate (and κ) between each agent's drafted answers/verdicts and the answers you validated, per question and per rule."
             : "How each agent's answers compared to your validated answers, per field."}
         </p>
       </div>
@@ -293,14 +384,196 @@ export function PhaseDecide({ taskId, activeSessionId, iterId, taskKind }: Phase
         </div>
       )}
 
-      {!isNer && state === "ready" && report && report.n_patients === 0 && (
+      {/* ── Adherence performance: per-agent question + rule match rate + κ ── */}
+      {isAdherence && state === "ready" && !adhHasData && (
+        <div className="rounded-md border border-border/60 bg-muted/30 px-4 py-3 text-[12.5px] text-muted-foreground">
+          No validated answers yet. Run the agents (TRY), then validate at least
+          one question or adjudicate one rule (VALIDATE) to score the agents
+          against your judgments.
+        </div>
+      )}
+
+      {isAdherence && state === "ready" && adhHasData && adhReport && (
+        <div className="space-y-4">
+          <div className="text-[12.5px] text-muted-foreground">
+            Per-agent agreement vs your validated answers · across{" "}
+            <strong>{adhReport.n_patients}</strong> patient
+            {adhReport.n_patients === 1 ? "" : "s"} ·{" "}
+            {adhReport.per_agent.length} agent
+            {adhReport.per_agent.length === 1 ? "" : "s"}
+          </div>
+
+          <div
+            className={cn(
+              "grid gap-3",
+              adhReport.per_agent.length === 1
+                ? "grid-cols-1"
+                : "grid-cols-1 md:grid-cols-2",
+            )}
+          >
+            {adhReport.per_agent.map((a) => (
+              <div key={a.agent_id} className="rounded-md border border-border bg-card p-3">
+                <div className="flex items-baseline gap-2">
+                  <span className="font-mono text-[12.5px]">{a.agent_id}</span>
+                  {a.role_preset && (
+                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                      {a.role_preset}
+                    </span>
+                  )}
+                </div>
+
+                <div className="mt-2 grid grid-cols-2 gap-3 text-[12.5px]">
+                  <div>
+                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                      Questions
+                    </div>
+                    {a.question_score.total > 0 ? (
+                      <>
+                        <div className={cn("font-medium", scoreColor(a.question_score.match_rate))}>
+                          {a.question_score.correct} / {a.question_score.total}
+                          <span className="ml-1 font-normal text-muted-foreground">
+                            ({pct(a.question_score.match_rate)})
+                          </span>
+                        </div>
+                        {a.question_score.kappa !== null && (
+                          <div className="text-[11px] text-muted-foreground">
+                            κ = {a.question_score.kappa.toFixed(2)}
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="text-[11.5px] italic text-muted-foreground">
+                        n/a (validate questions to score)
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                      Rules
+                    </div>
+                    {a.rule_score.total > 0 ? (
+                      <>
+                        <div className={cn("font-medium", scoreColor(a.rule_score.match_rate))}>
+                          {a.rule_score.concordant} / {a.rule_score.total}
+                          <span className="ml-1 font-normal text-muted-foreground">
+                            ({pct(a.rule_score.match_rate)})
+                          </span>
+                        </div>
+                        {a.rule_score.kappa !== null && (
+                          <div className="text-[11px] text-muted-foreground">
+                            κ = {a.rule_score.kappa.toFixed(2)}
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="text-[11.5px] italic text-muted-foreground">
+                        n/a (adjudicate rules to score)
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {a.question_disagreements.length > 0 && (
+                  <details className="mt-2">
+                    <summary className="cursor-pointer text-[11.5px] text-muted-foreground hover:text-foreground">
+                      {a.question_disagreements.length} question disagreement
+                      {a.question_disagreements.length === 1 ? "" : "s"} with reviewer
+                    </summary>
+                    <div className="mt-1.5 space-y-1 text-[11px]">
+                      {a.question_disagreements.map((d, i) => (
+                        <div key={i} className="flex flex-wrap gap-x-3">
+                          <span className="font-mono text-muted-foreground">{d.question_id}</span>
+                          <span>
+                            agent: <span className="font-mono">{JSON.stringify(d.agent_answer)}</span>
+                          </span>
+                          <span>
+                            reviewer:{" "}
+                            <span className="font-mono">{JSON.stringify(d.reviewer_answer)}</span>
+                          </span>
+                          {typeof d.confidence === "number" && (
+                            <span className="text-muted-foreground">conf {d.confidence.toFixed(2)}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                )}
+
+                {a.rule_disagreements.length > 0 && (
+                  <details className="mt-1">
+                    <summary className="cursor-pointer text-[11.5px] text-muted-foreground hover:text-foreground">
+                      {a.rule_disagreements.length} rule disagreement
+                      {a.rule_disagreements.length === 1 ? "" : "s"} with reviewer
+                    </summary>
+                    <div className="mt-1.5 space-y-1 text-[11px]">
+                      {a.rule_disagreements.map((d, i) => (
+                        <div key={i} className="flex flex-wrap gap-x-3">
+                          <span className="font-mono text-muted-foreground">{d.rule_id}</span>
+                          <span>
+                            agent: <span className="font-mono">{d.agent_verdict}</span>
+                          </span>
+                          <span>
+                            reviewer: <span className="font-mono">{d.reviewer_verdict}</span>
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {adhReport.inter_agent && (
+            <div className="rounded-md border border-border bg-card p-3">
+              <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                Inter-agent agreement ·{" "}
+                {adhReport.inter_agent.agent_a.replace(/^agent_/, "A")} ↔{" "}
+                {adhReport.inter_agent.agent_b.replace(/^agent_/, "A")}
+              </div>
+              <div className="mt-1 grid grid-cols-2 gap-4 text-[12.5px]">
+                <div>
+                  Questions:{" "}
+                  <span className={cn("font-medium", scoreColor(adhReport.inter_agent.question_agreement_rate))}>
+                    {pct(adhReport.inter_agent.question_agreement_rate)}
+                  </span>
+                  {adhReport.inter_agent.question_kappa !== null && (
+                    <span className="ml-1 text-[11px] text-muted-foreground">
+                      · κ = {adhReport.inter_agent.question_kappa.toFixed(2)}
+                    </span>
+                  )}
+                </div>
+                <div>
+                  Rules:{" "}
+                  <span className={cn("font-medium", scoreColor(adhReport.inter_agent.rule_agreement_rate))}>
+                    {pct(adhReport.inter_agent.rule_agreement_rate)}
+                  </span>
+                  {adhReport.inter_agent.rule_kappa !== null && (
+                    <span className="ml-1 text-[11px] text-muted-foreground">
+                      · κ = {adhReport.inter_agent.rule_kappa.toFixed(2)}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          <p className="text-[11px] text-muted-foreground">
+            Match rate = fraction of your validated questions / adjudicated rules
+            where the agent's drafted value matched yours. κ shown when ≥ 2 paired
+            observations make it meaningful (single-patient runs may show κ = —).
+          </p>
+        </div>
+      )}
+
+      {!isNer && !isAdherence && state === "ready" && report && report.n_patients === 0 && (
         <div className="rounded-md border border-border/60 bg-muted/30 px-4 py-3 text-[12.5px] text-muted-foreground">
           No validated patients yet. Run the agents (TRY), validate at least one
           patient and mark it validated (VALIDATE) to see performance.
         </div>
       )}
 
-      {!isNer && state === "ready" && hasData && report && (
+      {!isNer && !isAdherence && state === "ready" && hasData && report && (
         <div className="space-y-4">
           <div className="text-[12.5px] text-muted-foreground">
             Across <strong>{report.n_patients}</strong> validated patient
