@@ -1,14 +1,17 @@
-// RefineProposalCard — the transparent self-refinement proposal card (S2).
+// RefineProposalCard — the transparent self-refinement proposal card (S2 + S3).
 //
 // The methodologist picks a criterion that has guideline-gap disagreements on a
 // validated + judged iter, generates a proposal, and reviews a card with FOUR
 // human-legible sections:
 //   ① What was wrong  — the agent-vs-reviewer mismatches (patient · excerpt ·
-//      `agent → X / you → Y`), gap-tagged only.
+//      `agent → X / you → Y`), gap-tagged + refine-set only.
 //   ② Why             — gap_summary: what the criterion fails to say.
 //   ③ Rule to add     — proposed_rule_text in a highlighted box.
 //      + rationale     — why the rule fixes the failure class.
-//   (④ held-out Δκ is S3 — not shown here.)
+//   ④ Does it help    — (S3) held-out Δ: agreement_old → agreement_new on
+//      patients the refiner never saw, with n_fixed / n_regressed. A
+//      non-improving (Δ≤0) or unvalidated (insufficient held-out) proposal is
+//      visually de-emphasized and its Apply softened — but never blocked.
 //
 // Plus [Apply] [Edit] [Reject]. APPLY appends proposed_rule_text to the
 // criterion's extraction guidance via PUT /api/tasks/:taskId/criteria/:fieldId
@@ -24,6 +27,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   Sparkles, AlertTriangle, CheckCircle, Pencil, X, Loader2, RefreshCw,
+  TrendingUp, Info,
 } from "lucide-react";
 import { authFetch } from "../../auth";
 import { Button } from "@/components/ui/button";
@@ -60,6 +64,20 @@ interface CandidatesResponse {
   clusters: RefineCluster[];
 }
 
+/** ④ held-out Δ — either a measured result or the insufficient-holdout guard. */
+type HoldoutResult =
+  | {
+      insufficient_holdout?: false;
+      delta: number;
+      agreement_old: number;
+      agreement_new: number;
+      n_fixed: number;
+      n_regressed: number;
+      heldout_n: number;
+      scored_n: number;
+    }
+  | { insufficient_holdout: true; heldout_n: number };
+
 interface ProposalCard {
   field_id: string;
   criterion_def: string;
@@ -68,6 +86,8 @@ interface ProposalCard {
   proposed_rule_text: string;
   rationale: string;
   leakage_warning?: string;
+  holdout?: HoldoutResult;
+  refine_n?: number;
   model?: string;
 }
 
@@ -82,6 +102,19 @@ function fmtAnswer(a: unknown): string {
  *  refiner is allowed to act on). */
 function refinableCount(c: RefineCluster): number {
   return c.n_guideline_gap + c.n_true_ambiguity;
+}
+
+function pct(x: number): string {
+  return `${Math.round(x * 100)}%`;
+}
+
+/** A proposal is "weak" — visually de-emphasized + Apply discouraged — when the
+ *  held-out Δ is ≤ 0 (no measurable improvement) or couldn't be validated
+ *  (insufficient held-out). It does NOT block Apply (the human decides). */
+function isWeakProposal(h: HoldoutResult | undefined): boolean {
+  if (!h) return false;
+  if (h.insufficient_holdout) return true;
+  return h.delta <= 0;
 }
 
 // ── Props ──────────────────────────────────────────────────────────────────────
@@ -293,9 +326,20 @@ export function RefineProposalCard({ taskId, iterId, sessionId }: RefineProposal
           <div className="text-[12px] text-[hsl(var(--oxblood))]">{genError}</div>
         )}
 
-        {/* The proposal card. */}
-        {card && (
-          <div className="rounded border border-border bg-card/60 p-4 space-y-4">
+        {/* The proposal card. A "weak" proposal (held-out Δ ≤ 0 or unvalidated)
+            is visually de-emphasized — softer border + reduced opacity — but
+            still applicable; the human decides. */}
+        {card && (() => {
+          const weak = isWeakProposal(card.holdout);
+          return (
+          <div
+            className={cn(
+              "rounded border p-4 space-y-4",
+              weak
+                ? "border-border/50 bg-card/30 opacity-80"
+                : "border-border bg-card/60",
+            )}
+          >
             <div className="flex items-center gap-2">
               <code className="font-mono text-[11.5px] text-foreground/90 bg-muted px-1.5 py-0.5 rounded">
                 {card.field_id}
@@ -422,20 +466,75 @@ export function RefineProposalCard({ taskId, iterId, sessionId }: RefineProposal
               </p>
             </section>
 
+            {/* ④ Does it help — held-out Δ */}
+            {card.holdout && (
+              <section className="space-y-1.5">
+                <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                  ④ Does it help — held-out validation
+                </div>
+                {card.holdout.insufficient_holdout ? (
+                  <div className="flex items-start gap-2 rounded border border-border bg-muted/40 px-3 py-2">
+                    <Info size={13} strokeWidth={1.9} className="mt-0.5 shrink-0 text-muted-foreground" />
+                    <p className="text-[11.5px] text-muted-foreground leading-relaxed">
+                      Insufficient held-out patients to validate this rule
+                      ({card.holdout.heldout_n} held out). Apply with caution —
+                      there's no out-of-sample proof it generalizes.
+                    </p>
+                  </div>
+                ) : card.holdout.delta > 0 ? (
+                  <div className="flex items-start gap-2 rounded border border-[hsl(var(--sage))]/50 bg-[hsl(var(--sage))]/6 px-3 py-2">
+                    <TrendingUp size={13} strokeWidth={1.9} className="mt-0.5 shrink-0 text-[hsl(var(--sage))]" />
+                    <p className="text-[11.5px] text-foreground leading-relaxed">
+                      Applying this rule improves held-out agreement{" "}
+                      <span className="font-medium">
+                        {pct(card.holdout.agreement_old)} → {pct(card.holdout.agreement_new)}
+                      </span>{" "}
+                      (Δ +{pct(card.holdout.delta)}) over {card.holdout.scored_n} unseen
+                      patient{card.holdout.scored_n === 1 ? "" : "s"}.{" "}
+                      <span className="text-[hsl(var(--sage))]">{card.holdout.n_fixed} fixed</span>
+                      {card.holdout.n_regressed > 0 && (
+                        <span className="text-[hsl(var(--oxblood))]">
+                          , {card.holdout.n_regressed} regressed
+                        </span>
+                      )}
+                      .
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex items-start gap-2 rounded border border-[hsl(var(--oxblood))]/40 bg-[hsl(var(--oxblood))]/6 px-3 py-2">
+                    <AlertTriangle size={13} strokeWidth={1.9} className="mt-0.5 shrink-0 text-[hsl(var(--oxblood))]" />
+                    <p className="text-[11.5px] text-foreground/90 leading-relaxed">
+                      No measurable improvement on held-out (Δ {pct(card.holdout.delta)};
+                      held-out agreement {pct(card.holdout.agreement_old)} →{" "}
+                      {pct(card.holdout.agreement_new)} over {card.holdout.scored_n} unseen
+                      patient{card.holdout.scored_n === 1 ? "" : "s"}
+                      {card.holdout.n_regressed > 0 && `, ${card.holdout.n_regressed} regressed`}).
+                      Consider editing the rule before applying.
+                    </p>
+                  </div>
+                )}
+              </section>
+            )}
+
             {/* Actions */}
             <div className="flex items-center gap-2 pt-1 border-t border-border/60">
               <Button
                 size="sm"
+                // Weak proposal (no held-out improvement / unvalidated): render
+                // Apply as a low-emphasis outline so the strong, proven path is
+                // the default visual affordance. Still clickable.
+                variant={weak ? "outline" : "default"}
                 className="gap-1.5 h-7"
                 onClick={apply}
                 disabled={applying || applied}
+                title={weak ? "Held-out validation did not show an improvement — review before applying" : undefined}
               >
                 {applying ? (
                   <Loader2 size={11} strokeWidth={1.75} className="animate-spin" />
                 ) : (
                   <CheckCircle size={11} strokeWidth={1.75} />
                 )}
-                {applied ? "Applied" : editing ? "Apply edited rule" : "Apply"}
+                {applied ? "Applied" : editing ? "Apply edited rule" : weak ? "Apply anyway" : "Apply"}
               </Button>
               {editing && !applied && (
                 <Button
@@ -471,7 +570,8 @@ export function RefineProposalCard({ taskId, iterId, sessionId }: RefineProposal
               )}
             </div>
           </div>
-        )}
+          );
+        })()}
       </div>
     </div>
   );

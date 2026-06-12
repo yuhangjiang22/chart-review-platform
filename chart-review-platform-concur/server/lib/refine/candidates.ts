@@ -65,6 +65,10 @@ export interface RefinementCluster {
    *  guidance), for the downstream refiner (S2). Null if the criterion is no
    *  longer in the rubric. */
   criterion_def: string | null;
+  /** The criterion's allowed answers (answer_schema.enum), for the S3 held-out
+   *  extractor prompt. Null when the criterion has no enum (free-form / numeric)
+   *  or is no longer in the rubric. */
+  answer_enum: string[] | null;
   examples: RefinementExample[];
   n_guideline_gap: number;
   n_true_ambiguity: number;
@@ -78,6 +82,11 @@ export interface RefinementCandidates {
   session_id: string;
   n_validated_patients: number;
   clusters: RefinementCluster[];
+  /** Per-field reviewer gold across ALL validated patients (not just
+   *  disagreements): `field_id → { patient_id → reviewer_answer }`. The S3
+   *  held-out re-score needs gold for held-out patients, which by definition
+   *  the disagreement clusters don't all contain. */
+  gold_by_field: Record<string, Record<string, unknown>>;
   /** Set when the task is not a phenotype task (NER/adherence are later
    *  increments). When present, `clusters` is empty. */
   unsupported?: { task_kind: string; reason: string };
@@ -87,6 +96,14 @@ export interface CollectOpts {
   sessionId: string;
   taskId: string;
   iterId: string;
+  /** When set, disagreement EXAMPLES are restricted to these patient ids — the
+   *  S3 refine set. Held-out patients' disagreements are excluded so the
+   *  refiner never sees them (anti-leakage). `gold_by_field` still spans ALL
+   *  validated patients (the held-out re-score needs held-out gold), and
+   *  `n_validated_patients` still counts the full validated corpus; only the
+   *  cluster `examples` (+ their counts) are filtered. Absent = no filter (S1
+   *  behavior). */
+  examplePatientFilter?: Set<string>;
 }
 
 // ── Internal helpers (mirror computePerformance) ───────────────────────────────
@@ -162,6 +179,16 @@ function criterionDef(c: CriterionFromSkill | undefined): string | null {
   return joined.length > 0 ? joined : null;
 }
 
+/** Extract the criterion's allowed-answer enum (answer_schema.enum) as a
+ *  string[] for the S3 extractor prompt. Returns null when there's no enum
+ *  (free-form / numeric criteria) or the criterion is missing. */
+function answerEnum(c: CriterionFromSkill | undefined): string[] | null {
+  const schema = c?.answer_schema as { enum?: unknown } | undefined;
+  const e = schema?.enum;
+  if (!Array.isArray(e) || e.length === 0) return null;
+  return e.map((v) => String(v));
+}
+
 /** Collapse the judge's per-side classification_hint to the cluster-level tag. */
 function collapseHint(
   hint: string | undefined,
@@ -219,11 +246,18 @@ export interface BuildClustersInput {
   criteriaById: Map<string, CriterionFromSkill>;
   /** Judge attribution by `${patient_id}::${field_id}`. */
   judgeByCell: Map<string, { classification_hint?: string; reasoning?: string }>;
+  /** When set, a disagreement EXAMPLE is emitted only for patients in this set
+   *  (the S3 refine set). gold_by_field + n_validated_patients are unaffected —
+   *  they span the full validated corpus. Absent = no filter. */
+  examplePatientFilter?: Set<string>;
 }
 
 export interface BuildClustersOutput {
   n_validated_patients: number;
   clusters: RefinementCluster[];
+  /** Per-field reviewer gold across all validated patients (see
+   *  RefinementCandidates.gold_by_field). */
+  gold_by_field: Record<string, Record<string, unknown>>;
 }
 
 /**
@@ -233,16 +267,21 @@ export interface BuildClustersOutput {
  * field_id. No env reads, no listing of iters — everything is injected.
  */
 export function buildClusters(input: BuildClustersInput): BuildClustersOutput {
-  const { sessionDir, runsDir, taskId, leafFieldIds, runChain, criteriaById, judgeByCell } =
-    input;
+  const {
+    sessionDir, runsDir, taskId, leafFieldIds, runChain, criteriaById, judgeByCell,
+    examplePatientFilter,
+  } = input;
   const leafSet = new Set(leafFieldIds);
 
   // field_id → examples
   const clustered = new Map<string, RefinementExample[]>();
   const validatedPatients = new Set<string>();
+  // field_id → patient_id → reviewer gold (ALL validated patients, for the S3
+  // held-out re-score — not just disagreement patients).
+  const goldByField: Record<string, Record<string, unknown>> = {};
 
   if (!fs.existsSync(sessionDir)) {
-    return { n_validated_patients: 0, clusters: [] };
+    return { n_validated_patients: 0, clusters: [], gold_by_field: {} };
   }
 
   for (const pid of fs.readdirSync(sessionDir)) {
@@ -270,6 +309,21 @@ export function buildClusters(input: BuildClustersInput): BuildClustersOutput {
     // of computePerformance counting validated patients, but here we count the
     // denominator of the refine corpus.
     validatedPatients.add(pid);
+
+    // Record gold for every human-decided leaf field on this validated patient
+    // (the S3 held-out re-score needs gold for held-out patients, which aren't
+    // all in the disagreement clusters). This happens for EVERY validated
+    // patient, including held-out ones — only the example emission below is
+    // filtered.
+    for (const fid of decidedFields) {
+      (goldByField[fid] ??= {})[pid] = humanFinal[fid];
+    }
+
+    // Anti-leakage (S3): if a refine-set filter is supplied, skip emitting
+    // disagreement examples for held-out patients so the refiner never sees
+    // them. (gold + the validated-patient count above are intentionally NOT
+    // filtered — the held-out re-score depends on held-out gold.)
+    if (examplePatientFilter && !examplePatientFilter.has(pid)) continue;
 
     // Agent answers, most-recent run wins. Mirrors computePerformance: the
     // imported run (if any) is appended to the chain as the lowest priority.
@@ -348,6 +402,7 @@ export function buildClusters(input: BuildClustersInput): BuildClustersOutput {
     clusters.push({
       field_id: fid,
       criterion_def: criterionDef(criteriaById.get(fid)),
+      answer_enum: answerEnum(criteriaById.get(fid)),
       examples,
       n_guideline_gap: examples.filter((e) => e.classification_hint === "guideline_gap").length,
       n_true_ambiguity: examples.filter((e) => e.classification_hint === "true_ambiguity").length,
@@ -356,7 +411,7 @@ export function buildClusters(input: BuildClustersInput): BuildClustersOutput {
     });
   }
 
-  return { n_validated_patients: validatedPatients.size, clusters };
+  return { n_validated_patients: validatedPatients.size, clusters, gold_by_field: goldByField };
 }
 
 // ── Disk-wired entry point ─────────────────────────────────────────────────────
@@ -375,7 +430,7 @@ function runsRootDir(): string {
  * an `unsupported` marker with empty clusters (later increments).
  */
 export function collectRefinementCandidates(opts: CollectOpts): RefinementCandidates {
-  const { sessionId, taskId, iterId } = opts;
+  const { sessionId, taskId, iterId, examplePatientFilter } = opts;
 
   const task = loadCompiledTask(taskId);
   const taskKind = task?.task_kind ?? "phenotype";
@@ -386,6 +441,7 @@ export function collectRefinementCandidates(opts: CollectOpts): RefinementCandid
       session_id: sessionId,
       n_validated_patients: 0,
       clusters: [],
+      gold_by_field: {},
       unsupported: {
         task_kind: taskKind,
         reason: `self-refinement S1 supports phenotype tasks only; ${taskKind} is a later increment`,
@@ -422,7 +478,7 @@ export function collectRefinementCandidates(opts: CollectOpts): RefinementCandid
 
   const runChain = runChainForIter(taskId, sessionId, iterId);
 
-  const { n_validated_patients, clusters } = buildClusters({
+  const { n_validated_patients, clusters, gold_by_field } = buildClusters({
     sessionDir: path.join(reviewsRoot(), sessionId),
     runsDir: runsRootDir(),
     taskId,
@@ -430,6 +486,7 @@ export function collectRefinementCandidates(opts: CollectOpts): RefinementCandid
     runChain,
     criteriaById,
     judgeByCell,
+    examplePatientFilter,
   });
 
   return {
@@ -438,5 +495,6 @@ export function collectRefinementCandidates(opts: CollectOpts): RefinementCandid
     session_id: sessionId,
     n_validated_patients,
     clusters,
+    gold_by_field,
   };
 }
