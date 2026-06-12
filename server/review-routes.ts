@@ -573,7 +573,11 @@ export const reviewRoutes: RouteEntry[] = [
         const idx = spans.findIndex((s) => s.span_id === p.spanId);
         if (idx < 0) throw httpErr(404, { error: `span_id ${p.spanId} not found` });
         const before = { ...spans[idx]! };
-        if (concept_name !== undefined) spans[idx]!.concept_name = concept_name;
+        // Trim on store so a whitespace-only concept_name isn't persisted
+        // verbatim (which would display as blank and desync from the status
+        // logic below, which already trims). The UI guards this, but the
+        // route must too for direct/programmatic callers.
+        if (concept_name !== undefined) spans[idx]!.concept_name = concept_name.trim();
         // Status is derived from concept_name presence — non-empty maps to
         // "mapped", empty maps to "novel_candidate". An explicit status in
         // the body still wins so agent tools / programmatic callers can
