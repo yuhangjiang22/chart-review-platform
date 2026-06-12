@@ -14,6 +14,7 @@ import { PhaseHeadline } from "./PhaseHeadline";
 import { WorkspaceSettings } from "./WorkspaceSettings";
 import { taskKindFromTaskType } from "./task-kind-registry";
 import { PhaseTry } from "./PhaseTry";
+import { RubricPanel } from "./RubricPanel";
 import { PhaseValidate } from "./PhaseValidate";
 import { PhaseJudge } from "./PhaseJudge";
 import { PhaseDecide } from "./PhaseDecide";
@@ -365,10 +366,12 @@ export function Workspace({
   const activePhase: Phase =
     manualPhaseOverride ?? (phaseInfo.phase === "DECIDE" ? "TRY" : phaseInfo.phase);
 
-  // "Open skill rubric" reveal: the sidebar link bumps this nonce and switches
-  // to TRY. The nonce flows to RubricPanel as a prop, which opens when it's >0
-  // — robust to PhaseTry remounting (Branch B→A) when a run loads.
-  const [revealRubricNonce, setRevealRubricNonce] = useState(0);
+  // RubricPanel "reveal" nonce, still threaded into PhaseTry's Branch-B
+  // RubricPanel as `revealNonce`. The sidebar's "author" jump now targets the
+  // dedicated AUTHOR phase (which renders the editor alwaysOpen) instead of
+  // bumping this nonce, so it stays 0 — TRY's panel keeps its collapsed
+  // default. Mechanism left intact for any future TRY-internal reveal.
+  const [revealRubricNonce] = useState(0);
 
   const donePhases = useMemo((): Phase[] => {
     const idx = PHASE_ORDER.indexOf(phaseInfo.phase);
@@ -460,8 +463,10 @@ export function Workspace({
 
       {/* Active phase surface */}
       <main className="min-h-[400px] py-6">
-        {/* No-session gate — every phase requires an active session. */}
-        {!activeSessionId && (
+        {/* No-session gate — every phase EXCEPT author requires an active
+            session. AUTHOR is the rubric-editing home; the methodologist can
+            edit the rubric before running anything, so it's session-exempt. */}
+        {activePhase !== "AUTHOR" && !activeSessionId && (
           <div className="mx-auto max-w-[520px] py-12 space-y-4 text-center">
             <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
               No active session
@@ -483,6 +488,42 @@ export function Workspace({
           </div>
         )}
 
+        {/* AUTHOR — the rubric-authoring home. Session-EXEMPT: no
+            `activeSessionId` requirement, so the methodologist can edit the
+            rubric before starting any session/run. Branch on the raw
+            task_type (like PhaseJudge/PhaseDecide) since the shared taskKind
+            always resolves to "phenotype" in this fork. */}
+        {activePhase === "AUTHOR" && (
+          task?.task_type === "ner" || task?.task_type === "adherence" ? (
+            <div className="mx-auto max-w-[560px] py-12 space-y-3 text-center">
+              <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                Author
+              </div>
+              <h3
+                className="font-display text-[20px] tracking-tight"
+                style={{ fontVariationSettings: '"opsz" 20, "SOFT" 50' }}
+              >
+                Author for {task.task_type} isn't available yet
+              </h3>
+              <p className="text-[13px] text-muted-foreground">
+                Edit this task via the Builder for now. A dedicated{" "}
+                {task.task_type} authoring pane is a later increment.
+              </p>
+            </div>
+          ) : (
+            <div className="mx-auto max-w-[760px] space-y-5 py-2">
+              {/* RubricPanel is the existing editable rubric editor (also
+                  used in TRY). It has no read-only mode in this fork, so it
+                  isn't gated on isMethodologist here — matching TRY. */}
+              <RubricPanel taskId={taskId} alwaysOpen />
+              <div className="flex justify-end">
+                <Button onClick={() => setPhase("TRY")} className="gap-1.5">
+                  Try on patients →
+                </Button>
+              </div>
+            </div>
+          )
+        )}
         {activePhase === "TRY" && activeSessionId && (
           <PhaseTry
             taskId={taskId}
@@ -557,10 +598,7 @@ export function Workspace({
         patientStatus={sidebarPatientStatus}
         isOpen={sidebarOpen}
         onToggle={() => setSidebarOpen(!sidebarOpen)}
-        onJumpToAuthor={() => {
-          setPhase("TRY");
-          setRevealRubricNonce((n) => n + 1);
-        }}
+        onJumpToAuthor={() => setPhase("AUTHOR")}
         taskKind={taskKind}
       />
     </div>
