@@ -67,6 +67,7 @@ import { pilotReadRoutes, pilotWriteRoutes, versionsRoutes } from "./pilot-route
 import { sessionRoutes } from "./session-routes.js";
 import { packageRoutes } from "./package-routes.js";
 import { performanceRoutes } from "./performance-routes.js";
+import { nerCalibrationRoutes } from "./ner-calibration-routes.js";
 import { issueRoutes } from "./issue-routes.js";
 import { cohortRoutes } from "./cohort-routes.js";
 import { coreRoutes, type RawBody, type SSEStream } from "./core-routes.js";
@@ -217,6 +218,7 @@ const paramRouter = makeRouter([
   ...sessionRoutes,
   ...packageRoutes,
   ...performanceRoutes,
+  ...nerCalibrationRoutes,
   ...issueRoutes,
   ...cohortRoutes,
   ...coreRoutes,
