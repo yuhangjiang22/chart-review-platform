@@ -123,11 +123,18 @@ export interface RefineProposalCardProps {
   taskId: string;
   iterId: string;
   sessionId: string;
+  /** Single-field mode (PERFORMANCE-page entry). When set, the card skips the
+   *  candidates fetch + the criterion picker and immediately generates the
+   *  proposal for this one field — surfacing refinement inline under the matrix
+   *  row whose disagreement the methodologist clicked. Absent → the original
+   *  AUTHOR-phase behavior (load all clusters, show the picker). */
+  initialFieldId?: string;
 }
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
-export function RefineProposalCard({ taskId, iterId, sessionId }: RefineProposalCardProps) {
+export function RefineProposalCard({ taskId, iterId, sessionId, initialFieldId }: RefineProposalCardProps) {
+  const singleField = initialFieldId != null;
   const [clusters, setClusters] = useState<RefineCluster[] | null>(null);
   const [loadState, setLoadState] = useState<"idle" | "loading" | "error">("idle");
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -167,40 +174,52 @@ export function RefineProposalCard({ taskId, iterId, sessionId }: RefineProposal
       });
   }, [taskId, iterId, sessionId]);
 
-  useEffect(() => {
-    fetchCandidates();
-  }, [fetchCandidates]);
-
-  async function generate(fieldId: string) {
-    setGenerating(fieldId);
-    setGenError(null);
-    setCard(null);
-    setApplied(false);
-    setApplyError(null);
-    setEditing(false);
-    try {
-      const r = await authFetch(
-        `/api/refine/${encodeURIComponent(taskId)}/${encodeURIComponent(iterId)}/propose` +
-          `?session_id=${encodeURIComponent(sessionId)}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ field_id: fieldId }),
-        },
-      );
-      if (!r.ok) {
-        const d = (await r.json().catch(() => ({}))) as { message?: string; error?: string };
-        throw new Error(d.message ?? d.error ?? `Server error: ${r.status}`);
+  const generate = useCallback(
+    async (fieldId: string) => {
+      setGenerating(fieldId);
+      setGenError(null);
+      setCard(null);
+      setApplied(false);
+      setApplyError(null);
+      setEditing(false);
+      try {
+        const r = await authFetch(
+          `/api/refine/${encodeURIComponent(taskId)}/${encodeURIComponent(iterId)}/propose` +
+            `?session_id=${encodeURIComponent(sessionId)}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ field_id: fieldId }),
+          },
+        );
+        if (!r.ok) {
+          const d = (await r.json().catch(() => ({}))) as { message?: string; error?: string };
+          throw new Error(d.message ?? d.error ?? `Server error: ${r.status}`);
+        }
+        const c = (await r.json()) as ProposalCard;
+        setCard(c);
+        setRuleDraft(c.proposed_rule_text);
+      } catch (e) {
+        setGenError((e as Error).message);
+      } finally {
+        setGenerating(null);
       }
-      const c = (await r.json()) as ProposalCard;
-      setCard(c);
-      setRuleDraft(c.proposed_rule_text);
-    } catch (e) {
-      setGenError((e as Error).message);
-    } finally {
-      setGenerating(null);
+    },
+    [taskId, iterId, sessionId],
+  );
+
+  // Mount behavior splits on mode. AUTHOR (multi-field) loads all clusters and
+  // shows the picker. PERFORMANCE (single-field) skips the candidates fetch and
+  // immediately generates the one proposal — refinement opens inline under the
+  // matrix row the methodologist clicked.
+  useEffect(() => {
+    if (singleField) {
+      setLoadState("idle");
+      void generate(initialFieldId as string);
+      return;
     }
-  }
+    fetchCandidates();
+  }, [singleField, initialFieldId, generate, fetchCandidates]);
 
   async function apply() {
     if (!card) return;
@@ -256,22 +275,35 @@ export function RefineProposalCard({ taskId, iterId, sessionId }: RefineProposal
       <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border">
         <Sparkles size={13} strokeWidth={1.75} className="text-[hsl(var(--sage))]" />
         <span className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-          Refine — proposals from agent-vs-you disagreements
+          {singleField
+            ? `Refine ${initialFieldId} — proposal from agent-vs-you disagreements`
+            : "Refine — proposals from agent-vs-you disagreements"}
         </span>
-        <button
-          type="button"
-          onClick={fetchCandidates}
-          className="ml-auto inline-flex items-center gap-1 text-[10px] text-muted-foreground/70 hover:text-foreground transition-colors"
-          title="Reload disagreement clusters"
-        >
-          <RefreshCw size={11} strokeWidth={1.75} />
-          Reload
-        </button>
+        {!singleField && (
+          <button
+            type="button"
+            onClick={fetchCandidates}
+            className="ml-auto inline-flex items-center gap-1 text-[10px] text-muted-foreground/70 hover:text-foreground transition-colors"
+            title="Reload disagreement clusters"
+          >
+            <RefreshCw size={11} strokeWidth={1.75} />
+            Reload
+          </button>
+        )}
       </div>
 
       <div className="px-4 py-4 space-y-4">
         {loadState === "loading" && (
           <div className="text-[12px] text-muted-foreground italic">Loading disagreements…</div>
+        )}
+        {/* Single-field mode generates immediately on mount — surface the
+            in-flight state (the picker, which would otherwise show a per-button
+            spinner, is hidden here). */}
+        {singleField && generating !== null && !card && (
+          <div className="flex items-center gap-2 text-[12px] text-muted-foreground italic">
+            <Loader2 size={12} strokeWidth={1.75} className="animate-spin" />
+            Generating proposal…
+          </div>
         )}
         {loadState === "error" && (
           <div className="text-[12px] text-[hsl(var(--oxblood))]">
@@ -282,7 +314,7 @@ export function RefineProposalCard({ taskId, iterId, sessionId }: RefineProposal
           </div>
         )}
 
-        {loadState === "idle" && clusters && refinable.length === 0 && (
+        {!singleField && loadState === "idle" && clusters && refinable.length === 0 && (
           <div className="text-[12px] text-muted-foreground leading-relaxed">
             No guideline-gap disagreements to refine on this iteration. Run the
             agents, validate the patients, and run the judge — only cells the
@@ -292,7 +324,7 @@ export function RefineProposalCard({ taskId, iterId, sessionId }: RefineProposal
         )}
 
         {/* Criterion picker — one button per refinable cluster. */}
-        {loadState === "idle" && refinable.length > 0 && (
+        {!singleField && loadState === "idle" && refinable.length > 0 && (
           <div className="space-y-2">
             <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
               Criteria with guideline-gap disagreements
