@@ -101,13 +101,13 @@ export const nerCalibrationRoutes: RouteEntry[] = [
         if (validated.size === 0) continue;
         totalValidatedNotes += validated.size;
 
-        // GOLD SET: every reviewer span inside a validated note counts as
-        // ground truth — we do NOT exclude spans with status === "rejected".
-        // This matches the v2 behavior we ported. TODO(P3): excluding
-        // rejected spans may be more correct — a span the reviewer rejected
-        // shouldn't count as agreement when an agent re-proposes it, which
-        // can inflate F1. Revisit if the live F1 looks degenerate.
-        const rsSpans = (rs.span_labels ?? []).filter((s) => validated.has(s.note_id));
+        // GOLD SET: the reviewer's KEPT spans inside validated notes — spans
+        // the reviewer marked `rejected` are excluded, so an agent doesn't get
+        // credit for re-proposing something the reviewer threw out. (v2 counted
+        // rejected spans as gold, which inflates agreement; we tightened it.)
+        const rsSpans = (rs.span_labels ?? []).filter(
+          (s) => validated.has(s.note_id) && s.status !== "rejected",
+        );
         reviewerSpans.push(...rsSpans);
 
         const runIdOrNull = latestRunWithAgents(p.taskId, pid);
