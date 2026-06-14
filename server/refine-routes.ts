@@ -44,6 +44,8 @@ import {
   type RefinementCardSnapshot,
 } from "./lib/refine/provenance.js";
 import { readReviewerFromRequest } from "./auth.js";
+import { collectNerRefinementCandidates } from "./lib/refine/ner-candidates.js";
+import { runNerErrorAnalysisBatch } from "./lib/refine/ner-error-analysis.js";
 
 /** The attributions that feed refinement (safeguard #1: never agent_error,
  *  never unjudged). Mirrors the plan's filter. */
@@ -260,6 +262,43 @@ export const refineRoutes: RouteEntry[] = [
           (out.cost_usd ?? 0) +
           (holdout.insufficient_holdout ? 0 : holdout.cost_usd ?? 0) || out.cost_usd,
         duration_ms: out.duration_ms,
+      };
+    },
+  },
+
+  {
+    // NER: entity-type span-disagreement clusters (agent vs reviewer-validated
+    // spans), the ① data for entity-type guidance refinement. ner-gated.
+    method: "GET",
+    pattern: "/api/refine/:taskId/:iterId/ner-candidates",
+    handler: async (_b, _r, p, query) => {
+      const task = loadCompiledTask(p.taskId);
+      if (!task) throw httpErr(404, `task ${p.taskId} not found`);
+      const sessionId = query.get("session_id");
+      if (!sessionId) throw httpErr(400, "session_id is required");
+      const result = collectNerRefinementCandidates({ sessionId, taskId: p.taskId, iterId: p.iterId });
+      if (result.unsupported) throw httpErr(400, result.unsupported.reason);
+      return result;
+    },
+  },
+
+  {
+    // NER: run the model-vs-human error-analysis pass over the entity-type
+    // clusters → attributes each (guideline_gap / true_ambiguity / agent_error)
+    // and persists ner_error_analyses.json. One LLM call per entity type.
+    method: "POST",
+    pattern: "/api/refine/:taskId/:iterId/ner-analyze-errors",
+    handler: async (_b, _r, p, query) => {
+      const task = loadCompiledTask(p.taskId);
+      if (!task) throw httpErr(404, `task ${p.taskId} not found`);
+      const sessionId = query.get("session_id");
+      if (!sessionId) throw httpErr(400, "session_id is required");
+      const result = await runNerErrorAnalysisBatch({ sessionId, taskId: p.taskId, iterId: p.iterId });
+      if (!result.ok) throw httpErr(400, result.error ?? "ner error-analysis failed");
+      return {
+        cells_analyzed: result.cells_analyzed,
+        cells_failed: result.cells_failed,
+        analyses: result.analyses,
       };
     },
   },
