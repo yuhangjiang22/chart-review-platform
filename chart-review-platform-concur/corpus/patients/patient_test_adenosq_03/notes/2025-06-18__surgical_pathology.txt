@@ -1,0 +1,22 @@
+SURGICAL PATHOLOGY REPORT
+Specimen: Left lower lobe lung mass, lobectomy
+Specimen received: 2025-06-14
+Report finalized: 2025-06-18
+Pathologist: S. Greenberg, MD
+
+MICROSCOPIC DESCRIPTION
+A dual-lineage malignant epithelial tumor. Approximately 55% demonstrates
+adenocarcinoma (glandular architecture, mucin-positive); approximately 45%
+demonstrates squamous cell carcinoma (keratinization, intercellular
+bridges). The two components are admixed; each exceeds 10% of tumor volume.
+
+IMMUNOHISTOCHEMISTRY
+- TTF-1: positive (glandular areas)
+- p40: positive (squamous areas)
+
+FINAL DIAGNOSIS
+Left lower lobe, lobectomy: ADENOSQUAMOUS CARCINOMA of the lung
+(adenocarcinoma ~55%, squamous cell carcinoma ~45%). Lymphovascular
+invasion not identified; margins clear.
+
+S. Greenberg, MD — electronically signed 2025-06-18

@@ -1,0 +1,22 @@
+SURGICAL PATHOLOGY REPORT
+Specimen: Right middle lobe lung mass, lobectomy
+Specimen received: 2025-04-07
+Report finalized: 2025-04-11
+Pathologist: M. Castellano, MD
+
+MICROSCOPIC DESCRIPTION
+Biphasic non-small-cell carcinoma. ~65% adenocarcinoma (acinar/glandular,
+mucin-positive) and ~35% squamous cell carcinoma (keratin pearls,
+intercellular bridges). Both lineages exceed the 10% combined-tumor
+threshold.
+
+IMMUNOHISTOCHEMISTRY
+- Napsin A / TTF-1: positive in glandular component
+- p40 / CK5/6: positive in squamous component
+
+FINAL DIAGNOSIS
+Right middle lobe, lobectomy: ADENOSQUAMOUS CARCINOMA of the lung
+(adenocarcinoma component ~65%, squamous cell carcinoma component ~35%).
+Margins negative.
+
+M. Castellano, MD — electronically signed 2025-04-11
