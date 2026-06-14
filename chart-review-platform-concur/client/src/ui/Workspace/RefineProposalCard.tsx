@@ -226,26 +226,35 @@ export function RefineProposalCard({ taskId, iterId, sessionId, initialFieldId }
     setApplying(true);
     setApplyError(null);
     try {
-      // Read the current criterion so we append (not overwrite) its extraction
-      // guidance. The rubric GET returns per-field definition/extraction_guidance.
-      const rubricRes = await authFetch(`/api/tasks/${encodeURIComponent(taskId)}/rubric`);
-      if (!rubricRes.ok) throw new Error(`Could not load rubric: ${rubricRes.status}`);
-      const rubric = (await rubricRes.json()) as {
-        fields: Array<{ field_id: string; extraction_guidance: string }>;
-      };
-      const field = rubric.fields.find((f) => f.field_id === card.field_id);
+      // Apply through the refinement route: it appends the rule to the
+      // criterion's extraction guidance AND records the card (①②③④) + the
+      // prior text as revertable provenance (a plain PUT would lose the
+      // "added to fix these N cases (+Δ)" history). The server reads the
+      // current guidance and appends — no client-side read/merge needed.
       const ruleText = (editing ? ruleDraft : card.proposed_rule_text).trim();
-      const existing = (field?.extraction_guidance ?? "").trim();
-      const appended = existing
-        ? `${existing}\n\n- ${ruleText}`
-        : `- ${ruleText}`;
-
       const r = await authFetch(
-        `/api/tasks/${encodeURIComponent(taskId)}/criteria/${encodeURIComponent(card.field_id)}`,
+        `/api/refine/${encodeURIComponent(taskId)}/${encodeURIComponent(iterId)}/apply` +
+          `?session_id=${encodeURIComponent(sessionId)}`,
         {
-          method: "PUT",
+          method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ extraction_guidance: appended }),
+          body: JSON.stringify({
+            field_id: card.field_id,
+            proposed_rule_text: ruleText,
+            card: {
+              examples: card.examples.map((e) => ({
+                patient_id: e.patient_id,
+                agent_answer: e.agent_answer,
+                reviewer_answer: e.reviewer_answer,
+                classification_hint: e.classification_hint,
+                excerpt: e.excerpt,
+              })),
+              gap_summary: card.gap_summary,
+              rationale: card.rationale,
+              holdout: card.holdout,
+              refine_n: card.refine_n,
+            },
+          }),
         },
       );
       if (!r.ok) {

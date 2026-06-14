@@ -37,6 +37,13 @@ import {
   rescoreCriterionOnHeldout,
 } from "./lib/refine/holdout.js";
 import { runErrorAnalysisBatch } from "./lib/refine/error-analysis.js";
+import {
+  applyRefinement,
+  readRefinementLog,
+  revertRefinement,
+  type RefinementCardSnapshot,
+} from "./lib/refine/provenance.js";
+import { readReviewerFromRequest } from "./auth.js";
 
 /** The attributions that feed refinement (safeguard #1: never agent_error,
  *  never unjudged). Mirrors the plan's filter. */
@@ -254,6 +261,97 @@ export const refineRoutes: RouteEntry[] = [
           (holdout.insufficient_holdout ? 0 : holdout.cost_usd ?? 0) || out.cost_usd,
         duration_ms: out.duration_ms,
       };
+    },
+  },
+
+  {
+    // Apply a proposal card: append ③ to the criterion's extraction guidance AND
+    // record the whole card (①②③④) + prior text as revertable provenance.
+    // Phenotype-only, session-scoped. The reviewer (human) applies — this just
+    // performs the edit + logs it.
+    method: "POST",
+    pattern: "/api/refine/:taskId/:iterId/apply",
+    handler: async (body, req, p, query) => {
+      const task = loadCompiledTask(p.taskId);
+      if (!task) throw httpErr(404, `task ${p.taskId} not found`);
+      const taskKind = task.task_kind ?? "phenotype";
+      if (taskKind !== "phenotype") {
+        throw httpErr(400, `self-refinement supports phenotype tasks only; ${p.taskId} is ${taskKind}`);
+      }
+      const b = (body ?? {}) as {
+        field_id?: unknown;
+        proposed_rule_text?: unknown;
+        card?: Partial<RefinementCardSnapshot>;
+      };
+      if (typeof b.field_id !== "string" || !b.field_id.trim()) {
+        throw httpErr(400, "field_id is required");
+      }
+      if (typeof b.proposed_rule_text !== "string" || !b.proposed_rule_text.trim()) {
+        throw httpErr(400, "proposed_rule_text is required");
+      }
+      // Trim the card to the stored snapshot shape (don't persist the full
+      // criterion_def / model / cost fields).
+      const card: RefinementCardSnapshot | undefined = b.card
+        ? {
+            examples: Array.isArray(b.card.examples) ? b.card.examples.slice(0, 20) : [],
+            gap_summary: typeof b.card.gap_summary === "string" ? b.card.gap_summary : "",
+            rationale: typeof b.card.rationale === "string" ? b.card.rationale : "",
+            holdout: b.card.holdout,
+            refine_n: typeof b.card.refine_n === "number" ? b.card.refine_n : undefined,
+          }
+        : undefined;
+      try {
+        const entry = applyRefinement({
+          taskId: p.taskId,
+          fieldId: b.field_id,
+          ruleText: b.proposed_rule_text,
+          card,
+          appliedBy: readReviewerFromRequest(req) ?? "reviewer",
+          iterId: p.iterId,
+          sessionId: query.get("session_id") ?? undefined,
+        });
+        return { ok: true, entry };
+      } catch (e) {
+        throw httpErr(400, (e as Error).message);
+      }
+    },
+  },
+
+  {
+    // The criterion's refinement history (provenance): which rules were added to
+    // fix which cases, the held-out Δ, and whether each was reverted.
+    method: "GET",
+    pattern: "/api/refine/:taskId/log",
+    handler: async (_b, _r, p, query) => {
+      const task = loadCompiledTask(p.taskId);
+      if (!task) throw httpErr(404, `task ${p.taskId} not found`);
+      const fieldId = query.get("field_id") ?? undefined;
+      return { entries: readRefinementLog(p.taskId, fieldId) };
+    },
+  },
+
+  {
+    // Revert a previously-applied edit (restore the pre-apply guidance). Flags
+    // `intervening_edit` when the guidance changed since the apply.
+    method: "POST",
+    pattern: "/api/refine/:taskId/revert",
+    handler: async (body, req, p) => {
+      const task = loadCompiledTask(p.taskId);
+      if (!task) throw httpErr(404, `task ${p.taskId} not found`);
+      const entryId = (body as { entry_id?: unknown } | null)?.entry_id;
+      if (typeof entryId !== "string" || !entryId.trim()) {
+        throw httpErr(400, "entry_id is required");
+      }
+      try {
+        const { entry, intervening_edit } = revertRefinement({
+          taskId: p.taskId,
+          entryId,
+          by: readReviewerFromRequest(req) ?? "reviewer",
+        });
+        return { ok: true, entry, intervening_edit };
+      } catch (e) {
+        throw httpErr(400, (e as Error).message);
+      }
     },
   },
 ];
