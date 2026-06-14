@@ -29,6 +29,7 @@ import { PLATFORM_ROOT } from "@chart-review/patients";
 import { loadCompiledTask } from "@chart-review/tasks";
 import { loadCriteria, type CriterionFromSkill } from "../domain/rubric/index.js";
 import { listPilotIterations } from "../domain/iter/index.js";
+import { pilotIterDir } from "../domain/iter/pilots.js";
 import { readJudgeAnalyses } from "../judge-batch.js";
 import type { EvidenceRef } from "@chart-review/disagreements";
 
@@ -459,8 +460,42 @@ export function collectRefinementCandidates(opts: CollectOpts): RefinementCandid
     if (!c.derivation) leafFieldIds.push(c.field_id);
   }
 
-  // Judge attribution from the iter's judge_analyses.json, keyed by cell.
+  // Attribution by cell. Two sources, judge wins:
+  //   1) the agent-vs-agent JUDGE (judge_analyses.json) — present only where the
+  //      two drafting agents disagreed (+ low-conf / type-drift).
+  //   2) the model-vs-human ERROR ANALYSIS (error_analyses.json) — fills in
+  //      cells the judge never saw (the systematic-gap case: model wrong vs
+  //      human, both agents wrong the same way → no agent-vs-agent disagreement).
+  // A judge record, when present, takes precedence (it's the same vocabulary and
+  // was computed from the richer two-agent comparison).
   const judgeByCell = new Map<string, { classification_hint?: string; reasoning?: string }>();
+
+  // 2) Error-analysis attribution first (lower precedence — judge overwrites).
+  //    Read the file directly (not via error-analysis.ts) to avoid an import
+  //    cycle: error-analysis.ts depends on collectRefinementCandidates.
+  try {
+    const eaPath = path.join(pilotIterDir(taskId, iterId), "error_analyses.json");
+    const ea = readJson<{
+      analyses?: Array<{
+        patient_id?: string;
+        field_id?: string;
+        classification_hint?: string;
+        reasoning?: string;
+      }>;
+    }>(eaPath);
+    for (const rec of ea?.analyses ?? []) {
+      if (!rec.patient_id || !rec.field_id || !rec.classification_hint) continue;
+      judgeByCell.set(`${rec.patient_id}::${rec.field_id}`, {
+        classification_hint: rec.classification_hint,
+        reasoning: rec.reasoning,
+      });
+    }
+  } catch {
+    // no error_analyses.json yet — fine.
+  }
+
+  // 1) Judge attribution from the iter's judge_analyses.json, keyed by cell.
+  //    Overwrites any error-analysis entry for the same cell.
   const ja = readJudgeAnalyses(taskId, iterId);
   if (ja && !("task_kind" in ja && (ja as { task_kind?: string }).task_kind === "ner")) {
     for (const rec of ja.analyses ?? []) {

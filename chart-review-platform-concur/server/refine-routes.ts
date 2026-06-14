@@ -36,6 +36,7 @@ import {
   splitValidatedPatients,
   rescoreCriterionOnHeldout,
 } from "./lib/refine/holdout.js";
+import { runErrorAnalysisBatch } from "./lib/refine/error-analysis.js";
 
 /** The attributions that feed refinement (safeguard #1: never agent_error,
  *  never unjudged). Mirrors the plan's filter. */
@@ -80,6 +81,44 @@ export const refineRoutes: RouteEntry[] = [
         taskId: p.taskId,
         iterId: p.iterId,
       });
+    },
+  },
+
+  {
+    // Run the model-vs-human ERROR-ANALYSIS pass over the iter's mismatches the
+    // agent-vs-agent judge never attributed (the systematic-gap case). Persists
+    // error_analyses.json so subsequent /candidates + /propose pick up the
+    // guideline_gap / true_ambiguity attribution. Session-scoped, phenotype-only.
+    // Makes one LLM call per unattributed mismatch cell.
+    method: "POST",
+    pattern: "/api/refine/:taskId/:iterId/analyze-errors",
+    handler: async (_body, _r, p, query) => {
+      const task = loadCompiledTask(p.taskId);
+      if (!task) throw httpErr(404, `task ${p.taskId} not found`);
+
+      const sessionId = query.get("session_id");
+      if (!sessionId) throw httpErr(400, "session_id is required");
+
+      const taskKind = task.task_kind ?? "phenotype";
+      if (taskKind !== "phenotype") {
+        throw httpErr(
+          400,
+          `self-refinement supports phenotype tasks only; ${p.taskId} is ${taskKind}`,
+        );
+      }
+
+      const result = await runErrorAnalysisBatch({
+        sessionId,
+        taskId: p.taskId,
+        iterId: p.iterId,
+      });
+      if (!result.ok) throw httpErr(400, result.error ?? "error-analysis batch failed");
+      return {
+        cells_analyzed: result.cells_analyzed,
+        cells_failed: result.cells_failed,
+        cells_skipped: result.cells_skipped,
+        analyses: result.file?.analyses ?? [],
+      };
     },
   },
 
