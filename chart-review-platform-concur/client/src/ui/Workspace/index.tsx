@@ -16,6 +16,7 @@ import { taskKindFromTaskType } from "./task-kind-registry";
 import { PhaseTry } from "./PhaseTry";
 import { RubricPanel } from "./RubricPanel";
 import { RefineProposalCard } from "./RefineProposalCard";
+import { RefinementHistory } from "./RefinementHistory";
 import { PhaseValidate } from "./PhaseValidate";
 import { PhaseJudge } from "./PhaseJudge";
 import { PhaseDecide } from "./PhaseDecide";
@@ -517,6 +518,10 @@ export function Workspace({
                   used in TRY). It has no read-only mode in this fork, so it
                   isn't gated on isMethodologist here — matching TRY. */}
               <RubricPanel taskId={taskId} alwaysOpen />
+              {/* Self-refinement provenance (S4): which rules were applied to
+                  this task's criteria, what they fixed (+held-out Δ), and a
+                  Revert. Renders nothing until the first rule is applied. */}
+              <RefinementHistory taskId={taskId} />
               {/* Self-refinement (S2): surface transparent proposal cards built
                   from the agent-vs-you disagreements on the active validated +
                   judged iter. Only shown when a session + iter exist — refinement
