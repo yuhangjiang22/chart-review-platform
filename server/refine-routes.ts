@@ -47,6 +47,8 @@ import { readReviewerFromRequest } from "./auth.js";
 import { collectNerRefinementCandidates } from "./lib/refine/ner-candidates.js";
 import { runNerErrorAnalysisBatch, readNerErrorAnalyses } from "./lib/refine/ner-error-analysis.js";
 import { proposeNerGuidanceEdit } from "./lib/refine/ner-propose.js";
+import { collectAdherenceRefinementCandidates } from "./lib/refine/adherence-candidates.js";
+import { runAdherenceErrorAnalysisBatch } from "./lib/refine/adherence-error-analysis.js";
 
 /** The attributions that feed refinement (safeguard #1: never agent_error,
  *  never unjudged). Mirrors the plan's filter. */
@@ -296,6 +298,44 @@ export const refineRoutes: RouteEntry[] = [
       if (!sessionId) throw httpErr(400, "session_id is required");
       const result = await runNerErrorAnalysisBatch({ sessionId, taskId: p.taskId, iterId: p.iterId });
       if (!result.ok) throw httpErr(400, result.error ?? "ner error-analysis failed");
+      return {
+        cells_analyzed: result.cells_analyzed,
+        cells_failed: result.cells_failed,
+        analyses: result.analyses,
+      };
+    },
+  },
+
+  {
+    // Adherence: per-question answer-disagreement clusters (agent vs
+    // reviewer-validated answers), the ① data for question-guidance refinement.
+    // adherence-gated. Rule verdicts are deterministic → not included.
+    method: "GET",
+    pattern: "/api/refine/:taskId/:iterId/adherence-candidates",
+    handler: async (_b, _r, p, query) => {
+      const task = loadCompiledTask(p.taskId);
+      if (!task) throw httpErr(404, `task ${p.taskId} not found`);
+      const sessionId = query.get("session_id");
+      if (!sessionId) throw httpErr(400, "session_id is required");
+      const result = collectAdherenceRefinementCandidates({ sessionId, taskId: p.taskId, iterId: p.iterId });
+      if (result.unsupported) throw httpErr(400, result.unsupported.reason);
+      return result;
+    },
+  },
+
+  {
+    // Adherence: run the model-vs-human error-analysis pass over the per-question
+    // clusters → attributes each (guideline_gap / true_ambiguity / agent_error)
+    // and persists adherence_error_analyses.json. One LLM call per question.
+    method: "POST",
+    pattern: "/api/refine/:taskId/:iterId/adherence-analyze-errors",
+    handler: async (_b, _r, p, query) => {
+      const task = loadCompiledTask(p.taskId);
+      if (!task) throw httpErr(404, `task ${p.taskId} not found`);
+      const sessionId = query.get("session_id");
+      if (!sessionId) throw httpErr(400, "session_id is required");
+      const result = await runAdherenceErrorAnalysisBatch({ sessionId, taskId: p.taskId, iterId: p.iterId });
+      if (!result.ok) throw httpErr(400, result.error ?? "adherence error-analysis failed");
       return {
         cells_analyzed: result.cells_analyzed,
         cells_failed: result.cells_failed,
