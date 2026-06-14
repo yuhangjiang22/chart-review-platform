@@ -45,7 +45,8 @@ import {
 } from "./lib/refine/provenance.js";
 import { readReviewerFromRequest } from "./auth.js";
 import { collectNerRefinementCandidates } from "./lib/refine/ner-candidates.js";
-import { runNerErrorAnalysisBatch } from "./lib/refine/ner-error-analysis.js";
+import { runNerErrorAnalysisBatch, readNerErrorAnalyses } from "./lib/refine/ner-error-analysis.js";
+import { proposeNerGuidanceEdit } from "./lib/refine/ner-propose.js";
 
 /** The attributions that feed refinement (safeguard #1: never agent_error,
  *  never unjudged). Mirrors the plan's filter. */
@@ -299,6 +300,68 @@ export const refineRoutes: RouteEntry[] = [
         cells_analyzed: result.cells_analyzed,
         cells_failed: result.cells_failed,
         analyses: result.analyses,
+      };
+    },
+  },
+
+  {
+    // NER: propose an entity-type guidance improvement (②③) for one entity type
+    // whose span errors were attributed guideline_gap / true_ambiguity. Gated on
+    // that attribution (run ner-analyze-errors first); model_slip is refused.
+    method: "POST",
+    pattern: "/api/refine/:taskId/:iterId/ner-propose",
+    handler: async (body, _r, p, query) => {
+      const task = loadCompiledTask(p.taskId);
+      if (!task) throw httpErr(404, `task ${p.taskId} not found`);
+      const sessionId = query.get("session_id");
+      if (!sessionId) throw httpErr(400, "session_id is required");
+      const entityType = (body as { entity_type?: unknown } | null)?.entity_type;
+      if (typeof entityType !== "string" || !entityType.trim()) {
+        throw httpErr(400, "entity_type is required");
+      }
+
+      const candidates = collectNerRefinementCandidates({ sessionId, taskId: p.taskId, iterId: p.iterId });
+      if (candidates.unsupported) throw httpErr(400, candidates.unsupported.reason);
+      const cluster = candidates.clusters.find((c) => c.entity_type === entityType);
+      if (!cluster || cluster.examples.length === 0) {
+        throw httpErr(404, `no span-disagreement cluster for entity_type ${entityType}`);
+      }
+      if (!cluster.guidance_text) {
+        throw httpErr(400, `entity_type ${entityType} has no guidance file to refine`);
+      }
+
+      // Refinable-attribution gate (safeguard #1): the entity type's error
+      // analysis must be guideline_gap / true_ambiguity, never model_slip.
+      const ea = readNerErrorAnalyses(p.taskId, p.iterId);
+      const rec = ea?.analyses.find((a) => a.entity_type === entityType);
+      if (!rec) {
+        throw httpErr(400, `run ner-analyze-errors first — ${entityType} has no attribution yet`);
+      }
+      if (!REFINABLE.has(rec.classification_hint)) {
+        throw httpErr(400, `${entityType} was attributed ${rec.classification_hint}; not refinable (no guidance change)`);
+      }
+
+      const out = await proposeNerGuidanceEdit({
+        taskId: p.taskId,
+        entityType,
+        guidanceText: cluster.guidance_text,
+        examples: cluster.examples,
+      });
+      if (!out.ok || !out.proposal) throw httpErr(502, out.error ?? "ner refiner failed");
+
+      return {
+        entity_type: entityType,
+        guidance_text: cluster.guidance_text,
+        examples: cluster.examples,
+        classification_hint: rec.classification_hint,
+        what_rubric_misses: rec.what_rubric_misses,
+        gap_summary: out.proposal.gap_summary,
+        proposed_guidance_addition: out.proposal.proposed_guidance_addition,
+        rationale: out.proposal.rationale,
+        ...(out.proposal.leakage_warning ? { leakage_warning: out.proposal.leakage_warning } : {}),
+        model: out.model,
+        cost_usd: out.cost_usd,
+        duration_ms: out.duration_ms,
       };
     },
   },
