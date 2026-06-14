@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useState } from "react";
-import { Download, Sparkles, Info } from "lucide-react";
+import { Download, Sparkles, Info, ScanSearch } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { authFetch } from "../../auth";
@@ -174,6 +174,59 @@ export function PhaseDecide({ taskId, activeSessionId, iterId, taskKind }: Phase
   const [clustersByField, setClustersByField] = useState<Record<string, RefineClusterSummary>>({});
   // Which field's RefineProposalCard is currently expanded inline (null = none).
   const [refineField, setRefineField] = useState<string | null>(null);
+  // Which field's error-analysis pass is currently running (null = none), and
+  // the last error if it failed. The pass is iter-wide (attributes every
+  // model-vs-human mismatch the agent-vs-agent judge never saw), but it's
+  // triggered per-row from the "Analyze errors" affordance.
+  const [analyzing, setAnalyzing] = useState<string | null>(null);
+  const [analyzeErr, setAnalyzeErr] = useState<string | null>(null);
+
+  // Re-pull the attributed clusters after the error-analysis pass writes
+  // error_analyses.json, so an unjudged row flips to Refine / model-error.
+  async function refetchCandidates() {
+    if (!iterId || !activeSessionId) return;
+    try {
+      const r = await authFetch(
+        `/api/refine/${encodeURIComponent(taskId)}/${encodeURIComponent(iterId)}/candidates` +
+          `?session_id=${encodeURIComponent(activeSessionId)}`,
+      );
+      if (!r.ok) return;
+      const d: CandidatesResponse = await r.json();
+      const map: Record<string, RefineClusterSummary> = {};
+      for (const c of d.clusters ?? []) map[c.field_id] = c;
+      setClustersByField(map);
+    } catch {
+      /* leave existing clusters in place */
+    }
+  }
+
+  // Run the model-vs-human ERROR-ANALYSIS pass. Used when the disagreement is
+  // "unjudged" — the agents agreed (so the judge never compared them) but the
+  // reviewer's validated answer differs from the model's. The judge can't help
+  // there; this pass compares the model answer to the human annotation and
+  // attributes it (rubric gap / ambiguity / model slip).
+  async function analyzeErrors(fid: string) {
+    if (!iterId || !activeSessionId) return;
+    setAnalyzing(fid);
+    setAnalyzeErr(null);
+    try {
+      const r = await authFetch(
+        `/api/refine/${encodeURIComponent(taskId)}/${encodeURIComponent(iterId)}/analyze-errors` +
+          `?session_id=${encodeURIComponent(activeSessionId)}`,
+        { method: "POST" },
+      );
+      const body = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setAnalyzeErr(body?.error ?? `HTTP ${r.status}`);
+        return;
+      }
+      await refetchCandidates();
+    } catch (e) {
+      setAnalyzeErr((e as Error).message);
+    } finally {
+      setAnalyzing(null);
+    }
+  }
 
   // Export the validated task package (rubric + agent config + performance +
   // gold answers) to var/exports/ so it can be re-run on a larger cohort.
@@ -740,11 +793,32 @@ export function PhaseDecide({ taskId, activeSessionId, iterId, taskKind }: Phase
                                   rubric change needed.
                                 </>
                               ) : (
-                                <>
-                                  Not judged yet — run JUDGE on this iteration to attribute
-                                  the disagreement (guideline gap vs. model error) before
-                                  refining.
-                                </>
+                                <div className="space-y-1.5">
+                                  <p>
+                                    Your validated answer differs from the model's, but the
+                                    agents agreed with each other — so the judge has nothing
+                                    to compare. Run the <strong>error analysis</strong> to
+                                    compare the model's answer to your annotation and
+                                    attribute it (rubric gap / ambiguity / model error)
+                                    before refining.
+                                  </p>
+                                  <button
+                                    type="button"
+                                    onClick={() => analyzeErrors(fid)}
+                                    disabled={analyzing != null}
+                                    className={cn(
+                                      "inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10.5px] transition-colors",
+                                      "border-border/60 text-muted-foreground hover:text-foreground hover:border-border",
+                                      analyzing != null && "opacity-60",
+                                    )}
+                                  >
+                                    <ScanSearch size={10} strokeWidth={1.75} />
+                                    {analyzing === fid ? "Analyzing…" : "Analyze errors"}
+                                  </button>
+                                  {analyzeErr && (
+                                    <span className="ml-2 text-destructive">{analyzeErr}</span>
+                                  )}
+                                </div>
                               )}
                             </div>
                           )}
@@ -769,9 +843,11 @@ export function PhaseDecide({ taskId, activeSessionId, iterId, taskKind }: Phase
           <p className="text-[11px] text-muted-foreground">
             Agreement = fraction of validated patients where that agent's answer
             matched your final answer for the field. Where the agent and you
-            disagreed, <strong>Refine</strong> proposes a rubric rule (when the
-            judge attributed a guideline gap); <strong>Why?</strong> explains a
-            disagreement the rubric doesn't need to change for.
+            disagreed, <strong>Refine</strong> proposes a rubric rule (when a
+            guideline gap or ambiguity was attributed); <strong>Analyze errors</strong>
+            attributes an unjudged mismatch by comparing the model's answer to your
+            annotation; <strong>Why?</strong> explains a disagreement the rubric
+            doesn't need to change for.
           </p>
         </div>
       )}

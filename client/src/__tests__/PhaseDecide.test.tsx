@@ -214,11 +214,17 @@ function setupMocks(opts: {
   adherence?: unknown | (() => ReturnType<typeof okJson>);
   candidates?: unknown | (() => ReturnType<typeof okJson>);
   propose?: (url: string, init?: RequestInit) => ReturnType<typeof okJson>;
+  analyzeErrors?: (url: string, init?: RequestInit) => ReturnType<typeof okJson>;
   export?: (url: string, init?: RequestInit) => ReturnType<typeof okJson>;
 } = {}) {
   mockAuthFetch.mockImplementation((url: string, init?: RequestInit) => {
     if (url.includes("/api/export/") && init?.method === "POST") {
       return opts.export ? opts.export(url, init) : okJson({ ok: true, dir: "var/exports/x", n_gold_patients: 3 });
+    }
+    if (url.includes("/analyze-errors") && init?.method === "POST") {
+      return opts.analyzeErrors
+        ? opts.analyzeErrors(url, init)
+        : okJson({ cells_analyzed: 1, cells_failed: 0, cells_skipped: 0, analyses: [] });
     }
     if (url.includes("/propose") && init?.method === "POST") {
       return opts.propose ? opts.propose(url, init) : okJson(proposalCard("has_distant_metastasis"));
@@ -465,7 +471,7 @@ describe("per-field refinement affordance", () => {
     expect(screen.queryByRole("button", { name: /^Apply$/i })).not.toBeInTheDocument();
   });
 
-  it("a field whose only attribution is unjudged renders the 'run JUDGE' note (Why?), NO propose button", async () => {
+  it("a field whose only attribution is unjudged offers 'Analyze errors' (Why?), NO propose button", async () => {
     setupMocks({
       performance: singleGapPerf(),
       candidates: candResponse([cluster("has_distant_metastasis", { n_unjudged: 2 })]),
@@ -473,8 +479,36 @@ describe("per-field refinement affordance", () => {
     render(<PhaseDecide taskId="cancer-diagnosis" activeSessionId="sess-1" iterId="i1" />);
     const btn = await screen.findByRole("button", { name: /Why\?/i });
     fireEvent.click(btn);
-    await waitFor(() => screen.getByText(/Not judged yet/i));
+    // The unjudged note now offers the model-vs-human error-analysis pass
+    // (the agents agreed, so the judge has nothing to compare).
+    await waitFor(() => screen.getByRole("button", { name: /Analyze errors/i }));
+    expect(screen.getByText(/agents agreed with each other/i)).toBeInTheDocument();
     expect(postsTo("/propose")).toHaveLength(0);
+  });
+
+  it("clicking 'Analyze errors' POSTs /analyze-errors then refetches candidates → flips to Refine", async () => {
+    // candidates returns unjudged first; after the analyze-errors POST it
+    // returns the same cluster attributed true_ambiguity → Refine appears.
+    let analyzed = false;
+    setupMocks({
+      performance: singleGapPerf(),
+      candidates: () =>
+        okJson(
+          candResponse([
+            cluster("has_distant_metastasis", analyzed ? { n_true_ambiguity: 2 } : { n_unjudged: 2 }),
+          ]),
+        ),
+      analyzeErrors: () => {
+        analyzed = true;
+        return okJson({ cells_analyzed: 1, cells_failed: 0, cells_skipped: 0, analyses: [] });
+      },
+    });
+    render(<PhaseDecide taskId="cancer-diagnosis" activeSessionId="sess-1" iterId="i1" />);
+    fireEvent.click(await screen.findByRole("button", { name: /Why\?/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /Analyze errors/i }));
+    await waitFor(() => expect(postsTo("/analyze-errors")).toHaveLength(1));
+    // After attribution the row offers Refine (true_ambiguity is refinable).
+    await waitFor(() => screen.getByRole("button", { name: /Refine/i }));
   });
 
   it("a 100% field with no cluster gets NO refine affordance", async () => {
@@ -496,10 +530,10 @@ describe("per-field refinement affordance", () => {
     // candidates returns no clusters at all; the matrix still shows the gap.
     setupMocks({ performance: singleGapPerf(), candidates: candResponse([]) });
     render(<PhaseDecide taskId="cancer-diagnosis" activeSessionId="sess-1" iterId="i1" />);
-    // has_distant_metastasis is <100% → Why? (no attribution → unjudged note).
+    // has_distant_metastasis is <100% → Why? (no attribution → Analyze-errors note).
     const btn = await screen.findByRole("button", { name: /Why\?/i });
     fireEvent.click(btn);
-    await waitFor(() => screen.getByText(/Not judged yet/i));
+    await waitFor(() => screen.getByRole("button", { name: /Analyze errors/i }));
   });
 
   it("candidates fetch failing does not break the performance matrix", async () => {
