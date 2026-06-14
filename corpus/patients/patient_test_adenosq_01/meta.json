@@ -1,0 +1,11 @@
+{
+  "patient_id": "patient_test_adenosq_01",
+  "category": "confirmed_nsclc",
+  "demographics": { "age": 64, "sex": "M", "region": "West" },
+  "smoking": "25 pack-years",
+  "index_date": "2025-08-12",
+  "doc_types": ["surgical_pathology", "oncology_progress"],
+  "generated_by": "hand-crafted",
+  "generation_run_id": "refine-error-analysis-fixture-2026-06-13",
+  "fixture_notes": "Mixed histology (adenosquamous). Tests the cancer_type rubric gap: the enum has pure squamous + pure adeno but no rule for combined/adenosquamous histology. Intended human annotation cancer_type=adenocarcinoma (predominant-component convention). mets=no_info (M0), recurrence=no_info (initial dx)."
+}
