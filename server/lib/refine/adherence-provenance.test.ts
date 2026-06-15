@@ -1,0 +1,115 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { parse as parseYaml } from "yaml";
+
+let skillDir = "";
+vi.mock("@chart-review/rubric", () => ({ phenotypeSkillDir: () => skillDir, guidelineDir: () => skillDir }));
+
+import {
+  applyAdherenceRefinement,
+  revertAdherenceRefinement,
+  readAdherenceRefinementLog,
+  findQuestionInBundles,
+} from "./adherence-provenance.js";
+
+const TASK = "asthma-adherence";
+
+function writeBundle(file: string, questions: Array<Record<string, unknown>>): void {
+  const dir = path.join(skillDir, "references", "questions");
+  fs.mkdirSync(dir, { recursive: true });
+  // Use the yaml lib via a hand-written doc to keep it simple.
+  const lines = ["questions:"];
+  for (const q of questions) {
+    lines.push(`  - question_id: ${q.question_id}`);
+    lines.push(`    text: ${JSON.stringify(q.text ?? "")}`);
+    if (q.retrieval_hints !== undefined) lines.push(`    retrieval_hints: ${JSON.stringify(q.retrieval_hints)}`);
+    lines.push(`    tier: ${q.tier ?? 1}`);
+  }
+  fs.writeFileSync(path.join(dir, file), lines.join("\n") + "\n");
+}
+
+function readHints(questionId: string): string | undefined {
+  const found = findQuestionInBundles(TASK, questionId);
+  return found ? (found.question.retrieval_hints as string | undefined) : undefined;
+}
+
+beforeEach(() => {
+  skillDir = fs.mkdtempSync(path.join(os.tmpdir(), "adh-prov-"));
+});
+afterEach(() => {
+  fs.rmSync(skillDir, { recursive: true, force: true });
+});
+
+describe("findQuestionInBundles", () => {
+  it("locates a question across tier files", () => {
+    writeBundle("T0_eligibility.yaml", [{ question_id: "T0-AsthmaDx", text: "Asthma dx?", tier: 0 }]);
+    writeBundle("T1_assessment.yaml", [{ question_id: "T1-ACTScore", text: "ACT?", tier: 1 }]);
+    expect(findQuestionInBundles(TASK, "T1-ACTScore")?.file).toBe("T1_assessment.yaml");
+    expect(findQuestionInBundles(TASK, "nope")).toBeNull();
+  });
+});
+
+describe("applyAdherenceRefinement", () => {
+  it("appends to a question's retrieval_hints, leaves siblings intact, logs prior", () => {
+    writeBundle("T1.yaml", [
+      { question_id: "T1-ACTScore", text: "ACT?", retrieval_hints: "Look in pulmonology notes.", tier: 1 },
+      { question_id: "T1-Other", text: "Other?", retrieval_hints: "Untouched hint.", tier: 1 },
+    ]);
+    const entry = applyAdherenceRefinement({
+      taskId: TASK,
+      questionId: "T1-ACTScore",
+      hintAddition: "When multiple ACT scores exist, use the MOST RECENT.",
+      appliedBy: "methodologist",
+      now: "t1",
+      entryId: "e1",
+    });
+    const hints = readHints("T1-ACTScore")!;
+    expect(hints).toContain("Look in pulmonology notes.");
+    expect(hints).toContain("use the MOST RECENT");
+    expect(entry.prior_retrieval_hints).toBe("Look in pulmonology notes.");
+    expect(entry.new_retrieval_hints).toContain("MOST RECENT");
+    // sibling untouched
+    expect(readHints("T1-Other")).toBe("Untouched hint.");
+    // file still parses with both questions
+    const doc = parseYaml(fs.readFileSync(path.join(skillDir, "references", "questions", "T1.yaml"), "utf8")) as { questions: unknown[] };
+    expect(doc.questions).toHaveLength(2);
+  });
+
+  it("sets retrieval_hints when the question had none", () => {
+    writeBundle("T1.yaml", [{ question_id: "Q1", text: "Q?", tier: 1 }]);
+    applyAdherenceRefinement({ taskId: TASK, questionId: "Q1", hintAddition: "the only hint", appliedBy: "r", now: "t", entryId: "e1" });
+    expect(readHints("Q1")).toBe("the only hint");
+  });
+
+  it("throws on empty addition or unknown question", () => {
+    writeBundle("T1.yaml", [{ question_id: "Q1", text: "Q?", tier: 1 }]);
+    expect(() => applyAdherenceRefinement({ taskId: TASK, questionId: "Q1", hintAddition: "  ", appliedBy: "r" })).toThrow(/empty/);
+    expect(() => applyAdherenceRefinement({ taskId: TASK, questionId: "ZZ", hintAddition: "x", appliedBy: "r" })).toThrow(/not found/);
+  });
+});
+
+describe("readAdherenceRefinementLog + revert", () => {
+  it("returns newest-first and reverts cleanly (restores prior, marks reverted)", () => {
+    writeBundle("T1.yaml", [{ question_id: "Q1", text: "Q?", retrieval_hints: "orig", tier: 1 }]);
+    applyAdherenceRefinement({ taskId: TASK, questionId: "Q1", hintAddition: "added", appliedBy: "r", now: "t1", entryId: "e1" });
+    expect(readHints("Q1")).toBe("orig\nadded");
+    const log = readAdherenceRefinementLog(TASK, "Q1");
+    expect(log).toHaveLength(1);
+    const res = revertAdherenceRefinement({ taskId: TASK, entryId: "e1", by: "r2", now: "t2" });
+    expect(res.intervening_edit).toBe(false);
+    expect(readHints("Q1")).toBe("orig"); // restored
+    expect(readAdherenceRefinementLog(TASK)[0].reverted).toMatchObject({ by: "r2", intervening_edit: false });
+  });
+
+  it("flags intervening_edit + throws on already-reverted / unknown", () => {
+    writeBundle("T1.yaml", [{ question_id: "Q1", text: "Q?", retrieval_hints: "orig", tier: 1 }]);
+    applyAdherenceRefinement({ taskId: TASK, questionId: "Q1", hintAddition: "added", appliedBy: "r", now: "t1", entryId: "e1" });
+    applyAdherenceRefinement({ taskId: TASK, questionId: "Q1", hintAddition: "more", appliedBy: "r", now: "t2", entryId: "e2" });
+    const res = revertAdherenceRefinement({ taskId: TASK, entryId: "e1", by: "r", now: "t3" });
+    expect(res.intervening_edit).toBe(true);
+    expect(() => revertAdherenceRefinement({ taskId: TASK, entryId: "e1", by: "r", now: "t4" })).toThrow(/already reverted/);
+    expect(() => revertAdherenceRefinement({ taskId: TASK, entryId: "zz", by: "r" })).toThrow(/not found/);
+  });
+});

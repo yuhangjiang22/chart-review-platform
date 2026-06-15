@@ -50,6 +50,12 @@ import { proposeNerGuidanceEdit } from "./lib/refine/ner-propose.js";
 import { collectAdherenceRefinementCandidates } from "./lib/refine/adherence-candidates.js";
 import { runAdherenceErrorAnalysisBatch, readAdherenceErrorAnalyses } from "./lib/refine/adherence-error-analysis.js";
 import { proposeAdherenceGuidanceEdit } from "./lib/refine/adherence-propose.js";
+import {
+  applyAdherenceRefinement,
+  readAdherenceRefinementLog,
+  revertAdherenceRefinement,
+  type AdherenceCardSnapshot,
+} from "./lib/refine/adherence-provenance.js";
 
 /** The attributions that feed refinement (safeguard #1: never agent_error,
  *  never unjudged). Mirrors the plan's filter. */
@@ -400,6 +406,84 @@ export const refineRoutes: RouteEntry[] = [
         cost_usd: out.cost_usd,
         duration_ms: out.duration_ms,
       };
+    },
+  },
+
+  {
+    // Adherence: apply a proposal — append ③ to the question's retrieval_hints
+    // in its tier bundle AND log the card + prior text as revertable provenance.
+    method: "POST",
+    pattern: "/api/refine/:taskId/:iterId/adherence-apply",
+    handler: async (body, req, p, query) => {
+      const task = loadCompiledTask(p.taskId);
+      if (!task) throw httpErr(404, `task ${p.taskId} not found`);
+      if ((task.task_kind ?? "phenotype") !== "adherence") {
+        throw httpErr(400, `task ${p.taskId} is not an adherence task`);
+      }
+      const b = (body ?? {}) as {
+        question_id?: unknown;
+        proposed_guidance_addition?: unknown;
+        card?: Partial<AdherenceCardSnapshot>;
+      };
+      if (typeof b.question_id !== "string" || !b.question_id.trim()) throw httpErr(400, "question_id is required");
+      if (typeof b.proposed_guidance_addition !== "string" || !b.proposed_guidance_addition.trim()) {
+        throw httpErr(400, "proposed_guidance_addition is required");
+      }
+      const card: AdherenceCardSnapshot | undefined = b.card
+        ? {
+            examples: Array.isArray(b.card.examples) ? b.card.examples.slice(0, 20) : [],
+            gap_summary: typeof b.card.gap_summary === "string" ? b.card.gap_summary : "",
+            rationale: typeof b.card.rationale === "string" ? b.card.rationale : "",
+            classification_hint: typeof b.card.classification_hint === "string" ? b.card.classification_hint : undefined,
+          }
+        : undefined;
+      try {
+        const entry = applyAdherenceRefinement({
+          taskId: p.taskId,
+          questionId: b.question_id,
+          hintAddition: b.proposed_guidance_addition,
+          card,
+          appliedBy: readReviewerFromRequest(req) ?? "reviewer",
+          iterId: p.iterId,
+          sessionId: query.get("session_id") ?? undefined,
+        });
+        return { ok: true, entry };
+      } catch (e) {
+        throw httpErr(400, (e as Error).message);
+      }
+    },
+  },
+
+  {
+    // Adherence: the question's refinement history (provenance).
+    method: "GET",
+    pattern: "/api/refine/:taskId/adherence-log",
+    handler: async (_b, _r, p, query) => {
+      const task = loadCompiledTask(p.taskId);
+      if (!task) throw httpErr(404, `task ${p.taskId} not found`);
+      return { entries: readAdherenceRefinementLog(p.taskId, query.get("question_id") ?? undefined) };
+    },
+  },
+
+  {
+    // Adherence: revert a previously-applied retrieval_hints edit.
+    method: "POST",
+    pattern: "/api/refine/:taskId/adherence-revert",
+    handler: async (body, req, p) => {
+      const task = loadCompiledTask(p.taskId);
+      if (!task) throw httpErr(404, `task ${p.taskId} not found`);
+      const entryId = (body as { entry_id?: unknown } | null)?.entry_id;
+      if (typeof entryId !== "string" || !entryId.trim()) throw httpErr(400, "entry_id is required");
+      try {
+        const { entry, intervening_edit } = revertAdherenceRefinement({
+          taskId: p.taskId,
+          entryId,
+          by: readReviewerFromRequest(req) ?? "reviewer",
+        });
+        return { ok: true, entry, intervening_edit };
+      } catch (e) {
+        throw httpErr(400, (e as Error).message);
+      }
     },
   },
 
