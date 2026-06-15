@@ -48,7 +48,8 @@ import { collectNerRefinementCandidates } from "./lib/refine/ner-candidates.js";
 import { runNerErrorAnalysisBatch, readNerErrorAnalyses } from "./lib/refine/ner-error-analysis.js";
 import { proposeNerGuidanceEdit } from "./lib/refine/ner-propose.js";
 import { collectAdherenceRefinementCandidates } from "./lib/refine/adherence-candidates.js";
-import { runAdherenceErrorAnalysisBatch } from "./lib/refine/adherence-error-analysis.js";
+import { runAdherenceErrorAnalysisBatch, readAdherenceErrorAnalyses } from "./lib/refine/adherence-error-analysis.js";
+import { proposeAdherenceGuidanceEdit } from "./lib/refine/adherence-propose.js";
 
 /** The attributions that feed refinement (safeguard #1: never agent_error,
  *  never unjudged). Mirrors the plan's filter. */
@@ -340,6 +341,64 @@ export const refineRoutes: RouteEntry[] = [
         cells_analyzed: result.cells_analyzed,
         cells_failed: result.cells_failed,
         analyses: result.analyses,
+      };
+    },
+  },
+
+  {
+    // Adherence: propose a question retrieval_hints improvement (②③) for one
+    // question whose answer disagreements were attributed guideline_gap /
+    // true_ambiguity. Gated on that attribution (run adherence-analyze-errors
+    // first); model_slip is refused.
+    method: "POST",
+    pattern: "/api/refine/:taskId/:iterId/adherence-propose",
+    handler: async (body, _r, p, query) => {
+      const task = loadCompiledTask(p.taskId);
+      if (!task) throw httpErr(404, `task ${p.taskId} not found`);
+      const sessionId = query.get("session_id");
+      if (!sessionId) throw httpErr(400, "session_id is required");
+      const questionId = (body as { question_id?: unknown } | null)?.question_id;
+      if (typeof questionId !== "string" || !questionId.trim()) {
+        throw httpErr(400, "question_id is required");
+      }
+
+      const candidates = collectAdherenceRefinementCandidates({ sessionId, taskId: p.taskId, iterId: p.iterId });
+      if (candidates.unsupported) throw httpErr(400, candidates.unsupported.reason);
+      const cluster = candidates.clusters.find((c) => c.question_id === questionId);
+      if (!cluster || cluster.examples.length === 0) {
+        throw httpErr(404, `no answer-disagreement cluster for question ${questionId}`);
+      }
+
+      const ea = readAdherenceErrorAnalyses(p.taskId, p.iterId);
+      const rec = ea?.analyses.find((a) => a.question_id === questionId);
+      if (!rec) throw httpErr(400, `run adherence-analyze-errors first — ${questionId} has no attribution yet`);
+      if (!REFINABLE.has(rec.classification_hint)) {
+        throw httpErr(400, `${questionId} was attributed ${rec.classification_hint}; not refinable (no guidance change)`);
+      }
+
+      const out = await proposeAdherenceGuidanceEdit({
+        taskId: p.taskId,
+        questionId,
+        questionText: cluster.question_text ?? questionId,
+        retrievalHints: cluster.retrieval_hints ?? "",
+        examples: cluster.examples,
+      });
+      if (!out.ok || !out.proposal) throw httpErr(502, out.error ?? "adherence refiner failed");
+
+      return {
+        question_id: questionId,
+        question_text: cluster.question_text,
+        retrieval_hints: cluster.retrieval_hints,
+        examples: cluster.examples,
+        classification_hint: rec.classification_hint,
+        what_rubric_misses: rec.what_rubric_misses,
+        gap_summary: out.proposal.gap_summary,
+        proposed_guidance_addition: out.proposal.proposed_guidance_addition,
+        rationale: out.proposal.rationale,
+        ...(out.proposal.leakage_warning ? { leakage_warning: out.proposal.leakage_warning } : {}),
+        model: out.model,
+        cost_usd: out.cost_usd,
+        duration_ms: out.duration_ms,
       };
     },
   },
