@@ -315,6 +315,9 @@ export interface ErrorAnalysisRecord {
   classification_hint: "guideline_gap" | "true_ambiguity" | "agent_error";
   /** The raw error_class before collapsing (kept for provenance / the card). */
   error_class: ErrorClass;
+  /** Per-class vote counts when majority voting is on (votes > 1). Omitted for
+   *  single-vote runs. Surfaces how decisive the attribution was. */
+  vote_tally?: Record<ErrorClass, number>;
   what_rubric_misses: string;
   reasoning: string;
   model_answer: unknown;
@@ -359,6 +362,10 @@ export interface RunErrorAnalysisBatchOpts {
   provider?: ProviderName;
   /** Re-analyze cells that already have a record (default false: skip them). */
   force?: boolean;
+  /** How many independent analyst votes to take per cell; the majority verdict
+   *  wins (default 3). Single-vote attribution coin-flips on genuinely-borderline
+   *  cells — a majority tames that variance. Set 1 to disable. */
+  votes?: number;
 }
 
 export interface RunErrorAnalysisBatchResult {
@@ -368,6 +375,65 @@ export interface RunErrorAnalysisBatchResult {
   cells_failed: number;
   cells_skipped: number;
   file?: ErrorAnalysesFile;
+}
+
+/**
+ * Majority-vote one mismatch: run the analyst `n` times (independently, in
+ * parallel) and collapse to a single verdict. A gap-induced wrong answer reads
+ * as either "rubric gap" or "model slip" depending on how hard the analyst
+ * second-guesses itself, so a single vote coin-flips on borderline cells; a
+ * majority lands on the stable answer. The refinable-vs-slip call is decided by
+ * majority (gap+ambiguity vs slip); the refinable SUBTYPE is the more-voted of
+ * gap/ambiguity. Cost is summed across votes; wall-clock ≈ the slowest vote
+ * (they run concurrently). Returns analysis=null only if every vote failed.
+ */
+async function voteOnMismatch(
+  input: AnalyzeMismatchInput,
+  n: number,
+): Promise<{
+  analysis: MismatchAnalysis | null;
+  tally: Record<ErrorClass, number>;
+  cost_usd: number;
+  duration_ms: number;
+  model?: string;
+}> {
+  const runs = await Promise.all(
+    Array.from({ length: Math.max(1, n) }, () => analyzeMismatch(input)),
+  );
+  const ok = runs.filter((r) => r.ok && r.analysis);
+  const cost_usd = runs.reduce((s, r) => s + (r.cost_usd ?? 0), 0);
+  const duration_ms = Math.max(...runs.map((r) => r.duration_ms));
+  const model = runs.find((r) => r.model)?.model;
+  if (ok.length === 0) {
+    return { analysis: null, tally: { rubric_gap: 0, genuine_ambiguity: 0, model_slip: 0 }, cost_usd, duration_ms, model };
+  }
+  const { winner, tally } = pickMajorityErrorClass(ok.map((r) => r.analysis!.error_class));
+  // Keep the reasoning/what_rubric_misses from a vote that chose the winner.
+  const winning = ok.find((r) => r.analysis!.error_class === winner)?.analysis ?? ok[0].analysis!;
+  return { analysis: winning, tally, cost_usd, duration_ms, model };
+}
+
+/**
+ * Collapse N independent analyst votes to one verdict + the per-class tally.
+ * The refinable-vs-slip decision is by majority (gap+ambiguity vs slip); the
+ * refinable SUBTYPE is the more-voted of gap/ambiguity (tie → rubric_gap). This
+ * means a borderline cell only refines when *most* votes say so, while a clear
+ * model error needs a slip majority to be left alone. Exported for unit tests.
+ */
+export function pickMajorityErrorClass(votes: ErrorClass[]): {
+  winner: ErrorClass;
+  tally: Record<ErrorClass, number>;
+} {
+  const tally: Record<ErrorClass, number> = { rubric_gap: 0, genuine_ambiguity: 0, model_slip: 0 };
+  for (const v of votes) tally[v]++;
+  const refinable = tally.rubric_gap + tally.genuine_ambiguity;
+  const winner: ErrorClass =
+    refinable > tally.model_slip
+      ? tally.rubric_gap >= tally.genuine_ambiguity
+        ? "rubric_gap"
+        : "genuine_ambiguity"
+      : "model_slip";
+  return { winner, tally };
 }
 
 /**
@@ -384,6 +450,15 @@ export async function runErrorAnalysisBatch(
   opts: RunErrorAnalysisBatchOpts,
 ): Promise<RunErrorAnalysisBatchResult> {
   const { sessionId, taskId, iterId, provider, force } = opts;
+  const votes = Math.max(1, opts.votes ?? 3);
+
+  // force: wipe the prior attribution FIRST. collectRefinementCandidates folds
+  // error_analyses.json into each cell's classification_hint, so a previously-
+  // attributed cell no longer reads "unjudged" and would be filtered out below —
+  // deleting the file re-surfaces those cells for a fresh (re-voted) pass.
+  if (force) {
+    try { fs.rmSync(errorAnalysesPath(taskId, iterId), { force: true }); } catch { /* ignore */ }
+  }
 
   const candidates = collectRefinementCandidates({ sessionId, taskId, iterId });
   if (candidates.unsupported) {
@@ -446,30 +521,34 @@ export async function runErrorAnalysisBatch(
       skipped++;
       continue;
     }
-    const out = await analyzeMismatch({
-      taskId,
-      fieldId: cell.field_id,
-      criterionDef: cell.criterion_def,
-      patientId: cell.patient_id,
-      humanAnswer: cell.human_answer,
-      modelAnswer: cell.model_answer,
-      excerpt: cell.excerpt,
-      noteId: cell.note_id,
-      provider,
-    });
+    const out = await voteOnMismatch(
+      {
+        taskId,
+        fieldId: cell.field_id,
+        criterionDef: cell.criterion_def,
+        patientId: cell.patient_id,
+        humanAnswer: cell.human_answer,
+        modelAnswer: cell.model_answer,
+        excerpt: cell.excerpt,
+        noteId: cell.note_id,
+        provider,
+      },
+      votes,
+    );
     totalDur += out.duration_ms;
     if (out.model) model = out.model;
-    if (!out.ok || !out.analysis) {
+    if (!out.analysis) {
       failed++;
       continue;
     }
-    totalCost += out.cost_usd ?? 0;
+    totalCost += out.cost_usd;
     analyzed++;
     byCell.set(key, {
       patient_id: cell.patient_id,
       field_id: cell.field_id,
       classification_hint: errorClassToHint(out.analysis.error_class),
       error_class: out.analysis.error_class,
+      ...(votes > 1 ? { vote_tally: out.tally } : {}),
       what_rubric_misses: out.analysis.what_rubric_misses,
       reasoning: out.analysis.reasoning,
       model_answer: cell.model_answer,
