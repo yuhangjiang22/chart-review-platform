@@ -1,0 +1,30 @@
+BOSTON MEDICAL CENTER — DEPARTMENT OF PATHOLOGY
+SURGICAL PATHOLOGY REPORT
+Accession: BMC-SP-2024-091672
+Patient: Susan E. Callahan  DOB: 1963-11-07  MRN: 662317
+Date Received: 2024-07-19  Date Reported: 2024-07-21
+Procedure: VATS left upper lobe wedge resection
+Surgeon: Dr. Maria Concepcion, MD (Thoracic Surgery)
+
+GROSS DESCRIPTION:
+Received: One wedge resection specimen of left upper lobe, 5.0 x 4.0 x 2.5 cm, staple line intact. On serial sectioning, a 1.7 x 1.4 cm firm, gray-white nodule is identified in the parenchyma, 1.2 cm from the pleural surface. Margins appear uninvolved grossly. Submitted: nodule in entirety (3 cassettes), margins, adjacent lung.
+
+MICROSCOPIC DESCRIPTION:
+The nodule consists of an atypical epithelial proliferation with mixed growth patterns: approximately 50% lepidic pattern with atypical cells lining intact alveolar walls, and 50% acinar pattern with gland-forming structures and stromal invasion. Tumor cells show moderate nuclear pleomorphism, vesicular chromatin, and prominent nucleoli. Mucin production absent. No necrosis. Vascular invasion not identified. Visceral pleural invasion: absent. Resection margins: negative (closest margin 7 mm).
+
+Immunohistochemistry:
+  TTF-1: Diffuse strong nuclear positivity
+  Napsin A: Diffuse cytoplasmic positivity
+  p40: Negative
+  CK7: Positive; CK20: Negative
+
+DIAGNOSIS:
+LEFT UPPER LOBE WEDGE RESECTION:
+— ADENOCARCINOMA, lepidic-acinar type, moderately differentiated
+— Tumor size: 1.7 cm (pathologic)
+— Visceral pleura: not invaded
+— Margins: uninvolved
+— Pathologic stage: pT1bN0 (lymph nodes not sampled at time of wedge; sentinel node protocol deferred to subsequent lobectomy if indicated)
+
+Electronically signed: Dr. Priya V. Subramaniam, MD (Thoracic Pathology)
+Date/Time: 2024-07-21  09:38

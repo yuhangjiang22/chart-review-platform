@@ -1,0 +1,1 @@
+{"jsonrpc":"2.0","id":2,"method":"tool/execute","params":{"name":"find_quote_offsets","arguments":{"note_id":"2024-11-26__surgical_pathology","snippet":"SURGICAL PATHOLOGY REPORT"}}}

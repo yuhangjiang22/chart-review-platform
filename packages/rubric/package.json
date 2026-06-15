@@ -1,0 +1,31 @@
+{
+  "name": "@chart-review/rubric",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Phenotype skill bundle loader: walks .agents/skills/chart-review-<taskId>/ and assembles a CompiledTask from meta.yaml + references/criteria/*.md + keyword_sets/ + code_sets/ + edge_cases/. The rubric layer the agent + reviewer share.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./skill-bundle": {
+      "types": "./src/skill-bundle.ts",
+      "default": "./src/skill-bundle.ts"
+    },
+    "./phenotype-skill": {
+      "types": "./src/phenotype-skill.ts",
+      "default": "./src/phenotype-skill.ts"
+    },
+    "./yaml-to-markdown": {
+      "types": "./src/yaml-to-markdown.ts",
+      "default": "./src/yaml-to-markdown.ts"
+    }
+  },
+  "dependencies": {
+    "@chart-review/patients": "*",
+    "yaml": "^2.6.0"
+  }
+}

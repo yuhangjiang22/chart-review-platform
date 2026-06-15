@@ -1,0 +1,209 @@
+/*
+ * Chart-Review-Platform base layer.
+ *
+ * Aesthetic: editorial-scientific. The screen feels like a sheet of warm
+ * paper with light ledger ruling, deep ink for text, oxblood for decisive
+ * action, and a serif display face for headings to remind you this is a
+ * scholarly tool, not a SaaS dashboard.
+ *
+ * Tokens are HSL channels (no `hsl()` wrapper) so Tailwind can apply
+ * `<alpha-value>` and shadcn primitives can consume them directly.
+ */
+
+/* Fraunces (display serif, optical sizing 9-144, weights 400-900) +
+ * IBM Plex Sans (body) + IBM Plex Mono (evidence quotes / terminal output).
+ * Loaded from Google Fonts; preconnect handled in index.html. */
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Light theme — editorial-scientific. */
+    --background: 36 30% 96%;        /* #FAF7F2 cream paper */
+    --paper:      36 30% 96%;
+    --foreground: 24 15% 8%;         /* #14110F deep ink */
+    --ink:        24 15% 8%;
+
+    --card:       0 0% 100%;         /* pure white, lifts off cream */
+    --card-foreground: 24 15% 8%;
+
+    --popover:    0 0% 100%;
+    --popover-foreground: 24 15% 8%;
+
+    /* Primary action — oxblood. Decisive, scholarly, never frivolous. */
+    --primary:    353 60% 31%;       /* #7E1F2A */
+    --primary-foreground: 36 30% 96%;
+    --oxblood:    353 60% 31%;
+
+    /* Secondary — warm graphite, paired with primary for hover states. */
+    --secondary:  30 12% 92%;        /* warm gray surface */
+    --secondary-foreground: 24 15% 8%;
+
+    --muted:      32 18% 90%;        /* paper crease */
+    --muted-foreground: 24 12% 38%;  /* warm graphite */
+
+    --accent:     32 25% 88%;
+    --accent-foreground: 24 15% 8%;
+
+    --destructive: 353 60% 31%;
+    --destructive-foreground: 36 30% 96%;
+
+    --border:     34 18% 84%;        /* #E8E1D6 warm divider */
+    --input:      34 18% 84%;
+    --ring:       353 60% 31%;
+
+    /* Editorial extras */
+    --ochre:      40 65% 38%;        /* #B8860B marginal note */
+    --sage:       105 28% 32%;       /* #4A6B3A validated state */
+
+    --radius:     0.5rem;
+  }
+
+  /* Dark theme placeholder — kept so a future toggle works. Not the focus
+   * for the prove-out; tuned later. */
+  .dark {
+    --background: 24 18% 7%;
+    --paper:      24 18% 7%;
+    --foreground: 36 30% 96%;
+    --ink:        36 30% 96%;
+    --card:       24 16% 10%;
+    --card-foreground: 36 30% 96%;
+    --popover:    24 16% 10%;
+    --popover-foreground: 36 30% 96%;
+    --primary:    353 65% 58%;
+    --primary-foreground: 24 18% 7%;
+    --oxblood:    353 65% 58%;
+    --secondary:  24 12% 16%;
+    --secondary-foreground: 36 30% 96%;
+    --muted:      24 12% 16%;
+    --muted-foreground: 32 12% 64%;
+    --accent:     24 12% 22%;
+    --accent-foreground: 36 30% 96%;
+    --destructive: 353 65% 58%;
+    --destructive-foreground: 24 18% 7%;
+    --border:     24 12% 22%;
+    --input:      24 12% 22%;
+    --ring:       353 65% 58%;
+    --ochre:      40 65% 58%;
+    --sage:       105 25% 52%;
+  }
+}
+
+@layer base {
+  html, body, #root { height: 100%; }
+  html { font-feature-settings: "ss01" on, "ss02" on, "cv11" on; }
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family:
+      "IBM Plex Sans",
+      ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+      "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  /* Tabular figures everywhere data lives — counts, kappas, costs, dates. */
+  .tabular-nums { font-variant-numeric: tabular-nums; }
+  /* Headings adopt Fraunces with the SOFT axis dialed in for warmth. */
+  .font-display, h1, h2, h3, h4 {
+    font-family: "Fraunces", Georgia, serif;
+    font-variation-settings: "SOFT" 50, "WONK" 0;
+    letter-spacing: -0.01em;
+  }
+  /* Evidence quotes / inline code / terminal-style cells */
+  code, kbd, pre, .font-mono { font-family: "IBM Plex Mono", ui-monospace, monospace; }
+  kbd {
+    font-size: 0.72em;
+    padding: 0.1em 0.4em;
+    border: 1px solid hsl(var(--border));
+    border-radius: 0.3em;
+    background: hsl(var(--muted));
+    color: hsl(var(--muted-foreground));
+    box-shadow: 0 1px 0 hsl(var(--border));
+  }
+}
+
+@layer components {
+  /* The lock seal — a small filled oxblood square with a paper-impressed
+   * shadow. Used wherever a record is locked to give a physical-document
+   * cue without literal wax. */
+  .seal {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.25rem;
+    height: 1.25rem;
+    border-radius: 0.25rem;
+    background: hsl(var(--oxblood));
+    color: hsl(var(--paper));
+    box-shadow: var(--tw-shadow, 0 1px 0 hsl(0 60% 25% / 0.18));
+    font-weight: 600;
+    font-size: 0.7rem;
+  }
+
+  /* Brief flash on a structured-row the user just jumped to (e.g. by
+   * clicking an OMOP evidence card). Pulses an ochre tint so the eye lands
+   * on the row, then fades back to the row's normal styling. */
+  @keyframes structured-row-flash {
+    0%, 100% { background-color: transparent; }
+    20%, 60% { background-color: hsl(var(--ochre) / 0.18); }
+  }
+  .structured-row-flash {
+    animation: structured-row-flash 1.4s ease-in-out;
+  }
+
+  /* Subtle ledger background applied to the page shell. Positioned so the
+   * rules align with the 8px baseline grid most components use. */
+  .ledger-bg {
+    background-image:
+      repeating-linear-gradient(
+        0deg,
+        transparent 0,
+        transparent 31px,
+        hsl(var(--border) / 0.5) 31px,
+        hsl(var(--border) / 0.5) 32px
+      );
+  }
+
+  /* Multi-citer overlay on cited spans in the Notes tab. Three distinct
+   * visual channels so a single span can encode multiple citers without
+   * overlap or color confusion:
+   *
+   *   - Agent 1: ochre (warm yellow) underline.
+   *   - Agent 2: teal (cool green-blue) underline — distinct hue from
+   *              Agent 1, not just a dashed variant of the same color.
+   *   - You:     oxblood background highlight — most prominent, signals
+   *              "this is yours."
+   *
+   * Agents and human use different visual channels (line vs background),
+   * so a span cited by Agent 1 + you shows ochre underline AND oxblood
+   * highlight at once with no stacking gymnastics. Hover hints the span
+   * is clickable to reuse the citation. */
+  .cite-a1      { border-bottom: 2px solid hsl(var(--ochre)); }
+  .cite-a2      { border-bottom: 2px solid #0d9488; /* teal-600 — clearly distinct from ochre */ }
+  .cite-you     { background-color: hsl(var(--oxblood) / 0.22); border-radius: 2px; cursor: pointer; }
+  .cite-derived { background-color: hsl(var(--sage) / 0.18);    border-radius: 2px; }
+  /* Both agents on the same span: stack the colors as a thicker bar with
+   * both hues — they don't merge into a single ambiguous color. */
+  .cite-a1.cite-a2 {
+    border-bottom: 2px solid hsl(var(--ochre));
+    box-shadow: 0 4px 0 0 #0d9488;
+  }
+  /* Soft-focus dim: when a citer is focused and this span isn't theirs. */
+  .cite-dim     { opacity: 0.35; }
+  /* Hover affordance on agent-cited spans so the reviewer learns the
+   * span is clickable to reuse the citation. */
+  .cite-a1:hover, .cite-a2:hover { background-color: hsl(var(--muted) / 0.40); cursor: pointer; }
+  /* Brief flash to confirm a citation was just added or clicked. */
+  @keyframes cite-pulse {
+    0%   { background-color: hsl(var(--oxblood) / 0.50); }
+    100% { background-color: hsl(var(--oxblood) / 0.22); }
+  }
+  .cite-pulse { animation: cite-pulse 600ms ease-out; }
+}

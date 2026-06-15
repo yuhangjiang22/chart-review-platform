@@ -1,0 +1,20 @@
+PRIMARY CARE FOLLOW-UP
+Provider: D. Lin, MD — Family Medicine
+Encounter date: 2025-07-21
+
+INTERVAL HISTORY
+67-year-old man returns following ED visit for musculoskeletal chest
+pain on 2025-07-09. Pain has fully resolved.
+
+PROBLEM LIST REVIEW
+- Hypertension, controlled.
+- Tobacco use, former.
+- Chronic lung condition coded on prior charts (Z85.118 personal history
+  added during a 2017 hospitalization; C34.10 carried forward from
+  oncology problem list).
+
+ASSESSMENT
+Musculoskeletal chest pain, resolved. Continue current medications.
+Routine annual examination.
+
+D. Lin, MD — electronically signed 2025-07-21

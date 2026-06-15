@@ -1,0 +1,8 @@
+{
+  "name": "@chart-review/ui-studio",
+  "version": "0.1.0",
+  "private": true,
+  "description": "React Studio UI for chart-review-platform. Built with Vite + Radix UI + Tailwind. Same-origin proxy to the v2 HTTP + WebSocket server.",
+  "type": "module",
+  "files": ["index.html", "src"]
+}

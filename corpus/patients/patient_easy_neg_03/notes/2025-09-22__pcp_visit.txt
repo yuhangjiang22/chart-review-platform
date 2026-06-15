@@ -1,0 +1,31 @@
+DATE: 2025-09-22
+PATIENT: Female, 55 yo | PROVIDER: Dr. M. Okonkwo, MD — Primary Care
+VISIT: Office visit — fatigue and thyroid concern
+
+CC: Fatigue, weight gain, concern about thyroid function.
+
+HPI: Ms. [P.] reports 6 months of progressive fatigue, cold intolerance, constipation, 10-lb weight gain, diffuse hair thinning, and dry skin. No palpitations, heat intolerance, or tremor. Borderline TSH noted at outside facility 2 years ago; no follow-up then. No fevers, night sweats, or unintentional weight loss. No cough or dyspnea. No malignancy history.
+
+ROS: Constitutional: fatigue, weight gain. No fevers, no night sweats. Thyroid: cold intolerance, constipation, hair thinning. CV/Resp: negative.
+
+PMH: Seasonal allergic rhinitis.
+MEDS: Cetirizine 10 mg PRN, calcium carbonate 500 mg daily.
+ALLERGIES: NKDA.
+SOC HX: Never smoker. Indianapolis, IN. Elementary teacher.
+FAM HX: Mother and sister with Hashimoto's / hypothyroidism.
+
+EXAM:
+VS: BP 118/76, HR 58 (bradycardia), T 97.8°F, SpO2 99%, BMI 28.1
+Thyroid: Mildly enlarged, diffusely firm, non-tender, no discrete nodule.
+Neck: No LAD. CV: Bradycardia, regular, no murmurs.
+Lungs: CTA bilaterally. Skin: Dry, cool. Reflexes: delayed relaxation bilaterally.
+
+A/P:
+1. Hypothyroidism, likely Hashimoto's thyroiditis.
+   - Labs: TSH, free T4, anti-TPO, anti-Tg, CBC, CMP.
+   - Begin levothyroxine 50 mcg PO daily on empty stomach.
+   - Thyroid ultrasound ordered.
+   - Endocrinology referral placed.
+2. Weight gain — likely hypothyroid. Diet and light activity counseled.
+
+F/U in 6-8 weeks with repeat TSH/free T4.

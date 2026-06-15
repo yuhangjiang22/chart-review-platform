@@ -1,0 +1,21 @@
+{
+  "name": "@chart-review/mcp-server-anthropic",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Anthropic Claude Agent SDK adapter for the chart_review_state MCP server. Wraps @chart-review/mcp-core handlers via tool() + createSdkMcpServer() for in-process use.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.1.28",
+    "@chart-review/mcp-core": "*",
+    "@chart-review/tasks": "*",
+    "zod": "^3.23.0"
+  }
+}

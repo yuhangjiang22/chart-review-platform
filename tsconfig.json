@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "allowImportingTsExtensions": false,
+    "noEmit": true,
+    "isolatedModules": true
+  },
+  // v2 owns its source outright (M7.1 vendored v1's app/server/* into
+  // server/lib/). No more cross-project includes.
+  "include": [
+    "shared/**/*.ts", "modules/**/*.ts", "workflows/**/*.ts",
+    "examples/**/*.ts", "server/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules", "dist", "client",
+    "server/lib/**/__tests__/**"
+  ]
+}

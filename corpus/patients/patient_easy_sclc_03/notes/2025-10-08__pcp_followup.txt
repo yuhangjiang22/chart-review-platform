@@ -1,0 +1,28 @@
+VANDERBILT UNIVERSITY MEDICAL CENTER – PRIMARY CARE
+PCP FOLLOW-UP NOTE
+Date: 2025-10-08
+Patient: [REDACTED], 65M  MRN: [REDACTED]
+Provider: Dr. A. Morris, MD – Internal Medicine / Primary Care
+
+REASON FOR VISIT: Interval follow-up for small-cell lung cancer and SIADH/sodium normalization.
+
+INTERVAL HISTORY:
+Mr. [REDACTED] completed cycle 2 of cisplatin/etoposide + thoracic radiation on 2025-10-01. He reports mild fatigue and grade 1 nausea, manageable with ondansetron. Appetite improving. No fever, hemoptysis, or new neurologic symptoms. He reports continued smoking but is actively engaged with varenicline therapy.
+
+SODIUM TREND:
+- Pre-treatment (2025-07-28): Na 118 mEq/L
+- Cycle 1 start (2025-09-12): Na 129 mEq/L
+- Today (2025-10-08): Na 136 mEq/L — normalized
+
+Sodium normalization is consistent with tumor response reducing ectopic ADH production. Fluid restriction liberalized. Nephrology concurs with discontinuing formal fluid restriction.
+
+MEDICATIONS: Cisplatin/etoposide (oncology manages), ondansetron 8 mg PRN, varenicline 1 mg BID, dexamethasone taper (completing).
+
+ASSESSMENT/PLAN:
+1. LS-SCLC (C34.10): Tolerating cCRT well; oncology managing primary treatment.
+2. Paraneoplastic SIADH: Resolved with cancer treatment. Sodium now normal; no further restriction needed.
+3. Smoking cessation: Varenicline continued; patient reported reducing to 5 cigarettes/day from 1 ppd.
+4. Follow-up in 4 weeks or sooner PRN; copy oncology on all labs.
+
+Electronically signed: Dr. A. Morris, MD
+2025-10-08 09:15

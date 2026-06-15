@@ -1,0 +1,19 @@
+{
+  "name": "@chart-review/audit-trail",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Per-(patient × task × session) audit JSONL append + read. Records ui_action, tool_call_pre/post, state_write, result, error events. The append-only ledger every agent + reviewer mutation writes to.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "dependencies": {
+    "@chart-review/patients": "*",
+    "@chart-review/reviews-context": "*"
+  }
+}

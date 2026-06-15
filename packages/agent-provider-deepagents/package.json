@@ -1,0 +1,19 @@
+{
+  "name": "@chart-review/agent-provider-deepagents",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DeepAgentsProvider: AgentProvider implementation backed by a spawned Python deepagents sidecar. The sidecar loads tools from the stdio MCP server and runs the agent against an Azure/vLLM model.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "dependencies": {
+    "@chart-review/agent-provider": "*",
+    "@chart-review/agent-compose": "*"
+  }
+}
