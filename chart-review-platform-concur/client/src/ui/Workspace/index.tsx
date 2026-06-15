@@ -210,6 +210,15 @@ export function Workspace({
 
   useEffect(() => { void refreshSessions(); }, [refreshSessions]);
 
+  const archiveSession = useCallback(async (sessionId: string) => {
+    const r = await authFetch(
+      `/api/sessions/${encodeURIComponent(taskId)}/${encodeURIComponent(sessionId)}/archive`,
+      { method: "POST" },
+    );
+    if (!r.ok) return;
+    await refreshSessions();
+  }, [taskId, refreshSessions]);
+
   const task = tasks.find((t) => t.id === taskId);
   const versionTag = task?.manual_version ? `v${task.manual_version}` : null;
   const criterionCount = task?.field_count ?? 1;
@@ -444,6 +453,7 @@ export function Workspace({
             activeSessionId={activeSessionId}
             onSelect={setActiveSessionId}
             onNewSession={() => setNewSessionOpen(true)}
+            onArchive={isMethodologist ? archiveSession : undefined}
           />
           <WorkspaceSettings taskId={taskId} onShowAllToolsChange={() => { /* show-all-tools not used in light platform */ }} />
         </div>

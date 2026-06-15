@@ -14,7 +14,8 @@
 
 import { test, expect } from "@playwright/test";
 import {
-  loginAsYuhang, gotoWorkspace, startSession, archiveAllSessions,
+  loginAsYuhang, gotoWorkspace, startSession,
+  snapshotActiveSessionIds, archiveSessionsNotIn,
   setActiveSession,
 } from "./_helpers";
 
@@ -22,16 +23,25 @@ import {
 const TASK_ID = "cancer-diagnosis";
 const COHORT_PATIENT = "patient_easy_nsclc_01";
 
+type TestState = { _token: string; _preexisting: Set<string> };
+
 test.describe("session workflow", () => {
   test.beforeEach(async ({ page }) => {
     const token = await loginAsYuhang(page);
     // Stash the token where each test can grab it without re-logging in.
-    (page as unknown as { _token: string })._token = token;
+    const st = page as unknown as TestState;
+    st._token = token;
+    // Snapshot the sessions that ALREADY exist so afterEach only archives the
+    // ones THIS test creates — never the developer's real sessions (which is
+    // how a UI smoke run silently archived a live "session-new").
+    st._preexisting = await snapshotActiveSessionIds(page, token, TASK_ID);
   });
 
   test.afterEach(async ({ page }) => {
-    const token = (page as unknown as { _token: string })._token;
-    if (token) await archiveAllSessions(page, token, TASK_ID);
+    const st = page as unknown as TestState;
+    if (st._token) {
+      await archiveSessionsNotIn(page, st._token, TASK_ID, st._preexisting ?? new Set());
+    }
   });
 
   test("no active session: TRY phase shows the gate, not a run card", async ({ page }) => {
@@ -115,6 +125,32 @@ test.describe("session workflow", () => {
       page.locator("main").getByText(/No active iteration to validate/i),
     ).toBeVisible();
     expect(sidA).not.toEqual(sidB); // sanity check
+  });
+
+  test("archive control: the Session switcher archives an active session in place", async ({ page }) => {
+    const token = (page as unknown as { _token: string })._token;
+    const name = "archive-me smoke";
+    const sid = await startSession(page, token, TASK_ID, name, [COHORT_PATIENT]);
+    await setActiveSession(page, TASK_ID, sid);
+    await gotoWorkspace(page, TASK_ID, "try");
+
+    // Open the Session switcher — its pill is the only listbox trigger.
+    await page.locator('button[aria-haspopup="listbox"]').click();
+
+    // The active row reveals an archive control, aria-labelled by name. (It's
+    // opacity-revealed on hover, which Playwright still treats as visible.)
+    const archiveBtn = page.getByRole("button", { name: `Archive session ${name}` });
+    await expect(archiveBtn).toBeVisible();
+
+    // Accept the confirm() prompt, then archive.
+    page.once("dialog", (d) => d.accept());
+    await archiveBtn.click();
+
+    // The session flips to the read-only Archived group: its archive control is
+    // gone (archived rows render none), but the session itself is still listed —
+    // archiving preserves it, it doesn't delete.
+    await expect(archiveBtn).toHaveCount(0);
+    await expect(page.getByText(name).first()).toBeVisible();
   });
 
   test("agent run: TRY → VALIDATE works end-to-end (needs Azure)", async ({ page }) => {

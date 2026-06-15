@@ -107,7 +107,12 @@ export async function gotoWorkspace(page: Page, taskId: string, phase = "try") {
 }
 
 /** Cleanup helper: archive ALL sessions for a task. Safe to call from
- *  afterAll — uses the API, no UI interactions. */
+ *  afterAll — uses the API, no UI interactions.
+ *
+ *  ⚠️ Blanket — this archives the operator's REAL sessions too. Prefer
+ *  `snapshotActiveSessionIds` + `archiveSessionsNotIn` so a test run only
+ *  cleans up the sessions IT created and leaves a developer's live sessions
+ *  alone. Kept for the rare suite that genuinely owns every session. */
 export async function archiveAllSessions(
   page: Page, token: string, taskId: string,
 ): Promise<void> {
@@ -116,6 +121,40 @@ export async function archiveAllSessions(
   };
   for (const s of list.sessions) {
     if (s.session.state === "active" && s.session.session_id !== "session_legacy") {
+      try { await archiveSession(page, token, taskId, s.session.session_id); }
+      catch { /* tolerate */ }
+    }
+  }
+}
+
+/** Snapshot the ids of every session that exists NOW, so a later
+ *  `archiveSessionsNotIn` can archive only sessions created in between —
+ *  never the developer's pre-existing ones. Call in beforeEach. */
+export async function snapshotActiveSessionIds(
+  page: Page, token: string, taskId: string,
+): Promise<Set<string>> {
+  const list = await apiGet(page, `/api/sessions/${taskId}`, token) as {
+    sessions: Array<{ session: { session_id: string } }>;
+  };
+  return new Set(list.sessions.map((s) => s.session.session_id));
+}
+
+/** Cleanup helper: archive only the ACTIVE sessions that did NOT exist in the
+ *  `preexisting` snapshot — i.e. the ones THIS test created (whether via the
+ *  API helper or the new-session dialog). Leaves the developer's real sessions
+ *  untouched. Call in afterEach with the beforeEach snapshot. */
+export async function archiveSessionsNotIn(
+  page: Page, token: string, taskId: string, preexisting: Set<string>,
+): Promise<void> {
+  const list = await apiGet(page, `/api/sessions/${taskId}`, token) as {
+    sessions: Array<{ session: { session_id: string; state: string } }>;
+  };
+  for (const s of list.sessions) {
+    if (
+      s.session.state === "active"
+      && s.session.session_id !== "session_legacy"
+      && !preexisting.has(s.session.session_id)
+    ) {
       try { await archiveSession(page, token, taskId, s.session.session_id); }
       catch { /* tolerate */ }
     }
