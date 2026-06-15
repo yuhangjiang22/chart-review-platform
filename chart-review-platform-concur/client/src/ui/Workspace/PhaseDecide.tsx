@@ -805,12 +805,25 @@ export function PhaseDecide({ taskId, activeSessionId, iterId, taskKind }: Phase
                               ) : (
                                 <div className="space-y-1.5">
                                   <p>
-                                    Your validated answer differs from the model's, but the
-                                    agents agreed with each other — so the judge has nothing
-                                    to compare. Run the <strong>error analysis</strong> to
-                                    compare the model's answer to your annotation and
-                                    attribute it (rubric gap / ambiguity / model error)
-                                    before refining.
+                                    {report.agents.length === 1 ? (
+                                      <>
+                                        Your validated answer differs from the model's, and with
+                                        only one agent there's no second agent for the
+                                        agent-vs-agent judge to compare against. Run the{" "}
+                                        <strong>error analysis</strong> to compare the model's
+                                        answer to your annotation and attribute it (rubric gap /
+                                        ambiguity / model error) before refining.
+                                      </>
+                                    ) : (
+                                      <>
+                                        Your validated answer differs from the model's, but the
+                                        agents agreed with each other — so the judge has nothing
+                                        to compare. Run the <strong>error analysis</strong> to
+                                        compare the model's answer to your annotation and
+                                        attribute it (rubric gap / ambiguity / model error)
+                                        before refining.
+                                      </>
+                                    )}
                                   </p>
                                   <button
                                     type="button"
