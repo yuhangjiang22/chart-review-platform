@@ -20,10 +20,12 @@ attribution+propose. See `server/lib/refine/` and
 
 ```
 chart-review-platform-concur/
-├── .agents/skills/chart-review-cancer-diagnosis/
-│   ├── SKILL.md, meta.yaml
+├── .claude/skills/chart-review-cancer-diagnosis/   ← the rubric the SERVER reads
+│   ├── SKILL.md, meta.yaml                            (guidelinesRoot() = <root>/.claude/skills)
 │   └── references/criteria/{cancer_type,has_distant_metastasis,has_local_recurrence,disease_extent}.md
 │       (disease_extent is a derived field: computed from the two has_* leaves)
+├── .agents/skills/…                                ← PLATFORM_ROOT *marker* only (see gotcha #5);
+│                                                      a SEPARATE, drifted copy — NOT read at runtime
 ├── client/               React 18 + Tailwind + Radix Studio UI
 ├── server/               Express + WebSocket (index.ts + route files)
 ├── packages/
@@ -149,3 +151,14 @@ cd python && ./.venv/bin/python -m pytest -q
    in-process Anthropic-SDK server path (`makeReviewMcpServer`) is dead,
    since deepagents always uses subprocess transport. `STDIO_SERVER_PATH`
    in that file must point at `mcp-server-stdio/src/index.ts`.
+
+5. **`.claude/skills` is the rubric the server reads — NOT `.agents/skills`.**
+   `guidelinesRoot()` resolves to `<PLATFORM_ROOT>/.claude/skills`, and all
+   runtime state (pilots/, sessions/, refinement_log.jsonl) is written there.
+   `.agents/skills` exists only as the marker `packages/patients` walks up to
+   find PLATFORM_ROOT — it is **not** a symlink here (unlike the upstream
+   monorepo's `chart-review-platform/`) and its content has **drifted** from
+   `.claude/skills`. Edit a criterion/rubric under **`.claude/skills`** or the
+   change is silently ignored. (Some package descriptions / loader comments
+   still say `.agents/skills`; those are stale. The two trees' content is
+   unreconciled — pick one as canonical before relying on the other.)
