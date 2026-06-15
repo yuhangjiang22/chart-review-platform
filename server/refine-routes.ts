@@ -50,6 +50,8 @@ import { proposeNerGuidanceEdit } from "./lib/refine/ner-propose.js";
 import { collectAdherenceRefinementCandidates } from "./lib/refine/adherence-candidates.js";
 import { runAdherenceErrorAnalysisBatch, readAdherenceErrorAnalyses } from "./lib/refine/adherence-error-analysis.js";
 import { proposeAdherenceGuidanceEdit } from "./lib/refine/adherence-propose.js";
+import { rescoreQuestionOnHeldout } from "./lib/refine/adherence-holdout.js";
+import { splitValidatedPatients } from "./lib/refine/holdout.js";
 import {
   applyAdherenceRefinement,
   readAdherenceRefinementLog,
@@ -368,11 +370,19 @@ export const refineRoutes: RouteEntry[] = [
         throw httpErr(400, "question_id is required");
       }
 
-      const candidates = collectAdherenceRefinementCandidates({ sessionId, taskId: p.taskId, iterId: p.iterId });
-      if (candidates.unsupported) throw httpErr(400, candidates.unsupported.reason);
+      // First pass (unfiltered): this question's full validated gold → split.
+      const goldPass = collectAdherenceRefinementCandidates({ sessionId, taskId: p.taskId, iterId: p.iterId });
+      if (goldPass.unsupported) throw httpErr(400, goldPass.unsupported.reason);
+      const fieldGold = goldPass.gold_by_question[questionId] ?? {};
+      const { refine: refineSet, heldout: heldoutSet } = splitValidatedPatients(Object.keys(fieldGold));
+
+      // Second pass (filtered): refiner sees ONLY refine-set disagreements.
+      const candidates = collectAdherenceRefinementCandidates({
+        sessionId, taskId: p.taskId, iterId: p.iterId, examplePatientFilter: new Set(refineSet),
+      });
       const cluster = candidates.clusters.find((c) => c.question_id === questionId);
       if (!cluster || cluster.examples.length === 0) {
-        throw httpErr(404, `no answer-disagreement cluster for question ${questionId}`);
+        throw httpErr(404, `no refine-set answer-disagreement cluster for question ${questionId} (held-out patients are reserved)`);
       }
 
       const ea = readAdherenceErrorAnalyses(p.taskId, p.iterId);
@@ -391,6 +401,32 @@ export const refineRoutes: RouteEntry[] = [
       });
       if (!out.ok || !out.proposal) throw httpErr(502, out.error ?? "adherence refiner failed");
 
+      // ④ held-out: re-answer the question on held-out patients under the
+      // current vs candidate (current + addition) retrieval_hints.
+      const hintsOld = cluster.retrieval_hints ?? "";
+      const hintsNew = hintsOld.trim() ? `${hintsOld.trim()}\n${out.proposal.proposed_guidance_addition}` : out.proposal.proposed_guidance_addition;
+      const holdout = await rescoreQuestionOnHeldout({
+        taskId: p.taskId,
+        questionId,
+        questionText: cluster.question_text ?? questionId,
+        retrievalHintsOld: hintsOld,
+        retrievalHintsNew: hintsNew,
+        heldoutPatients: heldoutSet,
+        gold: fieldGold,
+        answerEnum: cluster.answer_enum ?? undefined,
+      });
+      const holdoutForCard = holdout.insufficient_holdout
+        ? { insufficient_holdout: true as const, heldout_n: holdout.heldout_n }
+        : {
+            delta: holdout.delta,
+            agreement_old: holdout.agreement_old,
+            agreement_new: holdout.agreement_new,
+            n_fixed: holdout.n_fixed,
+            n_regressed: holdout.n_regressed,
+            heldout_n: holdout.heldout_n,
+            scored_n: holdout.scored_n,
+          };
+
       return {
         question_id: questionId,
         question_text: cluster.question_text,
@@ -402,6 +438,8 @@ export const refineRoutes: RouteEntry[] = [
         proposed_guidance_addition: out.proposal.proposed_guidance_addition,
         rationale: out.proposal.rationale,
         ...(out.proposal.leakage_warning ? { leakage_warning: out.proposal.leakage_warning } : {}),
+        holdout: holdoutForCard,
+        refine_n: refineSet.length,
         model: out.model,
         cost_usd: out.cost_usd,
         duration_ms: out.duration_ms,
