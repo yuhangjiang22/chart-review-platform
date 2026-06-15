@@ -41,6 +41,19 @@ describe("listModels", () => {
     expect(models.find((m) => m.id === "llama")!.available).toBe(true);
   });
 
+  it("labels a vllm-backend model 'OpenRouter' when its base URL is OpenRouter", () => {
+    const p = path.join(dir, "models.json");
+    fs.writeFileSync(p, JSON.stringify({
+      "claude-sonnet": { backend: "vllm", base_url_env: "VLLM_BASE_URL", model: "anthropic/claude-sonnet-4.6", default: true },
+      "local-llama": { backend: "vllm", base_url: "http://h:8000/v1", model: "meta/Llama" },
+    }));
+    const env = { VLLM_BASE_URL: "https://openrouter.ai/api/v1" } as NodeJS.ProcessEnv;
+    const { models } = listModels({ env, modelsPath: p });
+    // OpenRouter base → "OpenRouter ·"; a genuine local vllm host stays "vllm ·".
+    expect(models.find((m) => m.id === "claude-sonnet")!.label).toBe("OpenRouter · anthropic/claude-sonnet-4.6");
+    expect(models.find((m) => m.id === "local-llama")!.label).toBe("vllm · meta/Llama");
+  });
+
   it("synthesizes vllm default when no file and backend is vllm", () => {
     const env = { DEEPAGENTS_LLM_BACKEND: "vllm", VLLM_BASE_URL: "http://h:8000/v1", VLLM_MODEL: "meta/Llama" } as NodeJS.ProcessEnv;
     const { models, default: def } = listModels({ env, modelsPath: path.join(dir, "absent.json") });
