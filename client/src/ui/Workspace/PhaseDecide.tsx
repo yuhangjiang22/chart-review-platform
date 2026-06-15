@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { authFetch } from "../../auth";
 import { RefineProposalCard } from "./RefineProposalCard";
+import { AdherenceRefinePanel } from "./AdherenceRefinePanel";
 
 // Performance report (light platform DECIDE phase).
 //
@@ -688,6 +689,10 @@ export function PhaseDecide({ taskId, activeSessionId, iterId, taskKind }: Phase
             where the agent's drafted value matched yours. κ shown when ≥ 2 paired
             observations make it meaningful (single-patient runs may show κ = —).
           </p>
+
+          {iterId && activeSessionId && (
+            <AdherenceRefinePanel taskId={taskId} iterId={iterId} sessionId={activeSessionId} />
+          )}
         </div>
       )}
 
