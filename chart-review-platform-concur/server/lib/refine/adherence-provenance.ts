@@ -71,6 +71,23 @@ export function findQuestionInBundles(
   return null;
 }
 
+/** Direct (human) edit of a question's editable fields in its tier bundle —
+ *  the AUTHOR-pane counterpart to the refinement Apply. Sets (not appends)
+ *  `text` / `retrieval_hints`; sibling questions are untouched. Not logged to
+ *  the refinement provenance (that log is for agent-proposed applies only),
+ *  matching the phenotype PUT /criteria behavior. */
+export function setAdherenceQuestionFields(
+  taskId: string,
+  questionId: string,
+  fields: { text?: string; retrieval_hints?: string },
+): void {
+  const found = findQuestionInBundles(taskId, questionId);
+  if (!found) throw new Error(`question ${questionId} not found in ${taskId} question bundles`);
+  if (typeof fields.text === "string") found.question.text = fields.text;
+  if (typeof fields.retrieval_hints === "string") found.question.retrieval_hints = fields.retrieval_hints;
+  atomicWriteText(path.join(questionsDir(taskId), found.file), stringifyYaml(found.doc));
+}
+
 // ── Log IO ─────────────────────────────────────────────────────────────────────
 
 function logPath(taskId: string): string {

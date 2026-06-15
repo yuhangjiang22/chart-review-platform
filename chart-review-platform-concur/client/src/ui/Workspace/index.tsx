@@ -17,6 +17,7 @@ import { PhaseTry } from "./PhaseTry";
 import { RubricPanel } from "./RubricPanel";
 import { RefineProposalCard } from "./RefineProposalCard";
 import { RefinementHistory } from "./RefinementHistory";
+import { AdherenceRubricPanel } from "./AdherenceRubricPanel";
 import { PhaseValidate } from "./PhaseValidate";
 import { PhaseJudge } from "./PhaseJudge";
 import { PhaseDecide } from "./PhaseDecide";
@@ -496,7 +497,18 @@ export function Workspace({
             task_type (like PhaseJudge/PhaseDecide) since the shared taskKind
             always resolves to "phenotype" in this fork. */}
         {activePhase === "AUTHOR" && (
-          task?.task_type === "ner" || task?.task_type === "adherence" ? (
+          task?.task_type === "adherence" ? (
+            <div className="mx-auto max-w-[760px] space-y-5 py-2">
+              {/* Editable adherence question rubric — the AUTHOR counterpart to
+                  the refinement agent's proposals on PERFORMANCE. */}
+              <AdherenceRubricPanel taskId={taskId} />
+              <div className="flex justify-end">
+                <Button onClick={() => setPhase("TRY")} className="gap-1.5">
+                  Try on patients →
+                </Button>
+              </div>
+            </div>
+          ) : task?.task_type === "ner" ? (
             <div className="mx-auto max-w-[560px] py-12 space-y-3 text-center">
               <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
                 Author
@@ -505,11 +517,11 @@ export function Workspace({
                 className="font-display text-[20px] tracking-tight"
                 style={{ fontVariationSettings: '"opsz" 20, "SOFT" 50' }}
               >
-                Author for {task.task_type} isn't available yet
+                Author for NER isn't available yet
               </h3>
               <p className="text-[13px] text-muted-foreground">
-                Edit this task via the Builder for now. A dedicated{" "}
-                {task.task_type} authoring pane is a later increment.
+                Edit entity-type guidance via the Builder for now. A dedicated NER
+                authoring pane is a later increment.
               </p>
             </div>
           ) : (
