@@ -51,7 +51,7 @@ import { collectAdherenceRefinementCandidates } from "./lib/refine/adherence-can
 import { runAdherenceErrorAnalysisBatch, readAdherenceErrorAnalyses } from "./lib/refine/adherence-error-analysis.js";
 import { proposeAdherenceGuidanceEdit } from "./lib/refine/adherence-propose.js";
 import { rescoreQuestionOnHeldout } from "./lib/refine/adherence-holdout.js";
-import { splitValidatedPatients } from "./lib/refine/holdout.js";
+// (splitValidatedPatients is already imported above from ./lib/refine/holdout.js)
 import {
   applyAdherenceRefinement,
   readAdherenceRefinementLog,
