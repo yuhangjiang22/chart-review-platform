@@ -62,12 +62,17 @@ export async function apiPost(page: Page, path: string, body: unknown, token: st
 }
 
 /** Create a fresh session via the API. Used by tests that need an
- *  active session but don't want to drive the dialog. */
+ *  active session but don't want to drive the dialog. Includes a default
+ *  agent_spec so the session is runnable + matches the server's
+ *  ≥1-agent requirement (a specless session is unrunnable and drifts). */
 export async function startSession(
   page: Page, token: string, taskId: string, name: string, patientIds: string[],
+  agentSpecs: Array<Record<string, unknown>> = [
+    { id: "agent_1", model: "claude-sonnet", role_preset: "default", role_version: "v1" },
+  ],
 ): Promise<string> {
   const body = await apiPost(page, `/api/sessions/${taskId}`, {
-    name, patient_ids: patientIds,
+    name, patient_ids: patientIds, agent_specs: agentSpecs,
   }, token) as { session: { session_id: string } };
   return body.session.session_id;
 }
