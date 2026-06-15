@@ -187,6 +187,17 @@ export const sessionRoutes: RouteEntry[] = [
         err.status = 400;
         throw err;
       }
+      // A session with no agents is unrunnable and drifts against any iter
+      // that later defaults an agent ("manifest has 0, prior iter had 1"). The
+      // UI dialog already requires ≥1 agent; enforce it server-side too so the
+      // bare API can't create the broken state. (Import seeds specs from the run.)
+      if (!Array.isArray(specs) || specs.length === 0) {
+        const err = new Error(
+          "agent_specs must be a non-empty array — at least one agent is required to run a session",
+        ) as Error & { status: number };
+        err.status = 400;
+        throw err;
+      }
       try {
         const m = createSession({
           task_id: p.taskId,
