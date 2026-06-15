@@ -41,6 +41,8 @@ export interface AdherenceRefinementCluster {
    *  Null when the question has none yet. */
   retrieval_hints: string | null;
   tier: number | null;
+  /** answer_schema.enum as strings, for the held-out extractor. Null when none. */
+  answer_enum: string[] | null;
   examples: AdherenceRefinementExample[];
   n_disagreements: number;
 }
@@ -51,6 +53,10 @@ export interface AdherenceRefinementCandidates {
   session_id: string;
   n_validated_patients: number;
   clusters: AdherenceRefinementCluster[];
+  /** Per-question reviewer gold across ALL validated patients (not just
+   *  disagreements): question_id → { patient_id → reviewer_answer }. The
+   *  held-out re-score needs gold for held-out patients. */
+  gold_by_question: Record<string, Record<string, unknown>>;
   unsupported?: { task_kind: string; reason: string };
 }
 
@@ -71,6 +77,7 @@ interface QDef {
   text: string | null;
   retrieval_hints: string | null;
   tier: number | null;
+  answer_enum: string[] | null;
 }
 
 /** Flatten the skill's questions_by_tier to question_id → {text, retrieval_hints, tier}. */
@@ -80,10 +87,12 @@ export function loadQuestionDefs(taskId: string): Map<string, QDef> {
     const skill = loadAdherenceSkill(taskId);
     for (const [tier, qs] of skill.questions_by_tier) {
       for (const q of qs) {
+        const en = (q.answer_schema as { enum?: unknown } | undefined)?.enum;
         out.set(q.question_id, {
           text: typeof q.text === "string" ? q.text : null,
           retrieval_hints: typeof q.retrieval_hints === "string" ? q.retrieval_hints : null,
           tier: typeof tier === "number" ? tier : null,
+          answer_enum: Array.isArray(en) && en.length ? en.map((v) => String(v)) : null,
         });
       }
     }
@@ -111,18 +120,28 @@ export interface AdherencePatientInput {
  * Build per-question disagreement clusters from validated adherence patients.
  * A disagreement = an agent answer ≠ the reviewer's validated answer on a
  * validated question. Pure — no disk, no skill load (caller fills text/hints).
+ *
+ * `examplePatientFilter`, when set, restricts which patients' disagreements are
+ * emitted as cluster EXAMPLES (the S3 refine set); gold_by_question +
+ * n_validated_patients still span ALL validated patients (the held-out re-score
+ * needs held-out gold). Absent = no filter.
  */
-export function buildAdherenceClusters(patients: AdherencePatientInput[]): {
+export function buildAdherenceClusters(
+  patients: AdherencePatientInput[],
+  examplePatientFilter?: Set<string>,
+): {
   clusters: Map<string, AdherenceRefinementCluster>;
   n_validated_patients: number;
+  gold_by_question: Record<string, Record<string, unknown>>;
 } {
   const clusters = new Map<string, AdherenceRefinementCluster>();
   const validatedPatients = new Set<string>();
+  const goldByQuestion: Record<string, Record<string, unknown>> = {};
 
   function cluster(qid: string): AdherenceRefinementCluster {
     let c = clusters.get(qid);
     if (!c) {
-      c = { question_id: qid, question_text: null, retrieval_hints: null, tier: null, examples: [], n_disagreements: 0 };
+      c = { question_id: qid, question_text: null, retrieval_hints: null, tier: null, answer_enum: null, examples: [], n_disagreements: 0 };
       clusters.set(qid, c);
     }
     return c;
@@ -132,6 +151,17 @@ export function buildAdherenceClusters(patients: AdherencePatientInput[]): {
     const validated = new Set(p.validated_questions);
     if (validated.size === 0) continue;
     validatedPatients.add(p.patient_id);
+
+    // Record gold for every validated question on this patient (spans ALL
+    // validated patients — the held-out re-score needs held-out gold).
+    for (const qid of validated) {
+      if (!(qid in p.human_answers)) continue;
+      (goldByQuestion[qid] ??= {})[p.patient_id] = p.human_answers[qid];
+    }
+
+    // Anti-leakage: emit disagreement EXAMPLES only for refine-set patients.
+    if (examplePatientFilter && !examplePatientFilter.has(p.patient_id)) continue;
+
     for (const [agentId, answers] of Object.entries(p.agent_answers_by_agent)) {
       for (const qid of validated) {
         if (!(qid in p.human_answers)) continue; // no gold for this question
@@ -156,7 +186,7 @@ export function buildAdherenceClusters(patients: AdherencePatientInput[]): {
   for (const c of clusters.values()) {
     c.examples.sort((a, b) => a.patient_id.localeCompare(b.patient_id) || a.agent_id.localeCompare(b.agent_id));
   }
-  return { clusters, n_validated_patients: validatedPatients.size };
+  return { clusters, n_validated_patients: validatedPatients.size, gold_by_question: goldByQuestion };
 }
 
 // ── Disk-wired entry point ─────────────────────────────────────────────────────
@@ -185,8 +215,10 @@ export function collectAdherenceRefinementCandidates(opts: {
   sessionId: string;
   taskId: string;
   iterId: string;
+  /** S3 refine-set filter: emit examples only for these patients (gold spans all). */
+  examplePatientFilter?: Set<string>;
 }): AdherenceRefinementCandidates {
-  const { sessionId, taskId, iterId } = opts;
+  const { sessionId, taskId, iterId, examplePatientFilter } = opts;
   const base = { task_id: taskId, iter_id: iterId, session_id: sessionId };
 
   const task = loadCompiledTask(taskId);
@@ -196,6 +228,7 @@ export function collectAdherenceRefinementCandidates(opts: {
       ...base,
       n_validated_patients: 0,
       clusters: [],
+      gold_by_question: {},
       unsupported: {
         task_kind: taskKind,
         reason: `adherence self-refinement supports adherence tasks only; ${taskKind} uses a different path`,
@@ -250,7 +283,7 @@ export function collectAdherenceRefinementCandidates(opts: {
     }
   }
 
-  const { clusters, n_validated_patients } = buildAdherenceClusters(patients);
+  const { clusters, n_validated_patients, gold_by_question } = buildAdherenceClusters(patients, examplePatientFilter);
   const defs = loadQuestionDefs(taskId);
   const out = [...clusters.values()].sort((a, b) => a.question_id.localeCompare(b.question_id));
   for (const c of out) {
@@ -258,7 +291,8 @@ export function collectAdherenceRefinementCandidates(opts: {
     c.question_text = d?.text ?? null;
     c.retrieval_hints = d?.retrieval_hints ?? null;
     c.tier = d?.tier ?? null;
+    c.answer_enum = d?.answer_enum ?? null;
   }
 
-  return { ...base, n_validated_patients, clusters: out };
+  return { ...base, n_validated_patients, clusters: out, gold_by_question };
 }

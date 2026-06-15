@@ -66,4 +66,16 @@ describe("buildAdherenceClusters", () => {
     ]);
     expect(n_validated_patients).toBe(0);
   });
+
+  it("gold_by_question spans ALL validated patients; examplePatientFilter restricts only examples", () => {
+    const patients: AdherencePatientInput[] = [
+      { patient_id: "refine1", validated_questions: ["Q1"], human_answers: { Q1: "yes" }, agent_answers_by_agent: { a1: { Q1: "no" } } },
+      { patient_id: "held1", validated_questions: ["Q1"], human_answers: { Q1: "yes" }, agent_answers_by_agent: { a1: { Q1: "no" } } },
+    ];
+    const { clusters, gold_by_question } = buildAdherenceClusters(patients, new Set(["refine1"]));
+    // gold spans both patients
+    expect(Object.keys(gold_by_question.Q1).sort()).toEqual(["held1", "refine1"]);
+    // but only refine1's disagreement is emitted as an example
+    expect(clusters.get("Q1")!.examples.map((e) => e.patient_id)).toEqual(["refine1"]);
+  });
 });
