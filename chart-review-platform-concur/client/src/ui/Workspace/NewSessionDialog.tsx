@@ -109,8 +109,7 @@ export function NewSessionDialog({
   // Patient list loaded INDEPENDENTLY of any active session — the previous
   // implementation chained through iterDetail.patient_status which was
   // circular ("need a session to start a session"). Source of truth:
-  //   1. cohort-sampling.dev_patient_ids if the task has a curated cohort
-  //   2. /api/patients (the workspace-wide corpus) as fallback
+  //   /api/patients (the workspace-wide corpus).
   const [availablePatientIds, setAvailablePatientIds] = useState<string[]>([]);
   const [patientsLoading, setPatientsLoading] = useState(false);
   // Optional "start from package" — when selected, the package's
@@ -174,9 +173,9 @@ export function NewSessionDialog({
     }
   }, [selectedPackageId, availablePackages]);
 
-  // Load the patient list on dialog open. Prefer the task's curated dev
-  // cohort (cohort-sampling.dev_patient_ids); fall back to the whole
-  // corpus if no sampling has been configured.
+  // Load the patient list on dialog open from the workspace-wide corpus.
+  // (concur has no cohort-sampling service — the curated-dev-cohort source
+  // was a v2 feature with no server backing here, so it's not consulted.)
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
@@ -184,23 +183,12 @@ export function NewSessionDialog({
     (async () => {
       let ids: string[] = [];
       try {
-        const r = await authFetch(`/api/cohort-sampling/${encodeURIComponent(taskId)}`);
+        const r = await authFetch("/api/patients");
         if (r.ok) {
-          const sampling = await r.json() as { dev_patient_ids?: string[] };
-          if (Array.isArray(sampling?.dev_patient_ids) && sampling.dev_patient_ids.length > 0) {
-            ids = sampling.dev_patient_ids;
-          }
+          const list = await r.json() as Array<{ patient_id: string }>;
+          ids = Array.isArray(list) ? list.map((p) => p.patient_id) : [];
         }
-      } catch { /* fall through */ }
-      if (ids.length === 0) {
-        try {
-          const r = await authFetch("/api/patients");
-          if (r.ok) {
-            const list = await r.json() as Array<{ patient_id: string }>;
-            ids = Array.isArray(list) ? list.map((p) => p.patient_id) : [];
-          }
-        } catch { /* leave empty */ }
-      }
+      } catch { /* leave empty */ }
       if (!cancelled) {
         setAvailablePatientIds(ids);
         setPatientsLoading(false);
@@ -421,7 +409,7 @@ export function NewSessionDialog({
           <div>
             <div className="flex items-baseline justify-between">
               <label className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-                2 · Cohort ({selected.size}/{availablePatientIds.length} selected)
+                2 · Cohort ({patientsLoading ? "loading…" : `${selected.size}/${availablePatientIds.length} selected`})
               </label>
               <div className="flex gap-2 text-[10px]">
                 <button type="button" onClick={selectAll} className="text-muted-foreground hover:text-ink underline-offset-2 hover:underline">

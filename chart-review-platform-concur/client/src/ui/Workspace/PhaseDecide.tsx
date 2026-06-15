@@ -751,7 +751,12 @@ export function PhaseDecide({ taskId, activeSessionId, iterId, taskKind }: Phase
                         {showRefine && (
                           <button
                             type="button"
-                            onClick={() => setRefineField(expanded ? null : fid)}
+                            onClick={() => {
+                              // Clear any stale analyze error from a different
+                              // field when switching which row is expanded.
+                              setAnalyzeErr(null);
+                              setRefineField(expanded ? null : fid);
+                            }}
                             className={cn(
                               "inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10.5px] transition-colors",
                               expanded
