@@ -12,6 +12,7 @@ import {
   revertAdherenceRefinement,
   readAdherenceRefinementLog,
   findQuestionInBundles,
+  setAdherenceQuestionFields,
 } from "./adherence-provenance.js";
 
 const TASK = "asthma-adherence";
@@ -87,6 +88,36 @@ describe("applyAdherenceRefinement", () => {
     writeBundle("T1.yaml", [{ question_id: "Q1", text: "Q?", tier: 1 }]);
     expect(() => applyAdherenceRefinement({ taskId: TASK, questionId: "Q1", hintAddition: "  ", appliedBy: "r" })).toThrow(/empty/);
     expect(() => applyAdherenceRefinement({ taskId: TASK, questionId: "ZZ", hintAddition: "x", appliedBy: "r" })).toThrow(/not found/);
+  });
+});
+
+describe("setAdherenceQuestionFields (direct AUTHOR edit)", () => {
+  it("sets text + retrieval_hints, leaves siblings intact, no log entry", () => {
+    writeBundle("T1.yaml", [
+      { question_id: "Q1", text: "old?", retrieval_hints: "old hint", tier: 1 },
+      { question_id: "Q2", text: "other?", retrieval_hints: "keep", tier: 1 },
+    ]);
+    setAdherenceQuestionFields(TASK, "Q1", { text: "new?", retrieval_hints: "new hint" });
+    const q1 = findQuestionInBundles(TASK, "Q1")!.question;
+    expect(q1.text).toBe("new?");
+    expect(q1.retrieval_hints).toBe("new hint");
+    // sibling untouched
+    expect(findQuestionInBundles(TASK, "Q2")!.question.retrieval_hints).toBe("keep");
+    // direct edits are NOT logged (only refinement applies are)
+    expect(readAdherenceRefinementLog(TASK)).toHaveLength(0);
+  });
+
+  it("updates only the provided field", () => {
+    writeBundle("T1.yaml", [{ question_id: "Q1", text: "t", retrieval_hints: "h", tier: 1 }]);
+    setAdherenceQuestionFields(TASK, "Q1", { retrieval_hints: "h2" });
+    const q1 = findQuestionInBundles(TASK, "Q1")!.question;
+    expect(q1.text).toBe("t"); // unchanged
+    expect(q1.retrieval_hints).toBe("h2");
+  });
+
+  it("throws on an unknown question", () => {
+    writeBundle("T1.yaml", [{ question_id: "Q1", text: "t", tier: 1 }]);
+    expect(() => setAdherenceQuestionFields(TASK, "ZZ", { text: "x" })).toThrow(/not found/);
   });
 });
 
