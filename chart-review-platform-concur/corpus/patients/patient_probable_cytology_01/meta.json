@@ -1,0 +1,9 @@
+{
+  "patient_id": "patient_probable_cytology_01",
+  "category": "probable",
+  "demographics": { "age": 81, "sex": "F", "region": "Mountain West" },
+  "smoking": "Former smoker, 40 pack-years, quit 2008; on home oxygen for COPD",
+  "index_date": "2025-06-04",
+  "doc_types": ["ct_chest", "pulmonology_consult", "cytology_fna", "oncology_progress"],
+  "generated_by": "hand"
+}

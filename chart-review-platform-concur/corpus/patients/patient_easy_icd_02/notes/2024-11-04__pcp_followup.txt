@@ -1,0 +1,27 @@
+OUTPATIENT CLINIC NOTE
+Date: 2024-11-04
+Patient: Female, 74 years
+Provider: Dr. C. Abrams, MD — Internal Medicine
+Visit Type: Post-hospitalization Follow-up
+
+REASON FOR VISIT: Follow-up after right hip fracture ORIF.
+
+HPI: Mrs. E.W. presents 9 days after discharge from orthopedic admission for right intertrochanteric femur fracture treated with ORIF. Reports good recovery. Ambulating with walker, performing ADLs with minimal assistance. Pain 2–3/10 at rest, 4/10 with PT exercises. Oxycodone used only once in past 4 days. No fever, no wound drainage, no chest pain or dyspnea. No lower extremity swelling or calf tenderness.
+
+MEDICATIONS CONFIRMED: Levothyroxine, amlodipine, omeprazole, enoxaparin (day 9 of 28), acetaminophen scheduled, oxycodone PRN, calcium+vitamin D. Alendronate on hold per orthopedics.
+
+PHYSICAL EXAMINATION:
+Vitals: BP 136/82, HR 74, SpO2 98%, Wt 148 lbs.
+Right hip incision: Well-healed, no erythema or discharge. ROM improving. Mild deep tenderness at operative site.
+Lower extremities: No edema, no calf tenderness bilaterally.
+Pulmonary: Clear bilaterally.
+
+ASSESSMENT AND PLAN:
+1. Post-op hip fracture ORIF — recovering well. Continue PT. Orthopedics follow-up in 5 days as scheduled.
+2. DVT prophylaxis — continue enoxaparin through ~2024-11-19.
+3. Hypertension — BP acceptable today.
+4. Hypothyroidism — continue levothyroxine; TSH at next quarterly visit.
+5. Osteoporosis — resume alendronate at 6-week post-op clearance. Reinforce fall prevention.
+6. Pain — taper oxycodone; transition to acetaminophen-only by week's end.
+
+Next PCP visit in 4–6 weeks or sooner as needed.

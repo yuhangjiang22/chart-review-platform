@@ -1,0 +1,15 @@
+# Keep the build context small and the image clean of host-specific state.
+node_modules
+**/node_modules
+dist
+python/.venv
+**/__pycache__
+var
+data
+.git
+.env
+.env.*
+!.env.docker.example
+*.log
+vllm_endpoint.txt
+.app_state

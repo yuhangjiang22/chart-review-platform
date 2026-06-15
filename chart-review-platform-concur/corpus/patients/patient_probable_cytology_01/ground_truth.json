@@ -1,0 +1,20 @@
+{
+  "patient_id": "patient_probable_cytology_01",
+  "category": "probable",
+  "lung_cancer_status": "probable",
+  "leaf_answers": {
+    "pathology_report_present": "no",
+    "pathology_lung_primary": "not_applicable",
+    "cytology_supports_lung_primary": "yes",
+    "imaging_lung_lesion": "yes",
+    "oncologist_lung_cancer_diagnosis_in_note": "yes",
+    "icd_lung_cancer_present": "yes"
+  },
+  "applicability": {
+    "pathology_lung_primary": "not_applicable",
+    "cytology_supports_lung_primary": "applicable"
+  },
+  "expected_contradicting_evidence_fields": [],
+  "difficulty": "hard",
+  "difficulty_notes": "Hand-crafted. Patient deemed too high-risk for core biopsy; only cytology FNA was obtained. pathology_report_present='no' so pathology_lung_primary is gated to not_applicable. cytology_supports_lung_primary becomes applicable and is 'yes' (FNA reports adenocarcinoma cells). Tests the new is_applicable_when contract field end-to-end."
+}

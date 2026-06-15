@@ -1,0 +1,28 @@
+DATE: 2025-04-04
+PATIENT: Male, 62 yo | PROVIDER: Dr. R. Patel, MD — Emergency Medicine
+FACILITY: Providence Portland Medical Center, ED
+VISIT: ED visit — right knee injury after fall
+
+CC: Right knee injury; fell while hiking.
+
+HPI: Mr. [K.], with known right knee OA, presents 2 hours after mechanical fall on a downhill hiking trail when his right knee "gave out." Immediate worsening pain, swelling, and inability to fully weight-bear. No head injury, no LOC. No neck or back pain. No other extremity injuries. Denies chest pain, dyspnea, or other systemic symptoms. No malignancy history.
+
+ROS: No fevers, no constitutional symptoms. Neuro intact.
+
+PMH: Right knee OA, hypertension. Former smoker, quit 2000.
+MEDS: Lisinopril 10 mg, naproxen PRN, omeprazole 20 mg.
+
+EXAM:
+VS: BP 138/84, HR 88, T 98.6°F, SpO2 97%
+Right knee: Moderate effusion. Diffuse tenderness. ROM 0-80° (pain limited). No open wound. Distal pulses 2+, sensation intact.
+
+IMAGING: Right knee X-ray (AP, lateral, sunrise): Medial joint space narrowing, small osteophytes. No acute fracture. No loose body. Moderate soft tissue swelling.
+
+A/P:
+1. Right knee contusion with traumatic effusion superimposed on OA. No fracture.
+   - Knee immobilizer. Crutches, non-weight-bearing.
+   - Ibuprofen 600 mg TID x7 days with food. Ice and elevation.
+   - Orthopedic F/U in 1 week.
+2. HTN — defer to PCP.
+
+Discharge instructions given. Ambulatory with crutches at discharge.

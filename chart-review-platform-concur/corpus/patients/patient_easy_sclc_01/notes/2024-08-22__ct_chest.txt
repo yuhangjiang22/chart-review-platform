@@ -1,0 +1,27 @@
+INDIANA UNIVERSITY HEALTH – RADIOLOGY
+CT CHEST WITH CONTRAST
+Date: 2024-08-22
+Patient: [REDACTED], 67M  MRN: [REDACTED]
+Ordering provider: Dr. J. Caldwell, PCP
+
+TECHNIQUE:
+Multidetector CT of the chest acquired in the portal venous phase following administration of 100 mL IV iohexol. Axial images reconstructed at 1.25 mm and 5 mm; coronal and sagittal reformats generated.
+
+FINDINGS:
+LUNG PARENCHYMA: A 4.1 x 3.7 cm centrally located mass is present in the right hilar region, abutting the right mainstem bronchus and extending into the mediastinum. Margins are lobulated and ill-defined. No satellite nodules identified. Left lung clear.
+
+MEDIASTINUM/LYMPH NODES: Bulky bilateral mediastinal lymphadenopathy. Right paratracheal station 4R nodes measure up to 2.8 cm short-axis. Subcarinal node cluster measures 3.2 cm in aggregate. Bilateral hilar adenopathy present. Findings raise concern for extensive nodal involvement.
+
+PLEURA: No pleural effusion. No pneumothorax.
+
+CARDIOVASCULAR: Heart size normal. No pericardial effusion. Superior vena cava patent.
+
+BONES/SOFT TISSUE: No lytic or blastic osseous lesions identified on this exam.
+
+IMPRESSION:
+1. Right central hilar mass (4.1 cm) with bulky bilateral mediastinal and hilar lymphadenopathy. Imaging pattern is highly suspicious for a central primary lung malignancy, small-cell carcinoma favored given nodal burden and central location.
+2. Tissue sampling strongly recommended for histologic confirmation and staging.
+3. Recommend PET/CT for complete staging workup.
+
+Electronically signed: Dr. A. Nguyen, MD, Thoracic Radiology
+2024-08-22 15:44

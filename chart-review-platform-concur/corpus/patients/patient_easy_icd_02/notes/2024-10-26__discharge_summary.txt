@@ -1,0 +1,22 @@
+DISCHARGE SUMMARY
+Discharge Date: 2024-10-26 | Admission: 2024-10-22 | LOS: 4 days
+Patient: Female, 74 years
+Attending: Dr. B. Sandoval, MD — Orthopedic Surgery
+
+ADMISSION DIAGNOSIS: Right intertrochanteric femur fracture, displaced.
+
+DISCHARGE DIAGNOSES:
+1. S72.141A — Right intertrochanteric femur fracture (primary)
+2. M81.0 — Age-related osteoporosis
+3. I10 — Essential hypertension
+4. E03.9 — Hypothyroidism, unspecified
+5. K21.0 — GERD
+6. C34.10 — Bronchus/lung upper lobe, unspecified (chronic, problem list carry-forward per billing practice; no active workup)
+
+HOSPITAL COURSE: Mrs. E.W. admitted from ED with right intertrochanteric femur fracture from mechanical fall. Medically optimized hospital day 1; cardiology cleared for surgery. Pre-op Hgb 11.6, transfusion not required. On hospital day 2, she underwent ORIF with cephalomedullary nail under spinal anesthesia without complications (EBL 150 mL). Post-op course uncomplicated. PT initiated day 1 post-op, touch-down weight bearing. Pain controlled with scheduled acetaminophen and short-course oxycodone. DVT prophylaxis with enoxaparin started. Incision clean, dry at discharge.
+
+DISCHARGE MEDICATIONS: Levothyroxine 75 mcg daily, amlodipine 5 mg daily, omeprazole 20 mg daily, enoxaparin 40 mg SQ daily x28d, oxycodone 5 mg q6h PRN x10d, acetaminophen 650 mg q6h x2wk, calcium+vitamin D daily. (Alendronate held; resume 6 weeks post-op.)
+
+FOLLOW-UP: Orthopedics in 2 weeks. PCP within 4 weeks. Outpatient PT referral placed.
+
+DISCHARGE CONDITION: Stable. Ambulatory with walker.

@@ -1,0 +1,15 @@
+{
+  "name": "@chart-review/deploy-runner",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Headless CLI: run an exported package's best agent on a new cohort dir.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": { ".": { "types": "./src/index.ts", "default": "./src/index.ts" } },
+  "dependencies": {
+    "@chart-review/infra-batch-run": "*",
+    "@chart-review/agent-specs": "*",
+    "@chart-review/patients": "*"
+  }
+}

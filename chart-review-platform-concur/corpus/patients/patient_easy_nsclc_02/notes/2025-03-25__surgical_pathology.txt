@@ -1,0 +1,35 @@
+TACOMA GENERAL HOSPITAL — DEPARTMENT OF PATHOLOGY
+SURGICAL PATHOLOGY REPORT
+Accession: TGH-SP-2025-04417
+Patient: Gerald R. Whitmore  DOB: 1949-08-22  MRN: 774509
+Date Received: 2025-03-24  Date Reported: 2025-03-25
+Procedure: Flexible bronchoscopy with endobronchial biopsy and EBUS-TBNA (station 4R)
+Ordering: Dr. Helena F. Olsen, MD (Pulmonology)
+
+GROSS DESCRIPTION:
+Specimen A — Endobronchial biopsy, RLL superior segment bronchus: Three tan-gray tissue fragments, each 0.3–0.5 cm. Submitted entirely.
+Specimen B — EBUS-TBNA, station 4R node: Bloody aspirate with visible tissue cores; cell block and smear prepared.
+
+MICROSCOPIC DESCRIPTION:
+Specimen A: Sections show nests and sheets of large polygonal cells with abundant dense eosinophilic cytoplasm, distinct intercellular bridges, and centrally located hyperchromatic nuclei with prominent nucleoli. Focal keratin pearl formation present. Brisk mitotic activity. Background: desmoplastic stromal reaction.
+
+Specimen B (cell block): Clusters of malignant squamoid cells morphologically identical to Specimen A. No necrosis.
+
+Immunohistochemistry (Specimen A):
+  p40: Strong diffuse nuclear positivity
+  p63: Positive
+  CK5/6: Positive
+  TTF-1: Negative
+  Napsin A: Negative
+  Synaptophysin: Negative
+  Chromogranin: Negative
+
+DIAGNOSIS:
+A. RLL ENDOBRONCHIAL BIOPSY: SQUAMOUS CELL CARCINOMA, moderately differentiated
+B. STATION 4R EBUS-TBNA: POSITIVE FOR MALIGNANCY — metastatic squamous cell carcinoma
+   (morphology and IHC consistent with lung primary)
+
+NOTE: Molecular testing (EGFR, ALK, PD-L1 TPS) recommended per institutional NSCLC protocol for squamous cell histology.
+
+Electronically signed: Dr. Nadia K. Bergstrom, MD (Anatomic Pathology)
+Date/Time: 2025-03-25  10:52

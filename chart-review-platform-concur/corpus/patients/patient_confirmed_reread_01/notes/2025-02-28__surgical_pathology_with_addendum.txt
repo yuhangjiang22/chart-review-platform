@@ -1,0 +1,61 @@
+SURGICAL PATHOLOGY REPORT
+Specimen: Right lower lobe lung mass, CT-guided core biopsy
+Specimen received: 2025-02-25
+Original report finalized: 2025-02-28
+Pathologist (original): J. McGregor, MD
+
+GROSS DESCRIPTION
+Three core biopsy fragments, the longest measuring 1.6 cm. Submitted in
+toto.
+
+MICROSCOPIC DESCRIPTION
+Sections demonstrate a malignant epithelial neoplasm with sheets of
+small to intermediate-sized cells with scant cytoplasm and finely
+stippled chromatin. Nuclear molding is noted. Mitoses are frequent
+(>10 per high-power field). Necrosis is present. Initial morphologic
+impression on H&E is small-cell carcinoma.
+
+DIAGNOSIS (ORIGINAL)
+Right lower lobe, core biopsy: SMALL-CELL CARCINOMA (SCLC).
+
+J. McGregor, MD — electronically signed 2025-02-28
+
+
+==================================================================
+                            ADDENDUM
+                        RE-READ AND REVISION
+==================================================================
+
+Addendum date: 2025-03-07
+Re-reading pathologist: H. Okafor, MD — Thoracic Pathology
+
+REASON FOR ADDENDUM
+This case was sent for second-opinion thoracic pathology review and
+immunohistochemical work-up given atypical morphologic features.
+
+ADDITIONAL IMMUNOHISTOCHEMISTRY
+- TTF-1: positive (diffuse, strong)
+- Napsin A: positive
+- p63 / p40: negative
+- Synaptophysin: negative
+- Chromogranin: negative
+- CK7: positive
+- Ki-67: ~35%
+
+INTERPRETATION
+The immunohistochemical profile is incompatible with small-cell
+carcinoma (synaptophysin and chromogranin are negative; Ki-67 is too
+low). The TTF-1+/Napsin A+/p40− profile is diagnostic of pulmonary
+ADENOCARCINOMA. The original H&E features that suggested small-cell
+morphology are reinterpreted as crush artifact and a basaloid growth
+pattern.
+
+REVISED DIAGNOSIS (RE-READ)
+Right lower lobe, core biopsy: NON-SMALL-CELL LUNG CARCINOMA (NSCLC),
+ADENOCARCINOMA SUBTYPE.
+
+This addendum supersedes the original diagnosis above. Per institutional
+re-read policy, the re-read interpretation is authoritative for
+treatment planning.
+
+H. Okafor, MD — electronically signed 2025-03-07

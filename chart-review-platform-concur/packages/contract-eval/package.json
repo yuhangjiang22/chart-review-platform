@@ -1,0 +1,15 @@
+{
+  "name": "@chart-review/contract-eval",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Pure DSL evaluator for criterion applicability + derivation expressions. Zero dependencies. Mirrors lib-py/chart_review/derivation.py via parity tests.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  }
+}

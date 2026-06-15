@@ -1,0 +1,30 @@
+BOSTON MEDICAL CENTER — THORACIC ONCOLOGY
+NEW PATIENT CONSULTATION / PROGRESS NOTE
+Date: 2024-08-14
+Patient: Susan E. Callahan  DOB: 1963-11-07  MRN: 662317
+Attending: Dr. Jonathan P. Okafor, MD (Medical Oncology — Thoracic)
+
+SUBJECTIVE:
+Ms. Callahan is a 60-year-old woman referred for post-surgical oncologic management following incidental discovery and resection of a left upper lobe nodule. She remains asymptomatic. She notes mild incisional pain improving, no dyspnea at rest, SpO2 98% at home. ECOG PS 0. She is eager to understand adjuvant therapy options and return to full activity.
+
+OBJECTIVE:
+Vitals: BP 120/70, HR 64, SpO2 98% RA, Weight 67.5 kg
+Exam: Well-healed VATS port sites. No lymphadenopathy. Lungs clear. No clubbing.
+PET/CT (2024-07-12, pre-op): Mildly hypermetabolic LUL nodule (SUVmax 2.8). No mediastinal or distant hypermetabolic foci.
+Pathology (BMC-SP-2024-091672): adenocarcinoma, lepidic-acinar type, 1.7 cm, TTF-1+/Napsin A+, pT1bN0, margins negative.
+Molecular: EGFR exon 19 deletion detected (reflex NGS report 2024-08-05). ALK negative. ROS1 negative. PD-L1 TPS 2%.
+
+ASSESSMENT:
+Stage IA2 non-small cell lung cancer, adenocarcinoma subtype, left upper lobe, resected with negative margins (pT1bN0M0). EGFR exon 19 deletion-positive. Incidentally discovered — no prior symptoms attributable to malignancy.
+
+PLAN:
+1. Adjuvant osimertinib (ADAURA trial protocol) — 80 mg daily for 3 years given pT1b stage and EGFR driver mutation. Prescription sent.
+2. CT chest surveillance: every 6 months for 2 years, then annually.
+3. Re-engage with smoking cessation support to maintain abstinence.
+4. Patient counseled on EGFR mutation significance and targeted therapy rationale.
+5. Return to thoracic oncology in 3 months.
+
+ICD-10: C34.12 (Malignant neoplasm of upper lobe, left bronchus or lung)
+
+Electronically signed: Dr. Jonathan P. Okafor, MD
+Date/Time: 2024-08-14  13:05

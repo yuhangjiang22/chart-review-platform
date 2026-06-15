@@ -1,0 +1,19 @@
+MOLECULAR PATHOLOGY REPORT
+Specimen: Right lower lobe core biopsy (re-read NSCLC adenocarcinoma)
+Test: Comprehensive Genomic Profiling (CGP) panel
+Date reported: 2025-03-12
+
+RESULTS
+- EGFR: no actionable mutation
+- KRAS: G12C mutation detected (variant allele frequency 32%)
+- ALK: no rearrangement
+- ROS1: no rearrangement
+- BRAF: wild-type
+- PD-L1 (22C3): tumor proportion score 60%
+
+CLINICAL INTERPRETATION
+Findings consistent with primary pulmonary adenocarcinoma. KRAS G12C
+identified, candidate for sotorasib or adagrasib. High PD-L1 supports
+consideration of immunotherapy.
+
+D. Kapoor, MD — Molecular Pathology — electronically signed 2025-03-12

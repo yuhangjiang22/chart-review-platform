@@ -1,0 +1,29 @@
+VANDERBILT-INGRAM CANCER CENTER – THORACIC ONCOLOGY
+ONCOLOGY PROGRESS NOTE
+Date: 2025-09-12
+Patient: [REDACTED], 65M  MRN: [REDACTED]
+Attending: Dr. H. Reyes, MD – Thoracic Oncology
+
+DIAGNOSIS: Small-cell lung carcinoma (SCLC), limited stage (LS-SCLC)
+ICD-10: C34.10
+
+HISTORY OF PRESENT ILLNESS:
+Mr. [REDACTED] is a 65-year-old male, 50 pack-year current smoker, who presented to endocrinology on 2025-07-28 with confusion, fatigue, and nausea. Laboratory evaluation revealed serum sodium of 118 mEq/L with hypoosmolality and inappropriately concentrated urine (urine osmolality 540 mOsm/kg, urine sodium 62 mEq/L), consistent with SIADH. Initial fluid restriction partially improved sodium to 126 mEq/L. CT chest (2025-08-04) revealed right hilar mass concerning for SCLC as paraneoplastic etiology. EBUS-TBNA (2025-08-19) confirmed small-cell lung carcinoma. PET/CT (2025-08-28): FDG-avid right hilar mass (SUVmax 12.4) and ipsilateral mediastinal nodes; no distant metastases. MRI brain negative. Staging: LS-SCLC.
+
+PARANEOPLASTIC SYNDROME: SIADH attributable to ectopic ADH production by SCLC. Sodium at today's visit: 129 mEq/L (improved on partial fluid restriction; expect further correction with treatment).
+
+PERFORMANCE STATUS: ECOG 1
+
+TREATMENT PLAN:
+1. Concurrent chemoradiotherapy (cCRT):
+   - Cisplatin 75 mg/m2 day 1 + Etoposide 100 mg/m2 days 1-3, q21d x 4 cycles
+   - Thoracic RT: 45 Gy in 30 twice-daily fractions, beginning cycle 1
+2. Sodium monitoring: BMP weekly; nephrology co-management for SIADH correction
+3. Smoking cessation: Varenicline initiated
+4. Prophylactic cranial irradiation (PCI) to be offered after cCRT if response confirmed
+5. Repeat CT chest post-cycle 2; sodium trend expected to normalize with tumor response
+
+Patient counseled; verbalized understanding of diagnosis (LS-SCLC with paraneoplastic SIADH) and treatment goals.
+
+Electronically signed: Dr. H. Reyes, MD, Thoracic Oncology
+2025-09-12 11:30

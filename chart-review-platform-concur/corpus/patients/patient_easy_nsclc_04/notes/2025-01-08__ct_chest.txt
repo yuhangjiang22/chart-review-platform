@@ -1,0 +1,34 @@
+SOUTHEASTERN HEALTH SYSTEM — RADIOLOGY DEPARTMENT
+CHARLESTON, SC
+CT CHEST WITH CONTRAST
+Date: 2025-01-08
+Patient: William D. Tanner  DOB: 1942-09-03  MRN: 993084
+Ordering Physician: Dr. Curtis B. Franklin, MD (Internal Medicine)
+Indication: Progressive exertional dyspnea x 6 weeks, unintentional 14-pound weight loss; 45 pack-year history, quit 2002.
+
+TECHNIQUE:
+Helical CT chest with IV contrast (Visipaque 320, 80 mL). Multiplanar reconstructions performed. Pre-contrast images also obtained.
+
+FINDINGS:
+Lungs: A 3.3 x 2.9 cm irregular spiculated mass occupies the left lower lobe posterior basal segment. The lesion contacts but does not clearly invade the visceral pleura. No satellite pulmonary nodules. Mild linear atelectasis left lower lobe.
+
+Lymph nodes: Left hilar lymph node cluster measuring up to 1.9 cm (short axis) with rounded morphology, suspicious for nodal involvement. Subcarinal node 1.3 cm. No right-sided mediastinal adenopathy.
+
+Emphysema: Mild panlobular emphysema, bilateral.
+
+Pleura: Small left-sided pleural effusion, trace. No pneumothorax.
+
+Airways: Mild bronchial wall thickening, no endobronchial mass.
+
+Cardiovascular: Aortic valve and coronary artery calcifications, moderate. Cardiomegaly mild.
+
+Abdomen (limited views): No adrenal masses.
+
+IMPRESSION:
+1. 3.3 cm spiculated left lower lobe mass — highly suspicious for primary lung malignancy. Urgent tissue diagnosis recommended.
+2. Left hilar and subcarinal lymphadenopathy, suspicious for regional spread.
+3. Trace left pleural effusion (likely reactive vs. malignant — cytologic sampling at provider discretion).
+4. Recommend PET/CT, thoracic surgery or pulmonology consultation.
+
+Electronically signed: Dr. Kevin J. Rourke, MD (Body Radiology)
+Date/Time: 2025-01-08  08:55

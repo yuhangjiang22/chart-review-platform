@@ -1,0 +1,18 @@
+{
+  "name": "@chart-review/agent-compose",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Compose @anthropic-ai/claude-agent-sdk query() options from a single ComposeAgentInput. The seam for adding new agent capabilities (MCP servers, extra tools, hooks) without touching call sites.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "dependencies": {
+    "@chart-review/model-config": "*"
+  }
+}
