@@ -9,7 +9,7 @@
 // localStorage with key chart-review:active-session:<taskId>.
 
 import { useState, useRef, useEffect } from "react";
-import { ChevronDown, Plus, Folders } from "lucide-react";
+import { ChevronDown, Plus, Folders, Archive } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
@@ -31,6 +31,9 @@ interface SessionSwitcherProps {
   activeSessionId: string | null;
   onSelect: (sessionId: string) => void;
   onNewSession: () => void;
+  /** Archive an active session. When omitted (e.g. the viewer isn't a
+   *  methodologist), rows render no archive affordance. */
+  onArchive?: (sessionId: string) => void;
 }
 
 function fmtDate(iso: string): string {
@@ -40,7 +43,7 @@ function fmtDate(iso: string): string {
 }
 
 export function SessionSwitcher({
-  sessions, activeSessionId, onSelect, onNewSession,
+  sessions, activeSessionId, onSelect, onNewSession, onArchive,
 }: SessionSwitcherProps) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -113,6 +116,7 @@ export function SessionSwitcher({
                   item={s}
                   isActive={s.session.session_id === activeSessionId}
                   onClick={() => { setOpen(false); onSelect(s.session.session_id); }}
+                  onArchive={onArchive}
                 />
               ))}
             </div>
@@ -144,30 +148,65 @@ export function SessionSwitcher({
 }
 
 function SessionRow({
-  item, isActive, onClick,
-}: { item: SessionListItem; isActive: boolean; onClick: () => void }) {
+  item, isActive, onClick, onArchive,
+}: {
+  item: SessionListItem;
+  isActive: boolean;
+  onClick: () => void;
+  onArchive?: (sessionId: string) => void;
+}) {
+  const name = item.session.name;
+  // Archive is only meaningful for an active session; an archived session is
+  // already read-only. The control is also absent when no handler is wired
+  // (non-methodologist viewer).
+  const canArchive = !!onArchive && item.session.state === "active";
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "w-full text-left px-3 py-2 border-l-2 transition-colors hover:bg-paper/60",
-        isActive
-          ? "border-[hsl(var(--sage))] bg-[hsl(var(--sage))]/5"
-          : "border-transparent",
+    <div className="relative group">
+      <button
+        type="button"
+        onClick={onClick}
+        className={cn(
+          "w-full text-left px-3 py-2 border-l-2 transition-colors hover:bg-paper/60",
+          canArchive && "pr-9",
+          isActive
+            ? "border-[hsl(var(--sage))] bg-[hsl(var(--sage))]/5"
+            : "border-transparent",
+        )}
+        role="option"
+        aria-selected={isActive}
+      >
+        <div className="flex items-baseline justify-between gap-2">
+          <span className="text-[12px] font-medium truncate">{name}</span>
+          <span className="text-[9.5px] text-muted-foreground shrink-0">{fmtDate(item.session.started_at)}</span>
+        </div>
+        <div className="text-[10px] text-muted-foreground mt-0.5">
+          {item.session.cohort.patient_ids.length === 0
+            ? `${item.iter_count} iter${item.iter_count === 1 ? "" : "s"}`
+            : `${item.session.cohort.patient_ids.length} patient${item.session.cohort.patient_ids.length === 1 ? "" : "s"} · ${item.iter_count} iter${item.iter_count === 1 ? "" : "s"}`}
+        </div>
+      </button>
+      {canArchive && (
+        <button
+          type="button"
+          aria-label={`Archive session ${name}`}
+          title="Archive session"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (window.confirm(`Archive “${name}”? It becomes read-only; its iters are preserved.`)) {
+              onArchive!(item.session.session_id);
+            }
+          }}
+          className={cn(
+            "absolute right-1.5 top-1.5 rounded p-1 text-muted-foreground transition-opacity",
+            "hover:bg-paper hover:text-foreground",
+            // Hidden until the row is hovered or the control is focused
+            // (keyboard-reachable).
+            "opacity-0 group-hover:opacity-100 focus:opacity-100 focus-visible:opacity-100",
+          )}
+        >
+          <Archive size={13} strokeWidth={1.75} />
+        </button>
       )}
-      role="option"
-      aria-selected={isActive}
-    >
-      <div className="flex items-baseline justify-between gap-2">
-        <span className="text-[12px] font-medium truncate">{item.session.name}</span>
-        <span className="text-[9.5px] text-muted-foreground shrink-0">{fmtDate(item.session.started_at)}</span>
-      </div>
-      <div className="text-[10px] text-muted-foreground mt-0.5">
-        {item.session.cohort.patient_ids.length === 0
-          ? `${item.iter_count} iter${item.iter_count === 1 ? "" : "s"}`
-          : `${item.session.cohort.patient_ids.length} patient${item.session.cohort.patient_ids.length === 1 ? "" : "s"} · ${item.iter_count} iter${item.iter_count === 1 ? "" : "s"}`}
-      </div>
-    </button>
+    </div>
   );
 }
