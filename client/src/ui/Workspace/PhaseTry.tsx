@@ -183,14 +183,11 @@ export function PhaseTry({
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [pr, iters, sr] = await Promise.all([
+      const [pr, iters] = await Promise.all([
         authFetch("/api/patients").then((r) => (r.ok ? r.json() : [])),
         authFetch(`/api/pilots/${encodeURIComponent(taskId)}`)
           .then((r) => (r.ok ? r.json() : []))
           .catch(() => [] as IterListing[]),
-        authFetch(`/api/cohort-sampling/${encodeURIComponent(taskId)}`)
-          .then((r) => (r.ok ? r.json() : null))
-          .catch(() => null),
       ]);
       if (cancelled) return;
       const list: Patient[] = Array.isArray(pr) ? pr : [];
@@ -217,10 +214,9 @@ export function PhaseTry({
         }
       }
 
-      // Fallback: curated dev cohort
-      const dev: string[] = sr?.dev_patient_ids ?? [];
-      const seed = dev.filter((id) => valid.has(id));
-      setSelected(seed);
+      // No curated dev cohort in concur — default to an empty selection
+      // (the reviewer picks patients explicitly in the dialog).
+      setSelected([]);
     })();
     return () => {
       cancelled = true;

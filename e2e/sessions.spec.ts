@@ -80,7 +80,9 @@ test.describe("session workflow", () => {
     await gotoWorkspace(page, TASK_ID, "try");
     // The cohort readout in PhaseTry should show EXACTLY 1 patient.
     await expect(page.getByText(/Cohort \(1 patient\)/i)).toBeVisible();
-    await expect(page.getByText(COHORT_PATIENT)).toBeVisible();
+    // The patient id legitimately appears in both the cohort readout and the
+    // sidebar cohort list — scope to the first match (not a duplicate-render bug).
+    await expect(page.getByText(COHORT_PATIENT).first()).toBeVisible();
   });
 
   test("phenotype task: sidebar uses 'Agents' label, matching PhaseTry", async ({ page }) => {

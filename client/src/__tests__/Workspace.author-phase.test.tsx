@@ -60,6 +60,14 @@ function setupDefaultMocks() {
         ],
       });
     }
+    // GET /api/tasks/:taskId/adherence-rubric — what AdherenceRubricPanel fetches.
+    if (/\/tasks\/[^/]+\/adherence-rubric$/.test(url)) {
+      return okJson({
+        questions: [
+          { question_id: "T0-AsthmaDx", tier: 0, text: "Asthma diagnosis present?", retrieval_hints: "STRUCTURED FIRST", answer_schema: { type: "boolean" } },
+        ],
+      });
+    }
     const pilotsIterDetail = /\/pilots\/[^/]+\/[^/]+$/.test(url);
     if (pilotsIterDetail) return okJson({ patient_status: [] });
     if (url.includes("/pilots")) return okJson([]);
@@ -126,7 +134,7 @@ describe("Workspace — AUTHOR phase (phenotype)", () => {
     expect(screen.queryByText(/rubric — what the agents use/i)).not.toBeInTheDocument();
   });
 
-  it("shows a placeholder (no crash) for a non-phenotype task", async () => {
+  it("renders the editable question rubric for an adherence task (not a placeholder)", async () => {
     render(
       <Workspace
         taskId="asthma-adherence"
@@ -138,8 +146,12 @@ describe("Workspace — AUTHOR phase (phenotype)", () => {
       />,
     );
 
-    expect(await screen.findByText(/isn't available yet/i)).toBeInTheDocument();
-    // No rubric editor for non-phenotype.
+    // Adherence AUTHOR is now the editable question rubric (AdherenceRubricPanel),
+    // NOT the old "isn't available yet" placeholder.
+    expect(await screen.findByText("T0-AsthmaDx")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Asthma diagnosis present?")).toBeInTheDocument();
+    expect(screen.queryByText(/isn't available yet/i)).not.toBeInTheDocument();
+    // And not the PHENOTYPE rubric editor.
     expect(screen.queryByText(/rubric — what the agents use/i)).not.toBeInTheDocument();
   });
 });
