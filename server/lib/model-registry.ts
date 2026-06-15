@@ -74,8 +74,21 @@ function available(entry: Entry, env: NodeJS.ProcessEnv): boolean {
   return isConfigured(baseUrl);
 }
 
-function label(entry: Entry): string {
-  return entry.backend === "azure" ? `azure · ${entry.deployment}` : `vllm · ${entry.model}`;
+/** The provider label shown in the picker. The "vllm" backend is really
+ *  "any OpenAI-compatible endpoint"; when its base URL points at OpenRouter we
+ *  show "OpenRouter" (and "vLLM" otherwise) so the picker reflects where the
+ *  model actually runs, not the registry's internal backend name. */
+function providerLabel(entry: Entry, env: NodeJS.ProcessEnv): string {
+  if (entry.backend === "azure") return "azure";
+  const baseUrl = (entry.base_url_env ? env[entry.base_url_env] : entry.base_url) ?? "";
+  if (/openrouter\.ai/i.test(baseUrl)) return "OpenRouter";
+  return "vllm";
+}
+
+function label(entry: Entry, env: NodeJS.ProcessEnv): string {
+  return entry.backend === "azure"
+    ? `azure · ${entry.deployment}`
+    : `${providerLabel(entry, env)} · ${entry.model}`;
 }
 
 export function listModels(opts?: { env?: NodeJS.ProcessEnv; modelsPath?: string }): ListModelsResult {
@@ -86,7 +99,7 @@ export function listModels(opts?: { env?: NodeJS.ProcessEnv; modelsPath?: string
   let def: string | null = null;
   for (const [id, entry] of Object.entries(registry)) {
     const avail = available(entry, env);
-    models.push({ id, backend: entry.backend, label: label(entry), available: avail });
+    models.push({ id, backend: entry.backend, label: label(entry, env), available: avail });
     if (avail && def === null) def = id;
   }
   const marked = Object.entries(registry).find(([, e]) => e.default && available(e, env));
