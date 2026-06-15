@@ -277,6 +277,69 @@ export function deleteRun(runId: string): boolean {
   return true;
 }
 
+/**
+ * One-shot reconcile at server startup. `driveRun` is an IN-PROCESS,
+ * fire-and-forget loop — it cannot survive a server restart and runs are never
+ * resumed. So any run still marked `running` at boot is, by definition,
+ * orphaned: its driver died with the previous process and will never finalize
+ * `status.json`. Left alone, the UI shows a phantom "RUNNING" badge forever
+ * (the bug a server restart mid-run produces).
+ *
+ * For each orphaned run we recompute a terminal state from its per-patient
+ * statuses (mirroring `driveRun`'s finalize): any patient still `pending` /
+ * `running` becomes `error` (the agent never finished); already-terminal
+ * patients are preserved so a run that completed most of its cohort before the
+ * crash keeps those drafts. The run is then `complete` (all done),
+ * `complete_with_errors` (some done), or `failed` (none done).
+ *
+ * Returns the run_ids it reconciled, for the boot log + tests. Run this BEFORE
+ * `reconcilePilotStatesOnStartup` so a now-terminal run cascades: the pilot
+ * reconciler advances the owning iter out of "running" too.
+ */
+export function reconcileOrphanedRunsOnStartup(now: Date = new Date()): string[] {
+  const root = runsRoot();
+  if (!fs.existsSync(root)) return [];
+  const iso = now.toISOString();
+  const reconciled: string[] = [];
+  for (const name of fs.readdirSync(root)) {
+    if (name.startsWith("_") || name.startsWith(".")) continue;
+    const status = getRunStatus(name);
+    if (!status || status.state !== "running") continue;
+
+    const perPatient: Record<string, PerPatientStatus> = {};
+    for (const [pid, pp] of Object.entries(status.per_patient)) {
+      perPatient[pid] =
+        pp.state === "pending" || pp.state === "running"
+          ? {
+              ...pp,
+              state: "error",
+              completed_at: pp.completed_at ?? iso,
+              error:
+                pp.error ??
+                "run orphaned — server restarted while this patient was in progress",
+            }
+          : pp;
+    }
+    const nComplete = Object.values(perPatient).filter((p) => p.state === "complete").length;
+    const nError = Object.values(perPatient).filter((p) => p.state === "error").length;
+    const finalState: RunState =
+      nComplete === 0 && nError > 0 ? "failed" : nError > 0 ? "complete_with_errors" : "complete";
+
+    atomicWriteJson(statusPath(name), {
+      ...status,
+      state: finalState,
+      updated_at: iso,
+      completed_at: status.completed_at ?? iso,
+      n_running: 0,
+      n_complete: nComplete,
+      n_error: nError,
+      per_patient: perPatient,
+    } satisfies RunStatus);
+    reconciled.push(name);
+  }
+  return reconciled;
+}
+
 // ── id generation ────────────────────────────────────────────────────────────
 
 export function generateRunId(now = new Date()): string {

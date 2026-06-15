@@ -39,6 +39,7 @@ export {
   // Lifecycle
   startBatchRun,
   deleteRun,
+  reconcileOrphanedRunsOnStartup,
   generateRunId,
   cohortSpend,
   // Persistence helpers

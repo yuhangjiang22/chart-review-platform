@@ -73,6 +73,7 @@ import { issueRoutes } from "./issue-routes.js";
 import { cohortRoutes } from "./cohort-routes.js";
 import { coreRoutes, type RawBody, type SSEStream } from "./core-routes.js";
 import { reconcilePilotStatesOnStartup } from "./lib/domain/iter/index.js";
+import { reconcileOrphanedRunsOnStartup } from "@chart-review/infra-batch-run";
 import { miscRoutes } from "./misc-routes.js";
 import { jobsRoutes } from "./jobs-routes.js";
 import { authoringRoutes } from "./authoring-routes.js";
@@ -424,6 +425,19 @@ server.on("upgrade", (req, socket, head) => {
 server.listen(PORT, () => {
   console.log(`chart-review-platform-concur listening on http://localhost:${PORT}`);
   console.log(`reviewsRoot: ${REVIEWS_ROOT}`);
+  // A batch-run driver is an in-process loop that dies with the server, and
+  // runs are never resumed — so any run still marked "running" at boot was
+  // orphaned by the restart and would show a phantom RUNNING badge forever.
+  // Flip those to a terminal state FIRST, so the pilot reconciler below sees a
+  // terminal run and advances the owning iter out of "running" too.
+  try {
+    const orphaned = reconcileOrphanedRunsOnStartup();
+    if (orphaned.length > 0) {
+      console.log(`[startup] reconciled ${orphaned.length} orphaned run(s): ${orphaned.join(", ")}`);
+    }
+  } catch (err) {
+    console.warn("[startup] reconcileOrphanedRunsOnStartup failed:", (err as Error).message);
+  }
   // Catch any pilot iters that finished while the server was down and got
   // stuck in "running". v1 does this on boot; the screenshot of a 100%-
   // complete iter still marked RUNNING is the bug this prevents.
