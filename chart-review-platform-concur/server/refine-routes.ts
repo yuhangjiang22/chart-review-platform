@@ -128,10 +128,17 @@ export const refineRoutes: RouteEntry[] = [
         );
       }
 
+      // votes: independent analyst votes per cell, majority wins (default 3 in
+      // the batch). force: re-attribute cells that already have a record.
+      const votesQ = query.get("votes");
+      const votes = votesQ != null && Number.isFinite(Number(votesQ)) ? Math.max(1, Math.floor(Number(votesQ))) : undefined;
+      const force = query.get("force") === "1" || query.get("force") === "true";
       const result = await runErrorAnalysisBatch({
         sessionId,
         taskId: p.taskId,
         iterId: p.iterId,
+        ...(votes != null ? { votes } : {}),
+        force,
       });
       if (!result.ok) throw httpErr(400, result.error ?? "error-analysis batch failed");
       return {
