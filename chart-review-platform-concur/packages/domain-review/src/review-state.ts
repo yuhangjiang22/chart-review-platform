@@ -644,6 +644,24 @@ export function assertAnswerInEnum(
 }
 
 /**
+ * Canonicalize an enum answer to the enum value's own type, so a numeric-scored
+ * field stores `2` (number) when the agent wrote `"2"` (string). Without this a
+ * derivation summing those fields concatenates strings ("2"+"3" -> "23"). Match
+ * is by trimmed string equality (so "2" -> the enum's 2); non-enum fields and
+ * unmatched answers pass through unchanged. Run AFTER assertAnswerInEnum.
+ */
+export function canonicalizeEnumAnswer(
+  field: { answer_schema?: unknown },
+  answer: unknown,
+): unknown {
+  const schema = field.answer_schema as { enum?: unknown } | undefined;
+  const enumValues = Array.isArray(schema?.enum) ? (schema!.enum as unknown[]) : null;
+  if (!enumValues || answer == null || Array.isArray(answer)) return answer;
+  const match = enumValues.find((e) => String(e).trim() === String(answer).trim());
+  return match !== undefined ? match : answer;
+}
+
+/**
  * Faithfulness gate for set_field_assessment. Throws on fabrication;
  * returns any non-fatal warnings. Pure: no state writes.
  */
@@ -925,7 +943,11 @@ export function transitionReviewState(
         );
       }
       assertAnswerInEnum(field, action.payload.answer);
-      applySetAssessmentMutation(s, by, by_id, action.payload, task);
+      const canonicalPayload = {
+        ...action.payload,
+        answer: canonicalizeEnumAnswer(field, action.payload.answer),
+      };
+      applySetAssessmentMutation(s, by, by_id, canonicalPayload, task);
       break;
     }
     case "set_summary": {
