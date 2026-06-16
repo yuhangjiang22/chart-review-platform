@@ -85,6 +85,11 @@ export type AgentRunInput = ComposeAgentInput & {
   /** Extra run context force-bound into plugin tools (e.g. person_id for
    *  cohort-CSV tasks like RUCAM). Merged with dataDir on the sidecar. */
   pluginBind?: Record<string, unknown>;
+  /** deepagents skill dirs to load (virtual paths under .claude/skills, e.g.
+   *  ["/chart-review-rucam/"]) — gives the agent the task's SKILL.md + its
+   *  reference files (e.g. RUCAM's per-item scoring methodology). Empty for
+   *  tasks that don't need skill methodology beyond the criteria. */
+  skills?: string[];
 };
 
 /** Provider contract: one method that yields events. Implementations
