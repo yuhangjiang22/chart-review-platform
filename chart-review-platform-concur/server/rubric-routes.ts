@@ -58,9 +58,10 @@ export const rubricRoutes: RouteEntry[] = [
   {
     method: "GET",
     pattern: "/api/tasks/:taskId/rubric",
-    handler: async (_b, _r, p) => {
+    handler: async (_b, _r, p, query) => {
       const task = loadCompiledTask(p.taskId);
       if (!task) throw httpErr(404, `task ${p.taskId} not found`);
+      const sessionId = query.get("session_id") ?? undefined;
 
       // Read overview_prose from meta.yaml (most up-to-date on disk)
       const metaPath = path.join(phenotypeSkillDir(p.taskId), "meta.yaml");
@@ -72,7 +73,10 @@ export const rubricRoutes: RouteEntry[] = [
         } catch { /* use compiled value */ }
       }
 
-      const criteriaDir = path.join(phenotypeSkillDir(p.taskId), "references", "criteria");
+      // Criteria come from the session's rubric fork when a session is active —
+      // so the AUTHOR editor DISPLAYS what its PUT writes. meta/overview stay on
+      // the baseline (not forked per session).
+      const criteriaDir = path.join(resolveRubricRoot(p.taskId, sessionId), "references", "criteria");
 
       const fields = task.fields.map((f) => {
         const fid = (f as { field_id?: string; id?: string }).field_id ?? (f as { id: string }).id;

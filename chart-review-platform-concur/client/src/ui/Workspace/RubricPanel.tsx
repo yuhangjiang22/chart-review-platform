@@ -99,6 +99,9 @@ function FieldEditor({ taskId, field, onSaved, sessionId }: FieldEditorProps) {
         setSaved(true);
         setTimeout(() => setSaved(false), 2500);
         onSaved({ ...field, prompt, enum: enumValues, definition, extraction_guidance, examples });
+        // The save snapshotted a new rubric version — tell the sidebar switcher
+        // (+ other listeners) to reload so the timeline isn't stale.
+        if (sessionId) window.dispatchEvent(new Event("chartreview:rubric-edited"));
       }
     } catch (e) {
       setError((e as Error).message);
@@ -265,7 +268,10 @@ export function RubricPanel({ taskId, revealNonce, alwaysOpen = false, activeSes
 
   const fetchRubric = useCallback(() => {
     setLoadState("loading");
-    authFetch(`/api/tasks/${encodeURIComponent(taskId)}/rubric`)
+    // Read through the active session's rubric fork (so the editor DISPLAYS what
+    // it writes); no session → the baseline.
+    const qs = activeSessionId ? `?session_id=${encodeURIComponent(activeSessionId)}` : "";
+    authFetch(`/api/tasks/${encodeURIComponent(taskId)}/rubric${qs}`)
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
       .then((d: RubricData) => {
         setData(d);
@@ -273,7 +279,7 @@ export function RubricPanel({ taskId, revealNonce, alwaysOpen = false, activeSes
         setLoadState("idle");
       })
       .catch(() => setLoadState("error"));
-  }, [taskId]);
+  }, [taskId, activeSessionId]);
 
   // Fetch when panel is first opened
   useEffect(() => {
@@ -281,6 +287,17 @@ export function RubricPanel({ taskId, revealNonce, alwaysOpen = false, activeSes
       fetchRubric();
     }
   }, [open, data, loadState, fetchRubric]);
+
+  // Refetch when the session's rubric version changes elsewhere (a switch in the
+  // sidebar switcher, or a refine apply) so the editor never shows stale content.
+  useEffect(() => {
+    function onVersionChange() {
+      setData(null);
+      setLoadState("idle");
+    }
+    window.addEventListener("chartreview:rubric-switched", onVersionChange);
+    return () => window.removeEventListener("chartreview:rubric-switched", onVersionChange);
+  }, []);
 
   async function saveOverview() {
     if (!data) return;

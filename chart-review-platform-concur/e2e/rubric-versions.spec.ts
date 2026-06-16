@@ -78,3 +78,24 @@ test.describe("rubric versioning", () => {
     expect(v.versions.map((x) => x.id)).toEqual(["s1", "s2"]);
   });
 });
+
+test.describe("rubric GET session-awareness", () => {
+  let token: string; let pre: Set<string>;
+  test.beforeEach(async ({ page }) => { token = await loginAsYuhang(page); pre = await snapshotActiveSessionIds(page, token, "cancer-diagnosis"); });
+  test.afterEach(async ({ page }) => { if (token) await archiveSessionsNotIn(page, token, "cancer-diagnosis", pre); });
+
+  test("the AUTHOR rubric GET reads the session fork (displays what it writes)", async ({ page }) => {
+    const T = "cancer-diagnosis"; const S = "http://localhost:3002";
+    const a = await startSession(page, token, T, "get-fork", ["patient_easy_neg_02"]);
+    await page.request.put(`${S}/api/tasks/${T}/criteria/cancer_type?session_id=${encodeURIComponent(a)}`, {
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      data: { extraction_guidance: "FORK-ONLY-GUIDANCE-XYZ" },
+    });
+    const sess = await (await page.request.get(`${S}/api/tasks/${T}/rubric?session_id=${encodeURIComponent(a)}`, { headers: { Authorization: `Bearer ${token}` } })).json();
+    const base = await (await page.request.get(`${S}/api/tasks/${T}/rubric`, { headers: { Authorization: `Bearer ${token}` } })).json();
+    const sCt = sess.fields.find((f: { field_id: string }) => f.field_id === "cancer_type");
+    const bCt = base.fields.find((f: { field_id: string }) => f.field_id === "cancer_type");
+    expect(sCt.extraction_guidance).toContain("FORK-ONLY-GUIDANCE-XYZ"); // session reads its fork
+    expect(bCt.extraction_guidance).not.toContain("FORK-ONLY-GUIDANCE-XYZ"); // baseline untouched
+  });
+});
