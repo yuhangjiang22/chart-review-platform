@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { assertAnswerInEnum, ReviewStateError } from "./review-state.js";
+import { assertAnswerInEnum, canonicalizeEnumAnswer, ReviewStateError } from "./review-state.js";
 
 const enumField = {
   id: "cancer_type",
@@ -42,5 +42,22 @@ describe("assertAnswerInEnum", () => {
   it("validates every element of a multi-value (cardinality many) answer", () => {
     expect(() => assertAnswerInEnum(multiField, ["a", "b"])).not.toThrow();
     expect(() => assertAnswerInEnum(multiField, ["a", "z"])).toThrow(/not an allowed value/);
+  });
+});
+
+describe("canonicalizeEnumAnswer", () => {
+  const scoreField = { id: "item_1", answer_schema: { enum: [2, 1, 0, -2] } };
+  it("coerces a numeric-string answer to the enum's number (so derivations sum, not concat)", () => {
+    expect(canonicalizeEnumAnswer(scoreField, "2")).toBe(2);
+    expect(canonicalizeEnumAnswer(scoreField, "-2")).toBe(-2);
+    expect(canonicalizeEnumAnswer(scoreField, 2)).toBe(2);
+  });
+  it("leaves string-enum answers unchanged", () => {
+    expect(canonicalizeEnumAnswer(enumField, "adenocarcinoma")).toBe("adenocarcinoma");
+  });
+  it("passes through non-enum / null / unmatched answers", () => {
+    expect(canonicalizeEnumAnswer(freeTextField, "free text")).toBe("free text");
+    expect(canonicalizeEnumAnswer(scoreField, null)).toBe(null);
+    expect(canonicalizeEnumAnswer(scoreField, "99")).toBe("99");
   });
 });
