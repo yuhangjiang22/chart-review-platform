@@ -20,6 +20,7 @@ from deepagents import create_deep_agent
 
 from .models import make_model
 from .events import messages_to_events, emit
+from .plugins import load_python_plugins
 
 
 def _recoverable(tools):
@@ -82,6 +83,10 @@ async def run(spec: dict) -> None:
     # persistent session keeps one server process alive across all tool calls.
     async with client.session("chart_review_state") as session:
         tools = _recoverable(await load_mcp_tools(session))
+        # Append task-specific read/compute plugin tools (e.g. RUCAM's) selected
+        # by the task's tool profile. The MCP tools (writes + note faithfulness)
+        # remain the primary surface; plugins are read/compute only.
+        tools = tools + load_python_plugins(spec.get("python_plugins", []), spec.get("data_dir", "data"))
         agent = create_deep_agent(
             model=make_model(spec.get("model")),
             tools=tools,
