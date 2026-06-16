@@ -376,7 +376,7 @@ import type { QuestionAnswer, RuleVerdict } from "@chart-review/platform-types";
 import { computeTaskSha } from "@chart-review/lock";
 import { guidelineDir, phenotypeSkillDir, resolveRubricRoot } from "@chart-review/rubric";
 import { getActiveVersion } from "@chart-review/rubric-versions";
-import { patientDir, listNotes, isPhiPatient } from "@chart-review/patients";
+import { patientDir, listNotes, isPhiPatient, patientPersonId } from "@chart-review/patients";
 import { resolveRolePrompt, validateAgentSpec } from "@chart-review/agent-specs";
 import { extractSpansDirect } from "@chart-review/pipeline-extract-ner";
 import { pathFor } from "@chart-review/storage";
@@ -1321,6 +1321,15 @@ async function runOneAgent(
     for (const cfg of Object.values(mcpServers) as Array<{ env?: Record<string, string> }>) {
       cfg.env = { ...(cfg.env ?? {}), CHART_REVIEW_MCP_TOOLS: mcpAllowlist(profile) };
     }
+    // Plugin tools' run context. Cohort-CSV tasks (RUCAM) read a shared CSV dir
+    // (CHART_REVIEW_RUCAM_DATA_DIR) filtered by the patient's PERSON_ID — both
+    // force-bound so the agent can't pick the patient/dir. Other tasks bind the
+    // patient's own dir.
+    const isCohortCsv = profile.dataSource === "rucam-csv";
+    const pluginDataDir = isCohortCsv
+      ? (process.env.CHART_REVIEW_RUCAM_DATA_DIR ?? patientDir(patientId))
+      : patientDir(patientId);
+    const pluginBind = isCohortCsv ? { person_id: patientPersonId(patientId) } : undefined;
     const sdkHooks: Record<string, Array<{ hooks: any[] }>> = {
       PreToolUse: [{ hooks: [auditHooks.pre] }],
       PostToolUse: [{ hooks: [auditHooks.post] }],
@@ -1346,7 +1355,8 @@ async function runOneAgent(
       transcriptPath: agentTranscriptPath(runId, patientId, spec.id),
       extraSystemPrompt: extraSystem,
       pythonPlugins: profile.pythonPlugins,
-      dataDir: patientDir(patientId),
+      dataDir: pluginDataDir,
+      pluginBind,
     })) {
       if (event.type === "result" && typeof event.cost_usd === "number") {
         cost = (cost ?? 0) + event.cost_usd;

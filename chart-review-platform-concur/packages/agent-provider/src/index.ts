@@ -82,6 +82,9 @@ export type AgentRunInput = ComposeAgentInput & {
   pythonPlugins?: string[];
   /** Data dir the plugin tools read (bound into each plugin tool at load). */
   dataDir?: string;
+  /** Extra run context force-bound into plugin tools (e.g. person_id for
+   *  cohort-CSV tasks like RUCAM). Merged with dataDir on the sidecar. */
+  pluginBind?: Record<string, unknown>;
 };
 
 /** Provider contract: one method that yields events. Implementations
