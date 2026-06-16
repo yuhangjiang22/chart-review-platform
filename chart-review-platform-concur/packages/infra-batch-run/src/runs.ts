@@ -1330,6 +1330,10 @@ async function runOneAgent(
       ? (process.env.CHART_REVIEW_RUCAM_DATA_DIR ?? patientDir(patientId))
       : patientDir(patientId);
     const pluginBind = isCohortCsv ? { person_id: patientPersonId(patientId) } : undefined;
+    // When the profile declares skills, load this task's own skill bundle
+    // (SKILL.md + references/, e.g. RUCAM's per-item scoring methodology). The
+    // sidecar roots the skill backend at .claude/skills, so this resolves there.
+    const skills = profile.skills.length ? [`/chart-review-${taskId}/`] : undefined;
     const sdkHooks: Record<string, Array<{ hooks: any[] }>> = {
       PreToolUse: [{ hooks: [auditHooks.pre] }],
       PostToolUse: [{ hooks: [auditHooks.post] }],
@@ -1357,6 +1361,7 @@ async function runOneAgent(
       pythonPlugins: profile.pythonPlugins,
       dataDir: pluginDataDir,
       pluginBind,
+      skills,
     })) {
       if (event.type === "result" && typeof event.cost_usd === "number") {
         cost = (cost ?? 0) + event.cost_usd;

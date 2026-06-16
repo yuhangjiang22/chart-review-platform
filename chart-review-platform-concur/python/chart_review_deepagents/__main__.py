@@ -95,11 +95,26 @@ async def run(spec: dict) -> None:
                 file=sys.stderr,
             )
         tools = tools + plugin_tools
-        agent = create_deep_agent(
+        agent_kwargs = dict(
             model=make_model(spec.get("model")),
             tools=tools,
             system_prompt=spec.get("system_prompt", ""),
         )
+        # Load task skills when the run requests them (e.g. RUCAM's per-item
+        # scoring methodology). deepagents skills need a FilesystemBackend; we
+        # root it at .claude/skills (NOT the platform root) so the skill read_file
+        # can reach skill files only — patient notes stay behind the MCP
+        # faithfulness gate, never readable through this backend.
+        skills = spec.get("skills") or []
+        if skills:
+            from deepagents.backends.filesystem import FilesystemBackend
+            skills_root = os.path.join(
+                os.environ.get("CHART_REVIEW_PLATFORM_ROOT", "."), ".claude", "skills"
+            )
+            agent_kwargs["backend"] = FilesystemBackend(root_dir=skills_root, virtual_mode=True)
+            agent_kwargs["skills"] = skills
+            print(f"[skills] loaded: {', '.join(skills)} (root {skills_root})", file=sys.stderr)
+        agent = create_deep_agent(**agent_kwargs)
         seen = 0
         last_text = ""
         final_msgs = []
