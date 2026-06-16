@@ -36,6 +36,14 @@ export function RubricVersionSwitcher({ taskId, sessionId, onSwitched }: Props) 
     void load();
   }, [load]);
 
+  // Reload the timeline when the rubric version changes elsewhere (a criterion
+  // edit / refine apply dispatches this), so the list never goes stale.
+  useEffect(() => {
+    const reload = () => { void load(); };
+    window.addEventListener("chartreview:rubric-edited", reload);
+    return () => window.removeEventListener("chartreview:rubric-edited", reload);
+  }, [load]);
+
   async function doSwitch(id: string) {
     if (!window.confirm(`Switch this session's rubric to ${id}? The next run will use it.`)) return;
     const r = await authFetch(`${sBase}/switch`, {
@@ -46,6 +54,8 @@ export function RubricVersionSwitcher({ taskId, sessionId, onSwitched }: Props) 
     if (r.ok) {
       await load();
       onSwitched?.(id);
+      // Tell the rubric editor (+ any other listener) to refetch the now-active version.
+      window.dispatchEvent(new Event("chartreview:rubric-switched"));
     }
   }
 
