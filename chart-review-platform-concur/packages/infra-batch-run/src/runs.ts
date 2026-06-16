@@ -376,7 +376,7 @@ import type { QuestionAnswer, RuleVerdict } from "@chart-review/platform-types";
 import { computeTaskSha } from "@chart-review/lock";
 import { guidelineDir, phenotypeSkillDir, resolveRubricRoot } from "@chart-review/rubric";
 import { getActiveVersion } from "@chart-review/rubric-versions";
-import { patientDir, listNotes } from "@chart-review/patients";
+import { patientDir, listNotes, isPhiPatient } from "@chart-review/patients";
 import { resolveRolePrompt, validateAgentSpec } from "@chart-review/agent-specs";
 import { extractSpansDirect } from "@chart-review/pipeline-extract-ner";
 import { pathFor } from "@chart-review/storage";
@@ -881,6 +881,29 @@ async function runOnePatient(
   return { patient_status, cost_usd: totalCost, field_count: totalFieldCount, confidence_summary: mergedConfidence };
 }
 
+/**
+ * Compliance-aware model selection. PHI patients (meta.phi=true) MUST run on the
+ * HIPAA-eligible model (modelFor("phi") — e.g. the Azure gpt-4o deployment), never
+ * the default backend (here vLLM = OpenRouter, an external relay). Fail loudly if
+ * a patient is PHI but no PHI model is configured: refuse to send PHI out rather
+ * than silently fall back to the default.
+ */
+export function resolveAgentModel(
+  isPhi: boolean,
+  phiModel: string | undefined,
+  specModel: string | undefined,
+): string | undefined {
+  if (!isPhi) return specModel;
+  if (!phiModel) {
+    throw new Error(
+      "patient is PHI (meta.phi=true) but no PHI model is configured — set " +
+        "CHART_REVIEW_PHI_MODEL to a HIPAA-eligible model key (e.g. gpt-4o) so PHI " +
+        "is never sent to the default backend",
+    );
+  }
+  return phiModel;
+}
+
 async function runOneAgent(
   manifest: RunManifest,
   patientId: string,
@@ -889,6 +912,10 @@ async function runOneAgent(
   const { run_id: runId, task_id: taskId } = manifest;
   const task = loadCompiledTask(taskId);
   if (!task) throw new Error(`task ${taskId} not found at runtime`);
+
+  // PHI patients run on the HIPAA-eligible model, never the default backend.
+  // Throws (patient errors loudly) if PHI but CHART_REVIEW_PHI_MODEL is unset.
+  const effectiveModel = resolveAgentModel(isPhiPatient(patientId), modelFor("phi"), spec.model);
 
   // The rubric root the agent's MCP criteria reads must resolve to: this session's
   // fork (or the baseline for legacy/session-less runs). Threaded into the
@@ -1018,10 +1045,10 @@ async function runOneAgent(
       // KEY); vllm entries map to OpenRouter, azure entries to the Responses
       // API. extractSpansDirect writes spans to the scratch reviewsRoot via
       // the mcp-core-ner disk-write helpers (same path the agent flow uses).
-      const endpoint = resolveModelEndpoint(spec.model ?? "");
+      const endpoint = resolveModelEndpoint(effectiveModel ?? "");
       if (!endpoint) {
         // Fail loudly — never guess an endpoint for an unknown model key.
-        agentError = `NER: model '${spec.model ?? "(unset)"}' has no python/models.json entry`;
+        agentError = `NER: model '${effectiveModel ?? "(unset)"}' has no python/models.json entry`;
         return;
       }
       const ontologyPath = resolveNerOntologyPath(task);
@@ -1190,7 +1217,7 @@ async function runOneAgent(
           hooks: adhSdkHooks,
           maxTurns: manifest.max_turns_per_patient,
           permissionMode: "acceptEdits",
-          model: spec.model,
+          model: effectiveModel,
           provider: manifest.provider,
           transcriptPath: agentTranscriptPath(runId, patientId, spec.id),
           extraSystemPrompt: extraAdherenceSystem,
@@ -1314,7 +1341,7 @@ async function runOneAgent(
       hooks: sdkHooks,
       maxTurns: manifest.max_turns_per_patient,
       permissionMode: "acceptEdits",
-      model: spec.model,
+      model: effectiveModel,
       provider: manifest.provider,
       transcriptPath: agentTranscriptPath(runId, patientId, spec.id),
       extraSystemPrompt: extraSystem,
