@@ -39,6 +39,15 @@ export interface CompiledTask {
    * assumption that pre-NER code carried.
    */
   task_kind?: TaskKind;
+  /**
+   * Declares that this task reads EHR structured data (OMOP). When true, the
+   * run exposes the `list_structured_data` / `read_structured_data` MCP tools;
+   * when absent/false the task is notes-only and those tools are NOT exposed
+   * (no wasted tool descriptions, no agent calling them on a patient with no
+   * structured data). Set per task in meta.yaml; spread through by
+   * loadSkillBundle. See runOneAgent's tool-allowlist construction.
+   */
+  uses_structured_data?: boolean;
   review_unit?: string;
   manual_version?: string;
   source_document_sha: string;

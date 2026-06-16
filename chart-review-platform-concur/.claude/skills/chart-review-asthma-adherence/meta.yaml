@@ -1,5 +1,6 @@
 task_type: adherence
 task_kind: adherence
+uses_structured_data: true
 manual_version: 0.2
 source_document_sha: sha256:asthma-adherence-naepp-grounded-2026-06
 status: draft
