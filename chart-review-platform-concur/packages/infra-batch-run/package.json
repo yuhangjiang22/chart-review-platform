@@ -32,6 +32,7 @@
     "@chart-review/rule-engine": "*",
     "@chart-review/storage": "*",
     "@chart-review/tasks": "*",
-    "@chart-review/rubric-versions": "*"
+    "@chart-review/rubric-versions": "*",
+    "@chart-review/task-tools": "*"
   }
 }
