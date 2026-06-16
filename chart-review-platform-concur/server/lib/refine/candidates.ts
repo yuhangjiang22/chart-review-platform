@@ -451,8 +451,10 @@ export function collectRefinementCandidates(opts: CollectOpts): RefinementCandid
   }
 
   // Leaf criteria only (derived fields are computed downstream and can't be
-  // refined). Mirrors judge-batch's leaf filter.
-  const criteria = loadCriteria(taskId);
+  // refined). Mirrors judge-batch's leaf filter. Read the SESSION's fork (the
+  // version the agent actually ran against) so a gap introduced/refined within
+  // the session is visible to the refiner — not the pristine baseline.
+  const criteria = loadCriteria(taskId, sessionId);
   const criteriaById = new Map<string, CriterionFromSkill>();
   const leafFieldIds: string[] = [];
   for (const c of criteria) {
