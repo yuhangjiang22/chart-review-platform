@@ -7,7 +7,12 @@ conventions, and gotchas. For the full narrative, see `README.md`.
 
 A trimmed fork of chart-review-platform-v2, extended back up toward parity.
 **Three task kinds** — phenotype (`cancer-diagnosis`), NER (`bso-ad-ner`),
-adherence (`asthma-adherence`) — clinical notes only, one agent provider
+adherence (`asthma-adherence`) — over clinical notes **and EHR structured
+data** (OMOP tables, read via the `list_structured_data` / `read_structured_data`
+MCP tools; evidence can be `source:"omop"`). Notes are the primary source;
+structured data corroborates. Available to a patient with an `omop/` dir —
+currently the asthma patient plus `patient_test_adenosq_01`; missing tables
+resolve to empty and the agent falls back to notes. One agent provider
 (`deepagents`). Phases: **AUTHOR · TRY · JUDGE (optional) · VALIDATE ·
 PERFORMANCE** (LOCK/DEPLOY deferred). Plus an **automatic rubric
 self-refinement loop** that improves the rubric from the reviewer's validated
