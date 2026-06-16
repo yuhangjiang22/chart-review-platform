@@ -99,9 +99,17 @@ function writeAll(taskId: string, entries: RefinementLogEntry[]): void {
  * Read the refinement log, newest-first. Optionally filter to one field. Each
  * entry is the provenance for one applied (or applied-then-reverted) edit.
  */
-export function readRefinementLog(taskId: string, fieldId?: string): RefinementLogEntry[] {
+export function readRefinementLog(
+  taskId: string,
+  fieldId?: string,
+  sessionId?: string,
+): RefinementLogEntry[] {
   const all = readAll(taskId);
-  const filtered = fieldId ? all.filter((e) => e.field_id === fieldId) : all;
+  let filtered = fieldId ? all.filter((e) => e.field_id === fieldId) : all;
+  // The log is task-level (one file), but each entry records the session that
+  // made it. When a sessionId is given, show only THAT session's refinements —
+  // so a session's history reflects its own inner loop, not every session's.
+  if (sessionId) filtered = filtered.filter((e) => e.session_id === sessionId);
   return filtered.slice().reverse(); // newest-first
 }
 

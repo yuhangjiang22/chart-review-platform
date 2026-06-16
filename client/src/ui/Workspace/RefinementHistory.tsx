@@ -54,17 +54,20 @@ function holdoutLabel(h: Holdout | undefined): string {
   return parts.join(" · ");
 }
 
-export function RefinementHistory({ taskId }: { taskId: string }) {
+export function RefinementHistory({ taskId, activeSessionId }: { taskId: string; activeSessionId?: string | null }) {
   const [entries, setEntries] = useState<LogEntry[] | null>(null);
   const [reverting, setReverting] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(() => {
-    authFetch(`/api/refine/${encodeURIComponent(taskId)}/log`)
+    // Scope to the active session so a session shows only ITS OWN refinements,
+    // not every session's (the task-level log records a session_id per entry).
+    const qs = activeSessionId ? `?session_id=${encodeURIComponent(activeSessionId)}` : "";
+    authFetch(`/api/refine/${encodeURIComponent(taskId)}/log${qs}`)
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
       .then((d: { entries?: LogEntry[] }) => setEntries(d.entries ?? []))
       .catch(() => setEntries([])); // best-effort — no history is a valid state
-  }, [taskId]);
+  }, [taskId, activeSessionId]);
 
   useEffect(() => {
     load();
