@@ -93,6 +93,37 @@ export function phenotypeSkillDir(taskId: string): string {
   return path.join(root, ".claude", "skills", `chart-review-${taskId}`);
 }
 
+// ── Session-scoped rubric resolution ─────────────────────────────────────────
+
+/** The baseline rubric root for a task = its skill dir (holds references/ + versions/). */
+export function baselineRubricRoot(taskId: string): string {
+  return phenotypeSkillDir(taskId);
+}
+
+/** A session's forked rubric root: <skill>/sessions/<sid>/rubric. */
+export function sessionRubricRoot(taskId: string, sessionId: string): string {
+  return path.join(phenotypeSkillDir(taskId), "sessions", sessionId, "rubric");
+}
+
+/** Resolve which rubric root to read/write for this (task, session).
+ *
+ *  A run subprocess receives the ALREADY-resolved root via CHART_REVIEW_RUBRIC_ROOT
+ *  (set by buildMcpServersConfig, mirroring CHART_REVIEW_REVIEWS_ROOT) and honors it
+ *  first — that is how the agent's MCP criteria reads land on the session fork. This
+ *  env var must ONLY ever be set on a subprocess config, never on the server's own
+ *  process.env (or every request would read one session's rubric). Otherwise: the
+ *  session fork when it exists, else the baseline (the lazy-migration fallback for
+ *  sessions created before forking existed). */
+export function resolveRubricRoot(taskId: string, sessionId?: string): string {
+  const override = process.env.CHART_REVIEW_RUBRIC_ROOT;
+  if (override) return override;
+  if (sessionId) {
+    const fork = sessionRubricRoot(taskId, sessionId);
+    if (fs.existsSync(path.join(fork, "references"))) return fork;
+  }
+  return baselineRubricRoot(taskId);
+}
+
 // ── Skill-format loader ──────────────────────────────────────────────────────
 
 /**
@@ -104,8 +135,8 @@ export function phenotypeSkillDir(taskId: string): string {
  * exist — the caller uses this as the "not migrated yet" signal and falls
  * back to the legacy YAML path.
  */
-export function loadPhenotypeCriteria(taskId: string): CriterionFromSkill[] {
-  const criteriaDir = path.join(phenotypeSkillDir(taskId), "references", "criteria");
+export function loadPhenotypeCriteria(taskId: string, sessionId?: string): CriterionFromSkill[] {
+  const criteriaDir = path.join(resolveRubricRoot(taskId, sessionId), "references", "criteria");
   if (!fs.existsSync(criteriaDir)) {
     return [];
   }
@@ -173,12 +204,12 @@ export function loadPhenotypeCriteria(taskId: string): CriterionFromSkill[] {
  * usually a sign that the guideline hasn't been promoted yet, or that a
  * test is missing a fixture seed.
  */
-export function loadCriteria(taskId: string): CriterionFromSkill[] {
-  const out = loadPhenotypeCriteria(taskId);
+export function loadCriteria(taskId: string, sessionId?: string): CriterionFromSkill[] {
+  const out = loadPhenotypeCriteria(taskId, sessionId);
   if (out.length === 0) {
     console.warn(
       `[phenotype-skill] ${taskId}: no criteria found at ` +
-      `${path.relative(PLATFORM_ROOT, phenotypeSkillDir(taskId))}/references/criteria/`,
+      `${path.relative(PLATFORM_ROOT, resolveRubricRoot(taskId, sessionId))}/references/criteria/`,
     );
   }
   return out;
