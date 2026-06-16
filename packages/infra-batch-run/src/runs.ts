@@ -82,6 +82,13 @@ export interface RunManifest {
    * Absent for whole-guideline runs (default behavior).
    */
   target_field_ids?: string[];
+  /** The review session this run belongs to (when started from a session). Drives
+   *  the session-scoped rubric fork the agent reads. Absent for cohort/lock-test
+   *  runs with no session. */
+  session_id?: string;
+  /** The session rubric version active when this run executed (e.g. "s2") —
+   *  provenance pinning which rubric the iter ran against. */
+  rubric_version?: string;
   /** Agent provider used for this run. Per-run override of the
    *  AGENT_PROVIDER env var. Absent on manifests written before
    *  v0.7.1 — readers should fall back to the env-var default. */
@@ -366,7 +373,8 @@ import { buildAuditHooks } from "@chart-review/audit-trail";
 import { loadCompiledTask, type CompiledTask } from "@chart-review/tasks";
 import type { QuestionAnswer, RuleVerdict } from "@chart-review/platform-types";
 import { computeTaskSha } from "@chart-review/lock";
-import { guidelineDir, phenotypeSkillDir } from "@chart-review/rubric";
+import { guidelineDir, phenotypeSkillDir, resolveRubricRoot } from "@chart-review/rubric";
+import { getActiveVersion } from "@chart-review/rubric-versions";
 import { patientDir, listNotes } from "@chart-review/patients";
 import { resolveRolePrompt, validateAgentSpec } from "@chart-review/agent-specs";
 import { extractSpansDirect } from "@chart-review/pipeline-extract-ner";
@@ -578,6 +586,9 @@ export interface StartBatchRunOptions {
   /** When set, the run manifest records this cohort linkage so the run
    *  can be retrieved by cohort. No change to the run filesystem layout. */
   cohort_id?: string;
+  /** The review session this run belongs to. When set, the run reads (and pins)
+   *  this session's rubric fork; when omitted, the baseline. */
+  session_id?: string;
   /** Per-run agent provider override. When omitted, falls back to the
    *  AGENT_PROVIDER env var resolved at server start. */
   provider?: ProviderName;
@@ -619,6 +630,13 @@ function makeSemaphore(limit: number) {
   };
 }
 
+/** The rubric root a run reads from = the session's fork (or the baseline for a
+ *  session-less run). Exposed for callers/tests that need to know which rubric a
+ *  given (task, session) run resolves to. */
+export function rubricRootForRun(taskId: string, sessionId?: string): string {
+  return resolveRubricRoot(taskId, sessionId);
+}
+
 export function startBatchRun(opts: StartBatchRunOptions): StartBatchRunResult {
   if (!opts.patient_ids || opts.patient_ids.length === 0) {
     throw new Error("patient_ids must be non-empty");
@@ -643,6 +661,9 @@ export function startBatchRun(opts: StartBatchRunOptions): StartBatchRunResult {
   const resolvedProvider: ProviderName = opts.provider ?? defaultProviderName();
 
   const runId = generateRunId();
+  // The session rubric version this run executes against (provenance pin). For a
+  // session run this resolves the fork's active version; baseline otherwise.
+  const rubricVersion = getActiveVersion(resolveRubricRoot(opts.task_id, opts.session_id)) ?? undefined;
   const manifest: RunManifest = {
     run_id: runId,
     label: opts.label,
@@ -662,6 +683,8 @@ export function startBatchRun(opts: StartBatchRunOptions): StartBatchRunResult {
       ? { target_field_ids: opts.target_field_ids }
       : {}),
     ...(opts.cohort_id ? { cohort_id: opts.cohort_id } : {}),
+    ...(opts.session_id ? { session_id: opts.session_id } : {}),
+    ...(rubricVersion ? { rubric_version: rubricVersion } : {}),
   };
 
   fs.mkdirSync(runDir(runId), { recursive: true });
@@ -861,6 +884,12 @@ async function runOneAgent(
   const { run_id: runId, task_id: taskId } = manifest;
   const task = loadCompiledTask(taskId);
   if (!task) throw new Error(`task ${taskId} not found at runtime`);
+
+  // The rubric root the agent's MCP criteria reads must resolve to: this session's
+  // fork (or the baseline for legacy/session-less runs). Threaded into the
+  // subprocess via CHART_REVIEW_RUBRIC_ROOT (buildMcpServersConfig) so read_criteria
+  // hits the session rubric, not the baseline.
+  const rubricRoot = resolveRubricRoot(taskId, manifest.session_id);
 
   const isNerTask = task.task_kind === "ner";
   const isAdherenceTask = task.task_kind === "adherence";
@@ -1070,7 +1099,7 @@ async function runOneAgent(
       ].join(",");
       const adherenceMcp = buildMcpServersConfig(
         patientId, task, sessionId, { onStateUpdate: () => {} },
-        { reviewsRoot: scratchRoot, provider: manifest.provider },
+        { reviewsRoot: scratchRoot, rubricRoot, provider: manifest.provider },
       ) as Record<string, { env?: Record<string, string> }>;
       // Inject the per-run tool allowlist into the subprocess env so only the
       // adherence tools are exposed (phenotype's set_field_assessment etc. stay
@@ -1249,7 +1278,7 @@ async function runOneAgent(
     // The subprocess server reads CHART_REVIEW_REVIEWS_ROOT env var.
     const mcpServers: Record<string, unknown> = buildMcpServersConfig(
       patientId, task, sessionId, { onStateUpdate: () => {} },
-      { reviewsRoot: scratchRoot, provider: manifest.provider },
+      { reviewsRoot: scratchRoot, rubricRoot, provider: manifest.provider },
     );
     const sdkHooks: Record<string, Array<{ hooks: any[] }>> = {
       PreToolUse: [{ hooks: [auditHooks.pre] }],
