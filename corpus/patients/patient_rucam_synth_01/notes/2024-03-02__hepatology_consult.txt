@@ -1,0 +1,17 @@
+HEPATOLOGY CONSULT — 2024-03-02
+
+62-year-old patient referred for acute hepatocellular liver injury. Started
+amoxicillin/clavulanate on 2024-02-20 for sinusitis; presented 2024-03-01 with
+malaise and jaundice. Drug was stopped on 2024-03-01.
+
+LABS: ALT 620 U/L (ULN 52), ALP 130 U/L (ULN 125) on 2024-03-01 — R ratio ~11,
+hepatocellular pattern. Baseline ALT 30 (2024-02-20). By 2024-03-09 ALT had
+fallen to 250 (>50% from peak), and to 70 by 2024-03-31.
+
+WORKUP: viral hepatitis serologies negative (HAV IgM, HBsAg, HCV Ab); CMV/EBV
+negative. No biliary obstruction on imaging. No alcohol use disorder, no
+hypotension/ischemia, no autoimmune features. Concomitant lisinopril (chronic,
+not hepatotoxic).
+
+ASSESSMENT: Probable amoxicillin/clavulanate-induced hepatocellular DILI;
+improving after drug cessation.
