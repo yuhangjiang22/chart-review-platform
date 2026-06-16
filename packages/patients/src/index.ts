@@ -66,6 +66,10 @@ interface CorpusMeta {
    *  the model to CHART_REVIEW_PHI_MODEL (and the runtime is expected
    *  to be configured with a HIPAA-eligible base URL). */
   phi?: boolean;
+  /** For cohort-CSV tasks (e.g. RUCAM): the integer PERSON_ID this concur
+   *  patient maps to in the shared CSV cohort. Bound into the task's plugin
+   *  tools so they read the right rows. */
+  person_id?: number;
 }
 
 /** #46 — surface the patient's PHI flag without exposing the rest of meta. */
@@ -74,6 +78,17 @@ export function isPhiPatient(patientId: string): boolean {
     return readMeta(patientId)?.phi === true;
   } catch {
     return false;
+  }
+}
+
+/** The cohort PERSON_ID this patient maps to (cohort-CSV tasks like RUCAM), or
+ *  undefined. Bound into plugin tools so the agent can't pick the patient. */
+export function patientPersonId(patientId: string): number | undefined {
+  try {
+    const v = readMeta(patientId)?.person_id;
+    return typeof v === "number" ? v : undefined;
+  } catch {
+    return undefined;
   }
 }
 

@@ -30,15 +30,17 @@ describe("buildRunSpec", () => {
     const spec = buildRunSpec({ prompt: "hi" } as any);
     expect(spec).toBeNull();
   });
-  it("carries python_plugins + data_dir when provided", () => {
-    const spec = buildRunSpec({ ...base, pythonPlugins: ["chart_review_plugins.rucam"], dataDir: "/x" });
+  it("carries python_plugins + data_dir + plugin_bind when provided", () => {
+    const spec = buildRunSpec({ ...base, pythonPlugins: ["chart_review_plugins.rucam"], dataDir: "/x", pluginBind: { person_id: 9001 } });
     expect(spec!.python_plugins).toEqual(["chart_review_plugins.rucam"]);
     expect(spec!.data_dir).toBe("/x");
+    expect(spec!.plugin_bind).toEqual({ person_id: 9001 });
   });
-  it("omits python_plugins/data_dir when absent", () => {
+  it("omits python_plugins/data_dir/plugin_bind when absent", () => {
     const spec = buildRunSpec(base);
     expect(spec!.python_plugins).toBeUndefined();
     expect(spec!.data_dir).toBeUndefined();
+    expect(spec!.plugin_bind).toBeUndefined();
   });
 });
 

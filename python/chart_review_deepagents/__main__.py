@@ -86,7 +86,8 @@ async def run(spec: dict) -> None:
         # Append task-specific read/compute plugin tools (e.g. RUCAM's) selected
         # by the task's tool profile. The MCP tools (writes + note faithfulness)
         # remain the primary surface; plugins are read/compute only.
-        plugin_tools = load_python_plugins(spec.get("python_plugins", []), spec.get("data_dir", "data"))
+        plugin_bind = {"data_dir": spec.get("data_dir", "data"), **(spec.get("plugin_bind") or {})}
+        plugin_tools = load_python_plugins(spec.get("python_plugins", []), plugin_bind)
         if plugin_tools:
             print(
                 f"[plugins] loaded {len(plugin_tools)} plugin tool(s): "
