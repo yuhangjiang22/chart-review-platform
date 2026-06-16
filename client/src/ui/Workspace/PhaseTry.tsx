@@ -378,7 +378,7 @@ export function PhaseTry({
           busy={busy}
           error={error}
         />
-        <RubricPanel taskId={taskId} />
+        <RubricPanel taskId={taskId} activeSessionId={activeSessionId} />
       </div>
     );
   }
@@ -398,7 +398,7 @@ export function PhaseTry({
         </p>
       </div>
 
-      <RubricPanel taskId={taskId} revealNonce={revealRubricNonce} />
+      <RubricPanel taskId={taskId} revealNonce={revealRubricNonce} activeSessionId={activeSessionId} />
 
       <div className="rounded-md border border-border bg-paper/40 px-4 py-3">
         <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-1">

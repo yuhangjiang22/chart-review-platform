@@ -539,7 +539,7 @@ export function Workspace({
               {/* RubricPanel is the existing editable rubric editor (also
                   used in TRY). It has no read-only mode in this fork, so it
                   isn't gated on isMethodologist here — matching TRY. */}
-              <RubricPanel taskId={taskId} alwaysOpen />
+              <RubricPanel taskId={taskId} alwaysOpen activeSessionId={activeSessionId} />
               {/* Self-refinement provenance (S4): which rules were applied to
                   this task's criteria, what they fixed (+held-out Δ), and a
                   Revert. Renders nothing until the first rule is applied. */}
