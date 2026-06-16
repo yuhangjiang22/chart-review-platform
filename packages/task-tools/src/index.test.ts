@@ -30,4 +30,10 @@ describe("toolProfileFor", () => {
     // hybrid: still has the phenotype write surface (MCP), plus structured + plugins
     expect(p.baseTools).toContain("set_field_assessment");
   });
+
+  it("the _demo profile loads the demo plugin (end-to-end proof hook)", () => {
+    const p = toolProfileFor({ task_id: "x", task_kind: "phenotype", tool_profile: "_demo" } as any);
+    expect(p.pythonPlugins).toContain("chart_review_plugins._demo");
+    expect(p.baseTools).toContain("set_field_assessment"); // base surface intact
+  });
 });
