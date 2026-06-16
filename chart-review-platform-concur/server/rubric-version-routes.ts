@@ -123,7 +123,11 @@ export const rubricVersionRoutes: RouteEntry[] = [
         by: "reviewer",
         now: new Date().toISOString(),
       });
-      return { ok: true, baseline_version: v.id, from: { session_id: b.session_id, version } };
+      // snapshotVersion dedups by content-SHA: if the chosen session version is
+      // byte-identical to the current baseline, no new version is created and it
+      // returns the existing active one — i.e. there was nothing to promote.
+      const unchanged = v.id === baseActive;
+      return { ok: true, baseline_version: v.id, unchanged, from: { session_id: b.session_id, version } };
     },
   },
 ];
