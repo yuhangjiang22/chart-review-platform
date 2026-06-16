@@ -38,6 +38,10 @@ export interface ProposeRubricEditInput {
    *  (guideline_gap + true_ambiguity) by the caller. The refiner sees ONLY
    *  these. */
   examples: RefinementExample[];
+  /** The field's allowed answer values (enum), shown to the refiner so the
+   *  rule resolves to a value the agent can actually emit. Absent for
+   *  free-text/numeric fields. */
+  answerEnum?: string[];
   /** Provider the cluster's run used (so the refiner inherits the same backend
    *  the judge would). Falls back to the AGENT_PROVIDER default when absent. */
   provider?: ProviderName;
@@ -214,12 +218,30 @@ export function buildRefinerPrompt(input: ProposeRubricEditInput): string {
     "### Current criterion definition (prompt + definition + extraction guidance)",
     input.criterionDef.trim() || "(empty)",
     "",
+    ...(input.answerEnum && input.answerEnum.length
+      ? [
+          "### Allowed answer values for this field (the rule MUST resolve to one of these)",
+          input.answerEnum.join(", "),
+          "",
+        ]
+      : []),
     `## The ${input.examples.length} disagreement example(s) in this cluster`,
     ...input.examples.map((ex, i) => exampleBlock(ex, i)),
     "",
     "## How to write the rule (read carefully)",
     "- GENERALIZE THE PATTERN across the examples — state a decision criterion or",
     "  edge-case-handling rule that ANY reviewer could apply to NEW patients.",
+    "- GROUND THE TRIGGER IN OBSERVABLE EVIDENCE — the rule's decision condition",
+    "  must key off signals that ACTUALLY appear in the note excerpts above (an",
+    "  explicit percentage/quantity, a specific phrase, a named finding). Do NOT",
+    "  require wording the notes don't use: if the excerpts quantify something",
+    "  (e.g. component percentages like \"~60% adenocarcinoma\"), phrase the",
+    "  condition in terms of that quantity — not a qualitative word like",
+    "  \"predominantly\" the report may never say. The rule must be DECIDABLE from",
+    "  what such a note typically states.",
+    "- RESOLVE TO AN ALLOWED VALUE — when the condition holds, map it to EXACTLY",
+    "  one of the allowed answer values listed above. A rule that doesn't change",
+    "  which allowed value the agent picks is useless; make the mapping explicit.",
     "- It MUST be a general rule. Do NOT write \"for patient X, answer Y\". Do NOT",
     "  reference any patient id. Do NOT encode the reviewers' gold answers as a",
     "  lookup or copy chart text verbatim. If the only thing the examples share",
