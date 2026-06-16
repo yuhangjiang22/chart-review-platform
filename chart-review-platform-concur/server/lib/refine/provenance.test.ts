@@ -8,6 +8,10 @@ import path from "node:path";
 let skillDir = "";
 vi.mock("@chart-review/rubric", () => ({
   phenotypeSkillDir: () => skillDir,
+  // criterion-md + snapshotAfterEdit now resolve through these; the fixture is a
+  // single baseline rubric at skillDir, so all three point there.
+  resolveRubricRoot: () => skillDir,
+  baselineRubricRoot: () => skillDir,
 }));
 
 import {
