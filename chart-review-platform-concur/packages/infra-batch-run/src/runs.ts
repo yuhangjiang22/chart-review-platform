@@ -510,6 +510,27 @@ const envInt = (k: string, fallback: number) => {
   return Number.isFinite(n) && n > 0 ? n : fallback;
 };
 const DEFAULT_MAX_CONCURRENCY = envInt("CHART_REVIEW_MAX_CONCURRENCY", 3);
+
+// Per-task-kind tool surface (the CHART_REVIEW_MCP_TOOLS allowlist the run pins
+// on the subprocess). Declarative tool scoping: a task is exposed only the tools
+// it needs, instead of "phenotype gets everything". EHR/structured-data tools
+// are added ONLY when the task declares `uses_structured_data` — a notes-only
+// task never sees them.
+const PHENOTYPE_BASE_TOOLS = [
+  "list_notes", "read_note", "read_notes", "search_notes",
+  "list_criteria", "read_criterion", "read_criteria",
+  "find_quote_offsets", "set_field_assessment", "select_evidence",
+  "set_summary", "set_review_status", "get_review_state", "recommend_keywords",
+];
+const STRUCTURED_DATA_TOOLS = ["list_structured_data", "read_structured_data"];
+/** The tool allowlist for a phenotype run: the notes/criteria/write surface,
+ *  plus the OMOP read tools only when the task opts into structured data. */
+export function phenotypeToolset(task: { uses_structured_data?: boolean }): string {
+  return [
+    ...PHENOTYPE_BASE_TOOLS,
+    ...(task.uses_structured_data ? STRUCTURED_DATA_TOOLS : []),
+  ].join(",");
+}
 // Empirically: 30 turns is too tight for the chart-review skill on a typical
 // The agent reads the guideline + all notes + all criterion YAMLs (8-15 turns)
 // before it ever calls set_field_assessment. Reasoning models (e.g. Qwen3) burn
@@ -1106,8 +1127,8 @@ async function runOneAgent(
         "read_note",
         "read_notes",
         "search_notes",
-        "list_structured_data",
-        "read_structured_data",
+        // EHR/structured-data tools only when the task declares it (asthma does).
+        ...(task.uses_structured_data ? STRUCTURED_DATA_TOOLS : []),
         "set_review_status",
       ].join(",");
       const adherenceMcp = buildMcpServersConfig(
@@ -1293,6 +1314,16 @@ async function runOneAgent(
       patientId, task, sessionId, { onStateUpdate: () => {} },
       { reviewsRoot: scratchRoot, rubricRoot, provider: manifest.provider },
     );
+    // Pin the phenotype tool allowlist on the subprocess env (mirrors the
+    // adherence path). Scopes the agent to the notes/criteria/write surface +
+    // EHR tools only when the task declares uses_structured_data — so a
+    // notes-only task is not handed the structured-data tools at all.
+    {
+      const allow = phenotypeToolset(task);
+      for (const cfg of Object.values(mcpServers) as Array<{ env?: Record<string, string> }>) {
+        cfg.env = { ...(cfg.env ?? {}), CHART_REVIEW_MCP_TOOLS: allow };
+      }
+    }
     const sdkHooks: Record<string, Array<{ hooks: any[] }>> = {
       PreToolUse: [{ hooks: [auditHooks.pre] }],
       PostToolUse: [{ hooks: [auditHooks.post] }],
