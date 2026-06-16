@@ -6,6 +6,7 @@ dependencies = [
   "deepagents",
   "langchain-openai",
   "langchain-mcp-adapters",
+  "pandas",  # RUCAM plugin tools (chart_review_plugins.rucam) read CSV cohorts
 ]
 
 [build-system]
