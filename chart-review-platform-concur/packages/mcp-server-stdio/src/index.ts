@@ -331,12 +331,14 @@ if (want("search_notes")) {
   );
 }
 
-// OMOP / structured-data read tools. The notes-only phenotype task
-// (cancer-diagnosis) doesn't register these, but adherence questions
-// reference OMOP tables (med lists, ACT scores, spirometry), so they're
-// enabled when the run requests them via the CHART_REVIEW_MCP_TOOLS
-// allowlist. Missing omop/ files resolve to empty tables (the handler
-// returns {ok:true, tables:[]} / empty rows) — the agent falls back to
+// OMOP / structured-data read tools. Registered for any run that doesn't
+// restrict the tool set via the CHART_REVIEW_MCP_TOOLS allowlist (`want()`
+// allows everything when no subset is set) — so BOTH the phenotype agent
+// (prompted to check structured data first, then fall back to notes) and
+// adherence (whose questions reference OMOP tables: med lists, ACT scores,
+// spirometry) get them. The adherence run further pins an explicit allowlist;
+// phenotype passes none. Missing omop/ files resolve to empty tables (the
+// handler returns {ok:true, tables:[]} / empty rows) — the agent falls back to
 // notes rather than crashing.
 if (want("list_structured_data")) {
   server.registerTool(
