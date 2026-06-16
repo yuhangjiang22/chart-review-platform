@@ -431,8 +431,16 @@ export function sessionRubricRoot(taskId: string, sessionId: string): string {
 
 /** Resolve which rubric root to read/write for this (task, session). Returns the
  *  session fork when it exists, else the baseline — the lazy-migration fallback
- *  for sessions created before forking existed. */
+ *  for sessions created before forking existed.
+ *
+ *  A run subprocess receives the ALREADY-resolved root via CHART_REVIEW_RUBRIC_ROOT
+ *  (set by buildMcpServersConfig, mirroring CHART_REVIEW_REVIEWS_ROOT) and honors it
+ *  first — that's how the agent's MCP criteria reads hit the session fork. This env
+ *  var must ONLY ever be set on a subprocess config, never on the server's own
+ *  process.env (or every request would read one session's rubric). */
 export function resolveRubricRoot(taskId: string, sessionId?: string): string {
+  const override = process.env.CHART_REVIEW_RUBRIC_ROOT;
+  if (override) return override;
   if (sessionId) {
     const fork = sessionRubricRoot(taskId, sessionId);
     if (fs.existsSync(path.join(fork, "references"))) return fork;
@@ -670,7 +678,16 @@ export function rubricRootForRun(taskId: string, sessionId?: string): string {
   return resolveRubricRoot(taskId, sessionId);
 }
 ```
-Then, in `runOneAgent`, derive the session id from the run (the run manifest / iter carries `session_id`; thread it into `StartBatchRunOptions` as `session_id?`), and pass it to the criteria reads (`loadCriteria(taskId, sessionId)` / the resolved `guidelinePath`). Record the resolved active version on the run manifest: read `getActiveVersion(rubricRootForRun(taskId, sessionId))` at run start and store `rubric_version` on the run + iter manifest.
+Then, in `runOneAgent`, derive the session id from the run (the run manifest / iter carries `session_id`; thread it into `StartBatchRunOptions` as `session_id?`, or look it up via `sessionIdForRun(taskId, runId)`), and:
+
+1. **Thread the resolved rubric root into the MCP subprocess** — this is what actually makes the agent read the session's rubric (the agent reads criteria through the stdio server's tools, not `loadCriteria`). Mirror the existing `reviewsRoot` plumbing:
+   - In `runOneAgent`: `const rubricRoot = rubricRootForRun(taskId, sessionId);` then pass it into `buildMcpServersConfig(patientId, task, sessionId, {...}, { reviewsRoot: scratchRoot, rubricRoot, provider })`.
+   - In `packages/mcp-server-anthropic/src/index.ts` `buildMcpServersConfig`: add `rubricRoot?: string` to its opts, and when set: `env.CHART_REVIEW_RUBRIC_ROOT = opts.rubricRoot;` (exactly alongside the existing `if (opts.reviewsRoot) env.CHART_REVIEW_REVIEWS_ROOT = opts.reviewsRoot;`).
+   - `resolveRubricRoot` (Task 3) already honors `CHART_REVIEW_RUBRIC_ROOT` first, so the subprocess's criteria reads resolve to the session fork. Confirm the subprocess's criteria reader (`loadCriteria` / the read_criteria tool path) routes through `resolveRubricRoot` (Task 3 Step 5).
+2. **Also** pass `sessionId` to the run loop's own in-process `loadCriteria(taskId, sessionId)` calls (prompt assembly, field lists) for consistency.
+3. **Record provenance:** read `getActiveVersion(rubricRootForRun(taskId, sessionId))` at run start and store `rubric_version` on the run + iter manifest.
+
+Add a test asserting `buildMcpServersConfig({ rubricRoot: "/x" })` sets `CHART_REVIEW_RUBRIC_ROOT=/x` on the returned subprocess env.
 
 - [ ] **Step 4: Run — verify pass + the existing batch-run suite still green**
 
