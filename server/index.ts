@@ -87,6 +87,7 @@ import { rubricRoutes } from "./rubric-routes.js";
 import { exportRoutes } from "./export-routes.js";
 import { refineRoutes } from "./refine-routes.js";
 import { adherenceRubricRoutes } from "./adherence-rubric-routes.js";
+import { rubricVersionRoutes } from "./rubric-version-routes.js";
 import { maturityDerivedRoutes } from "./maturity-derived-routes.js";
 import { attachWebSocketServer, registerBroadcasters } from "./ws.js";
 import {
@@ -241,6 +242,7 @@ const paramRouter = makeRouter([
   ...exportRoutes,
   ...refineRoutes,
   ...adherenceRubricRoutes,
+  ...rubricVersionRoutes,
   ...maturityDerivedRoutes,
 ]);
 
