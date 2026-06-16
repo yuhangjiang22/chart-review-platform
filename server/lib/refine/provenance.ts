@@ -20,6 +20,7 @@ import {
   buildCriterionMd,
   atomicWriteText,
 } from "../criterion-md.js";
+import { snapshotAfterEdit } from "../rubric-edit-snapshot.js";
 
 // ── Shapes ─────────────────────────────────────────────────────────────────────
 
@@ -130,7 +131,7 @@ export function applyRefinement(input: ApplyRefinementInput): RefinementLogEntry
   const rule = input.ruleText.trim();
   if (!rule) throw new Error("ruleText is empty");
 
-  const mdPath = criterionMdPath(input.taskId, input.fieldId);
+  const mdPath = criterionMdPath(input.taskId, input.fieldId, input.sessionId);
   if (!fs.existsSync(mdPath)) {
     throw new Error(`criterion ${input.fieldId} not found for task ${input.taskId}`);
   }
@@ -154,6 +155,14 @@ export function applyRefinement(input: ApplyRefinementInput): RefinementLogEntry
     examples: parsed.examples,
   });
   atomicWriteText(mdPath, newMd);
+  // Snapshot the post-apply rubric as a new version on the same root the write
+  // landed on (session fork when sessionId is set, else baseline).
+  snapshotAfterEdit({
+    taskId: input.taskId,
+    sessionId: input.sessionId,
+    source: `refine:${input.fieldId}`,
+    by: input.appliedBy,
+  });
 
   const now = input.now ?? new Date().toISOString();
   const entry: RefinementLogEntry = {
@@ -201,7 +210,7 @@ export function revertRefinement(opts: {
   const entry = all[idx];
   if (entry.reverted) throw new Error(`entry ${opts.entryId} is already reverted`);
 
-  const mdPath = criterionMdPath(opts.taskId, entry.field_id);
+  const mdPath = criterionMdPath(opts.taskId, entry.field_id, entry.session_id);
   if (!fs.existsSync(mdPath)) {
     throw new Error(`criterion ${entry.field_id} not found for task ${opts.taskId}`);
   }
@@ -223,6 +232,14 @@ export function revertRefinement(opts: {
     examples: parsed.examples,
   });
   atomicWriteText(mdPath, newMd);
+  // A revert is itself a rubric change → snapshot the restored state as a new
+  // version on the same (session or baseline) root.
+  snapshotAfterEdit({
+    taskId: opts.taskId,
+    sessionId: entry.session_id,
+    source: `revert:${entry.field_id}`,
+    by: opts.by,
+  });
 
   const now = opts.now ?? new Date().toISOString();
   all[idx] = { ...entry, reverted: { at: now, by: opts.by, intervening_edit } };

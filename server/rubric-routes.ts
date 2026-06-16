@@ -21,7 +21,8 @@ import path from "node:path";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import type { RouteEntry } from "./router.js";
 import { loadCompiledTask } from "./lib/tasks.js";
-import { phenotypeSkillDir } from "@chart-review/rubric";
+import { phenotypeSkillDir, resolveRubricRoot } from "@chart-review/rubric";
+import { snapshotAfterEdit } from "./lib/rubric-edit-snapshot.js";
 import {
   isSafeId,
   atomicWriteText,
@@ -123,14 +124,16 @@ export const rubricRoutes: RouteEntry[] = [
   {
     method: "PUT",
     pattern: "/api/tasks/:taskId/criteria/:fieldId",
-    handler: async (body, _r, p) => {
+    handler: async (body, _r, p, query) => {
       const { taskId, fieldId } = p;
+      const sessionId = query.get("session_id") ?? undefined;
 
       // Path traversal guard
       if (!isSafeId(taskId)) throw httpErr(400, "invalid taskId");
       if (!isSafeId(fieldId)) throw httpErr(400, "invalid fieldId");
 
-      const criteriaDir = path.join(phenotypeSkillDir(taskId), "references", "criteria");
+      // Session edit → the session's rubric fork; no session → the baseline.
+      const criteriaDir = path.join(resolveRubricRoot(taskId, sessionId), "references", "criteria");
       const mdPath = path.join(criteriaDir, `${fieldId}.md`);
 
       // Reject if the resolved path is outside the criteria dir
@@ -182,6 +185,8 @@ export const rubricRoutes: RouteEntry[] = [
       });
 
       atomicWriteText(mdPath, newContent);
+      // Snapshot the edited rubric as a new version (session fork or baseline).
+      snapshotAfterEdit({ taskId, sessionId, source: "author-edit", by: "reviewer" });
       return { ok: true };
     },
   },

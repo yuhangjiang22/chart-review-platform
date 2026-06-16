@@ -7,7 +7,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
-import { phenotypeSkillDir } from "@chart-review/rubric";
+import { resolveRubricRoot } from "@chart-review/rubric";
 
 /** Validate an identifier for use in a file path. Rejects anything that could
  *  traverse outside the criteria directory. */
@@ -15,11 +15,13 @@ export function isSafeId(id: string): boolean {
   return /^[a-z0-9_-]+$/.test(id);
 }
 
-/** Absolute path to a criterion's markdown file. Throws on unsafe ids. */
-export function criterionMdPath(taskId: string, fieldId: string): string {
+/** Absolute path to a criterion's markdown file. Throws on unsafe ids. When a
+ *  sessionId is given (and that session has a rubric fork), the path resolves to
+ *  the SESSION fork's criteria; otherwise the baseline. */
+export function criterionMdPath(taskId: string, fieldId: string, sessionId?: string): string {
   if (!isSafeId(taskId)) throw new Error(`invalid taskId: ${taskId}`);
   if (!isSafeId(fieldId)) throw new Error(`invalid fieldId: ${fieldId}`);
-  const criteriaDir = path.join(phenotypeSkillDir(taskId), "references", "criteria");
+  const criteriaDir = path.join(resolveRubricRoot(taskId, sessionId), "references", "criteria");
   const mdPath = path.join(criteriaDir, `${fieldId}.md`);
   if (!mdPath.startsWith(criteriaDir + path.sep)) {
     throw new Error("path traversal rejected");
