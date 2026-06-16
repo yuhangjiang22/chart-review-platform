@@ -656,7 +656,8 @@ export const refineRoutes: RouteEntry[] = [
       const task = loadCompiledTask(p.taskId);
       if (!task) throw httpErr(404, `task ${p.taskId} not found`);
       const fieldId = query.get("field_id") ?? undefined;
-      return { entries: readRefinementLog(p.taskId, fieldId) };
+      const sessionId = query.get("session_id") ?? undefined;
+      return { entries: readRefinementLog(p.taskId, fieldId, sessionId) };
     },
   },
 

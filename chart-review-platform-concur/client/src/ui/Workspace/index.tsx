@@ -543,7 +543,7 @@ export function Workspace({
               {/* Self-refinement provenance (S4): which rules were applied to
                   this task's criteria, what they fixed (+held-out Δ), and a
                   Revert. Renders nothing until the first rule is applied. */}
-              <RefinementHistory taskId={taskId} />
+              <RefinementHistory taskId={taskId} activeSessionId={activeSessionId} />
               {/* Self-refinement (S2): surface transparent proposal cards built
                   from the agent-vs-you disagreements on the active validated +
                   judged iter. Only shown when a session + iter exist — refinement
