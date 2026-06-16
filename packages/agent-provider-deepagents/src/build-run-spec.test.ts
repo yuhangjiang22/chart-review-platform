@@ -30,6 +30,16 @@ describe("buildRunSpec", () => {
     const spec = buildRunSpec({ prompt: "hi" } as any);
     expect(spec).toBeNull();
   });
+  it("carries python_plugins + data_dir when provided", () => {
+    const spec = buildRunSpec({ ...base, pythonPlugins: ["chart_review_plugins.rucam"], dataDir: "/x" });
+    expect(spec!.python_plugins).toEqual(["chart_review_plugins.rucam"]);
+    expect(spec!.data_dir).toBe("/x");
+  });
+  it("omits python_plugins/data_dir when absent", () => {
+    const spec = buildRunSpec(base);
+    expect(spec!.python_plugins).toBeUndefined();
+    expect(spec!.data_dir).toBeUndefined();
+  });
 });
 
 describe("nextRunSpecPath — concurrency safety", () => {

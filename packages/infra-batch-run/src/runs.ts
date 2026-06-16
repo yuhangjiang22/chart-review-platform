@@ -1290,11 +1290,9 @@ async function runOneAgent(
     // adherence path). Scopes the agent to the notes/criteria/write surface +
     // EHR tools only when the task declares uses_structured_data — so a
     // notes-only task is not handed the structured-data tools at all.
-    {
-      const allow = mcpAllowlist(toolProfileFor(task));
-      for (const cfg of Object.values(mcpServers) as Array<{ env?: Record<string, string> }>) {
-        cfg.env = { ...(cfg.env ?? {}), CHART_REVIEW_MCP_TOOLS: allow };
-      }
+    const profile = toolProfileFor(task);
+    for (const cfg of Object.values(mcpServers) as Array<{ env?: Record<string, string> }>) {
+      cfg.env = { ...(cfg.env ?? {}), CHART_REVIEW_MCP_TOOLS: mcpAllowlist(profile) };
     }
     const sdkHooks: Record<string, Array<{ hooks: any[] }>> = {
       PreToolUse: [{ hooks: [auditHooks.pre] }],
@@ -1320,6 +1318,8 @@ async function runOneAgent(
       provider: manifest.provider,
       transcriptPath: agentTranscriptPath(runId, patientId, spec.id),
       extraSystemPrompt: extraSystem,
+      pythonPlugins: profile.pythonPlugins,
+      dataDir: patientDir(patientId),
     })) {
       if (event.type === "result" && typeof event.cost_usd === "number") {
         cost = (cost ?? 0) + event.cost_usd;

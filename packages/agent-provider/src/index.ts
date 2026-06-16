@@ -76,6 +76,12 @@ export type AgentRunInput = ComposeAgentInput & {
    *  Provider-agnostic — works for both Claude and Codex. Set
    *  CHART_REVIEW_TRANSCRIPTS=0 to disable even when a path is supplied. */
   transcriptPath?: string;
+  /** Read/compute tool modules the deepagents sidecar loads as plugins, in
+   *  addition to the MCP tools (import paths, e.g. "chart_review_plugins.rucam").
+   *  See @chart-review/task-tools ToolProfile.pythonPlugins. */
+  pythonPlugins?: string[];
+  /** Data dir the plugin tools read (bound into each plugin tool at load). */
+  dataDir?: string;
 };
 
 /** Provider contract: one method that yields events. Implementations
