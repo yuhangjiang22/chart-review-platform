@@ -20,12 +20,12 @@ attribution+propose. See `server/lib/refine/` and
 
 ```
 chart-review-platform-concur/
-├── .claude/skills/chart-review-cancer-diagnosis/   ← the rubric the SERVER reads
+├── .claude/skills/chart-review-cancer-diagnosis/   ← the ONLY rubric tree (server-read + git-tracked)
 │   ├── SKILL.md, meta.yaml                            (guidelinesRoot() = <root>/.claude/skills)
-│   └── references/criteria/{cancer_type,has_distant_metastasis,has_local_recurrence,disease_extent}.md
-│       (disease_extent is a derived field: computed from the two has_* leaves)
-├── .agents/skills/…                                ← PLATFORM_ROOT *marker* only (see gotcha #5);
-│                                                      a SEPARATE, drifted copy — NOT read at runtime
+│   ├── references/criteria/{cancer_type,has_distant_metastasis,has_local_recurrence,disease_extent}.md
+│   │       (disease_extent is a derived field: computed from the two has_* leaves)
+│   ├── versions/   ← promoted baseline rubric versions (v1…vN), git-tracked
+│   └── sessions/<sid>/rubric/   ← per-session rubric forks (s1…sM), git-ignored
 ├── client/               React 18 + Tailwind + Radix Studio UI
 ├── server/               Express + WebSocket (index.ts + route files)
 ├── packages/
@@ -152,13 +152,13 @@ cd python && ./.venv/bin/python -m pytest -q
    since deepagents always uses subprocess transport. `STDIO_SERVER_PATH`
    in that file must point at `mcp-server-stdio/src/index.ts`.
 
-5. **`.claude/skills` is the rubric the server reads — NOT `.agents/skills`.**
-   `guidelinesRoot()` resolves to `<PLATFORM_ROOT>/.claude/skills`, and all
-   runtime state (pilots/, sessions/, refinement_log.jsonl) is written there.
-   `.agents/skills` exists only as the marker `packages/patients` walks up to
-   find PLATFORM_ROOT — it is **not** a symlink here (unlike the upstream
-   monorepo's `chart-review-platform/`) and its content has **drifted** from
-   `.claude/skills`. Edit a criterion/rubric under **`.claude/skills`** or the
-   change is silently ignored. (Some package descriptions / loader comments
-   still say `.agents/skills`; those are stale. The two trees' content is
-   unreconciled — pick one as canonical before relying on the other.)
+5. **`.claude/skills` is the one and only rubric tree.** `guidelinesRoot()`
+   resolves to `<PLATFORM_ROOT>/.claude/skills`; the server reads it, runtime
+   state (pilots/, sessions/, refinement_log.jsonl) is written there, and the
+   baseline `references/` + promoted `versions/` are git-tracked (per-session
+   `sessions/<sid>/rubric/` forks are git-ignored). The old duplicate
+   `.agents/skills` tree (a separate, drifted copy that used to confuse edits)
+   has been **retired**; `packages/patients` still accepts either `.claude/skills`
+   or `.agents/skills` as the PLATFORM_ROOT marker, so the resolution survives its
+   removal. (Some package descriptions / loader comments still mention
+   `.agents/skills`; those are stale text, harmless.)
