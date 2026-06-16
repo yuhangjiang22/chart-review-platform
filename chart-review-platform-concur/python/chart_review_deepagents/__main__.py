@@ -86,7 +86,14 @@ async def run(spec: dict) -> None:
         # Append task-specific read/compute plugin tools (e.g. RUCAM's) selected
         # by the task's tool profile. The MCP tools (writes + note faithfulness)
         # remain the primary surface; plugins are read/compute only.
-        tools = tools + load_python_plugins(spec.get("python_plugins", []), spec.get("data_dir", "data"))
+        plugin_tools = load_python_plugins(spec.get("python_plugins", []), spec.get("data_dir", "data"))
+        if plugin_tools:
+            print(
+                f"[plugins] loaded {len(plugin_tools)} plugin tool(s): "
+                f"{', '.join(t.__name__ for t in plugin_tools)}",
+                file=sys.stderr,
+            )
+        tools = tools + plugin_tools
         agent = create_deep_agent(
             model=make_model(spec.get("model")),
             tools=tools,

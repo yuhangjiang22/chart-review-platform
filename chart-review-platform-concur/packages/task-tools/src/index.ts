@@ -46,6 +46,12 @@ const NAMED_PROFILES: Record<string, Partial<ToolProfile>> = {
     dataSource: "rucam-csv",
     skills: ["rucam-scoring"],
   },
+  // Proof hook: a phenotype task with `tool_profile: _demo` loads the fixture
+  // plugin (chart_review_plugins._demo) so the registry→runspec→sidecar→agent
+  // chain can be exercised end-to-end. Not for real tasks.
+  _demo: {
+    pythonPlugins: ["chart_review_plugins._demo"],
+  },
 };
 
 /** Resolve a task to its tool profile. A task with no `tool_profile` resolves to
