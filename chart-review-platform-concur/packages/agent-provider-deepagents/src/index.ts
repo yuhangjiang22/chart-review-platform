@@ -35,6 +35,21 @@ export interface RunSpec {
 
 const KNOWN_EVENT_TYPES = new Set(["tool_use", "tool_result", "text", "result", "error"]);
 
+// Monotonic per-process counter so concurrent runs NEVER share a runspec path.
+// The old `${pid}-${Date.now()}` key collided when two agents started in the
+// same millisecond (the server runs patients concurrently, all in one process):
+// the second writeFileSync clobbered the first's spec before its sidecar read
+// it, so both sidecars loaded the SAME patient — cross-patient contamination
+// (one patient's review_state went to the other; its own was never written).
+// pid distinguishes processes; the counter distinguishes calls within one.
+let runSpecSeq = 0;
+export function nextRunSpecPath(): string {
+  return path.join(
+    os.tmpdir(),
+    `deepagents-runspec-${process.pid}-${Date.now()}-${runSpecSeq++}.json`,
+  );
+}
+
 /** Build the JSON run spec handed to the Python sidecar. Exported so the
  *  prompt → spec mapping (including the per-agent model) is unit-testable
  *  without spawning a subprocess. Returns null when no MCP config is present. */
@@ -58,7 +73,7 @@ export class DeepAgentsProvider implements AgentProvider {
       yield { type: "error", error: "deepagents provider: no chart_review_state MCP config in mcpServers" };
       return;
     }
-    const specPath = path.join(os.tmpdir(), `deepagents-runspec-${process.pid}-${Date.now()}.json`);
+    const specPath = nextRunSpecPath();
     fs.writeFileSync(specPath, JSON.stringify(spec), "utf8");
 
     const child = spawn(resolvePythonBin(), ["-m", "chart_review_deepagents", specPath], {
