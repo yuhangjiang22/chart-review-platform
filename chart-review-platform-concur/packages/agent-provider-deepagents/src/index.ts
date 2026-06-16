@@ -31,6 +31,10 @@ export interface RunSpec {
    *  sidecar via registry.resolve(); undefined → the registry default. */
   model?: string;
   mcp: unknown; // the chart_review_state stdio config {type,command,args,env}
+  /** Read/compute tool modules the sidecar loads as plugins (import paths). */
+  python_plugins?: string[];
+  /** Data dir bound into the plugin tools at load. */
+  data_dir?: string;
 }
 
 const KNOWN_EVENT_TYPES = new Set(["tool_use", "tool_result", "text", "result", "error"]);
@@ -63,6 +67,8 @@ export function buildRunSpec(input: AgentRunInput): RunSpec | null {
     mcp,
   };
   if (input.model) spec.model = input.model;
+  if (input.pythonPlugins?.length) spec.python_plugins = input.pythonPlugins;
+  if (input.dataDir) spec.data_dir = input.dataDir;
   return spec;
 }
 
