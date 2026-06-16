@@ -2,7 +2,15 @@ task_type: phenotype_validation
 review_unit: patient
 manual_version: 2026-06-09
 final_output: cancer_characterization
-overview_prose: x
+overview_prose: >-
+  Pan-cancer phenotype characterization. From a patient's clinical notes — and
+  EHR structured data (OMOP) where available — determine the cancer histology
+  type (cancer_type), whether distant metastasis is documented
+  (has_distant_metastasis), and whether local recurrence is documented
+  (has_local_recurrence); disease_extent is derived from the latter two.
+  Pathology and surgical-pathology notes are the primary source, every answer
+  is evidence-cited, and each criterion's enum and no_info rules are followed
+  exactly.
 phases:
   - author
   - try
