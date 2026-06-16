@@ -106,6 +106,34 @@ describe("buildRefinerPrompt", () => {
     expect(prompt).toContain("<REFINE_PROPOSAL>");
     expect(prompt).toContain("proposed_rule_text");
   });
+
+  it("shows the allowed enum values + demands an observable, value-resolving rule when an enum is given", () => {
+    const prompt = buildRefinerPrompt({
+      taskId: "cancer-diagnosis",
+      fieldId: "cancer_type",
+      criterionDef: CRITERION_DEF,
+      examples: [ex()],
+      answerEnum: ["adenocarcinoma", "squamous_cell_carcinoma", "other", "no_info"],
+    });
+    // allowed values listed for the refiner
+    expect(prompt).toMatch(/Allowed answer values/);
+    expect(prompt).toContain("adenocarcinoma, squamous_cell_carcinoma, other, no_info");
+    // the two new disciplines: ground the trigger in observable evidence + resolve to a value
+    expect(prompt).toMatch(/GROUND THE TRIGGER IN OBSERVABLE EVIDENCE/);
+    expect(prompt).toMatch(/RESOLVE TO AN ALLOWED VALUE/);
+    // and it warns off qualitative wording the notes may not use
+    expect(prompt).toMatch(/predominantly/);
+  });
+
+  it("omits the allowed-values block for a field with no enum (free-text)", () => {
+    const prompt = buildRefinerPrompt({
+      taskId: "cancer-diagnosis",
+      fieldId: "has_local_recurrence",
+      criterionDef: CRITERION_DEF,
+      examples: [ex()],
+    });
+    expect(prompt).not.toMatch(/Allowed answer values/);
+  });
 });
 
 // ── End-to-end (mocked LLM) parse + validate ─────────────────────────────────

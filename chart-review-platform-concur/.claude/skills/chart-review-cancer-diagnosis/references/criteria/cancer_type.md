@@ -1,6 +1,6 @@
 ---
 field_id: cancer_type
-prompt: What is the cancer histology type documented for this patient?
+prompt: x
 answer_schema:
   enum:
     - squamous_cell_carcinoma
@@ -65,11 +65,6 @@ If histology differs across notes, take the **most recent pathologic** diagnosis
 (e.g. adeno that later transforms to small-cell → `neuroendocrine_tumor`), and
 note the conflict in `rationale`.
 
-## Confidence
-- `high` = explicit pathology final diagnosis.
-- `medium` = oncologist narrative or an inferred mapping (e.g. "ductal" → adeno).
-- `low` = imaging-only hint or ambiguous wording (prefer `no_info` over a low guess).
-
 ## Examples
 
 - "FINAL DIAGNOSIS: Squamous cell carcinoma, moderately differentiated" → `squamous_cell_carcinoma` (high)
@@ -78,21 +73,3 @@ note the conflict in `rationale`.
 - "Urothelial carcinoma, high grade" → `other` (rationale: urothelial carcinoma)
 - "CT: spiculated mass; NSCLC NOS, pathology pending" → `no_info`
 - "Mother with lung cancer; patient's biopsy benign" → `no_info` (family hx + negated)
-
-## Evidence rule
-The cited span MUST **name the histology** that justifies the answer — e.g.
-"adenocarcinoma", "invasive ductal carcinoma", "diffuse large B-cell lymphoma",
-"squamous cell carcinoma". Do NOT cite a section header ("FINAL DIAGNOSIS:" with
-nothing after it), a boilerplate sentence (e.g. "The final diagnosis of each
-specimen incorporates the microscopic examination findings"), or an unrelated
-line. If the only span you can cite is boilerplate, you have not found the
-diagnosis — keep reading or answer `no_info`. Cite the SMALLEST span that names
-the histology (well under ~300 chars); for `no_info`, cite the short
-diagnosis/assessment span you checked.
-
-**The evidence span must be AFFIRMATIVE.** Never cite a negated sentence — "no
-evidence of…", "negative for…", "rule out…", "without…" — as support for a
-positive answer. If a histology is real for this patient, an affirmative line
-naming it exists (a pathology diagnosis, an oncologist's "patient with <type>");
-cite THAT, not a sentence that rules out a different entity. If the only mention
-is negated, the correct answer is `no_info`, not the negated term.

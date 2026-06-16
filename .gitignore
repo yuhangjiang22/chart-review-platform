@@ -3,6 +3,20 @@
 # Local tool/runtime state
 .claude/
 
+# Session-scoped rubric versioning: track the canonical AUTHORED skill content
+# under concur's .claude/skills (SKILL.md, meta.yaml, references/, promoted
+# versions/, etc.) so the rubric is fully version-controlled, but keep RUNTIME
+# state ignored (per-session rubric forks, pilot runs, refinement log).
+# Un-ignore .claude/ then re-ignore its other children, un-ignore skills/ and
+# everything under it, then re-ignore only the runtime bits per skill.
+!chart-review-platform-concur/.claude/
+chart-review-platform-concur/.claude/*
+!chart-review-platform-concur/.claude/skills/
+!chart-review-platform-concur/.claude/skills/**
+chart-review-platform-concur/.claude/skills/*/sessions/
+chart-review-platform-concur/.claude/skills/*/pilots/
+chart-review-platform-concur/.claude/skills/*/refinement_log.jsonl
+
 # Upstream reference repo — vendored locally as a research mirror but
 # not part of this project's history.
 claude-agent-sdk-benchmark/

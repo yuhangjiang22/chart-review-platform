@@ -418,6 +418,11 @@ export interface BuildMcpServersOptions {
    *  honors (taking precedence over the default
    *  `<PLATFORM_ROOT>/reviews/`). */
   reviewsRoot?: string;
+  /** Per-run override for the rubric root. The subprocess receives this as
+   *  CHART_REVIEW_RUBRIC_ROOT, which resolveRubricRoot() honors first — that is
+   *  how the agent's MCP criteria reads land on the SESSION's rubric fork rather
+   *  than the baseline. Set to resolveRubricRoot(task, session_id) by the run. */
+  rubricRoot?: string;
   /** Per-run agent provider. The only provider is "deepagents", which
    *  always uses subprocess MCP transport (its Python sidecar can't host
    *  an in-process server). Falls back to AGENT_PROVIDER env var when
@@ -476,6 +481,12 @@ export function buildMcpServersConfig(
     // with "did not write review_state.json".
     if (opts.reviewsRoot) {
       env.CHART_REVIEW_REVIEWS_ROOT = opts.reviewsRoot;
+    }
+    // The rubricRoot override scopes the agent's criteria reads to the session's
+    // rubric fork (resolveRubricRoot honors CHART_REVIEW_RUBRIC_ROOT first).
+    // Without it the subprocess reads the baseline and session edits are invisible.
+    if (opts.rubricRoot) {
+      env.CHART_REVIEW_RUBRIC_ROOT = opts.rubricRoot;
     }
     return {
       chart_review_state: {

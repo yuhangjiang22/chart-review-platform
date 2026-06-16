@@ -19,7 +19,7 @@ import {
   readNote as readNoteFn,
   readStructured as readStructuredFn,
 } from "@chart-review/patients";
-import { phenotypeSkillDir } from "@chart-review/rubric";
+import { resolveRubricRoot } from "@chart-review/rubric";
 import fs from "node:fs";
 import path from "node:path";
 import {
@@ -703,7 +703,7 @@ export async function listCriteriaTool(
   _args: ListCriteriaArgs,
 ): Promise<CallToolResult> {
   try {
-    const dir = path.join(phenotypeSkillDir(session.task.task_id), "references", "criteria");
+    const dir = path.join(resolveRubricRoot(session.task.task_id), "references", "criteria");
     if (!fs.existsSync(dir)) {
       return { content: [{ type: "text", text: JSON.stringify({ ok: true, count: 0, criteria: [] }) }] };
     }
@@ -753,7 +753,7 @@ export async function readCriterionTool(
       };
     }
     const fp = path.join(
-      phenotypeSkillDir(session.task.task_id), "references", "criteria",
+      resolveRubricRoot(session.task.task_id), "references", "criteria",
       `${args.field_id}.md`,
     );
     if (!fs.existsSync(fp)) {
@@ -835,7 +835,7 @@ export async function readCriteriaTool(
   session: McpSession,
   args: ReadCriteriaArgs,
 ): Promise<CallToolResult> {
-  const dir = path.join(phenotypeSkillDir(session.task.task_id), "references", "criteria");
+  const dir = path.join(resolveRubricRoot(session.task.task_id), "references", "criteria");
   const results: Array<Record<string, unknown>> = [];
   for (const field_id of args.field_ids) {
     if (!/^[a-zA-Z0-9_]+$/.test(field_id)) {

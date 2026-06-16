@@ -32,5 +32,9 @@ export {
   phenotypeSkillDir,
   loadPhenotypeCriteria,
   loadCriteria,
+  // session-scoped rubric resolution
+  baselineRubricRoot,
+  sessionRubricRoot,
+  resolveRubricRoot,
   type CriterionFromSkill,
 } from "./phenotype-skill.js";

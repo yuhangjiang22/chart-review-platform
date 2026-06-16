@@ -21,7 +21,8 @@ import path from "node:path";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import type { RouteEntry } from "./router.js";
 import { loadCompiledTask } from "./lib/tasks.js";
-import { phenotypeSkillDir } from "@chart-review/rubric";
+import { phenotypeSkillDir, resolveRubricRoot } from "@chart-review/rubric";
+import { snapshotAfterEdit } from "./lib/rubric-edit-snapshot.js";
 import {
   isSafeId,
   atomicWriteText,
@@ -57,9 +58,10 @@ export const rubricRoutes: RouteEntry[] = [
   {
     method: "GET",
     pattern: "/api/tasks/:taskId/rubric",
-    handler: async (_b, _r, p) => {
+    handler: async (_b, _r, p, query) => {
       const task = loadCompiledTask(p.taskId);
       if (!task) throw httpErr(404, `task ${p.taskId} not found`);
+      const sessionId = query.get("session_id") ?? undefined;
 
       // Read overview_prose from meta.yaml (most up-to-date on disk)
       const metaPath = path.join(phenotypeSkillDir(p.taskId), "meta.yaml");
@@ -71,7 +73,10 @@ export const rubricRoutes: RouteEntry[] = [
         } catch { /* use compiled value */ }
       }
 
-      const criteriaDir = path.join(phenotypeSkillDir(p.taskId), "references", "criteria");
+      // Criteria come from the session's rubric fork when a session is active —
+      // so the AUTHOR editor DISPLAYS what its PUT writes. meta/overview stay on
+      // the baseline (not forked per session).
+      const criteriaDir = path.join(resolveRubricRoot(p.taskId, sessionId), "references", "criteria");
 
       const fields = task.fields.map((f) => {
         const fid = (f as { field_id?: string; id?: string }).field_id ?? (f as { id: string }).id;
@@ -123,14 +128,16 @@ export const rubricRoutes: RouteEntry[] = [
   {
     method: "PUT",
     pattern: "/api/tasks/:taskId/criteria/:fieldId",
-    handler: async (body, _r, p) => {
+    handler: async (body, _r, p, query) => {
       const { taskId, fieldId } = p;
+      const sessionId = query.get("session_id") ?? undefined;
 
       // Path traversal guard
       if (!isSafeId(taskId)) throw httpErr(400, "invalid taskId");
       if (!isSafeId(fieldId)) throw httpErr(400, "invalid fieldId");
 
-      const criteriaDir = path.join(phenotypeSkillDir(taskId), "references", "criteria");
+      // Session edit → the session's rubric fork; no session → the baseline.
+      const criteriaDir = path.join(resolveRubricRoot(taskId, sessionId), "references", "criteria");
       const mdPath = path.join(criteriaDir, `${fieldId}.md`);
 
       // Reject if the resolved path is outside the criteria dir
@@ -182,6 +189,8 @@ export const rubricRoutes: RouteEntry[] = [
       });
 
       atomicWriteText(mdPath, newContent);
+      // Snapshot the edited rubric as a new version (session fork or baseline).
+      snapshotAfterEdit({ taskId, sessionId, source: "author-edit", by: "reviewer" });
       return { ok: true };
     },
   },

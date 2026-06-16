@@ -12,8 +12,8 @@ description: >
 This is a notes-only, pan-cancer phenotype task. You answer **three leaf fields**
 directly:
 - `cancer_type` — the histology type (enum).
-- `has_distant_metastasis` — `yes` / `no` / `no_info`.
-- `has_local_recurrence` — `yes` / `no` / `no_info`.
+- `has_distant_metastasis` — `yes` / `no_info` (no separate `no`: "documented negative" and "not addressed" are both `no_info`).
+- `has_local_recurrence` — `yes` / `no_info` (same — only `yes` or `no_info`).
 
 `disease_extent` is a **computed** field (derived from `has_distant_metastasis`
 and `has_local_recurrence`) — **do NOT answer it directly.**
@@ -39,8 +39,8 @@ and `has_local_recurrence`) — **do NOT answer it directly.**
    - Do NOT cite the whole note. A full-document citation is not acceptable.
    - The cited span must be **affirmative** — never cite "no evidence of
      metastatic disease" to support `has_distant_metastasis=yes`; a negation
-     supports `no`.
-   - For `no` / `no_info`: ALWAYS cite one short span — the section you checked
+     means the answer is `no_info`, not `yes`.
+   - For `no_info`: ALWAYS cite one short span — the section you checked
      where the info would appear if present (Assessment/Plan, Diagnosis, Staging).
 
 ## Decision rules (apply to all leaf fields)

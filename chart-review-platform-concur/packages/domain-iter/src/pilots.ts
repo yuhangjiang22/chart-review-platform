@@ -550,6 +550,7 @@ export function startPilotIteration(opts: StartPilotOptions): StartPilotResult {
     agent_specs: stampedSpecs,
     target_field_ids: targetFieldIds,
     provider: opts.provider,
+    session_id: opts.session_id,
     onStatus: opts.onRunStatus,
   });
 

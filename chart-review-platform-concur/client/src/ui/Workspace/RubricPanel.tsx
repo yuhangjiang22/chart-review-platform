@@ -47,9 +47,12 @@ interface FieldEditorProps {
   taskId: string;
   field: RubricField;
   onSaved: (updated: RubricField) => void;
+  /** When set, the edit writes this session's rubric fork (and snapshots a
+   *  session version); when null/undefined it writes the baseline. */
+  sessionId?: string | null;
 }
 
-function FieldEditor({ taskId, field, onSaved }: FieldEditorProps) {
+function FieldEditor({ taskId, field, onSaved, sessionId }: FieldEditorProps) {
   const [prompt, setPrompt] = useState(field.prompt);
   const [enumText, setEnumText] = useState(field.enum.join("\n"));
   const [definition, setDefinition] = useState(field.definition);
@@ -82,7 +85,7 @@ function FieldEditor({ taskId, field, onSaved }: FieldEditorProps) {
 
     try {
       const r = await authFetch(
-        `/api/tasks/${encodeURIComponent(taskId)}/criteria/${encodeURIComponent(field.field_id)}`,
+        `/api/tasks/${encodeURIComponent(taskId)}/criteria/${encodeURIComponent(field.field_id)}${sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : ""}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -96,6 +99,9 @@ function FieldEditor({ taskId, field, onSaved }: FieldEditorProps) {
         setSaved(true);
         setTimeout(() => setSaved(false), 2500);
         onSaved({ ...field, prompt, enum: enumValues, definition, extraction_guidance, examples });
+        // The save snapshotted a new rubric version — tell the sidebar switcher
+        // (+ other listeners) to reload so the timeline isn't stale.
+        if (sessionId) window.dispatchEvent(new Event("chartreview:rubric-edited"));
       }
     } catch (e) {
       setError((e as Error).message);
@@ -231,9 +237,12 @@ export interface RubricPanelProps {
    *  strip tucked under a run-status card as in TRY). Does not scroll into
    *  view — unlike revealNonce, which is a navigation jump. */
   alwaysOpen?: boolean;
+  /** The active session; when set, criterion edits write that session's rubric
+   *  fork (and snapshot a session version) instead of the shared baseline. */
+  activeSessionId?: string | null;
 }
 
-export function RubricPanel({ taskId, revealNonce, alwaysOpen = false }: RubricPanelProps) {
+export function RubricPanel({ taskId, revealNonce, alwaysOpen = false, activeSessionId }: RubricPanelProps) {
   const [open, setOpen] = useState(alwaysOpen);
   const rootRef = useRef<HTMLDivElement>(null);
   const [data, setData] = useState<RubricData | null>(null);
@@ -259,7 +268,10 @@ export function RubricPanel({ taskId, revealNonce, alwaysOpen = false }: RubricP
 
   const fetchRubric = useCallback(() => {
     setLoadState("loading");
-    authFetch(`/api/tasks/${encodeURIComponent(taskId)}/rubric`)
+    // Read through the active session's rubric fork (so the editor DISPLAYS what
+    // it writes); no session → the baseline.
+    const qs = activeSessionId ? `?session_id=${encodeURIComponent(activeSessionId)}` : "";
+    authFetch(`/api/tasks/${encodeURIComponent(taskId)}/rubric${qs}`)
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
       .then((d: RubricData) => {
         setData(d);
@@ -267,7 +279,7 @@ export function RubricPanel({ taskId, revealNonce, alwaysOpen = false }: RubricP
         setLoadState("idle");
       })
       .catch(() => setLoadState("error"));
-  }, [taskId]);
+  }, [taskId, activeSessionId]);
 
   // Fetch when panel is first opened
   useEffect(() => {
@@ -275,6 +287,17 @@ export function RubricPanel({ taskId, revealNonce, alwaysOpen = false }: RubricP
       fetchRubric();
     }
   }, [open, data, loadState, fetchRubric]);
+
+  // Refetch when the session's rubric version changes elsewhere (a switch in the
+  // sidebar switcher, or a refine apply) so the editor never shows stale content.
+  useEffect(() => {
+    function onVersionChange() {
+      setData(null);
+      setLoadState("idle");
+    }
+    window.addEventListener("chartreview:rubric-switched", onVersionChange);
+    return () => window.removeEventListener("chartreview:rubric-switched", onVersionChange);
+  }, []);
 
   async function saveOverview() {
     if (!data) return;
@@ -428,6 +451,7 @@ export function RubricPanel({ taskId, revealNonce, alwaysOpen = false }: RubricP
                       taskId={taskId}
                       field={field}
                       onSaved={handleFieldSaved}
+                      sessionId={activeSessionId}
                     />
                   ))}
                 </div>

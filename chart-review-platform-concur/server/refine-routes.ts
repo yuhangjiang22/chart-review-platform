@@ -226,6 +226,7 @@ export const refineRoutes: RouteEntry[] = [
         fieldId,
         criterionDef: cluster.criterion_def,
         examples: gapExamples,
+        answerEnum: cluster.answer_enum ?? undefined,
       });
       if (!out.ok || !out.proposal) {
         throw httpErr(502, out.error ?? "refiner failed");
@@ -656,7 +657,8 @@ export const refineRoutes: RouteEntry[] = [
       const task = loadCompiledTask(p.taskId);
       if (!task) throw httpErr(404, `task ${p.taskId} not found`);
       const fieldId = query.get("field_id") ?? undefined;
-      return { entries: readRefinementLog(p.taskId, fieldId) };
+      const sessionId = query.get("session_id") ?? undefined;
+      return { entries: readRefinementLog(p.taskId, fieldId, sessionId) };
     },
   },
 

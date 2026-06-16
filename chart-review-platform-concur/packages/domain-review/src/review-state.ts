@@ -613,6 +613,37 @@ export function assertQuoteWithinLimit(ev: { source: string; verbatim_quote?: st
 }
 
 /**
+ * Enum gate for set_field_assessment. When a field declares a non-empty
+ * `answer_schema.enum`, the answer MUST be one of those values (each element,
+ * for cardinality "many"). Rejects off-enum free text — e.g. an agent writing
+ * "adenosquamous carcinoma" when the enum only has adenocarcinoma/…/other — so
+ * the stored answer is always comparable to reviewer gold (exact-match scoring
+ * is meaningless if the agent can invent values). Skips fields with no enum
+ * (free-text/numeric) and a null/empty answer (cleared / not answered). The
+ * error lists the allowed values + the escape hatches so the agent can retry.
+ */
+export function assertAnswerInEnum(
+  field: { id: string; answer_schema?: unknown },
+  answer: unknown,
+): void {
+  const schema = field.answer_schema as { enum?: unknown } | undefined;
+  const enumValues = Array.isArray(schema?.enum) ? (schema!.enum as unknown[]).map(String) : null;
+  if (!enumValues || enumValues.length === 0) return; // free-text / numeric field
+  const values = Array.isArray(answer) ? answer : [answer];
+  for (const v of values) {
+    if (v == null || v === "") continue; // not answered / cleared
+    if (!enumValues.includes(String(v).trim())) {
+      throw new ReviewStateError(
+        "answer_not_in_enum",
+        `answer ${JSON.stringify(v)} for field "${field.id}" is not an allowed value. ` +
+          `Choose exactly one of: ${enumValues.join(", ")}. ` +
+          `Map the finding to the closest allowed value; if none fit, use "other" or "no_info".`,
+      );
+    }
+  }
+}
+
+/**
  * Faithfulness gate for set_field_assessment. Throws on fabrication;
  * returns any non-fatal warnings. Pure: no state writes.
  */
@@ -893,6 +924,7 @@ export function transitionReviewState(
           `field_id ${action.payload.field_id} is not part of task ${task.task_id}`,
         );
       }
+      assertAnswerInEnum(field, action.payload.answer);
       applySetAssessmentMutation(s, by, by_id, action.payload, task);
       break;
     }

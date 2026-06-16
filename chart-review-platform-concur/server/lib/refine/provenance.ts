@@ -20,6 +20,7 @@ import {
   buildCriterionMd,
   atomicWriteText,
 } from "../criterion-md.js";
+import { snapshotAfterEdit } from "../rubric-edit-snapshot.js";
 
 // ── Shapes ─────────────────────────────────────────────────────────────────────
 
@@ -98,9 +99,17 @@ function writeAll(taskId: string, entries: RefinementLogEntry[]): void {
  * Read the refinement log, newest-first. Optionally filter to one field. Each
  * entry is the provenance for one applied (or applied-then-reverted) edit.
  */
-export function readRefinementLog(taskId: string, fieldId?: string): RefinementLogEntry[] {
+export function readRefinementLog(
+  taskId: string,
+  fieldId?: string,
+  sessionId?: string,
+): RefinementLogEntry[] {
   const all = readAll(taskId);
-  const filtered = fieldId ? all.filter((e) => e.field_id === fieldId) : all;
+  let filtered = fieldId ? all.filter((e) => e.field_id === fieldId) : all;
+  // The log is task-level (one file), but each entry records the session that
+  // made it. When a sessionId is given, show only THAT session's refinements —
+  // so a session's history reflects its own inner loop, not every session's.
+  if (sessionId) filtered = filtered.filter((e) => e.session_id === sessionId);
   return filtered.slice().reverse(); // newest-first
 }
 
@@ -130,7 +139,7 @@ export function applyRefinement(input: ApplyRefinementInput): RefinementLogEntry
   const rule = input.ruleText.trim();
   if (!rule) throw new Error("ruleText is empty");
 
-  const mdPath = criterionMdPath(input.taskId, input.fieldId);
+  const mdPath = criterionMdPath(input.taskId, input.fieldId, input.sessionId);
   if (!fs.existsSync(mdPath)) {
     throw new Error(`criterion ${input.fieldId} not found for task ${input.taskId}`);
   }
@@ -154,6 +163,14 @@ export function applyRefinement(input: ApplyRefinementInput): RefinementLogEntry
     examples: parsed.examples,
   });
   atomicWriteText(mdPath, newMd);
+  // Snapshot the post-apply rubric as a new version on the same root the write
+  // landed on (session fork when sessionId is set, else baseline).
+  snapshotAfterEdit({
+    taskId: input.taskId,
+    sessionId: input.sessionId,
+    source: `refine:${input.fieldId}`,
+    by: input.appliedBy,
+  });
 
   const now = input.now ?? new Date().toISOString();
   const entry: RefinementLogEntry = {
@@ -201,7 +218,7 @@ export function revertRefinement(opts: {
   const entry = all[idx];
   if (entry.reverted) throw new Error(`entry ${opts.entryId} is already reverted`);
 
-  const mdPath = criterionMdPath(opts.taskId, entry.field_id);
+  const mdPath = criterionMdPath(opts.taskId, entry.field_id, entry.session_id);
   if (!fs.existsSync(mdPath)) {
     throw new Error(`criterion ${entry.field_id} not found for task ${opts.taskId}`);
   }
@@ -223,6 +240,14 @@ export function revertRefinement(opts: {
     examples: parsed.examples,
   });
   atomicWriteText(mdPath, newMd);
+  // A revert is itself a rubric change → snapshot the restored state as a new
+  // version on the same (session or baseline) root.
+  snapshotAfterEdit({
+    taskId: opts.taskId,
+    sessionId: entry.session_id,
+    source: `revert:${entry.field_id}`,
+    by: opts.by,
+  });
 
   const now = opts.now ?? new Date().toISOString();
   all[idx] = { ...entry, reverted: { at: now, by: opts.by, intervening_edit } };
