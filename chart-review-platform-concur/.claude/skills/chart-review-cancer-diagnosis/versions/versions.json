@@ -1,0 +1,13 @@
+{
+  "active": "v1",
+  "versions": [
+    {
+      "id": "v1",
+      "sha": "96b914dbbe2e8895",
+      "parent": null,
+      "source": "seed:initial",
+      "created_at": "2026-06-16T01:36:17.970Z",
+      "created_by": "system"
+    }
+  ]
+}

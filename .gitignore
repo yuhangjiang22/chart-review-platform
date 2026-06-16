@@ -3,6 +3,22 @@
 # Local tool/runtime state
 .claude/
 
+# Session-scoped rubric versioning: track the canonical rubric (criteria) + its
+# promoted version snapshots under concur's .claude/skills, but keep per-session
+# forks and run state ignored. Per-level re-include chain (git can't re-include a
+# path whose parent dir is excluded, so un-ignore each level then re-ignore its
+# other children).
+!chart-review-platform-concur/.claude/
+chart-review-platform-concur/.claude/*
+!chart-review-platform-concur/.claude/skills/
+chart-review-platform-concur/.claude/skills/*
+!chart-review-platform-concur/.claude/skills/*/
+chart-review-platform-concur/.claude/skills/*/*
+!chart-review-platform-concur/.claude/skills/*/references/
+!chart-review-platform-concur/.claude/skills/*/references/**
+!chart-review-platform-concur/.claude/skills/*/versions/
+!chart-review-platform-concur/.claude/skills/*/versions/**
+
 # Upstream reference repo — vendored locally as a research mirror but
 # not part of this project's history.
 claude-agent-sdk-benchmark/

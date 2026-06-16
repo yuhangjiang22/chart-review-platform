@@ -6,19 +6,24 @@ import type { NoteListing, PatientSummary } from "@chart-review/platform-types";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Resolve PLATFORM_ROOT: env var wins, else walk up from this file
-// looking for the v2 marker (.agents/skills/). Critical because this
-// package lives at packages/patients/src/ — the original
-// `__dirname/../..` heuristic resolved to v2 root only when the file
-// was at server/lib/. Walk-up makes the resolution location-independent.
-function findPlatformRoot(): string {
+// Resolve PLATFORM_ROOT: env var wins, else walk up from this file looking for
+// a skills marker. We accept EITHER `.claude/skills/` (the canonical, server-read
+// tree) OR the legacy `.agents/skills/` marker, so the resolution survives
+// retiring the `.agents` duplicate without breaking existing checkouts. Exported
+// (with an injectable start dir) for unit testing.
+export function findPlatformRoot(start: string = __dirname): string {
   if (process.env.CHART_REVIEW_PLATFORM_ROOT) return process.env.CHART_REVIEW_PLATFORM_ROOT;
-  let dir = __dirname;
+  let dir = start;
   for (let i = 0; i < 8; i++) {
     const parent = path.dirname(dir);
     if (parent === dir) break;
     dir = parent;
-    if (fs.existsSync(path.join(dir, ".agents", "skills"))) return dir;
+    if (
+      fs.existsSync(path.join(dir, ".claude", "skills")) ||
+      fs.existsSync(path.join(dir, ".agents", "skills"))
+    ) {
+      return dir;
+    }
   }
   // Fallback: process.cwd() — deployment owners should set the env var.
   return process.cwd();
