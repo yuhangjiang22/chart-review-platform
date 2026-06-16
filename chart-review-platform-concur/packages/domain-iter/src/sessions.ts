@@ -28,7 +28,8 @@
  */
 import fs from "fs";
 import path from "path";
-import { guidelineDir } from "@chart-review/rubric";
+import { guidelineDir, baselineRubricRoot, sessionRubricRoot } from "@chart-review/rubric";
+import { forkFrom, getActiveVersion } from "@chart-review/rubric-versions";
 import { computeTaskSha } from "@chart-review/lock";
 import type { AgentSpec } from "@chart-review/agent-specs";
 
@@ -48,6 +49,10 @@ export interface SessionManifest {
   state: SessionState;
   ended_at?: string;
   cohort: { patient_ids: string[] };
+  /** Session-scoped rubric fork provenance: the baseline version this session
+   *  forked from, and the currently-active session rubric version (s1, s2, …).
+   *  Absent on legacy sessions created before per-session rubric versioning. */
+  rubric?: { based_on: string; active_version: string };
   /** Agent_specs locked at session creation. Iters started under this
    *  session use these verbatim — no per-iter overrides allowed. */
   agent_specs?: AgentSpec[];
@@ -179,6 +184,20 @@ export function createSession(input: CreateSessionInput): SessionManifest {
     agent_specs: input.agent_specs,
     skill_snapshot_sha: computeTaskSha(guidelineDir(input.task_id)),
   };
+
+  // Fork the baseline rubric into this session so edits/refinements are isolated
+  // to it (the "inner loop"). The fork starts as session version s1, a copy of
+  // the baseline's active version; iters run against — and pin — session versions.
+  const baseRoot = baselineRubricRoot(input.task_id);
+  const baseVersion = getActiveVersion(baseRoot) ?? "v1";
+  const fork = sessionRubricRoot(input.task_id, session_id);
+  forkFrom(path.join(baseRoot, "references"), fork, {
+    source: `fork:${baseVersion}`,
+    by: input.started_by,
+    now: new Date().toISOString(),
+  });
+  manifest.rubric = { based_on: baseVersion, active_version: getActiveVersion(fork)! };
+
   writeManifestAtomic(input.task_id, manifest);
   return manifest;
 }

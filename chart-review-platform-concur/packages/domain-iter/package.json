@@ -7,13 +7,34 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
-    ".": { "types": "./src/index.ts", "default": "./src/index.ts" },
-    "./pilots": { "types": "./src/pilots.ts", "default": "./src/pilots.ts" },
-    "./stop-rule": { "types": "./src/stop-rule.ts", "default": "./src/stop-rule.ts" },
-    "./iter-accuracy": { "types": "./src/iter-accuracy.ts", "default": "./src/iter-accuracy.ts" },
-    "./regression-gate": { "types": "./src/regression-gate.ts", "default": "./src/regression-gate.ts" },
-    "./auto-advance-on-run-complete": { "types": "./src/auto-advance-on-run-complete.ts", "default": "./src/auto-advance-on-run-complete.ts" },
-    "./validating-transition": { "types": "./src/validating-transition.ts", "default": "./src/validating-transition.ts" }
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./pilots": {
+      "types": "./src/pilots.ts",
+      "default": "./src/pilots.ts"
+    },
+    "./stop-rule": {
+      "types": "./src/stop-rule.ts",
+      "default": "./src/stop-rule.ts"
+    },
+    "./iter-accuracy": {
+      "types": "./src/iter-accuracy.ts",
+      "default": "./src/iter-accuracy.ts"
+    },
+    "./regression-gate": {
+      "types": "./src/regression-gate.ts",
+      "default": "./src/regression-gate.ts"
+    },
+    "./auto-advance-on-run-complete": {
+      "types": "./src/auto-advance-on-run-complete.ts",
+      "default": "./src/auto-advance-on-run-complete.ts"
+    },
+    "./validating-transition": {
+      "types": "./src/validating-transition.ts",
+      "default": "./src/validating-transition.ts"
+    }
   },
   "dependencies": {
     "@chart-review/adjudications": "*",
@@ -31,6 +52,7 @@
     "@chart-review/patients": "*",
     "@chart-review/rubric": "*",
     "@chart-review/storage": "*",
-    "@chart-review/tasks": "*"
+    "@chart-review/tasks": "*",
+    "@chart-review/rubric-versions": "*"
   }
 }
