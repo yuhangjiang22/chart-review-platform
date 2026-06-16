@@ -105,6 +105,9 @@ if (want("set_field_assessment")) {
         "runs a faithfulness pre-check on every cited note quote. If the",
         "offsets do not resolve to the verbatim_quote in the source note,",
         "the call is rejected — do not invent quotes or guess offsets.",
+        "When the field defines an enum (answer_schema), the answer must be",
+        "EXACTLY one of those allowed values — off-enum free text is rejected.",
+        "Map the finding to the closest allowed value, or use \"other\"/\"no_info\".",
       ].join(" "),
       inputSchema: {
         field_id: z.string(),
