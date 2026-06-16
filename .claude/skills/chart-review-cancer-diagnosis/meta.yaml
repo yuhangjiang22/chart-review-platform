@@ -1,4 +1,5 @@
 task_type: phenotype_validation
+uses_structured_data: true
 review_unit: patient
 manual_version: 2026-06-09
 final_output: cancer_characterization
