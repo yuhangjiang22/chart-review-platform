@@ -72,4 +72,18 @@ describe("rubric version routes", () => {
     expect(getActiveVersion(base)).toBe("v2");
     expect(fs.readFileSync(path.join(base, "references", "criteria", "f.md"), "utf8")).toBe("two");
   });
+
+  it("POST promote reports unchanged (no new version) when the session matches the baseline", async () => {
+    const base = baselineRubricRoot("x");
+    fs.mkdirSync(path.join(base, "references", "criteria"), { recursive: true });
+    fs.writeFileSync(path.join(base, "references", "criteria", "f.md"), "two"); // == session s1's active s2
+    snapshotVersion(base, { prefix: "v", source: "seed", by: "y", now: "2026-06-15T00:00:00Z" }); // v1 = "two"
+    const res = (await route("POST", "/api/rubric/:taskId/promote")
+      .handler({ session_id: "s1" }, {} as never, { taskId: "x" }, new URLSearchParams())) as {
+      baseline_version: string; unchanged: boolean;
+    };
+    expect(res.unchanged).toBe(true);
+    expect(res.baseline_version).toBe("v1"); // dedup → no new baseline version
+    expect(getActiveVersion(base)).toBe("v1");
+  });
 });

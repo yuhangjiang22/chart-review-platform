@@ -68,13 +68,17 @@ export function RubricVersionSwitcher({ taskId, sessionId, onSwitched }: Props) 
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ session_id: sessionId, confirm_drift: confirmDrift }),
     });
-    const body = (await r.json().catch(() => ({}))) as { ok?: boolean; baseline_version?: string; error?: string };
+    const body = (await r.json().catch(() => ({}))) as { ok?: boolean; baseline_version?: string; unchanged?: boolean; error?: string };
     if (r.status === 409 && body.error) {
       if (window.confirm(`${body.error}\n\nPromote anyway?`)) return promote(true);
       return;
     }
     if (r.ok && body.baseline_version) {
-      setNote(`Promoted to baseline ${body.baseline_version}.`);
+      setNote(
+        body.unchanged
+          ? `Nothing to promote — this session matches baseline ${body.baseline_version}.`
+          : `Promoted to baseline ${body.baseline_version}.`,
+      );
     } else if (body.error) {
       setNote(`Promote failed: ${body.error}`);
     }
