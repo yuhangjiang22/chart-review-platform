@@ -7,6 +7,7 @@ dependencies = [
   "langchain-openai",
   "langchain-mcp-adapters",
   "pandas",  # RUCAM plugin tools (chart_review_plugins.rucam) read CSV cohorts
+  "openpyxl",  # RUCAM get_hepatotoxicity_category reads the LiverTox masterlist .xlsx
 ]
 
 [build-system]
