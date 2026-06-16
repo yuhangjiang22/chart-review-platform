@@ -1,6 +1,6 @@
 // packages/agent-provider-deepagents/src/build-run-spec.test.ts
-import { describe, it, expect } from "vitest";
-import { buildRunSpec } from "./index.js";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { buildRunSpec, nextRunSpecPath } from "./index.js";
 
 const base = {
   prompt: "hi",
@@ -29,5 +29,25 @@ describe("buildRunSpec", () => {
   it("returns null when no chart_review_state MCP config", () => {
     const spec = buildRunSpec({ prompt: "hi" } as any);
     expect(spec).toBeNull();
+  });
+});
+
+describe("nextRunSpecPath — concurrency safety", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("returns a UNIQUE path even when two calls land in the same millisecond", () => {
+    // Pin Date.now() to a constant so both calls share the timestamp segment —
+    // the exact collision that made concurrent agents clobber each other's
+    // runspec and cross patient context.
+    vi.spyOn(Date, "now").mockReturnValue(1_700_000_000_000);
+    const a = nextRunSpecPath();
+    const b = nextRunSpecPath();
+    expect(a).not.toBe(b); // the monotonic counter disambiguates
+  });
+
+  it("generates distinct paths across many rapid calls", () => {
+    vi.spyOn(Date, "now").mockReturnValue(42);
+    const paths = new Set(Array.from({ length: 50 }, () => nextRunSpecPath()));
+    expect(paths.size).toBe(50);
   });
 });
