@@ -226,6 +226,7 @@ export const refineRoutes: RouteEntry[] = [
         fieldId,
         criterionDef: cluster.criterion_def,
         examples: gapExamples,
+        answerEnum: cluster.answer_enum ?? undefined,
       });
       if (!out.ok || !out.proposal) {
         throw httpErr(502, out.error ?? "refiner failed");
