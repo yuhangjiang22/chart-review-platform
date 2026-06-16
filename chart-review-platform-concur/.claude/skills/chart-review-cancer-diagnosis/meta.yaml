@@ -1,0 +1,11 @@
+task_type: phenotype_validation
+review_unit: patient
+manual_version: 2026-06-09
+final_output: cancer_characterization
+overview_prose: x
+phases:
+  - author
+  - try
+  - validate
+  - decide
+  - lock

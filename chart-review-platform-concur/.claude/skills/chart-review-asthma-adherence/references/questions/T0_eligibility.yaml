@@ -1,0 +1,74 @@
+# T0 — Eligibility tier (gates whether the patient enters the adherence
+# assessment at all). Questions are grounded in NAEPP EPR-3 (2007)
+# Diagnosis criteria and platform methodology requirements.
+
+questions:
+  - question_id: T0-AsthmaDx
+    text: Does the chart document an active diagnosis of asthma (ICD-10 J45.x or
+      equivalent prose) at any point in the lookback window?
+    tier: 0
+    answer_schema:
+      type: boolean
+      description: true iff an asthma diagnosis is documented; null if unknowable from
+        the chart.
+    naepp_source: "EPR-3 Section 3, Component 1, p.40-43 — Diagnosis of Asthma;
+      Box 3-1 Key Indicators for Considering a Diagnosis of Asthma"
+    evidence_grade: clinical_criterion
+    clinical_rationale: >-
+      EPR-3 requires (1) episodic symptoms of airflow obstruction or airway
+      hyperresponsiveness, (2) at least partial reversibility, and (3)
+      exclusion of alternative diagnoses. ICD-10 J45.x in the structured record
+      is taken as documentation that a clinician applied these criteria.
+    retrieval_hints: "STRUCTURED FIRST → read_structured_data(table=\"conditions\").
+      Any row with icd10cm matching J45.* (J45.0-J45.99) and status=\"active\"
+      is a match. If conditions is empty, fall back to notes: problem list,
+      encounter diagnoses, assessment lines. Accept \"asthma\", \"reactive
+      airway disease\" only when paired with an asthma ICD code. Don't infer
+      from inhaler use alone."
+
+  - question_id: T0-AgeOk
+    text: Is the patient age at the index date >= 12 years? (The 2020 Focused
+      Update's SMART and LAMA recommendations are scoped to ages 12+; pediatric
+      <12y uses a different evidence base.)
+    tier: 0
+    answer_schema:
+      type: boolean
+    naepp_source: "2020 Focused Update Recommendations 13-16 (p.84-95) —
+      explicit population scope: 'individuals ages 12 years and older'"
+    evidence_grade: population_scope
+    clinical_rationale: >-
+      The 2020 Focused Update's strong SMART recommendation (Rec 13) and
+      LAMA add-on guidance (Recs 14-16) apply to individuals ages 12 and
+      older. Patients <12 are assessable for ICS adherence (EPR-3 stepwise)
+      but the T2-StepTherapyMatch logic in this skill assumes 12+ evidence.
+    retrieval_hints: Demographic header or notes. If age is unclear, return null.
+
+  - question_id: T0-LookbackHasNotes
+    text: Are there at least 2 outpatient or specialty notes in the lookback window
+      (so adherence has chart evidence to measure against)?
+    tier: 0
+    answer_schema:
+      type: boolean
+    naepp_source: "Methodological — not a NAEPP recommendation. Derived from
+      EPR-3 p.94 (Component 2 KP) requirement for 'regular review by an
+      informed clinician' (Evidence B), which presupposes longitudinal notes."
+    evidence_grade: methodological
+    clinical_rationale: >-
+      Adherence cannot be assessed from a single encounter. EPR-3 grounds the
+      assessment of asthma control in 'regular review by an informed
+      clinician' — at least 2 longitudinal notes are the minimum chart
+      evidence to evaluate that review.
+    retrieval_hints: >-
+      Use the encounter list + note titles to COUNT qualifying notes in the
+      lookback window. Qualifying notes are outpatient clinic progress notes and
+      specialty consult/follow-up notes (in-person, video, or telehealth visits
+      that generate a clinician note).
+
+      Do NOT count ED/hospitalization documentation (ED provider notes, H&P,
+      discharge summaries), procedures-only reports (PFT/spirometry reports
+      without a clinic note), imaging/lab result documents, telephone
+      encounters, refill requests, portal messages, administrative
+      documentation, or scheduling communications.
+
+      If fewer than 2 qualifying outpatient/specialty notes are present, answer
+      false.

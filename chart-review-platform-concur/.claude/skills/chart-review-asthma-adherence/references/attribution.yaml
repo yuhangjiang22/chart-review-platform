@@ -1,0 +1,77 @@
+# Attribution taxonomy for adherence rule verdicts.
+#
+# Aligned with the ACCR design (2026-03-Agentic-Asthma-Adherence-Design):
+# 5 canonical categories — DOCUMENTATION_GAP, GUIDELINE_DEVIATION,
+# PATIENT_FACTOR, SYSTEM_FACTOR, INSUFFICIENT_DATA — extended with two
+# domain-specific refinements of PATIENT_FACTOR (PATIENT_REFUSAL,
+# CONTRAINDICATION) and one for in-flight care (PENDING_FOLLOWUP).
+# OTHER captures cases that don't fit any of the above and requires
+# an explicit rationale on the verdict.
+#
+# Design intent: a reviewer should be able to pick exactly one category
+# per non-concordant rule. When two seem to apply, prefer the one that
+# changes the recommended intervention (DOCUMENTATION_GAP →
+# documentation training; GUIDELINE_DEVIATION → audit/feedback;
+# SYSTEM_FACTOR → policy/access fix; PATIENT_FACTOR → patient-centered
+# care decision).
+
+categories:
+  - DOCUMENTATION_GAP
+  - GUIDELINE_DEVIATION
+  - PATIENT_FACTOR
+  - PATIENT_REFUSAL
+  - CONTRAINDICATION
+  - SYSTEM_FACTOR
+  - PENDING_FOLLOWUP
+  - INSUFFICIENT_DATA
+  - OTHER
+
+descriptions:
+  DOCUMENTATION_GAP: >-
+    The guideline behavior may have happened but isn't recorded in
+    the chart. Most common attribution in retrospective review;
+    prompts a documentation intervention rather than a clinical
+    change.
+  GUIDELINE_DEVIATION: >-
+    The chart documents care that diverges from the guideline with no
+    countervailing reason (no contraindication, refusal, system
+    barrier, or pending plan). Prompts an audit + feedback
+    intervention.
+  PATIENT_FACTOR: >-
+    A documented clinical reason for the deviation that doesn't fit
+    the narrower PATIENT_REFUSAL or CONTRAINDICATION buckets — e.g.
+    competing comorbidity, patient preference framed as shared
+    decision-making, lifestyle/adherence barrier. Use when the chart
+    shows a patient-centered reason but it isn't a clear-cut refusal
+    or contraindication.
+  PATIENT_REFUSAL: >-
+    The chart explicitly records that the patient declined the
+    guideline-recommended action. Distinct from PATIENT_FACTOR in
+    that the choice is explicit and made by the patient against
+    advice.
+  CONTRAINDICATION: >-
+    The chart documents a clinical contraindication or allergy that
+    justifies the deviation. Distinct from PATIENT_FACTOR in that
+    the deviation is medically required, not preference-driven.
+  SYSTEM_FACTOR: >-
+    An institutional or access barrier prevented the
+    guideline-concordant action — formulary restriction, insurance
+    denial, referral delay, pharmacy stock-out, specialty access. The
+    deviation is neither the patient's nor the clinician's fault.
+  PENDING_FOLLOWUP: >-
+    The guideline action is scheduled or planned but not yet
+    completed at the index date. Use sparingly — only when the chart
+    explicitly records a future scheduled visit / pending test /
+    started-but-not-stabilized regimen.
+  INSUFFICIENT_DATA: >-
+    There isn't enough information in the available chart to make a
+    determination. Distinct from DOCUMENTATION_GAP — DOCUMENTATION_GAP
+    implies the action likely happened but wasn't written down;
+    INSUFFICIENT_DATA means we genuinely can't tell either way.
+    Common when the lookback window is too short or the patient is
+    new to the system.
+  OTHER: >-
+    Captures attributions that don't fit the above categories. Each
+    OTHER verdict MUST carry an explanatory rationale; if "OTHER"
+    becomes the most-used bucket, expand the taxonomy instead of
+    leaning on it.

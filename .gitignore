@@ -3,21 +3,19 @@
 # Local tool/runtime state
 .claude/
 
-# Session-scoped rubric versioning: track the canonical rubric (criteria) + its
-# promoted version snapshots under concur's .claude/skills, but keep per-session
-# forks and run state ignored. Per-level re-include chain (git can't re-include a
-# path whose parent dir is excluded, so un-ignore each level then re-ignore its
-# other children).
+# Session-scoped rubric versioning: track the canonical AUTHORED skill content
+# under concur's .claude/skills (SKILL.md, meta.yaml, references/, promoted
+# versions/, etc.) so the rubric is fully version-controlled, but keep RUNTIME
+# state ignored (per-session rubric forks, pilot runs, refinement log).
+# Un-ignore .claude/ then re-ignore its other children, un-ignore skills/ and
+# everything under it, then re-ignore only the runtime bits per skill.
 !chart-review-platform-concur/.claude/
 chart-review-platform-concur/.claude/*
 !chart-review-platform-concur/.claude/skills/
-chart-review-platform-concur/.claude/skills/*
-!chart-review-platform-concur/.claude/skills/*/
-chart-review-platform-concur/.claude/skills/*/*
-!chart-review-platform-concur/.claude/skills/*/references/
-!chart-review-platform-concur/.claude/skills/*/references/**
-!chart-review-platform-concur/.claude/skills/*/versions/
-!chart-review-platform-concur/.claude/skills/*/versions/**
+!chart-review-platform-concur/.claude/skills/**
+chart-review-platform-concur/.claude/skills/*/sessions/
+chart-review-platform-concur/.claude/skills/*/pilots/
+chart-review-platform-concur/.claude/skills/*/refinement_log.jsonl
 
 # Upstream reference repo — vendored locally as a research mirror but
 # not part of this project's history.
