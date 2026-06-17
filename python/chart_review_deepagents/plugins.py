@@ -4,9 +4,20 @@ The TS run pins a tool profile; for tasks with `pythonPlugins`, the run spec
 carries `python_plugins` (import paths) + run context to bind (`data_dir`, and
 for cohort-CSV tasks like RUCAM, `person_id`). We import each module and
 FORCE-bind that context into every tool in its `TOOLS` list — restricted to the
-params each tool actually declares — so the agent cannot override which patient
-or data dir a tool reads. __name__/__doc__ are preserved so deepagents builds the
-LLM tool schema (exactly like RUCAM/agent_v2's _bind_data_dir).
+params each tool actually declares.
+
+How the binding works at call time: the wrapper updates kwargs with the bound
+values AFTER the model's kwargs, so a force-bound value always OVERRIDES whatever
+the model supplied — the agent cannot change which patient or data dir a tool
+reads, even if it passes its own value.
+
+KNOWN LIMITATION — the bound params are NOT hidden from the LLM tool schema.
+`functools.wraps` copies `__wrapped__`, and `inspect.signature` (which deepagents
+uses to build the schema) follows `__wrapped__`, so the bound params (person_id,
+data_dir) still APPEAR in the LLM-facing signature/schema. The model may
+therefore still try to pass them; the override above makes that harmless, but the
+params are not removed. (__name__/__doc__ are preserved so deepagents names the
+tool correctly — mirrors RUCAM/agent_v2's _bind_data_dir.)
 
 Plugin tools are read/compute only — they never write review_state.
 """

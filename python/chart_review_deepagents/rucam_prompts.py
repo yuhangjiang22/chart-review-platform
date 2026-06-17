@@ -23,21 +23,24 @@ def build_item_task_prompt(entry: Dict[str, Any], prior: List[Dict[str, Any]]) -
 
     item5 = ""
     if fid == "item_5_exclusion":
-        item5 = ("\n4b. MANDATORY: call `score_item5_exclusion(person_id)` and start from its "
+        item5 = ("\n3b. MANDATORY: call `score_item5_exclusion` (it is already bound to this "
+                 "patient — pass no arguments) and start from its "
                  "`recommended_floor`. Raise above it ONLY by citing explicit note exclusions "
                  "(from your search_notes/read_note results) for `not_assessed` causes; lower "
                  "toward -3 if a competing cause clearly explains the injury.")
 
     return f"""Score ONLY RUCAM item {n} — {name} (field_id: `{fid}`). Do not score any other item.
 
-1. Read the scoring method first: read_file("{entry['skill_file']}"). Follow it exactly.
+1. Read the scoring method first. Read the shared eligibility setup
+   read_file("/chart-review-rucam/references/scoring/item-0-setup.md"), then the
+   item-specific method read_file("{entry['skill_file']}"). Follow it exactly.
 2. Gather the structured data its steps reference (the rucam tools: get_patient_summary,
    get_suspect_drug, get_drug_episodes, get_lft_series, get_lab_extremum, get_serology,
    get_conditions, get_hepatotoxicity_category, compute_r_ratio).
 3. Sweep the notes — REQUIRED: call `search_notes(keyword)` for each of these terms:
    {kws}
    then `read_note` the notes that matched, to confirm or exclude per the method.{item5}
-5. Write your verdict with `set_field_assessment(field_id="{fid}", answer=<score>, evidence=[...])`,
+4. Write your verdict with `set_field_assessment(field_id="{fid}", answer=<score>, evidence=[...])`,
    citing both structured evidence and any note quotes. Score ONLY `{fid}`.
 
 Prior item scores (context; do not re-score them):

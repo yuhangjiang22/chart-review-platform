@@ -121,29 +121,10 @@ async def run(spec: dict) -> None:
         if per_item:
             # RUCAM-style per-item scoring: drive ONE conversation per rubric
             # item, retrying an item until its field is written (or max attempts
-            # exhausted). `prior` carries a compact summary of already-scored
-            # items into each subsequent item's task prompt.
-            from .rucam_prompts import build_item_task_prompt
-            from .messages_util import fields_written
+            # exhausted). `prior` carries the real scores of already-scored items
+            # into each subsequent item's task prompt.
             max_attempts = int(spec.get("per_item_max_attempts", 2))
-            prior = []
-            final_msgs = []
-            last_text = ""
-            for entry in per_item:
-                fid = entry["field_id"]
-                wrote = False
-                for attempt in range(1, max_attempts + 1):
-                    emit({"type": "text",
-                          "text": f"Scoring item {entry['item_number']} ({fid}), attempt {attempt}…"})
-                    msgs, last_text = await _stream_once(agent, build_item_task_prompt(entry, prior), config)
-                    final_msgs += msgs
-                    if fid in fields_written(msgs):
-                        wrote = True
-                        break
-                if not wrote:
-                    emit({"type": "text", "text": f"WARNING: {fid} not written after {max_attempts} attempts"})
-                prior.append({"item_number": entry["item_number"], "field_id": fid,
-                              "answer": "written" if wrote else "unscored"})
+            prior, final_msgs = await _score_items(agent, per_item, max_attempts, config)
             last_text = "per-item scoring complete"
         else:
             # Immediate activity marker. astream(stream_mode="values") yields
@@ -157,6 +138,42 @@ async def run(spec: dict) -> None:
             final_msgs, last_text = await _stream_once(agent, spec["prompt"], config)
     _log_usage(spec, final_msgs)
     emit({"type": "result", "result": last_text})
+
+
+async def _score_items(agent, per_item, max_attempts: int, config: dict):
+    """Drive ONE conversation per rubric item, retrying an item until its field
+    is written (or max_attempts exhausted). Threads the REAL score the agent
+    wrote for each item into the `prior` context passed to later items.
+
+    Returns (prior, final_msgs):
+      - prior: list of {item_number, field_id, answer} — answer is the actual
+        score the agent wrote (may be 0, a valid score), or None if never written.
+      - final_msgs: concatenation of every attempt's message list (for usage log).
+    """
+    from .rucam_prompts import build_item_task_prompt
+    from .messages_util import field_answers
+
+    prior = []
+    final_msgs = []
+    for entry in per_item:
+        fid = entry["field_id"]
+        wrote = False
+        answer = None
+        for attempt in range(1, max_attempts + 1):
+            emit({"type": "text",
+                  "text": f"Scoring item {entry['item_number']} ({fid}), attempt {attempt}…"})
+            msgs, _last_text = await _stream_once(agent, build_item_task_prompt(entry, prior), config)
+            final_msgs += msgs
+            answers = field_answers(msgs)
+            # Membership, NOT truthiness — a score of 0 is a valid write.
+            if fid in answers:
+                wrote = True
+                answer = answers.get(fid)
+                break
+        if not wrote:
+            emit({"type": "text", "text": f"WARNING: {fid} not written after {max_attempts} attempts"})
+        prior.append({"item_number": entry["item_number"], "field_id": fid, "answer": answer})
+    return prior, final_msgs
 
 
 async def _stream_once(agent, user_content: str, config: dict):
