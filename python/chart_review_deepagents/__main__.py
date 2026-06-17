@@ -95,8 +95,13 @@ async def run(spec: dict) -> None:
                 file=sys.stderr,
             )
         tools = tools + plugin_tools
+        # Per-item mode uses short, single-item conversations that stay well under
+        # Azure's 128 tool_calls cap, so allow parallel tool-call batching (far
+        # fewer turns -> fewer context re-sends -> much cheaper). The note-heavy
+        # single-call path keeps serial to avoid the 128 overflow.
         agent_kwargs = dict(
-            model=make_model(spec.get("model")),
+            model=make_model(spec.get("model"),
+                             serial_tool_calls=not bool(spec.get("per_item"))),
             tools=tools,
             system_prompt=spec.get("system_prompt", ""),
         )

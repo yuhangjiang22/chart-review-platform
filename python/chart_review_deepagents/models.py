@@ -2,10 +2,16 @@
 from . import registry
 
 
-def make_model(model_key=None):
+def make_model(model_key=None, serial_tool_calls=True):
     """Build a LangChain chat model for a registry key. When model_key is None,
     use the registry's default entry. The registry resolves the key to a
-    backend + connection (Azure or vLLM); see registry.py for the contract."""
+    backend + connection (Azure or vLLM); see registry.py for the contract.
+
+    serial_tool_calls: when True (default), force ONE tool call per turn on the
+    Azure path (parallel_tool_calls=False) so the tool_calls array can't overflow
+    Azure's 128 cap — needed for the note-heavy single-call path. Per-item mode
+    passes False: its conversations are short (one item, well under the cap) and
+    parallel batching is far cheaper (fewer turns -> fewer context re-sends)."""
     if model_key is None:
         _, model_key = registry.list_models()
         if model_key is None:
@@ -27,6 +33,9 @@ def make_model(model_key=None):
                 kwargs.setdefault("parallel_tool_calls", False)
                 return super().bind_tools(tools, **kwargs)
 
+        # serial -> the override above; parallel -> stock AzureChatOpenAI (the
+        # client batches tool calls per turn, far fewer round-trips).
+        cls = _SerialToolCallsAzure if serial_tool_calls else AzureChatOpenAI
         kwargs = dict(
             azure_endpoint=conn["azure_endpoint"],
             api_key=conn["api_key"],
@@ -49,7 +58,7 @@ def make_model(model_key=None):
         else:
             # Non-reasoning models (gpt-4o): pin temperature=0 for determinism.
             kwargs["temperature"] = 0
-        return _SerialToolCallsAzure(**kwargs)
+        return cls(**kwargs)
     from langchain_openai import ChatOpenAI
 
     return ChatOpenAI(
