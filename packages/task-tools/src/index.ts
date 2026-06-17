@@ -79,12 +79,18 @@ const RUCAM_PER_ITEM: PerItemSpec[] = [
  *  `tool_profile`. Add an entry when a task needs bespoke tools. */
 const NAMED_PROFILES: Record<string, Partial<ToolProfile>> = {
   rucam: {
-    // Hybrid: write/note tools stay in baseTools (MCP); these read/compute tools
-    // are sidecar Python plugins reused from RUCAM/agent_v2/tools.py.
+    // Hybrid: write/note tools stay in baseTools (MCP); read/compute tools are
+    // sidecar Python plugins reused from RUCAM/agent_v2/tools.py.
     pythonPlugins: ["chart_review_plugins.rucam"],
     dataSource: "rucam-csv",
     skills: ["rucam-scoring"],
     perItem: RUCAM_PER_ITEM,
+    // Also expose read_structured_data/list_structured_data: the patient's
+    // labs/meds/conditions are materialized into omop/, so the agent can cite
+    // CITABLE structured rows ({source:"structured", table, row_id}) that resolve
+    // to what the reviewer sees — instead of falling back to a note. The plugin
+    // tools remain for the COMPUTED parts (R-ratio, exclusion floor, drug episodes).
+    structuredData: true,
   },
   // Proof hook: a phenotype task with `tool_profile: _demo` loads the fixture
   // plugin (chart_review_plugins._demo) so the registry→runspec→sidecar→agent

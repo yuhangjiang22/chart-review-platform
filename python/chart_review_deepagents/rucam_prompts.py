@@ -34,9 +34,13 @@ def build_item_task_prompt(entry: Dict[str, Any], prior: List[Dict[str, Any]]) -
 1. Read the scoring method first. Read the shared eligibility setup
    read_file("/chart-review-rucam/references/scoring/item-0-setup.md"), then the
    item-specific method read_file("{entry['skill_file']}"). Follow it exactly.
-2. Gather the structured data its steps reference (the rucam tools: get_patient_summary,
-   get_suspect_drug, get_drug_episodes, get_lft_series, get_lab_extremum, get_serology,
-   get_conditions, get_hepatotoxicity_category, compute_r_ratio).
+2. Gather structured data. Use the rucam tools for COMPUTED logic (compute_r_ratio,
+   get_drug_episodes' 45-day merge, get_lab_extremum, the LiverTox lookup
+   get_hepatotoxicity_category, get_patient_summary flags). For the
+   raw labs / meds / conditions you will CITE, also read them via `read_structured_data`
+   (tables: `measurements` = LFTs+serology, `drugs` = medications, `conditions`) —
+   each row has a `row_id` you can cite (see step 4). `list_structured_data` lists the
+   tables + row counts first.
 3. Sweep the notes — REQUIRED: call `search_notes(keyword)` for each of these terms:
    {kws}
    then, for each note that matched, call `get_note_section(filename)` to read just
@@ -44,13 +48,17 @@ def build_item_task_prompt(entry: Dict[str, Any], prior: List[Dict[str, Any]]) -
    it is much cheaper than the full note. Only fall back to `read_note` (full text)
    if the section you need is missing or the `get_note_section` result is ambiguous.{item5}
 4. Write your verdict with `set_field_assessment(field_id="{fid}", answer=<score>, evidence=[...])`.
-   EVIDENCE SOURCE — pick the right one or the write is REJECTED:
-   - From a NOTE → `source:"note"` with note_id, span_offsets [start,end], and a verbatim_quote.
-   - Derived from the rucam plugin/compute tools (labs, meds, LiverTox lookup, R-ratio, the
-     exclusion floor) → `source:"computed"` (no table/row_id needed); summarize the basis in the text.
-   - Only use `source:"omop"`/`"structured"` if you have a real OMOP `table` + `row_id`
-     (i.e. from read_structured_data) — plugin-tool output does NOT, so do not tag it omop.
-   Score ONLY `{fid}`.
+   EVIDENCE SOURCE — pick the right one or the write is REJECTED. PREFER citable
+   structured/note evidence over `computed` so a reviewer can trace the score:
+   - A specific lab / med / condition → `source:"structured"` with the `table`
+     (`measurements`/`drugs`/`conditions`) and the `row_id` of the exact row from
+     `read_structured_data`. Use this for the LFT values, the suspect/concomitant
+     drug rows, and the comorbidity rows you relied on.
+   - A statement in a NOTE → `source:"note"` with note_id, span_offsets [start,end],
+     and a verbatim_quote. Cite the note that actually supports THIS item.
+   - Only a purely DERIVED quantity with no single underlying row (e.g. the R-ratio
+     value, the exclusion-floor result) → `source:"computed"`; state the basis in the text.
+   Do NOT cite an unrelated note just to satisfy the requirement. Score ONLY `{fid}`.
 
 Prior item scores (context; do not re-score them):
 {prior_lines}

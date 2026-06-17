@@ -37,6 +37,15 @@ describe("toolProfileFor", () => {
     expect(p.baseTools).toContain("set_field_assessment");
   });
 
+  it("rucam enables read_structured_data even without uses_structured_data (profile sets it)", () => {
+    // The profile materializes labs/meds/conditions into omop/, so the agent can
+    // cite CITABLE structured rows — the allowlist must expose the structured tools
+    // regardless of the task's uses_structured_data flag.
+    const p = toolProfileFor({ task_id: "rucam", task_kind: "phenotype", tool_profile: "rucam" } as any);
+    expect(p.structuredData).toBe(true);
+    expect(mcpAllowlist(p).split(",")).toEqual(expect.arrayContaining(STRUCTURED_DATA_TOOLS));
+  });
+
   it("the _demo profile loads the demo plugin (end-to-end proof hook)", () => {
     const p = toolProfileFor({ task_id: "x", task_kind: "phenotype", tool_profile: "_demo" } as any);
     expect(p.pythonPlugins).toContain("chart_review_plugins._demo");
