@@ -48,7 +48,18 @@ def test_resolve_azure_reads_env_values(tmp_path):
     conn = registry.resolve("gpt-4o", env=AZURE_ENV, models_path=p)
     assert conn == {"backend": "azure", "azure_endpoint": "https://x.openai.azure.com",
                     "api_key": "secret", "api_version": "2024-10-21",
-                    "azure_deployment": "gpt-4o"}
+                    "azure_deployment": "gpt-4o",
+                    # non-reasoning entry -> reasoning_effort is None
+                    "reasoning_effort": None}
+
+
+def test_resolve_azure_passes_reasoning_effort(tmp_path):
+    p = tmp_path / "models.json"
+    p.write_text(json.dumps({"gpt-5.2": {"backend": "azure", "deployment": "gpt-5.2",
+                                         "reasoning_effort": "low"}}))
+    conn = registry.resolve("gpt-5.2", env=AZURE_ENV, models_path=p)
+    assert conn["reasoning_effort"] == "low"
+    assert conn["azure_deployment"] == "gpt-5.2"
 
 
 def test_resolve_vllm_defaults_api_key_empty(tmp_path):

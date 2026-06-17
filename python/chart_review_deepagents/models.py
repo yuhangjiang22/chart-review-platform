@@ -27,12 +27,11 @@ def make_model(model_key=None):
                 kwargs.setdefault("parallel_tool_calls", False)
                 return super().bind_tools(tools, **kwargs)
 
-        return _SerialToolCallsAzure(
+        kwargs = dict(
             azure_endpoint=conn["azure_endpoint"],
             api_key=conn["api_key"],
             api_version=conn["api_version"],
             azure_deployment=conn["azure_deployment"],
-            temperature=0,
             # Back off + retry on transient 429s. The OpenAI SDK honors
             # Retry-After with exponential backoff; without this a single 429
             # (server at capacity / batch concurrency) aborts the patient. The
@@ -40,6 +39,17 @@ def make_model(model_key=None):
             # the secondary cushion.
             max_retries=12,
         )
+        if conn.get("reasoning_effort"):
+            # Reasoning models (gpt-5.x) accept reasoning_effort (minimal|low|
+            # medium|high) — smaller effort = fewer reasoning tokens (billed as
+            # output) = cheaper + faster. They REJECT temperature != 1 ("only the
+            # default (1) is supported"), so we omit temperature entirely for them
+            # (RUCAM scoring is thus non-deterministic on these models).
+            kwargs["reasoning_effort"] = conn["reasoning_effort"]
+        else:
+            # Non-reasoning models (gpt-4o): pin temperature=0 for determinism.
+            kwargs["temperature"] = 0
+        return _SerialToolCallsAzure(**kwargs)
     from langchain_openai import ChatOpenAI
 
     return ChatOpenAI(

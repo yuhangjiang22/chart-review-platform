@@ -114,7 +114,10 @@ def resolve(key, env=None, models_path=None):
                 "api_key": api_key,
                 "api_version": env.get(entry.get("api_version_env", "AZURE_OPENAI_API_VERSION"),
                                        "2024-10-21"),
-                "azure_deployment": entry["deployment"]}
+                "azure_deployment": entry["deployment"],
+                # Reasoning effort for gpt-5.x models (minimal|low|medium|high).
+                # None for non-reasoning models (gpt-4o) -> not passed to the client.
+                "reasoning_effort": entry.get("reasoning_effort")}
     # vllm: endpoint from base_url_env (read at run time) or a literal base_url.
     base_url = env.get(entry["base_url_env"]) if entry.get("base_url_env") else entry.get("base_url")
     if not _is_configured(base_url):
