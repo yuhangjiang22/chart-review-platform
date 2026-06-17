@@ -9,7 +9,7 @@ import type {
   ReviewState,
 } from "./types";
 import { authFetch } from "./auth";
-import { type StructuredData } from "./StructuredTab";
+import { StructuredTab, type StructuredData } from "./StructuredTab";
 import { TimelineTab } from "./TimelineTab";
 import type { Citer } from "./citers";
 import { citerKey, citerLabel, buildCitersByNoteSpan, buildCitersByRowKey } from "./citers";
@@ -55,7 +55,7 @@ interface Props {
 
 type ActiveView = { kind: "note"; filename: string };
 
-type MainTab = "notes" | "timeline";
+type MainTab = "notes" | "structured" | "timeline";
 
 /** Map OMOP-canonical table names → the simplified plurals the UI tabs use.
  *  Agents emit canonical names in evidence; tabs are keyed by the plurals.
@@ -403,6 +403,14 @@ export function NoteViewer({
     setMainTab("notes");
   }, [noteFocus, patientId]);
 
+  // External "jump to source" for OMOP/structured evidence: flip to the
+  // structured tab so StructuredTab can scroll the matching row into view.
+  // `structuredFocus.nonce` re-triggers on repeated clicks of the same row.
+  useEffect(() => {
+    if (!structuredFocus || !patientId) return;
+    setMainTab("structured");
+  }, [structuredFocus, patientId]);
+
   useEffect(() => {
     if (!patientId || !active || active.kind !== "note") {
       setNoteText("");
@@ -517,6 +525,19 @@ export function NoteViewer({
   }, [citerEvidence]);
   const effectiveIndexDate = indexDate ?? structured?.index_date;
   const hasCitedAny = evidence.length > 0;
+  /** True when the patient has at least one non-empty OMOP table. Gates the
+   *  "structured" source tab — notes-only patients (no `omop/` dir) never see
+   *  an empty tab; patients with materialized structured data get the browser
+   *  back. */
+  const hasStructured = useMemo(() => {
+    if (!structured) return false;
+    return Object.entries(structured).some(
+      ([k, v]) => k !== "index_date" && Array.isArray(v) && v.length > 0,
+    );
+  }, [structured]);
+  const mainTabs: MainTab[] = hasStructured
+    ? ["notes", "structured", "timeline"]
+    : ["notes", "timeline"];
   const { citedNotes, otherNotes } = useMemo(() => {
     const cited: NoteListing[] = [];
     const other: NoteListing[] = [];
@@ -740,10 +761,11 @@ export function NoteViewer({
           )}
         </div>
       )}
-      {/* Main tabs — Notes / Timeline (per-criterion source view).
-          Notes-only platform: the OMOP "structured" tab is removed. */}
+      {/* Main tabs — Notes / Structured / Timeline (per-criterion source view).
+          The "structured" OMOP tab appears only when the patient has at least
+          one non-empty OMOP table (notes-only patients see Notes / Timeline). */}
       <div className="shrink-0 border-b border-border bg-paper/40 px-4 pt-2 flex items-end gap-1">
-        {(["notes", "timeline"] as const).map((t) => (
+        {mainTabs.map((t) => (
           <button
             key={t}
             onClick={() => setMainTab(t)}
@@ -1029,7 +1051,7 @@ export function NoteViewer({
         </div>
       )}
 
-      {mainTab === "timeline" && selectedField && (
+      {(mainTab === "timeline" || mainTab === "structured") && selectedField && (
         <div className="shrink-0 border-b border-border/60 bg-paper/40 px-4 py-1.5 flex items-center gap-3 text-[11.5px]">
           <label className="flex items-center gap-1.5 cursor-pointer select-none">
             <input
@@ -1052,6 +1074,28 @@ export function NoteViewer({
               No evidence cited yet for this criterion.
             </span>
           )}
+        </div>
+      )}
+
+      {mainTab === "structured" && (
+        <div className="flex-1 min-h-0 overflow-auto">
+          <StructuredTab
+            data={structured}
+            indexDate={effectiveIndexDate}
+            activeFieldId={selectedField?.id ?? null}
+            citedKeys={citedStructuredKeys}
+            citersByRowKey={citersByRowKey}
+            // Only narrow to cited rows when this criterion actually cited
+            // structured evidence. Otherwise (e.g. a note-only item) show the
+            // full structured browser rather than an empty filtered list.
+            showOnlyCited={showOnlyCited && citedStructuredKeys.size > 0}
+            focus={structuredFocus}
+            onCite={
+              onCite
+                ? (ev) => onCite({ source: "omop" as const, ...ev })
+                : undefined
+            }
+          />
         </div>
       )}
 
