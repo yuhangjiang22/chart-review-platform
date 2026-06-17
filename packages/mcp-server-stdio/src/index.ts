@@ -39,6 +39,7 @@ import {
   setReviewStatus as hSetReviewStatus,
   listNotesTool as hListNotes,
   readNoteTool as hReadNote,
+  getNoteSectionTool as hGetNoteSection,
   searchNotesTool as hSearchNotes,
   listCriteriaTool as hListCriteria,
   readCriterionTool as hReadCriterion,
@@ -307,6 +308,29 @@ if (want("read_note")) {
       },
     },
     async (args): Promise<CallToolResult> => hReadNote(session, args as any),
+  );
+}
+
+if (want("get_note_section")) {
+  server.registerTool(
+    "get_note_section",
+    {
+      description: [
+        "PREFER OVER read_note for RUCAM. Returns the note header plus ONLY the",
+        "rubric-relevant sections (Assessment, Plan, Impression, Diagnoses,",
+        "Hospital Course, Labs, Medications, HPI, …) — much cheaper than reading",
+        "the full note. Pass `sections` to override the default targets",
+        "(case-insensitive substring match on the section name). Quotes pulled",
+        "from a returned section still verify against the full note, so cite them",
+        "as normal. Fall back to read_note (full text) only if the section you",
+        "need is missing or the match looks ambiguous.",
+      ].join(" "),
+      inputSchema: {
+        filename: z.string(),
+        sections: z.array(z.string()).optional(),
+      },
+    },
+    async (args): Promise<CallToolResult> => hGetNoteSection(session, args as any),
   );
 }
 

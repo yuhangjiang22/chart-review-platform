@@ -39,7 +39,10 @@ def build_item_task_prompt(entry: Dict[str, Any], prior: List[Dict[str, Any]]) -
    get_conditions, get_hepatotoxicity_category, compute_r_ratio).
 3. Sweep the notes — REQUIRED: call `search_notes(keyword)` for each of these terms:
    {kws}
-   then `read_note` the notes that matched, to confirm or exclude per the method.{item5}
+   then, for each note that matched, call `get_note_section(filename)` to read just
+   its rubric-relevant sections (Assessment/Plan/Impression/Diagnoses/Labs/HPI/…) —
+   it is much cheaper than the full note. Only fall back to `read_note` (full text)
+   if the section you need is missing or the `get_note_section` result is ambiguous.{item5}
 4. Write your verdict with `set_field_assessment(field_id="{fid}", answer=<score>, evidence=[...])`,
    citing both structured evidence and any note quotes. Score ONLY `{fid}`.
 

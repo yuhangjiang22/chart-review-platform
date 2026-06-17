@@ -9,6 +9,7 @@ def test_prompt_is_focused_on_one_item_and_forces_discipline():
     assert "item_5_exclusion" in p
     assert ENTRY["skill_file"] in p          # read the method first
     assert "search_notes" in p               # the note sweep
+    assert "get_note_section" in p           # Pass 2 reads sections (cheaper than full notes)
     assert "autoimmune" in p and "ANA" in p  # the keywords are listed
     assert "set_field_assessment" in p       # write exactly one field
     assert "score_item5_exclusion" in p      # item-5 floor tool mandated

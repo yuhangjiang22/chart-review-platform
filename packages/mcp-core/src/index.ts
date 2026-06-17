@@ -616,6 +616,95 @@ export async function readNoteTool(
   };
 }
 
+// ── get_note_section ──────────────────────────────────────────────────
+// Section-extraction note read: returns the note header + only the sections
+// relevant to the active rubric, instead of the whole note. Much cheaper than
+// read_note for long notes. Ported from RUCAM agent_v2's get_note_section.
+//
+// A cited quote pulled from a returned section still verifies against the FULL
+// note bytes at the faithfulness gate (a section is a verbatim subset), so no
+// faithfulness change is needed.
+
+export const getNoteSectionArgsSchema = z.object({
+  filename: z.string(),
+  sections: z.array(z.string()).optional(),
+});
+export type GetNoteSectionArgs = z.infer<typeof getNoteSectionArgsSchema>;
+
+// A line is a SECTION HEADER if it is ALL-CAPS (optionally ":") or Title-Case
+// ending in ":" — and short (< 80 chars). Mirrors RUCAM's _SECTION_RE.
+const GET_NOTE_SECTION_HEADER_RE =
+  /^(?:[A-Z][A-Z0-9 /&-]{2,}:?$|[A-Z][a-zA-Z0-9 /&-]{2,}:)$/;
+
+const GET_NOTE_SECTION_DEFAULT_TARGETS = [
+  "assessment", "plan", "impression", "diagnos", "hospital course",
+  "labs", "laboratory", "medications", "history of present illness",
+  "hpi", "discharge diagnosis", "final diagnosis", "problem list",
+];
+
+export async function getNoteSectionTool(
+  session: McpSession,
+  args: GetNoteSectionArgs,
+): Promise<CallToolResult> {
+  const filename = args.filename.endsWith(".txt") ? args.filename : `${args.filename}.txt`;
+  let content: string;
+  try {
+    content = readNoteFn(session.patientId, filename);
+  } catch (e) {
+    return {
+      isError: true,
+      content: [{ type: "text", text: JSON.stringify({
+        ok: false, error: `note read failed: ${(e as Error).message}`,
+      }) }],
+    };
+  }
+
+  const targets = (args.sections ?? GET_NOTE_SECTION_DEFAULT_TARGETS).map((s) => s.toLowerCase());
+  const lines = content.split("\n");
+
+  // Always include the note header = the first 7 lines.
+  const headerLines = lines.slice(0, 7);
+
+  // Parse the body into sections keyed by their header line (":" stripped).
+  // Lines before the first header land in "_preamble".
+  const body = lines.slice(7);
+  const parsed = new Map<string, string[]>();
+  let current = "_preamble";
+  parsed.set(current, []);
+  for (const line of body) {
+    const stripped = line.trim();
+    if (stripped && stripped.length < 80 && GET_NOTE_SECTION_HEADER_RE.test(stripped)) {
+      current = stripped.replace(/:$/, "");
+      if (!parsed.has(current)) parsed.set(current, []);
+    } else {
+      parsed.get(current)!.push(line);
+    }
+  }
+
+  // Collect matching sections as "[<HEADER>]\n<content>" blocks.
+  const matched: string[] = [];
+  for (const [name, secLines] of parsed) {
+    if (targets.some((t) => name.toLowerCase().includes(t))) {
+      const secContent = secLines.join("\n").trim();
+      if (secContent) matched.push(`[${name}]\n${secContent}`);
+    }
+  }
+
+  const headerText = headerLines.join("\n");
+  const out = matched.length
+    ? `${headerText}\n\n${matched.join("\n\n")}`
+    : `${headerText}\n\n(No matching sections found — use read_note for full text)`;
+
+  return {
+    content: [{ type: "text", text: JSON.stringify({
+      ok: true,
+      filename,
+      returned_chars: out.length,
+      content: out,
+    }) }],
+  };
+}
+
 export const listStructuredDataArgsSchema = z.object({});
 export type ListStructuredDataArgs = z.infer<typeof listStructuredDataArgsSchema>;
 

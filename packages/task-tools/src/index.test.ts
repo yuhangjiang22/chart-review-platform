@@ -10,6 +10,12 @@ describe("toolProfileFor", () => {
     expect(mcpAllowlist(p)).not.toContain("list_structured_data");
   });
 
+  it("phenotype allowlist exposes the section-extraction note tool (get_note_section)", () => {
+    const p = toolProfileFor({ task_id: "cancer-diagnosis", task_kind: "phenotype" } as any);
+    expect(p.baseTools).toContain("get_note_section");
+    expect(mcpAllowlist(p).split(",")).toContain("get_note_section");
+  });
+
   it("phenotype with uses_structured_data adds the OMOP tools to the allowlist", () => {
     const p = toolProfileFor({ task_id: "x", task_kind: "phenotype", uses_structured_data: true } as any);
     expect(p.structuredData).toBe(true);

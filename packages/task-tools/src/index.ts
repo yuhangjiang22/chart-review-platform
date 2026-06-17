@@ -8,7 +8,7 @@ import type { CompiledTask } from "@chart-review/tasks";
 
 /** Phenotype's MCP surface: notes + criteria + write/evidence/status. */
 export const PHENOTYPE_BASE_TOOLS = [
-  "list_notes", "read_note", "read_notes", "search_notes",
+  "list_notes", "read_note", "read_notes", "search_notes", "get_note_section",
   "list_criteria", "read_criterion", "read_criteria",
   "find_quote_offsets", "set_field_assessment", "select_evidence",
   "set_summary", "set_review_status", "get_review_state", "recommend_keywords",
@@ -16,7 +16,7 @@ export const PHENOTYPE_BASE_TOOLS = [
 /** Adherence's MCP surface: its question tools + notes + status (no phenotype write). */
 export const ADHERENCE_BASE_TOOLS = [
   "list_questions", "read_question", "set_question_answer", "get_adherence_state",
-  "list_notes", "read_note", "read_notes", "search_notes", "set_review_status",
+  "list_notes", "read_note", "read_notes", "search_notes", "get_note_section", "set_review_status",
 ];
 /** EHR/OMOP read tools, added when a task opts into structured data. */
 export const STRUCTURED_DATA_TOOLS = ["list_structured_data", "read_structured_data"];
