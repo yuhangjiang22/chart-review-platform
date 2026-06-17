@@ -2,6 +2,27 @@
 
 **Goal:** Systematically rule out alternative causes of liver injury.
 
+### Step 0 — MANDATORY: anchor on the structured floor (`score_item5_exclusion`)
+
+**Call `score_item5_exclusion(person_id)` FIRST, before scoring.** It returns,
+from structured data, each cause's status under the strict rule (a NEGATIVE test
+= ruled out; a POSITIVE test / present diagnosis = a competing cause, NOT
+excluded; no test / flag = 0 = NOT ruled out), plus a `recommended_floor`.
+
+**Your item_5 score starts AT the floor. You may only move it with evidence:**
+- **RAISE above the floor** ONLY by citing, per cause, an explicit NOTE
+  exclusion for a cause the tool marked `not_assessed` (a negative test result
+  in a note, or an explicit "denies / no evidence of …"). Each such cause
+  upgrades the ruled-out count. A structured flag of 0 is NOT a justification —
+  you need a note quote. **Never return a score above the floor without naming
+  the notes that justify it.**
+- **LOWER toward −3** if a `competing_cause` clearly explains the injury.
+- If you cannot justify moving it, **use the floor.**
+
+This exists because asserting "all causes excluded" (→ +1) without the per-cause
+work is the most common error. The floor makes that impossible: most causes are
+`not_assessed` in structured data, so +1/+2 requires real note evidence.
+
 ### Step 1 — Collect structured flags (`get_patient_summary`)
 
 **Hypotension/shock/ischemia (within 2 weeks):**

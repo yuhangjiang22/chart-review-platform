@@ -23,6 +23,7 @@ from .rucam_tools import (
     get_hepatotoxicity_category,
 )
 from .rucam_r_ratio import compute_r_ratio
+from .rucam_item5 import score_item5_exclusion
 
 TOOLS = [
     get_patient_summary,
@@ -35,4 +36,9 @@ TOOLS = [
     get_conditions,
     get_hepatotoxicity_category,
     compute_r_ratio,
+    # Item-5 structured floor + per-cause breakdown. Concur addition (not from
+    # agent_v2): on real data the agent rotely scored item 5 = +1 ("all
+    # excluded"); this forces it to start from a data-derived floor and justify
+    # any score above it with note evidence. See rucam_item5.py.
+    score_item5_exclusion,
 ]
