@@ -203,7 +203,7 @@ def _log_usage(spec: dict, msgs) -> None:
     log_path = os.environ.get("DEEPAGENTS_USAGE_LOG")
     if not log_path:
         return
-    inp = out = tot = 0
+    inp = out = tot = cached = reasoning = 0
     from langchain_core.messages import AIMessage
     for m in msgs:
         if isinstance(m, AIMessage):
@@ -211,8 +211,13 @@ def _log_usage(spec: dict, msgs) -> None:
             inp += int(u.get("input_tokens", 0) or 0)
             out += int(u.get("output_tokens", 0) or 0)
             tot += int(u.get("total_tokens", 0) or 0)
+            # cost-relevant splits: cached input bills far cheaper; reasoning
+            # tokens (gpt-5.x) bill as output. Present in usage_metadata details.
+            cached += int((u.get("input_token_details") or {}).get("cache_read", 0) or 0)
+            reasoning += int((u.get("output_token_details") or {}).get("reasoning", 0) or 0)
     rec = {"model": spec.get("model"), "input_tokens": inp,
-           "output_tokens": out, "total_tokens": tot or (inp + out)}
+           "cached_input_tokens": cached, "output_tokens": out,
+           "reasoning_tokens": reasoning, "total_tokens": tot or (inp + out)}
     try:
         with open(log_path, "a", encoding="utf-8") as f:
             f.write(json.dumps(rec) + "\n")
