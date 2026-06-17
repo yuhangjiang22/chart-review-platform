@@ -137,20 +137,8 @@ async def run(spec: dict) -> None:
             # rejected and the original answer is kept).
             set_field_tool = next(
                 (t for t in tools if getattr(t, "name", None) == "set_field_assessment"), None)
-
-            async def _recommit(args: dict) -> bool:
-                if set_field_tool is None:
-                    return False
-                try:
-                    result = await set_field_tool.ainvoke(args)
-                except Exception as e:  # tool/transport error → keep original answer
-                    print(f"[reconcile] re-commit failed: {e}", file=sys.stderr)
-                    return False
-                content = result[0] if isinstance(result, tuple) else result
-                return '"ok":true' in str(content).replace(" ", "").lower()
-
             prior, final_msgs = await _score_items(agent, per_item, max_attempts, config,
-                                                   recommit=_recommit)
+                                                   recommit=make_recommit(set_field_tool))
             last_text = "per-item scoring complete"
         else:
             # Immediate activity marker. astream(stream_mode="values") yields
@@ -164,6 +152,32 @@ async def run(spec: dict) -> None:
             final_msgs, last_text = await _stream_once(agent, spec["prompt"], config)
     _log_usage(spec, final_msgs)
     emit({"type": "result", "result": last_text})
+
+
+def make_recommit(set_field_tool):
+    """Build the score-reconciliation re-commit callable for `_score_items`.
+
+    Re-invokes set_field_assessment with the corrected answer and reports whether
+    the write was ACCEPTED — the faithfulness gate + answer-enum enforcement still
+    apply, so an off-enum stated score comes back rejected and the loop keeps the
+    original answer. Returns an async `recommit(args)->bool`, or None when the tool
+    is unavailable (reconciliation is then detected-but-skipped)."""
+    if set_field_tool is None:
+        return None
+
+    async def recommit(args: dict) -> bool:
+        try:
+            result = await set_field_tool.ainvoke(args)
+        except Exception as e:  # tool/transport error → keep the original answer
+            print(f"[reconcile] re-commit failed: {e}", file=sys.stderr)
+            return False
+        # MCP tools load with response_format='content_and_artifact' → the result
+        # may be a (content, artifact) tuple; a successful write's content carries
+        # {"ok":true}. Tolerate either shape.
+        content = result[0] if isinstance(result, tuple) else result
+        return '"ok":true' in str(content).replace(" ", "").lower()
+
+    return recommit
 
 
 async def _score_items(agent, per_item, max_attempts: int, config: dict, recommit=None):
