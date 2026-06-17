@@ -248,6 +248,14 @@ export function SessionSidebar({
                       )}>
                         Run {runNumberOf.get(it.iter_id)}
                         {isActive && <span className="ml-1 text-[9px] text-[hsl(var(--sage))] uppercase tracking-[0.1em]">· active</span>}
+                        {it.guideline_sha && (
+                          <span
+                            className="ml-2 font-normal text-[9.5px] text-muted-foreground/70"
+                            title={`Rubric version this run was frozen against (guideline_sha): ${it.guideline_sha}`}
+                          >
+                            rubric {it.guideline_sha.slice(0, 8)}
+                          </span>
+                        )}
                       </span>
                       <span
                         className={cn(

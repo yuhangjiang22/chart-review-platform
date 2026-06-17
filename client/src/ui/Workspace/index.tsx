@@ -432,6 +432,10 @@ export function Workspace({
         .map((p) => ({
           iter_id: p.iter_id, iter_num: p.iter_num, state: p.state,
           started_at: (p as { started_at?: string }).started_at ?? "",
+          // The rubric version (content SHA) this run was frozen against, so the
+          // iter card can show which rubric produced it (it stays pinned even
+          // after later rubric edits).
+          guideline_sha: (p as { guideline_sha?: string }).guideline_sha,
         }))
     : [];
 
