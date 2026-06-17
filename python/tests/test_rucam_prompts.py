@@ -37,3 +37,28 @@ def test_item5_floor_tool_only_mentioned_for_item5():
 def test_prior_scores_threaded_in():
     p = build_item_task_prompt(ENTRY, prior=[{"item_number": 1, "field_id": "item_1_time_to_onset", "answer": 2}])
     assert "item_1_time_to_onset" in p and "2" in p
+
+def test_prior_reasoning_threaded_in_and_truncated():
+    # The prior item's reasoning is carried forward (not just its score) and
+    # truncated to ~120 chars so later items get context without bloat.
+    long_reason = "onset began 30 days after the suspect drug start, " + ("x" * 200) + " Score: 2"
+    p = build_item_task_prompt(ENTRY, prior=[{
+        "item_number": 1, "field_id": "item_1_time_to_onset", "answer": 2,
+        "reasoning": long_reason,
+    }])
+    assert "onset began 30 days after the suspect drug start" in p   # reasoning shown
+    assert ("x" * 200) not in p                                       # but truncated
+
+def test_prior_line_omits_dash_when_no_reasoning():
+    # A prior entry with empty reasoning renders the score only (no trailing "— ").
+    p = build_item_task_prompt(ENTRY, prior=[{
+        "item_number": 1, "field_id": "item_1_time_to_onset", "answer": 2, "reasoning": "",
+    }])
+    assert "item_1_time_to_onset): 2" in p
+
+def test_prompt_asks_for_score_marker_in_rationale():
+    # The reconciliation guard (port of agent_v2 sync_score_from_reasoning) needs
+    # the agent to end its rationale with "Score: X"; the prompt must request it.
+    p = build_item_task_prompt(ENTRY, prior=[])
+    assert "rationale" in p
+    assert "Score:" in p

@@ -1,6 +1,12 @@
 """Helpers for inspecting an agent run's message list."""
-from typing import Iterable, Set
+import re
+from typing import Iterable, Optional, Set
 from langchain_core.messages import AIMessage, ToolMessage
+
+# Trailing "Score: X" marker the per-item prompt asks the agent to end its
+# rationale with (e.g. "Score: -2"). Mirrors agent_v2/prompts.py + the
+# sync_score_from_reasoning validator in agent_v2/output_schema.py.
+_SCORE_MARKER = re.compile(r"\bscore[:\s=]+([+-]?\d+)", re.IGNORECASE)
 
 
 def set_field_committed(msgs: Iterable) -> bool:
@@ -52,3 +58,30 @@ def field_answers(msgs) -> dict:
                     if fid:
                         out[fid] = args.get("answer")
     return out
+
+
+def last_field_call_args(msgs, fid: str) -> dict:
+    """The args of the LAST set_field_assessment call for `fid` (last-write-wins,
+    matching field_answers). Returns {} if the field was never written. Used by
+    the per-item loop to recover the committed rationale + evidence for score
+    reconciliation / re-commit."""
+    out: dict = {}
+    for m in msgs:
+        if isinstance(m, AIMessage):
+            for tc in (getattr(m, "tool_calls", None) or []):
+                if tc.get("name") == "set_field_assessment":
+                    args = tc.get("args") or {}
+                    if args.get("field_id") == fid:
+                        out = args
+    return out
+
+
+def parse_stated_score(text: Optional[str]) -> Optional[int]:
+    """Extract the LAST "Score: X" integer the agent stated in free text (its
+    rationale), or None if absent. Ports agent_v2's sync_score_from_reasoning
+    regex so concur can reconcile a drifted structured answer against the prose
+    conclusion the agent actually reasoned to."""
+    if not text:
+        return None
+    matches = _SCORE_MARKER.findall(text)
+    return int(matches[-1]) if matches else None

@@ -17,9 +17,13 @@ def build_item_task_prompt(entry: Dict[str, Any], prior: List[Dict[str, Any]]) -
     fid = entry["field_id"]
     name = ITEM_NAMES.get(n, fid)
     kws = ", ".join(entry.get("keywords", []))
-    prior_lines = "\n".join(
-        f"  - item {p['item_number']} ({p['field_id']}): {p.get('answer')}" for p in prior
-    ) or "  (none yet)"
+
+    def _prior_line(p: Dict[str, Any]) -> str:
+        base = f"  - item {p['item_number']} ({p['field_id']}): {p.get('answer')}"
+        r = (p.get("reasoning") or "").strip().replace("\n", " ")
+        return f"{base} — {r[:120]}" if r else base
+
+    prior_lines = "\n".join(_prior_line(p) for p in prior) or "  (none yet)"
 
     item5 = ""
     if fid == "item_5_exclusion":
@@ -47,7 +51,10 @@ def build_item_task_prompt(entry: Dict[str, Any], prior: List[Dict[str, Any]]) -
    its rubric-relevant sections (Assessment/Plan/Impression/Diagnoses/Labs/HPI/…) —
    it is much cheaper than the full note. Only fall back to `read_note` (full text)
    if the section you need is missing or the `get_note_section` result is ambiguous.{item5}
-4. Write your verdict with `set_field_assessment(field_id="{fid}", answer=<score>, evidence=[...])`.
+4. Write your verdict with `set_field_assessment(field_id="{fid}", answer=<score>, rationale="…", evidence=[...])`.
+   In `rationale`, give your scoring reasoning and END it with `Score: <the score>`
+   (e.g. `Score: -2`); it MUST equal `answer`. If the two disagree, a reviewer trusts
+   the `Score:` in your reasoning — so make them consistent.
    EVIDENCE SOURCE — pick the right one or the write is REJECTED. PREFER citable
    structured/note evidence over `computed` so a reviewer can trace the score:
    - A specific lab / med / condition → `source:"structured"` with the `table`

@@ -129,7 +129,28 @@ async def run(spec: dict) -> None:
             # exhausted). `prior` carries the real scores of already-scored items
             # into each subsequent item's task prompt.
             max_attempts = int(spec.get("per_item_max_attempts", 2))
-            prior, final_msgs = await _score_items(agent, per_item, max_attempts, config)
+            # Re-commit path for score reconciliation: when the agent's rationale
+            # ("Score: X") drifts from the committed answer field, the loop trusts
+            # the prose (matching agent_v2) and re-writes the corrected score
+            # through the SAME set_field_assessment tool, so the faithfulness gate
+            # + answer-enum enforcement still apply (an off-enum stated score is
+            # rejected and the original answer is kept).
+            set_field_tool = next(
+                (t for t in tools if getattr(t, "name", None) == "set_field_assessment"), None)
+
+            async def _recommit(args: dict) -> bool:
+                if set_field_tool is None:
+                    return False
+                try:
+                    result = await set_field_tool.ainvoke(args)
+                except Exception as e:  # tool/transport error → keep original answer
+                    print(f"[reconcile] re-commit failed: {e}", file=sys.stderr)
+                    return False
+                content = result[0] if isinstance(result, tuple) else result
+                return '"ok":true' in str(content).replace(" ", "").lower()
+
+            prior, final_msgs = await _score_items(agent, per_item, max_attempts, config,
+                                                   recommit=_recommit)
             last_text = "per-item scoring complete"
         else:
             # Immediate activity marker. astream(stream_mode="values") yields
@@ -145,18 +166,29 @@ async def run(spec: dict) -> None:
     emit({"type": "result", "result": last_text})
 
 
-async def _score_items(agent, per_item, max_attempts: int, config: dict):
+async def _score_items(agent, per_item, max_attempts: int, config: dict, recommit=None):
     """Drive ONE conversation per rubric item, retrying an item until its field
-    is written (or max_attempts exhausted). Threads the REAL score the agent
-    wrote for each item into the `prior` context passed to later items.
+    is written (or max_attempts exhausted). Threads the REAL score AND reasoning
+    the agent wrote for each item into the `prior` context passed to later items.
+
+    Score reconciliation (port of agent_v2's sync_score_from_reasoning): the
+    per-item prompt asks the agent to end its rationale with `Score: X`. If that
+    prose conclusion disagrees with the committed `answer` field (the structured
+    field is the more error-prone of the two), trust the prose and re-commit the
+    corrected score via `recommit` so review_state — the scorecard's source of
+    truth — matches. `recommit(args)->bool` re-invokes set_field_assessment;
+    when None (unit tests / non-RUCAM), reconciliation is detected but skipped.
 
     Returns (prior, final_msgs):
-      - prior: list of {item_number, field_id, answer} — answer is the actual
-        score the agent wrote (may be 0, a valid score), or None if never written.
+      - prior: list of {item_number, field_id, answer, reasoning} — answer is the
+        actual (possibly reconciled) score, or None if never written; reasoning
+        is the committed rationale ("" if none), threaded into later items.
       - final_msgs: concatenation of every attempt's message list (for usage log).
     """
     from .rucam_prompts import build_item_task_prompt
-    from .messages_util import field_answers, set_field_committed
+    from .messages_util import (
+        field_answers, set_field_committed, last_field_call_args, parse_stated_score,
+    )
 
     prior = []
     final_msgs = []
@@ -164,6 +196,7 @@ async def _score_items(agent, per_item, max_attempts: int, config: dict):
         fid = entry["field_id"]
         wrote = False
         answer = None
+        reasoning = ""
         for attempt in range(1, max_attempts + 1):
             emit({"type": "text",
                   "text": f"Scoring item {entry['item_number']} ({fid}), attempt {attempt}…"})
@@ -177,10 +210,24 @@ async def _score_items(agent, per_item, max_attempts: int, config: dict):
             if set_field_committed(msgs) and fid in answers:
                 wrote = True
                 answer = answers.get(fid)
+                call_args = last_field_call_args(msgs, fid)
+                reasoning = call_args.get("rationale") or ""
+                stated = parse_stated_score(reasoning)
+                if stated is not None and stated != answer:
+                    if recommit is not None and await recommit({**call_args, "answer": stated}):
+                        emit({"type": "text",
+                              "text": f"Reconciled {fid}: committed {answer} → {stated} "
+                                      f"(rationale 'Score:' overrides the answer field)"})
+                        answer = stated
+                    else:
+                        emit({"type": "text",
+                              "text": f"NOTE: {fid} rationale states Score {stated} but answer "
+                                      f"field is {answer}; re-commit unavailable/rejected, keeping {answer}"})
                 break
         if not wrote:
             emit({"type": "text", "text": f"WARNING: {fid} not written after {max_attempts} attempts"})
-        prior.append({"item_number": entry["item_number"], "field_id": fid, "answer": answer})
+        prior.append({"item_number": entry["item_number"], "field_id": fid,
+                      "answer": answer, "reasoning": reasoning})
     return prior, final_msgs
 
 
