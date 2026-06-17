@@ -1,0 +1,39 @@
+task_type: adherence
+task_kind: adherence
+uses_structured_data: true
+manual_version: 0.1.0-concur
+source_document_sha: sha256:crc-evoskill-study-design-2026-03-23
+status: draft
+review_unit: patient
+overview_prose: >-
+  Colorectal cancer (CRC) NCCN guideline-concordance task. Per CRC patient, the
+  reviewer answers a small set of guideline-concordance questions — each judged
+  Concordant / Discordant / Not applicable — covering molecular testing, staging
+  workup, surgical nodal adequacy, and stage-appropriate systemic/neoadjuvant
+  therapy. Answers are read from pathology, radiology, oncology, and operative
+  notes plus structured EHR data.
+
+  Derived from the CRC EvoSkill study design (2026-03-23), Section 3 "Downstream
+  Concordance Rules". This is the TASK ONLY — the concordance question rubric —
+  not the study's abstraction targets, baselines/EvoSkill conditions, difficulty
+  levels, data-prep, or evaluation methodology. The stage-conditional rules use
+  three eligibility questions (site, stage group) to set their N/A conditions.
+final_output: question_answers
+phases:
+  - author
+  - try
+  - validate
+  - decide
+clinical_sources:
+  - id: NCCN-Colon-Rectal
+    title: "NCCN Clinical Practice Guidelines in Oncology — Colon Cancer and Rectal Cancer"
+    publisher: National Comprehensive Cancer Network
+    citation: "NCCN Guidelines: Colon Cancer; Rectal Cancer. National Comprehensive Cancer Network."
+  - id: STORE-2025
+    title: "STORE 2025 — Standards for Oncology Registry Entry / SEER coding manual (2025)"
+    publisher: Commission on Cancer / SEER
+    citation: "Standards for Oncology Registry Entry (STORE), 2025 edition."
+  - id: CRC-EvoSkill-Design-2026
+    title: "CRC EvoSkill Study Design"
+    publisher: Internal (IU Health Cancer Center / EvoSkill project)
+    local_path: 2026-03-23-crc-evoskill-study-design.docx
