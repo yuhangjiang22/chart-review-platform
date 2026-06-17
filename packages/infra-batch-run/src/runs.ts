@@ -1362,6 +1362,8 @@ async function runOneAgent(
       dataDir: pluginDataDir,
       pluginBind,
       skills,
+      perItem: profile.perItem,
+      perItemMaxAttempts: 2,
     })) {
       if (event.type === "result" && typeof event.cost_usd === "number") {
         cost = (cost ?? 0) + event.cost_usd;
