@@ -51,3 +51,16 @@ def test_set_field_committed_false_on_error_or_other_tool():
     other = [ToolMessage(content="hits", tool_call_id="2", name="search_notes")]
     assert set_field_committed(other) is False
     assert set_field_committed([]) is False
+
+
+def test_set_field_committed_false_on_rejected_write_returned_as_content():
+    # A rejected write comes back as a non-error ToolMessage whose CONTENT is a
+    # TOOL_ERROR (recoverable) — it must NOT count as committed, or the field is
+    # silently dropped. This is the real bug the incomplete 4/7 draft exposed.
+    rejected = [ToolMessage(
+        content="TOOL_ERROR: omop/structured evidence requires table and row_id",
+        tool_call_id="1", name="set_field_assessment")]
+    assert set_field_committed(rejected) is False
+    ok = [ToolMessage(content='{"ok":true,"action_type":"set_field_assessment"}',
+                      tool_call_id="1", name="set_field_assessment")]
+    assert set_field_committed(ok) is True

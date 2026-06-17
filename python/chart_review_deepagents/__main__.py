@@ -156,7 +156,7 @@ async def _score_items(agent, per_item, max_attempts: int, config: dict):
       - final_msgs: concatenation of every attempt's message list (for usage log).
     """
     from .rucam_prompts import build_item_task_prompt
-    from .messages_util import field_answers
+    from .messages_util import field_answers, set_field_committed
 
     prior = []
     final_msgs = []
@@ -171,8 +171,10 @@ async def _score_items(agent, per_item, max_attempts: int, config: dict):
                                                   config, stop_on_set_field=True)
             final_msgs += msgs
             answers = field_answers(msgs)
-            # Membership, NOT truthiness — a score of 0 is a valid write.
-            if fid in answers:
+            # Require a SUCCESSFUL commit (not just the tool call). A rejected
+            # write (e.g. malformed evidence) must trigger a retry, not be
+            # silently treated as done. Membership (not truthiness) so a 0 counts.
+            if set_field_committed(msgs) and fid in answers:
                 wrote = True
                 answer = answers.get(fid)
                 break

@@ -43,8 +43,14 @@ def build_item_task_prompt(entry: Dict[str, Any], prior: List[Dict[str, Any]]) -
    its rubric-relevant sections (Assessment/Plan/Impression/Diagnoses/Labs/HPI/…) —
    it is much cheaper than the full note. Only fall back to `read_note` (full text)
    if the section you need is missing or the `get_note_section` result is ambiguous.{item5}
-4. Write your verdict with `set_field_assessment(field_id="{fid}", answer=<score>, evidence=[...])`,
-   citing both structured evidence and any note quotes. Score ONLY `{fid}`.
+4. Write your verdict with `set_field_assessment(field_id="{fid}", answer=<score>, evidence=[...])`.
+   EVIDENCE SOURCE — pick the right one or the write is REJECTED:
+   - From a NOTE → `source:"note"` with note_id, span_offsets [start,end], and a verbatim_quote.
+   - Derived from the rucam plugin/compute tools (labs, meds, LiverTox lookup, R-ratio, the
+     exclusion floor) → `source:"computed"` (no table/row_id needed); summarize the basis in the text.
+   - Only use `source:"omop"`/`"structured"` if you have a real OMOP `table` + `row_id`
+     (i.e. from read_structured_data) — plugin-tool output does NOT, so do not tag it omop.
+   Score ONLY `{fid}`.
 
 Prior item scores (context; do not re-score them):
 {prior_lines}

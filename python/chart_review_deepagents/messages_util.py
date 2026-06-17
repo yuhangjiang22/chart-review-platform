@@ -14,7 +14,14 @@ def set_field_committed(msgs: Iterable) -> bool:
     cancel the graph before the MCP write runs — losing the score."""
     for m in msgs:
         if isinstance(m, ToolMessage) and getattr(m, "name", None) == "set_field_assessment":
-            if getattr(m, "status", "success") != "error":
+            if getattr(m, "status", "success") == "error":
+                continue
+            # A successful write returns {"ok":true,...}; a rejected one comes back
+            # as "TOOL_ERROR: ..." (recoverable). Only the former is a real commit —
+            # keying off the call (or any result) would treat a rejected write as
+            # done, leaving the field silently unscored.
+            content = str(getattr(m, "content", "") or "").replace(" ", "").lower()
+            if '"ok":true' in content:
                 return True
     return False
 
