@@ -44,6 +44,17 @@ describe("buildRunSpec", () => {
     expect(spec!.plugin_bind).toBeUndefined();
     expect(spec!.skills).toBeUndefined();
   });
+  it("carries per_item + per_item_max_attempts when provided", () => {
+    const perItem = [{ field_id: "item_5_exclusion", item_number: 5, skill_file: "/x/item-5.md", keywords: ["ANA"] }];
+    const spec = buildRunSpec({ ...base, perItem, perItemMaxAttempts: 3 });
+    expect(spec!.per_item).toEqual(perItem);
+    expect(spec!.per_item_max_attempts).toBe(3);
+  });
+  it("omits per_item when absent", () => {
+    const spec = buildRunSpec(base);
+    expect(spec!.per_item).toBeUndefined();
+    expect(spec!.per_item_max_attempts).toBeUndefined();
+  });
 });
 
 describe("nextRunSpecPath — concurrency safety", () => {

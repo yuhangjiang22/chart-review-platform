@@ -39,6 +39,10 @@ export interface RunSpec {
   plugin_bind?: Record<string, unknown>;
   /** deepagents skill dirs to load (virtual paths under .claude/skills). */
   skills?: string[];
+  /** Per-item scoring config; sidecar loops items when present. */
+  per_item?: Array<{ field_id: string; item_number: number; skill_file: string; keywords: string[] }>;
+  /** Retries per item (default 2). */
+  per_item_max_attempts?: number;
 }
 
 const KNOWN_EVENT_TYPES = new Set(["tool_use", "tool_result", "text", "result", "error"]);
@@ -75,6 +79,8 @@ export function buildRunSpec(input: AgentRunInput): RunSpec | null {
   if (input.dataDir) spec.data_dir = input.dataDir;
   if (input.pluginBind) spec.plugin_bind = input.pluginBind;
   if (input.skills?.length) spec.skills = input.skills;
+  if (input.perItem?.length) spec.per_item = input.perItem;
+  if (input.perItemMaxAttempts !== undefined) spec.per_item_max_attempts = input.perItemMaxAttempts;
   return spec;
 }
 

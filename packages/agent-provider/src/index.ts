@@ -90,6 +90,11 @@ export type AgentRunInput = ComposeAgentInput & {
    *  reference files (e.g. RUCAM's per-item scoring methodology). Empty for
    *  tasks that don't need skill methodology beyond the criteria. */
   skills?: string[];
+  /** Per-item scoring config (RUCAM). When set, the sidecar loops items
+   *  instead of one all-fields conversation. Shape = task-tools PerItemSpec[]. */
+  perItem?: Array<{ field_id: string; item_number: number; skill_file: string; keywords: string[] }>;
+  /** Retries per item before the field is left unscored. Default 2. */
+  perItemMaxAttempts?: number;
 };
 
 /** Provider contract: one method that yields events. Implementations
