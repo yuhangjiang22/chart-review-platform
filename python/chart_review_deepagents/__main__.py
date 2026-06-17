@@ -115,34 +115,67 @@ async def run(spec: dict) -> None:
             agent_kwargs["skills"] = skills
             print(f"[skills] loaded: {', '.join(skills)} (root {skills_root})", file=sys.stderr)
         agent = create_deep_agent(**agent_kwargs)
-        seen = 0
-        last_text = ""
-        final_msgs = []
         config = {"recursion_limit": int(spec.get("max_turns", 90)) * 2 + 10}
-        # Immediate activity marker. astream(stream_mode="values") yields
-        # nothing until the first super-step (model call) completes — ~5-15s
-        # of apparent silence during which the live agent-log shows "waiting
-        # for agent activity". Emit a start line up front so the reviewer sees
-        # the agent is alive the instant it launches. Display-only: this flows
-        # to the transcript/audit log, not to the draft (which comes from the
-        # MCP review_state) or the run's success/error tally.
-        emit({"type": "text", "text": "Agent started — reading the chart and rubric…"})
-        async for chunk in agent.astream(
-            {"messages": [{"role": "user", "content": spec["prompt"]}]},
-            stream_mode="values",
-            config=config,
-        ):
-            msgs = chunk.get("messages", [])
-            final_msgs = msgs
-            # stream_mode="values" yields the full message list each step;
-            # only emit the newly-appended tail.
-            for ev in messages_to_events(msgs[seen:]):
-                if ev["type"] == "text":
-                    last_text = ev["text"]
-                emit(ev)
-            seen = len(msgs)
+
+        per_item = spec.get("per_item")
+        if per_item:
+            # RUCAM-style per-item scoring: drive ONE conversation per rubric
+            # item, retrying an item until its field is written (or max attempts
+            # exhausted). `prior` carries a compact summary of already-scored
+            # items into each subsequent item's task prompt.
+            from .rucam_prompts import build_item_task_prompt
+            from .messages_util import fields_written
+            max_attempts = int(spec.get("per_item_max_attempts", 2))
+            prior = []
+            final_msgs = []
+            last_text = ""
+            for entry in per_item:
+                fid = entry["field_id"]
+                wrote = False
+                for attempt in range(1, max_attempts + 1):
+                    emit({"type": "text",
+                          "text": f"Scoring item {entry['item_number']} ({fid}), attempt {attempt}…"})
+                    msgs, last_text = await _stream_once(agent, build_item_task_prompt(entry, prior), config)
+                    final_msgs += msgs
+                    if fid in fields_written(msgs):
+                        wrote = True
+                        break
+                if not wrote:
+                    emit({"type": "text", "text": f"WARNING: {fid} not written after {max_attempts} attempts"})
+                prior.append({"item_number": entry["item_number"], "field_id": fid,
+                              "answer": "written" if wrote else "unscored"})
+            last_text = "per-item scoring complete"
+        else:
+            # Immediate activity marker. astream(stream_mode="values") yields
+            # nothing until the first super-step (model call) completes — ~5-15s
+            # of apparent silence during which the live agent-log shows "waiting
+            # for agent activity". Emit a start line up front so the reviewer sees
+            # the agent is alive the instant it launches. Display-only: this flows
+            # to the transcript/audit log, not to the draft (which comes from the
+            # MCP review_state) or the run's success/error tally.
+            emit({"type": "text", "text": "Agent started — reading the chart and rubric…"})
+            final_msgs, last_text = await _stream_once(agent, spec["prompt"], config)
     _log_usage(spec, final_msgs)
     emit({"type": "result", "result": last_text})
+
+
+async def _stream_once(agent, user_content: str, config: dict):
+    """Run one agent conversation; emit new events as they arrive; return (final_msgs, last_text)."""
+    seen = 0
+    final_msgs = []
+    last_text = ""
+    async for chunk in agent.astream(
+        {"messages": [{"role": "user", "content": user_content}]},
+        stream_mode="values", config=config,
+    ):
+        msgs = chunk.get("messages", [])
+        final_msgs = msgs
+        for ev in messages_to_events(msgs[seen:]):
+            if ev["type"] == "text":
+                last_text = ev["text"]
+            emit(ev)
+        seen = len(msgs)
+    return final_msgs, last_text
 
 
 def _log_usage(spec: dict, msgs) -> None:
