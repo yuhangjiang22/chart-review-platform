@@ -167,7 +167,8 @@ async def _score_items(agent, per_item, max_attempts: int, config: dict):
         for attempt in range(1, max_attempts + 1):
             emit({"type": "text",
                   "text": f"Scoring item {entry['item_number']} ({fid}), attempt {attempt}…"})
-            msgs, _last_text = await _stream_once(agent, build_item_task_prompt(entry, prior), config)
+            msgs, _last_text = await _stream_once(agent, build_item_task_prompt(entry, prior),
+                                                  config, stop_on_set_field=True)
             final_msgs += msgs
             answers = field_answers(msgs)
             # Membership, NOT truthiness — a score of 0 is a valid write.
@@ -181,8 +182,16 @@ async def _score_items(agent, per_item, max_attempts: int, config: dict):
     return prior, final_msgs
 
 
-async def _stream_once(agent, user_content: str, config: dict):
-    """Run one agent conversation; emit new events as they arrive; return (final_msgs, last_text)."""
+async def _stream_once(agent, user_content: str, config: dict, stop_on_set_field: bool = False):
+    """Run one agent conversation; emit new events as they arrive; return (final_msgs, last_text).
+
+    stop_on_set_field: when True, stop as soon as a set_field_assessment write has
+    COMMITTED (its tool result appears) — convergence for per-item mode, mirroring
+    agent_v2's structured-output stop so the agent can't keep searching/re-scoring
+    after it has answered. We break on the RESULT (not the tool_call) so the MCP
+    write executes first."""
+    from .messages_util import set_field_committed
+
     seen = 0
     final_msgs = []
     last_text = ""
@@ -197,6 +206,8 @@ async def _stream_once(agent, user_content: str, config: dict):
                 last_text = ev["text"]
             emit(ev)
         seen = len(msgs)
+        if stop_on_set_field and set_field_committed(msgs):
+            break
     return final_msgs, last_text
 
 
