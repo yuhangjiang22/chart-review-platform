@@ -6,18 +6,23 @@ source_document_sha: sha256:crc-evoskill-study-design-2026-03-23
 status: draft
 review_unit: patient
 overview_prose: >-
-  Colorectal cancer (CRC) NCCN guideline-concordance task. Per CRC patient, the
-  reviewer answers a small set of guideline-concordance questions — each judged
-  Concordant / Discordant / Not applicable — covering molecular testing, staging
-  workup, surgical nodal adequacy, and stage-appropriate systemic/neoadjuvant
-  therapy. Answers are read from pathology, radiology, oncology, and operative
-  notes plus structured EHR data.
+  Colorectal cancer (CRC) chart-review task in three tiers. Per CRC patient the
+  reviewer (T0) confirms eligibility — CRC status, subsite, stage group; (T1)
+  abstracts the STORE 2025 data elements — the core chart-review questions:
+  primary site, histology, grade, TNM, LVI, node counts, margins, MSI/MMR,
+  surgery, chemotherapy, radiation; then (T2) judges the five NCCN concordance
+  rules — each Concordant / Discordant / Not applicable — derived from the
+  abstracted answers, covering molecular testing, staging workup, nodal-harvest
+  adequacy, and stage-appropriate systemic/neoadjuvant therapy. Answers are read
+  from pathology, radiology, oncology, and operative notes plus structured EHR
+  data.
 
-  Derived from the CRC EvoSkill study design (2026-03-23), Section 3 "Downstream
-  Concordance Rules". This is the TASK ONLY — the concordance question rubric —
-  not the study's abstraction targets, baselines/EvoSkill conditions, difficulty
-  levels, data-prep, or evaluation methodology. The stage-conditional rules use
-  three eligibility questions (site, stage group) to set their N/A conditions.
+  Derived from the CRC EvoSkill study design (2026-03-23): the abstraction tier
+  from Section 2 (Domains 1–4) and the concordance tier from Section 3
+  "Downstream Concordance Rules". This is the TASK ONLY — the question rubric —
+  not the study's baselines/EvoSkill conditions, difficulty levels, data-prep,
+  or evaluation methodology. The stage-conditional concordance rules reference
+  the T0 eligibility answers (subsite, stage group) to set their N/A conditions.
 final_output: question_answers
 phases:
   - author

@@ -10,12 +10,12 @@ questions:
     text: >-
       Was MSI/MMR status (microsatellite instability or mismatch-repair
       immunohistochemistry) tested and resulted for this patient?
-    tier: 1
+    tier: 2
     answer_schema:
       type: string
       enum: [concordant, discordant, not_applicable]
     na_condition: "None — NCCN recommends universal MSI/MMR testing for all CRC, so this is rarely N/A."
-    depends_on: [T0-CRCConfirmed]
+    depends_on: [A13-MSI-MMR-Status, T0-CRCConfirmed]
     nccn_source: "NCCN Colon/Rectal: universal MSI/MMR (dMMR/MSI-H) testing recommended for all CRC patients."
     clinical_rationale: >-
       MSI-H/dMMR vs MSS/pMMR drives immunotherapy eligibility and the Stage II
@@ -29,7 +29,7 @@ questions:
     text: >-
       Was the baseline staging workup complete — CT chest/abdomen/pelvis (or
       equivalent cross-sectional imaging) AND a baseline CEA level?
-    tier: 1
+    tier: 2
     answer_schema:
       type: string
       enum: [concordant, discordant, not_applicable]
@@ -49,12 +49,12 @@ questions:
     text: >-
       Were at least 12 regional lymph nodes examined in the surgical resection
       specimen?
-    tier: 1
+    tier: 2
     answer_schema:
       type: string
       enum: [concordant, discordant, not_applicable]
     na_condition: "No surgical resection was performed (e.g. non-operative, neoadjuvant-only, or metastatic-first cases)."
-    depends_on: [T0-CRCConfirmed]
+    depends_on: [A10-NodesExamined, A14-SurgeryPerformed, T0-CRCConfirmed]
     nccn_source: "NCCN / CAP: a minimum of 12 regional lymph nodes should be examined for adequate nodal staging."
     clinical_rationale: >-
       Inadequate node harvest (<12) understages N and can wrongly withhold
@@ -72,7 +72,7 @@ questions:
       type: string
       enum: [concordant, discordant, not_applicable]
     na_condition: "Stage Group is I, II, or IV (not III), or stage group is unknown."
-    depends_on: [T0-StageGroup]
+    depends_on: [T0-StageGroup, A15-Chemotherapy]
     nccn_source: "NCCN Colon: adjuvant FOLFOX or CAPOX is recommended for resected Stage III colon cancer."
     clinical_rationale: >-
       Adjuvant chemotherapy is the standard of care for Stage III and the most
@@ -93,7 +93,7 @@ questions:
       type: string
       enum: [concordant, discordant, not_applicable]
     na_condition: "Colon primary (not rectal), OR rectal Stage I or IV, OR stage/subsite unknown."
-    depends_on: [T0-Subsite, T0-StageGroup]
+    depends_on: [T0-Subsite, T0-StageGroup, A14-SurgeryPerformed, A16-Radiation]
     nccn_source: "NCCN Rectal: neoadjuvant chemoradiation / TNT before surgery for locally advanced (cT3-4 or node-positive, i.e. Stage II–III) rectal cancer."
     clinical_rationale: >-
       Neoadjuvant chemoradiation before TME is standard for locally advanced

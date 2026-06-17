@@ -1,0 +1,170 @@
+# T1 — Abstraction. The core chart-review questions: STORE 2025 data elements a
+# reviewer abstracts from the chart (CRC EvoSkill design, Section 2, Domains 1–4).
+# These are the PRIMARY review questions; the concordance rules (T2) are derived
+# from them. Answer each from the cited source document, verbatim where possible.
+
+questions:
+  # --- Domain 1: Cancer Identification ---
+  - question_id: A1-PrimarySite
+    text: What is the primary site of the tumor?
+    tier: 1
+    answer_schema:
+      type: string
+      enum: [colon, rectosigmoid, rectum, unknown]
+    depends_on: [T0-CRCConfirmed]
+    store_source: "STORE 2025 primary site (ICD-O-3: colon C18.x, rectosigmoid C19, rectum C20)."
+    retrieval_hints: "Pathology report site; radiology/endoscopy for tumor location."
+
+  - question_id: A2-Histology
+    text: What is the histologic type?
+    tier: 1
+    answer_schema:
+      type: string
+      enum: [adenocarcinoma, mucinous_adenocarcinoma, signet_ring_cell, other, unknown]
+    depends_on: [T0-CRCConfirmed]
+    store_source: "STORE 2025 histology (ICD-O-3 morphology) from the pathology report."
+    retrieval_hints: "Pathology 'Diagnosis'/'Histologic type'."
+
+  - question_id: A3-Grade
+    text: What is the pathological tumor grade?
+    tier: 1
+    answer_schema:
+      type: string
+      # WHO 2019 two-tier; older CAP four-tier (G1–G4). Capture as stated.
+      enum: [low_grade, high_grade, G1, G2, G3, G4, unknown]
+    depends_on: [T0-CRCConfirmed]
+    store_source: "STORE 2025 grade. WHO 2019 = low/high; older CAP = G1–G4 (adjacent ±1 only applies to the four-tier scale)."
+    retrieval_hints: "Pathology 'Grade'/'Differentiation' (well/moderate/poorly = G1/G2/G3)."
+
+  - question_id: A4-DiagnosticConfirmation
+    text: How was the diagnosis confirmed?
+    tier: 1
+    answer_schema:
+      type: string
+      enum: [positive_histology, positive_cytology, radiography_only, clinical_only, unknown]
+    depends_on: [T0-CRCConfirmed]
+    store_source: "STORE 2025 diagnostic confirmation."
+    retrieval_hints: "Biopsy/resection path report vs imaging-only."
+
+  # --- Domain 2: Staging (AJCC TNM) — pathological shown; clinical (cT/cN/cM)
+  #     and post-therapy (ypT/ypN, rectal neoadjuvant only) are parallel questions. ---
+  - question_id: A5-pT
+    text: What is the AJCC pathological T category (pT)?
+    tier: 1
+    answer_schema:
+      type: string
+      enum: [pT0, pTis, pT1, pT2, pT3, pT4a, pT4b, pTX, unknown]
+    depends_on: [T0-CRCConfirmed]
+    store_source: "AJCC pT from the surgical pathology report (depth of invasion through the bowel wall)."
+    retrieval_hints: "Surgical pathology synoptic 'Pathologic Stage (pTNM)'."
+
+  - question_id: A6-pN
+    text: What is the AJCC pathological N category (pN)?
+    tier: 1
+    answer_schema:
+      type: string
+      enum: [pN0, pN1a, pN1b, pN1c, pN2a, pN2b, pNX, unknown]
+    depends_on: [T0-CRCConfirmed]
+    store_source: "AJCC pN (regional nodes: N0 none; N1 1–3; N2 4+)."
+    retrieval_hints: "Surgical pathology nodal status; positive/examined node counts."
+
+  - question_id: A7-pM
+    text: What is the AJCC M category (pM/cM)?
+    tier: 1
+    answer_schema:
+      type: string
+      enum: [M0, M1a, M1b, M1c, MX, unknown]
+    depends_on: [T0-CRCConfirmed]
+    store_source: "AJCC M (M1 = distant mets — liver/lung/peritoneum most common)."
+    retrieval_hints: "Imaging/operative/path for distant metastasis."
+
+  # --- Domain 3: Surgical/Pathologic Features ---
+  - question_id: A8-LVI
+    text: Is lymphovascular invasion (LVI) present?
+    tier: 1
+    answer_schema:
+      type: string
+      enum: [present, absent, unknown]
+    depends_on: [T0-CRCConfirmed]
+    store_source: "STORE 2025 LVI (pathology report)."
+    retrieval_hints: "Pathology 'Lymphovascular invasion / lymphatic / venous invasion'."
+
+  - question_id: A9-MesorectumQuirke
+    text: "What is the macroscopic (Quirke) grade of the mesorectum? (rectal cases only)"
+    tier: 1
+    answer_schema:
+      type: string
+      enum: [complete, near_complete, incomplete, not_stated, not_applicable]
+    depends_on: [T0-Subsite]
+    store_source: "STORE 2025 mesorectum evaluation (rectal only; code 40 / not_stated if not documented)."
+    retrieval_hints: "Rectal resection pathology 'mesorectal completeness/quality'. Colon → not_applicable."
+
+  - question_id: A10-NodesExamined
+    text: How many regional lymph nodes were examined?
+    tier: 1
+    answer_schema:
+      type: number
+    depends_on: [T0-CRCConfirmed]
+    store_source: "STORE 2025 regional nodes examined (count)."
+    retrieval_hints: "Surgical pathology 'Lymph nodes examined'."
+
+  - question_id: A11-NodesPositive
+    text: How many regional lymph nodes were positive?
+    tier: 1
+    answer_schema:
+      type: number
+    depends_on: [T0-CRCConfirmed]
+    store_source: "STORE 2025 regional nodes positive (count)."
+    retrieval_hints: "Surgical pathology 'Lymph nodes positive/involved'."
+
+  - question_id: A12-SurgicalMargins
+    text: What is the surgical margin status?
+    tier: 1
+    answer_schema:
+      type: string
+      enum: [negative, positive, close, not_assessed, unknown]
+    depends_on: [T0-CRCConfirmed]
+    store_source: "STORE 2025 margins (operative/pathology report)."
+    retrieval_hints: "Pathology 'Margins' (R0 negative / R1 microscopic / R2 macroscopic)."
+
+  - question_id: A13-MSI-MMR-Status
+    text: What is the MSI/MMR status?
+    tier: 1
+    answer_schema:
+      type: string
+      # Not binary — MSI-H/dMMR vs MSS/pMMR drives immunotherapy + Stage II chemo decisions.
+      enum: [MSI_H_dMMR, MSS_pMMR, equivocal_indeterminate, not_tested, unknown]
+    depends_on: [T0-CRCConfirmed]
+    store_source: "STORE 2025 MSI/MMR (pathology / molecular lab)."
+    retrieval_hints: "MSI PCR/NGS result or MMR IHC (MLH1/MSH2/MSH6/PMS2 retained vs lost)."
+
+  # --- Domain 4: First Course of Treatment (before disease progression) ---
+  - question_id: A14-SurgeryPerformed
+    text: What surgical procedure (type/scope) was performed, if any?
+    tier: 1
+    answer_schema:
+      type: string
+      enum: [colectomy, low_anterior_resection, abdominoperineal_resection, local_excision, other, none, unknown]
+    depends_on: [T0-CRCConfirmed]
+    store_source: "STORE 2025 surgery of primary site (operative notes)."
+    retrieval_hints: "Operative note procedure title."
+
+  - question_id: A15-Chemotherapy
+    text: Was systemic chemotherapy given as first course, and which regimen?
+    tier: 1
+    answer_schema:
+      type: string
+      enum: [none, FOLFOX, CAPOX, FOLFIRI, other, unknown]
+    depends_on: [T0-CRCConfirmed]
+    store_source: "STORE 2025 first-course chemotherapy (oncology notes / structured orders)."
+    retrieval_hints: "Oncology notes / chemo orders; first course = before disease progression."
+
+  - question_id: A16-Radiation
+    text: "Was radiation therapy given? (rectal cases only)"
+    tier: 1
+    answer_schema:
+      type: string
+      enum: [yes, no, not_applicable, unknown]
+    depends_on: [T0-Subsite]
+    store_source: "STORE 2025 radiation (oncology notes; rectal only)."
+    retrieval_hints: "Radiation-oncology notes. Colon → not_applicable."

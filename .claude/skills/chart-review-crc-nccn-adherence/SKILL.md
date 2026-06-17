@@ -9,32 +9,39 @@ description: >
   structured EHR data.
 ---
 
-# CRC NCCN concordance review
+# CRC chart review — STORE abstraction + NCCN concordance
 
-This task scores **guideline concordance**, not tumor-registry abstraction.
 For each in-scope CRC patient you answer the questions in
-`references/questions/`, each as **Concordant**, **Discordant**, or
-**Not applicable** (with a stated N/A condition).
+`references/questions/`, in three tiers: confirm eligibility, **abstract the
+STORE 2025 data elements** (the core chart-review questions), then judge the
+**NCCN concordance** rules (derived from the abstracted answers).
 
 ## Procedure
 
-1. **Eligibility + context** (`references/questions/eligibility.yaml`):
-   confirm this is a CRC case, the subsite (colon vs. rectal), and the AJCC
-   stage group. These set the N/A conditions for the stage-conditional rules —
-   answer them first.
-2. **Concordance** (`references/questions/concordance.yaml`): answer each rule.
-   Apply its N/A condition before judging concordant/discordant. If the
-   evidence to decide is genuinely absent from the chart, say so in the
-   rationale rather than guessing.
-3. Cite evidence for every answer: a verbatim **note** quote (path / radiology /
+1. **Eligibility + context** (`eligibility.yaml`, T0): confirm this is a CRC
+   case, the subsite (colon vs. rectal), and the AJCC stage group. Answer first —
+   these gate scope and set the N/A conditions for the stage-conditional rules.
+2. **Abstraction** (`abstraction.yaml`, T1) — the core chart-review questions:
+   abstract the STORE 2025 data elements (primary site, histology, grade, TNM,
+   LVI, node counts, margins, MSI/MMR, surgery, chemo, radiation) from the source
+   documents. Answer verbatim where possible.
+3. **Concordance** (`concordance.yaml`, T2): answer each NCCN rule —
+   Concordant / Discordant / Not-applicable — derived from the T1 answers; apply
+   its N/A condition first. If the deciding evidence is genuinely absent, say so
+   in the rationale rather than guessing.
+4. Cite evidence for every answer: a verbatim **note** quote (path / radiology /
    oncology / operative), or a **structured** row (labs/orders) when that is the
    source. Do not infer from parametric knowledge.
 
-## Scope (from the CRC EvoSkill design, Section 3)
+## Scope (from the CRC EvoSkill design)
 
-Five NCCN concordance rules: MSI/MMR testing performed; staging workup
-completeness (CT chest/abdomen/pelvis + CEA); regional lymph-node harvest
-adequacy (≥12 nodes); Stage III adjuvant chemotherapy; locally-advanced rectal
-neoadjuvant chemoradiation. The study's abstraction targets, evaluation
-methodology, and EvoSkill machinery are intentionally **out of scope** here —
-this package is the concordance task only.
+- **Abstraction (Section 2, Domains 1–4):** ~16 STORE data elements across cancer
+  identification, staging (TNM), surgical/pathologic features, and first-course
+  treatment — the primary chart-review questions.
+- **Concordance (Section 3):** five NCCN rules — MSI/MMR testing, staging-workup
+  completeness, ≥12-node harvest, Stage III adjuvant chemo, locally-advanced
+  rectal neoadjuvant chemoradiation.
+
+Intentionally **out of scope:** the study's baselines / Base+Human-Skills /
+EvoSkill conditions, difficulty levels, data-prep/linkage, train-val-test, and
+evaluation metrics — this package is the task rubric only.
