@@ -132,15 +132,38 @@ function cx(...classes: (string | false | null | undefined)[]): string {
   return classes.filter(Boolean).join(" ");
 }
 
+/** Some source cohorts store a row's diagnosis/procedure codes as a stringified
+ *  numpy/Python array — e.g. "['K74.69' 'R18.8' 'B19.20' '213']" (note: space-
+ *  OR comma-separated, single- or double-quoted). That raw repr reads as an
+ *  unintelligible jumble in the UI. Normalize it to a clean comma-separated
+ *  list; pass any plain scalar code (or generated "concept:NNN") through
+ *  unchanged. */
+function formatCodeList(raw: string | number | null | undefined): string | null {
+  if (raw == null) return null;
+  const s = String(raw).trim();
+  if (s.startsWith("[") && s.endsWith("]")) {
+    const inner = s.slice(1, -1).trim();
+    // Prefer quoted tokens; fall back to whitespace/comma splitting.
+    const quoted = inner.match(/'[^']*'|"[^"]*"/g);
+    const tokens = quoted
+      ? quoted.map((t) => t.slice(1, -1))
+      : inner.split(/[\s,]+/);
+    const cleaned = tokens.map((t) => t.trim()).filter(Boolean);
+    if (cleaned.length > 0) return cleaned.join(", ");
+  }
+  return s;
+}
+
 // ---- Sub-components ---------------------------------------------------------
 
 function RowMain({ row, kind }: { row: StructuredRow; kind: TabKind }) {
-  const code =
+  const code = formatCodeList(
     row.icd10cm ??
-    row.cpt ??
-    row.loinc ??
-    row.rxnorm ??
-    (row.concept_id != null ? `concept:${row.concept_id}` : null);
+      row.cpt ??
+      row.loinc ??
+      row.rxnorm ??
+      (row.concept_id != null ? `concept:${row.concept_id}` : null),
+  );
 
   if (kind === "conditions") {
     return (
@@ -148,16 +171,18 @@ function RowMain({ row, kind }: { row: StructuredRow; kind: TabKind }) {
         <div className="font-medium text-foreground">{row.concept_name}</div>
         <div className="text-[11px] text-muted-foreground flex gap-2 items-center">
           {code && <span className="font-mono">{code}</span>}
-          <span
-            className={cx(
-              "px-1.5 py-0 rounded",
-              row.status === "active"
-                ? "bg-[hsl(var(--ochre)/0.10)] text-[hsl(var(--ochre))]"
-                : "bg-muted text-muted-foreground",
-            )}
-          >
-            {row.status}
-          </span>
+          {row.status && (
+            <span
+              className={cx(
+                "px-1.5 py-0 rounded",
+                row.status === "active"
+                  ? "bg-[hsl(var(--ochre)/0.10)] text-[hsl(var(--ochre))]"
+                  : "bg-muted text-muted-foreground",
+              )}
+            >
+              {row.status}
+            </span>
+          )}
         </div>
       </>
     );
