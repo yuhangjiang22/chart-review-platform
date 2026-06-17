@@ -119,6 +119,69 @@ def safe_name(name):
     return base or "note"
 
 
+def _cv(x):
+    """JSON-safe cell value: NaN -> None, numpy scalar -> python."""
+    if x is None or (isinstance(x, float) and pd.isna(x)):
+        return None
+    return x.item() if hasattr(x, "item") else x
+
+
+def materialize_omop(fixture, pid, data_dir):
+    """Write the patient's cohort rows into omop/<table>.json so concur's
+    structured-data surface (readStructured / read_structured_data / the UI) can
+    show the labs, meds, serology, and conditions the agent scored from — which
+    otherwise live only in the out-of-band plugin cohort CSVs and are invisible to
+    a reviewer. row_ids are deterministic per table (citable later). Returns
+    {table: n_rows}."""
+    omop = fixture / "omop"
+    omop.mkdir(exist_ok=True)
+
+    def _load(name):
+        p = data_dir / name
+        if not p.exists():
+            return None
+        df = pd.read_csv(p)
+        return df[df["PERSON_ID"] == pid]
+
+    meas, rid = [], 100000
+    lft = _load("lft_series.csv")
+    if lft is not None:
+        for _, r in lft.iterrows():
+            meas.append({"row_id": rid, "concept_name": _cv(r.get("LAB_NAME")),
+                         "value": _cv(r.get("VALUE_AS_NUMBER")), "uln": _cv(r.get("ULN")),
+                         "date": str(r.get("MEASUREMENT_DATE", "")),
+                         "days_from_injury": _cv(r.get("DAYS_FROM_LIVER_INJURY"))}); rid += 1
+    sero = _load("serology.csv")
+    if sero is not None:
+        for _, r in sero.iterrows():
+            meas.append({"row_id": rid, "concept_name": _cv(r.get("LAB_NAME")),
+                         "value": _cv(r.get("VALUE_AS_NUMBER")), "value_text": _cv(r.get("VALUE_SOURCE_VALUE")),
+                         "date": str(r.get("MEASUREMENT_DATE", "")),
+                         "days_from_injury": _cv(r.get("DAYS_FROM_LIVER_INJURY"))}); rid += 1
+    (omop / "measurements.json").write_text(json.dumps(meas, indent=0, allow_nan=False))
+
+    meds, rid = [], 200000
+    am = _load("all_meds.csv")
+    if am is not None:
+        for _, r in am.iterrows():
+            meds.append({"row_id": rid, "concept_name": _cv(r.get("DRUG_NAME")),
+                         "start_date": str(r.get("START_DATE", "")), "end_date": str(r.get("STOP_DATE", "")),
+                         "active_at_injury": _cv(r.get("ACTIVE_AT_LIVER_INJURY")),
+                         "days_from_injury_start": _cv(r.get("DAYS_FROM_LIVER_INJURY_START"))}); rid += 1
+    (omop / "drugs.json").write_text(json.dumps(meds, indent=0, allow_nan=False))
+
+    cond, rid = [], 300000
+    cd = _load("conditions.csv")
+    if cd is not None:
+        for _, r in cd.iterrows():
+            cond.append({"row_id": rid, "concept_name": _cv(r.get("CONDITION")),
+                         "icd10cm": str(r.get("ICD9_10", "")), "date": str(r.get("DIAG_DATE", "")),
+                         "days_from_injury": _cv(r.get("DAYS_FROM_LIVER_INJURY"))}); rid += 1
+    (omop / "conditions.json").write_text(json.dumps(cond, indent=0, allow_nan=False))
+
+    return {"measurements": len(meas), "drugs": len(meds), "conditions": len(cond)}
+
+
 def build_fixture(fid, pid, gold, data_dir, corpus, note_window):
     derived = pd.read_csv(data_dir / "derived_rucam.csv")
     liver_date = str(derived.loc[derived["PERSON_ID"] == pid, "liver_injury_date"].iloc[0])
@@ -153,7 +216,8 @@ def build_fixture(fid, pid, gold, data_dir, corpus, note_window):
         "gold_complete": gold["complete"],
         "source": "Validation_Adjudication_v3.xlsx (human annotator)",
     }, indent=2) + "\n")
-    return copied
+    omop_counts = materialize_omop(fixture, pid, data_dir)
+    return copied, omop_counts
 
 
 def main():
@@ -198,9 +262,10 @@ def main():
     print(f"[setup] building {len(cands)} fixture(s) from {data_dir.name}")
     for k, g in enumerate(cands, 1):
         fid = f"patient_phi_{k:03d}"
-        n = build_fixture(fid, g["pid"], g, data_dir, corpus, args.note_window)
+        n, omop = build_fixture(fid, g["pid"], g, data_dir, corpus, args.note_window)
         flag = "" if g["complete"] else "  (gold per-item incomplete — total reliable)"
-        print(f"[setup]   {fid}: notes={n:>3}  gold_total={g['total']:>3}  "
+        print(f"[setup]   {fid}: notes={n:>3}  omop(meas/drug/cond)="
+              f"{omop['measurements']}/{omop['drugs']}/{omop['conditions']}  gold_total={g['total']:>3}  "
               f"category={g['category']:<16} items={[g['items'][i] for i in range(1,8)]}{flag}")
     print(f"[setup] fixtures under {corpus}/patient_phi_*  (gitignored)")
 
