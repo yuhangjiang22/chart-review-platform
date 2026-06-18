@@ -37,9 +37,12 @@ describe("CriterionCard — agent comparison panes", () => {
     // in Step 2), so we count occurrences instead of requiring uniqueness.
     expect(screen.getAllByText(/Agent 1/).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText(/Agent 2/).length).toBeGreaterThanOrEqual(1);
-    // Answers and rationales appear once each (only in their pane).
+    // Each agent pane shows its answer + rationale. "rationale 1" appears twice
+    // because the reviewer's answer form pre-fills from agentDrafts[0] (a1) for
+    // one-click accept — the agent pane <p> AND the pre-filled textarea both
+    // carry it. "rationale 2" (a2) appears once (only its pane).
     expect(screen.getByText("false")).toBeInTheDocument();
-    expect(screen.getByText("rationale 1")).toBeInTheDocument();
+    expect(screen.getAllByText("rationale 1").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("no")).toBeInTheDocument();
     expect(screen.getByText("rationale 2")).toBeInTheDocument();
   });

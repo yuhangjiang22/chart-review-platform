@@ -111,6 +111,7 @@ describe("CriterionCard — evidence is visible and editable", () => {
         agentDrafts={[]}
         committed={null}
         isLocked={false}
+        hasNext={false}  // terminal criterion → button label is exactly "Submit"
         onSubmit={onSubmit}
         evidence={[OMOP_EV]}
         onEvidenceChange={vi.fn()}
