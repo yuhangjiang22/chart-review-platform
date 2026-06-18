@@ -28,9 +28,14 @@ export function RubricVersionSwitcher({ taskId, sessionId, onSwitched }: Props) 
   const load = useCallback(async () => {
     const r = await authFetch(`${sBase}/versions`);
     if (!r.ok) return;
-    const b = (await r.json()) as { active: string | null; versions: Version[] };
-    setActive(b.active);
-    setVersions(b.versions);
+    // Guard against a malformed/empty 200 body: `versions` must stay an array
+    // or the render (`versions.length`, `versions.map`) crashes the whole
+    // sidebar. Array.isArray covers undefined / null / non-array alike.
+    const b = (await r.json().catch(() => null)) as
+      | { active?: string | null; versions?: Version[] }
+      | null;
+    setActive(b?.active ?? null);
+    setVersions(Array.isArray(b?.versions) ? b!.versions : []);
   }, [sBase]);
   useEffect(() => {
     void load();
