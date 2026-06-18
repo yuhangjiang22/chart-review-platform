@@ -80,11 +80,14 @@ export const rubricRoutes: RouteEntry[] = [
 
       const fields = task.fields.map((f) => {
         const fid = (f as { field_id?: string; id?: string }).field_id ?? (f as { id: string }).id;
-        const schema = f.answer_schema as { enum?: string[] } | undefined;
-        const enumValues: string[] = Array.isArray(schema?.enum) ? (schema!.enum as string[]) : [];
+        const schema = f.answer_schema as { enum?: unknown[] } | undefined;
 
-        // Read the raw .md to get definition / extraction_guidance / examples
-        // directly from disk (not the compiled snapshot).
+        // Defaults from the compiled (baseline) task — OVERRIDDEN below by the
+        // fork md when it exists. prompt + enum MUST come from the same md as the
+        // rest, or a session edit to the allowed answers / prompt is written by
+        // PUT but never read back here (it'd always show the baseline enum).
+        let prompt = (f.prompt as string) ?? "";
+        let enumValues: string[] = Array.isArray(schema?.enum) ? schema!.enum.map(String) : [];
         let definition = "";
         let extraction_guidance = "";
         let examples = "";
@@ -94,10 +97,13 @@ export const rubricRoutes: RouteEntry[] = [
           try {
             const raw = fs.readFileSync(mdPath, "utf8");
             const parsed = parseCriterionMd(raw);
+            const fm = parsed.frontmatter as { prompt?: string; answer_schema?: { enum?: unknown[] } };
+            if (typeof fm.prompt === "string") prompt = fm.prompt;
+            if (Array.isArray(fm.answer_schema?.enum)) enumValues = fm.answer_schema!.enum.map(String);
             definition = parsed.definition;
             extraction_guidance = parsed.extraction_guidance;
             examples = parsed.examples;
-          } catch { /* leave empty */ }
+          } catch { /* leave defaults */ }
         } else {
           // Fall back to compiled guidance_prose if file is missing
           const gp = f.guidance_prose as Record<string, string | undefined> | undefined;
@@ -106,14 +112,7 @@ export const rubricRoutes: RouteEntry[] = [
           examples = gp?.examples ?? "";
         }
 
-        return {
-          field_id: fid,
-          prompt: f.prompt ?? "",
-          enum: enumValues,
-          definition,
-          extraction_guidance,
-          examples,
-        };
+        return { field_id: fid, prompt, enum: enumValues, definition, extraction_guidance, examples };
       });
 
       return {
