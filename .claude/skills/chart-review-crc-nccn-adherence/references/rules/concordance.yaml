@@ -1,0 +1,92 @@
+# NCCN concordance rules (CRC EvoSkill design, Section 3). Each rule is computed
+# DETERMINISTICALLY by the rule-engine from the abstracted facts (eligibility T0
+# + abstraction T1) — the agent does not judge concordance directly. Each rule:
+#   verdict_if true  → CONCORDANT
+#   verdict_if false → NON_CONCORDANT (attribution picked from attribution_when)
+#   excluded_if true → EXCLUDED (the rule's N/A condition holds)
+# Expression grammar: ==,!=,>=,<=,>,<, `in [..]`, `is missing|present`, and/or/not.
+
+rules:
+  - rule_id: R-C1-MSI-MMR-Testing
+    description: >-
+      MSI/MMR status (microsatellite instability or mismatch-repair IHC) was
+      tested and resulted. NCCN recommends universal MSI/MMR testing for all CRC.
+    nccn_source: "NCCN Colon/Rectal: universal dMMR/MSI-H testing for all CRC patients."
+    excluded_if: 'T0-CRCConfirmed != "eligible"'
+    verdict_if: 'A13-MSI-MMR-Status != "not_tested" and A13-MSI-MMR-Status != "unknown"'
+    attribution: GUIDELINE_DEVIATION
+    attribution_when:
+      - when: 'A13-MSI-MMR-Status is missing'
+        category: DOCUMENTATION_GAP
+      - when: 'A13-MSI-MMR-Status == "unknown"'
+        category: DOCUMENTATION_GAP
+      - when: 'A13-MSI-MMR-Status == "not_tested"'
+        category: GUIDELINE_DEVIATION
+    supporting_questions: [A13-MSI-MMR-Status, T0-CRCConfirmed]
+
+  - rule_id: R-C2-StagingWorkupComplete
+    description: >-
+      Baseline staging workup complete — cross-sectional imaging of chest,
+      abdomen, and pelvis AND a baseline CEA.
+    nccn_source: "NCCN CRC workup: CT chest/abdomen/pelvis + baseline CEA at diagnosis."
+    excluded_if: 'T0-CRCConfirmed != "eligible"'
+    verdict_if: 'A17-StagingImaging == "complete" and A18-BaselineCEA == "done"'
+    attribution: GUIDELINE_DEVIATION
+    attribution_when:
+      - when: 'A17-StagingImaging == "not_documented" or A18-BaselineCEA == "unknown"'
+        category: DOCUMENTATION_GAP
+      - when: 'A17-StagingImaging == "incomplete" or A18-BaselineCEA == "not_done"'
+        category: GUIDELINE_DEVIATION
+    nuanced: true            # workup may be validly deferred — judge refines attribution
+    judge_can_override: false
+    supporting_questions: [A17-StagingImaging, A18-BaselineCEA, T0-CRCConfirmed]
+
+  - rule_id: R-C3-NodeHarvestAdequate
+    description: "At least 12 regional lymph nodes examined in the resection specimen."
+    nccn_source: "NCCN / CAP: ≥12 regional lymph nodes for adequate nodal staging."
+    # N/A when no nodal-harvest resection was done (non-operative, local excision,
+    # or surgery unknown).
+    excluded_if: >-
+      T0-CRCConfirmed != "eligible" or A14-SurgeryPerformed == "none"
+      or A14-SurgeryPerformed == "local_excision" or A14-SurgeryPerformed == "unknown"
+    verdict_if: 'A10-NodesExamined >= 12'
+    attribution: GUIDELINE_DEVIATION
+    attribution_when:
+      - when: 'A10-NodesExamined is missing'
+        category: DOCUMENTATION_GAP
+    supporting_questions: [A10-NodesExamined, A14-SurgeryPerformed, T0-CRCConfirmed]
+
+  - rule_id: R-C4-StageIII-AdjuvantChemo
+    description: "Stage III patient received adjuvant FOLFOX or CAPOX."
+    nccn_source: "NCCN Colon: adjuvant FOLFOX or CAPOX for resected Stage III."
+    excluded_if: 'T0-StageGroup != "III"'   # only applies to Stage III
+    verdict_if: 'A15-Chemotherapy == "FOLFOX" or A15-Chemotherapy == "CAPOX"'
+    attribution: GUIDELINE_DEVIATION
+    attribution_when:
+      - when: 'A15-Chemotherapy is missing or A15-Chemotherapy == "unknown"'
+        category: DOCUMENTATION_GAP
+      - when: 'A15-Chemotherapy == "none"'
+        category: GUIDELINE_DEVIATION
+    nuanced: true            # may be patient refusal / contraindication — judge refines
+    judge_can_override: false
+    supporting_questions: [T0-StageGroup, A15-Chemotherapy]
+
+  - rule_id: R-C5-Rectal-NeoadjuvantCRT
+    description: >-
+      Locally advanced (Stage II–III) rectal cancer received neoadjuvant
+      radiation / chemoradiation.
+    nccn_source: "NCCN Rectal: neoadjuvant CRT / TNT for locally advanced (Stage II–III) rectal cancer."
+    # N/A for colon, or rectal Stage I / IV, or unknown stage.
+    excluded_if: >-
+      T0-Subsite != "rectal" or T0-StageGroup == "I" or T0-StageGroup == "IV"
+      or T0-StageGroup == "unknown"
+    verdict_if: 'A16-Radiation == "yes"'
+    attribution: GUIDELINE_DEVIATION
+    attribution_when:
+      - when: 'A16-Radiation is missing or A16-Radiation == "unknown"'
+        category: DOCUMENTATION_GAP
+      - when: 'A16-Radiation == "no"'
+        category: GUIDELINE_DEVIATION
+    nuanced: true            # TNT / sequencing nuance — judge refines
+    judge_can_override: false
+    supporting_questions: [T0-Subsite, T0-StageGroup, A16-Radiation, A14-SurgeryPerformed]

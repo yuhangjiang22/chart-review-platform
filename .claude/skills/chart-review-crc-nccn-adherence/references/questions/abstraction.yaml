@@ -168,3 +168,31 @@ questions:
     depends_on: [T0-Subsite]
     store_source: "STORE 2025 radiation (oncology notes; rectal only)."
     retrieval_hints: "Radiation-oncology notes. Colon → not_applicable."
+
+  # --- Baseline staging workup (facts the C2 staging-completeness rule needs) ---
+  - question_id: A17-StagingImaging
+    text: >-
+      Was complete baseline staging imaging performed — cross-sectional imaging
+      (CT, or MRI/PET equivalent) of chest, abdomen, AND pelvis?
+    tier: 1
+    answer_schema:
+      type: string
+      enum: [complete, incomplete, not_documented, unknown]
+    depends_on: [T0-CRCConfirmed]
+    store_source: "STORE 2025 diagnostic imaging / baseline staging workup (radiology reports)."
+    retrieval_hints: >-
+      Radiology reports for CT/MRI/PET of chest, abdomen, pelvis. complete = all
+      three regions imaged at baseline; incomplete = one or more regions missing;
+      not_documented = no baseline staging imaging found.
+
+  - question_id: A18-BaselineCEA
+    text: "Was a baseline serum CEA level obtained at/around diagnosis (before first treatment)?"
+    tier: 1
+    answer_schema:
+      type: string
+      enum: [done, not_done, unknown]
+    depends_on: [T0-CRCConfirmed]
+    store_source: "STORE 2025 tumor marker — baseline CEA (labs / oncology notes)."
+    retrieval_hints: >-
+      Labs / oncology notes for a CEA value drawn before first treatment.
+      done = a baseline CEA resulted; not_done = no baseline CEA found.

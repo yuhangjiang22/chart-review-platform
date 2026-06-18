@@ -6,24 +6,26 @@ source_document_sha: sha256:crc-evoskill-study-design-2026-03-23
 status: draft
 review_unit: patient
 overview_prose: >-
-  Colorectal cancer (CRC) chart-review task in three tiers. Per CRC patient the
-  reviewer (T0) confirms eligibility — CRC status, subsite, stage group; (T1)
-  abstracts the STORE 2025 data elements — the core chart-review questions:
-  primary site, histology, grade, TNM, LVI, node counts, margins, MSI/MMR,
-  surgery, chemotherapy, radiation; then (T2) judges the five NCCN concordance
-  rules — each Concordant / Discordant / Not applicable — derived from the
-  abstracted answers, covering molecular testing, staging workup, nodal-harvest
-  adequacy, and stage-appropriate systemic/neoadjuvant therapy. Answers are read
-  from pathology, radiology, oncology, and operative notes plus structured EHR
-  data.
+  Colorectal cancer (CRC) guideline-concordance task. The agent answers FACTUAL
+  chart-review questions in two tiers — (T0) eligibility: CRC status, subsite,
+  stage group; (T1) abstraction: the STORE 2025 data elements (primary site,
+  histology, grade, TNM, LVI, node counts, margins, MSI/MMR, surgery,
+  chemotherapy, radiation) plus baseline staging workup (cross-sectional imaging,
+  CEA). The five NCCN concordance verdicts are then computed DETERMINISTICALLY by
+  the rule-engine from those facts (references/rules/concordance.yaml) — molecular
+  testing, staging-workup completeness, ≥12-node harvest, Stage III adjuvant
+  chemotherapy, locally-advanced rectal neoadjuvant chemoradiation — each
+  Concordant / Non-concordant / Excluded (N/A), with an attribution category for
+  non-concordant verdicts. Facts are read from pathology, radiology, oncology,
+  and operative notes plus structured EHR data.
 
-  Derived from the CRC EvoSkill study design (2026-03-23): the abstraction tier
-  from Section 2 (Domains 1–4) and the concordance tier from Section 3
-  "Downstream Concordance Rules". This is the TASK ONLY — the question rubric —
-  not the study's baselines/EvoSkill conditions, difficulty levels, data-prep,
-  or evaluation methodology. The stage-conditional concordance rules reference
-  the T0 eligibility answers (subsite, stage group) to set their N/A conditions.
-final_output: question_answers
+  Derived from the CRC EvoSkill study design (2026-03-23): abstraction from
+  Section 2 (Domains 1–4) and the concordance rules from Section 3 "Downstream
+  Concordance Rules". This is the TASK ONLY — the question + rule rubric — not the
+  study's baselines/EvoSkill conditions, difficulty levels, data-prep, or
+  evaluation methodology. The stage-conditional rules use the T0 eligibility
+  answers (subsite, stage group) as their excluded_if (N/A) gates.
+final_output: rule_verdicts
 phases:
   - author
   - try
