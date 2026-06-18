@@ -68,6 +68,16 @@ describe("lung concordance rules — parse + evaluate (experiment tokens)", () =
     expect(v("C5-TimeToTreatment", { ...NSCLC }).verdict).toBe("EXCLUDED");
   });
 
+  it("SCLC patient → ALL rules CONCORDANT (molecular testing not required), even with everything else unclear", () => {
+    // Mirrors the real patient_phi_lung_01 profile: small_cell, limited stage,
+    // all molecular questions unclear/null. The SCLC exemption must win over the
+    // doc-absent EXCLUDED gates.
+    const sclc = { MT0a: "yes", MT0b: "small_cell", MT0c: "limited", MT1: "unclear", MT5: "unclear", MT6: "unclear", MT7: "no", MT8a: "unclear", MT9: "unclear", MT12: "unclear" };
+    for (const id of ["C1-TestingPerformed", "C2-PanelCompleteness", "C3a-TestingOrderedBeforeTherapy", "C3b-ResultsBeforeTherapy", "C4-PDL1Testing", "C5-TimeToTreatment", "C6-TargetedTherapyAlignment"]) {
+      expect(v(id, sclc).verdict).toBe("CONCORDANT");
+    }
+  });
+
   it("C6 targeted-therapy alignment", () => {
     expect(v("C6-TargetedTherapyAlignment", { ...NSCLC, MT8a: "no" }).verdict).toBe("CONCORDANT");
     expect(v("C6-TargetedTherapyAlignment", { ...NSCLC, MT8a: "yes", MT9: "yes" }).verdict).toBe("CONCORDANT");

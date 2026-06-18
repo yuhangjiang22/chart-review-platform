@@ -1,25 +1,33 @@
 # NCCN NSCLC molecular-testing concordance rules, computed DETERMINISTICALLY by
 # the rule-engine from the MT* facts. Tokens match the lung-cancer-experiment
 # canonical options (small_cell, unclear, MT2 = CGP vendor).
-#   verdict_if true  → CONCORDANT      (requirement met, or not required: small_cell etc.)
-#   verdict_if false → NON_CONCORDANT  (required + not met)
-#   excluded_if true → EXCLUDED        (key documentation absent / unclear — cannot assess)
+#
+# IMPORTANT — small_cell (SCLC) is EXEMPT: the molecular-testing rules do not
+# apply, so SCLC → CONCORDANT ("the rule did not apply", per the experiment's
+# verdict definitions). The rule-engine checks excluded_if BEFORE verdict_if, so
+# every doc-absent exclusion gate is wrapped in `MT0b != "small_cell" and (…)` —
+# otherwise an SCLC patient with (correctly) unanswered molecular questions would
+# be wrongly EXCLUDED instead of CONCORDANT. verdict_if carries `MT0b ==
+# "small_cell"` so the exemption resolves to CONCORDANT.
+#   verdict_if true  → CONCORDANT      (requirement met, or not required: small_cell)
+#   verdict_if false → NON_CONCORDANT  (NSCLC + requirement not met)
+#   excluded_if true → EXCLUDED        (NSCLC + key documentation absent/unclear)
 
 rules:
   - rule_id: C1-TestingPerformed
     description: "Molecular testing was performed when required (NSCLC). Not required for small_cell."
-    nccn_source: "Rule 1 — testing required and performed, or not required (small_cell / resected pre-cutoff)."
-    excluded_if: 'MT0a != "yes" or MT0b == "unclear" or MT0c == "unknown" or MT1 == "unclear"'
+    nccn_source: "Rule 1 — testing required and performed, or not required (small_cell)."
+    excluded_if: 'MT0a != "yes" or (MT0b != "small_cell" and MT1 == "unclear")'
     verdict_if: 'MT0b == "small_cell" or MT1 == "yes"'
     attribution: MISSING_TESTING_DOCUMENTATION
     nuanced: true
     judge_can_override: false
-    supporting_questions: [MT0a, MT0b, MT0c, MT1]
+    supporting_questions: [MT0a, MT0b, MT1]
 
   - rule_id: C2-PanelCompleteness
     description: "CGP was performed (a named vendor), OR all essential biomarkers were individually tested."
     nccn_source: "Rule 2 — panel completeness for era-required biomarkers."
-    excluded_if: 'MT0a != "yes" or MT1 == "unclear"'
+    excluded_if: 'MT0a != "yes" or (MT0b != "small_cell" and MT1 == "unclear")'
     verdict_if: 'MT0b == "small_cell" or (MT2 != "not_performed" and MT2 != "unclear") or MT12 == "yes"'
     attribution: PLANNED_BUT_INCOMPLETE_TESTING
     attribution_when:
@@ -32,7 +40,7 @@ rules:
   - rule_id: C3a-TestingOrderedBeforeTherapy
     description: "Molecular testing was ordered before or on the same date as first-line therapy."
     nccn_source: "Rule 3 — test ordered <= first-line therapy start."
-    excluded_if: 'MT0a != "yes" or MT5 == "unclear"'
+    excluded_if: 'MT0a != "yes" or (MT0b != "small_cell" and MT5 == "unclear")'
     verdict_if: 'MT0b == "small_cell" or MT5 == "before_1L" or MT5 == "same_date" or MT5 == "no_systemic_therapy"'
     attribution: TREATMENT_STARTED_BEFORE_TESTING_WAS_READY
     supporting_questions: [MT0b, MT5]
@@ -40,7 +48,7 @@ rules:
   - rule_id: C3b-ResultsBeforeTherapy
     description: "Genomic results were available before first-line therapy was initiated."
     nccn_source: "Rule 3 — results available before first-line therapy."
-    excluded_if: 'MT0a != "yes" or MT6 == "unclear"'
+    excluded_if: 'MT0a != "yes" or (MT0b != "small_cell" and MT6 == "unclear")'
     verdict_if: 'MT0b == "small_cell" or MT6 == "yes" or MT5 == "no_systemic_therapy"'
     attribution: TREATMENT_STARTED_BEFORE_TESTING_WAS_READY
     nuanced: true
@@ -50,27 +58,27 @@ rules:
   - rule_id: C4-PDL1Testing
     description: "PD-L1 IHC was performed (any assay, any score) for NSCLC."
     nccn_source: "Rule 4 — PD-L1 IHC documented for advanced/resected NSCLC."
-    excluded_if: 'MT0a != "yes" or MT7 == "unclear"'
+    excluded_if: 'MT0a != "yes" or (MT0b != "small_cell" and MT7 == "unclear")'
     verdict_if: 'MT0b == "small_cell" or MT7 == "yes"'
     attribution: MISSING_TESTING_DOCUMENTATION
     supporting_questions: [MT0b, MT7]
 
   - rule_id: C5-TimeToTreatment
-    description: "Time from diagnosis to first-line systemic therapy <= 60 days (or no systemic therapy given)."
+    description: "Time from diagnosis to first-line systemic therapy <= 60 days (or no systemic therapy / small_cell)."
     nccn_source: "Rule 5 — time-to-treatment <= 60 days unless justified."
-    excluded_if: 'MT0a != "yes" or MT10 is missing'
-    verdict_if: 'MT10 <= 60 or MT5 == "no_systemic_therapy"'
+    excluded_if: 'MT0a != "yes" or (MT0b != "small_cell" and MT10 is missing)'
+    verdict_if: 'MT0b == "small_cell" or MT10 <= 60 or MT5 == "no_systemic_therapy"'
     attribution: UNEXPLAINED_TREATMENT_CHOICE_OR_DELAY
     nuanced: true
     judge_can_override: false
-    supporting_questions: [MT10, MT5]
+    supporting_questions: [MT0b, MT10, MT5]
 
   - rule_id: C6-TargetedTherapyAlignment
-    description: "An identified actionable mutation received the guideline-recommended first-line targeted therapy."
+    description: "An identified actionable mutation received the recommended first-line targeted therapy (N/A for small_cell)."
     nccn_source: "Rules 2 + 3 — targeted therapy aligned to the actionable biomarker."
-    excluded_if: 'MT0a != "yes" or MT8a == "unclear" or MT9 == "unclear"'
-    verdict_if: 'MT8a == "no" or MT9 == "yes"'
+    excluded_if: 'MT0a != "yes" or (MT0b != "small_cell" and (MT8a == "unclear" or MT9 == "unclear"))'
+    verdict_if: 'MT0b == "small_cell" or MT8a == "no" or MT9 == "yes"'
     attribution: WRONG_FIRST_LINE_TREATMENT_FOR_KNOWN_BIOMARKER
     nuanced: true
     judge_can_override: false
-    supporting_questions: [MT8a, MT9]
+    supporting_questions: [MT0b, MT8a, MT9]
