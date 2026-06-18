@@ -1,0 +1,21 @@
+SURGICAL PATHOLOGY REPORT
+Specimen: CT-guided core needle biopsy, right lower lobe lung mass
+Specimen collected: 2024-03-02
+Report finalized: 2024-03-05
+Pathologist: J. Okafor, MD
+
+CLINICAL HISTORY
+68-year-old woman, lifelong never-smoker, with a 3.4 cm right lower lobe mass
+and multiple lytic bony lesions on staging imaging. Biopsy to establish
+diagnosis.
+
+FINAL DIAGNOSIS
+Right lower lobe, core biopsy:
+  - INVASIVE ADENOCARCINOMA, acinar predominant, consistent with lung primary.
+  - Immunohistochemistry: TTF-1 positive, Napsin-A positive, p40 negative —
+    supporting pulmonary adenocarcinoma.
+
+COMMENT
+Histology is adenocarcinoma. Given metastatic presentation, tissue has been
+forwarded for comprehensive genomic profiling and PD-L1 immunohistochemistry.
+Date of diagnosis: 2024-03-05.

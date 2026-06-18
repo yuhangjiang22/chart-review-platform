@@ -1,0 +1,6 @@
+[
+  { "row_id": 9301, "concept_id": 36769180, "concept_name": "PD-L1 tumor proportion score (22C3 IHC)", "value": "5%", "value_as_string": "TPS 5% (1-49% band)", "date": "2024-03-20" },
+  { "row_id": 9302, "concept_id": 36769181, "concept_name": "Molecular finding — EGFR", "value_as_string": "EGFR exon 19 deletion (E746_A750del), actionable", "date": "2024-03-20" },
+  { "row_id": 9303, "concept_id": 4222303, "concept_name": "Tobacco use status", "value_as_string": "Never smoker", "date": "2024-03-05" },
+  { "row_id": 9304, "concept_id": 734392, "concept_name": "AJCC stage group", "value_as_string": "Stage IV (M1b, bone)", "date": "2024-03-05" }
+]
