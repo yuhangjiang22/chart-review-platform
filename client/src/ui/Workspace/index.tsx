@@ -432,10 +432,12 @@ export function Workspace({
         .map((p) => ({
           iter_id: p.iter_id, iter_num: p.iter_num, state: p.state,
           started_at: (p as { started_at?: string }).started_at ?? "",
-          // The rubric version (content SHA) this run was frozen against, so the
-          // iter card can show which rubric produced it (it stays pinned even
-          // after later rubric edits).
+          // The rubric this run was frozen against: the friendly version label
+          // (s1/v1, snapshotted from the session at run time) for display, plus
+          // the content SHA for precise identity. The iter stays pinned to its
+          // version even after later rubric edits/switches.
           guideline_sha: (p as { guideline_sha?: string }).guideline_sha,
+          rubric: (p as { rubric?: { based_on: string; active_version: string } }).rubric,
         }))
     : [];
 

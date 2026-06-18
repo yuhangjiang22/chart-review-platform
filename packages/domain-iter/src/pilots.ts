@@ -43,6 +43,17 @@ import {
   type RerunPlan,
 } from "@chart-review/criterion-hash";
 import type { ProviderName } from "@chart-review/agent-provider";
+import { getSessionManifest } from "./sessions.js";
+
+/** The session's rubric version label ({based_on, active_version}) to snapshot
+ *  onto a new iter, or undefined for session-less / legacy sessions. */
+function sessionRubricLabel(
+  taskId: string,
+  sessionId: string | undefined,
+): PilotManifest["rubric"] {
+  if (!sessionId) return undefined;
+  return getSessionManifest(taskId, sessionId)?.rubric;
+}
 
 export type PilotState =
   | "running"
@@ -193,6 +204,13 @@ export interface PilotManifest {
   session_id?: string;
   run_id: string;         // the batch-run that produced the drafts
   guideline_sha: string;  // SHA of the guideline at iteration start
+  /** Human-readable rubric version this iter ran on, snapshotted from the
+   *  session at iter start (e.g. {based_on:"v1", active_version:"s1"}). The
+   *  guideline_sha is the precise content identity; this is the friendly label
+   *  the UI shows. Snapshotted (not derived live) so the label stays correct
+   *  even if the session later switches versions. Absent on legacy iters and
+   *  session-less runs. */
+  rubric?: { based_on: string; active_version: string };
   started_at: string;
   started_by: string;
   state: PilotState;
@@ -561,6 +579,7 @@ export function startPilotIteration(opts: StartPilotOptions): StartPilotResult {
     session_id: opts.session_id,
     run_id,
     guideline_sha: guidelineSha,
+    rubric: sessionRubricLabel(opts.task_id, opts.session_id),
     started_at: new Date().toISOString(),
     started_by: opts.started_by,
     state: "running",
@@ -628,6 +647,7 @@ export function importPilotIteration(opts: ImportPilotOptions): StartPilotResult
     run_id: opts.run_id,
     guideline_sha:
       runManifest.guideline_sha || computeTaskSha(guidelineDir(opts.task_id)),
+    rubric: sessionRubricLabel(opts.task_id, opts.session_id),
     started_at: new Date().toISOString(),
     started_by: opts.started_by,
     state,

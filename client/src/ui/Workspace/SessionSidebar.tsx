@@ -32,6 +32,8 @@ interface SessionShape {
   agent_specs?: AgentSpecLite[];
   default_agent_specs?: AgentSpecLite[];
   skill_snapshot_sha: string;
+  /** Session-scoped rubric fork: baseline it forked from + active version. */
+  rubric?: { based_on: string; active_version: string };
 }
 
 interface IterShape {
@@ -40,6 +42,8 @@ interface IterShape {
   state: string;
   started_at: string;
   guideline_sha?: string;
+  /** Friendly rubric version this iter ran on, snapshotted at run time. */
+  rubric?: { based_on: string; active_version: string };
 }
 
 interface SessionSidebarProps {
@@ -248,14 +252,38 @@ export function SessionSidebar({
                       )}>
                         Run {runNumberOf.get(it.iter_id)}
                         {isActive && <span className="ml-1 text-[9px] text-[hsl(var(--sage))] uppercase tracking-[0.1em]">· active</span>}
-                        {it.guideline_sha && (
-                          <span
-                            className="ml-2 font-normal text-[9.5px] text-muted-foreground/70"
-                            title={`Rubric version this run was frozen against (guideline_sha): ${it.guideline_sha}`}
-                          >
-                            rubric {it.guideline_sha.slice(0, 8)}
-                          </span>
-                        )}
+                        {(() => {
+                          // Prefer the friendly version label the run was frozen
+                          // against (e.g. "s1"). Legacy iters predate that
+                          // snapshot — fall back to the session's current version
+                          // (best-effort), then to the raw content sha.
+                          const fromIter = it.rubric?.active_version;
+                          const ver = fromIter ?? session?.rubric?.active_version;
+                          const basedOn = it.rubric?.based_on ?? session?.rubric?.based_on;
+                          if (ver) {
+                            const shaPart = it.guideline_sha ? ` · sha ${it.guideline_sha.slice(0, 8)}` : "";
+                            const approx = fromIter ? "" : " (session's current version)";
+                            return (
+                              <span
+                                className="ml-2 font-normal text-[9.5px] text-muted-foreground/70"
+                                title={`Rubric version ${ver}${basedOn ? ` (forked from ${basedOn})` : ""}${approx}${shaPart}`}
+                              >
+                                rubric {ver}
+                              </span>
+                            );
+                          }
+                          if (it.guideline_sha) {
+                            return (
+                              <span
+                                className="ml-2 font-normal text-[9.5px] text-muted-foreground/70"
+                                title={`Rubric content hash this run was frozen against (guideline_sha): ${it.guideline_sha}`}
+                              >
+                                rubric {it.guideline_sha.slice(0, 8)}
+                              </span>
+                            );
+                          }
+                          return null;
+                        })()}
                       </span>
                       <span
                         className={cn(
