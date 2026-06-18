@@ -5,7 +5,7 @@ questions:
   - question_id: MT9
     text: "For a patient with an actionable mutation, was the guideline-recommended targeted therapy initiated as first-line treatment?"
     tier: 4
-    answer_schema: { type: string, enum: [yes, no, not_applicable, unknown] }
+    answer_schema: { type: string, enum: [yes, no, not_applicable, unclear] }
     depends_on: [MT8a]
     retrieval_hints: "Oncology first-line regimen. not_applicable if no actionable mutation (MT8a == no)."
 
@@ -26,6 +26,6 @@ questions:
   - question_id: MT12
     text: "If CGP was NOT performed, were at minimum EGFR, ALK, ROS1, BRAF, KRAS, and PD-L1 all tested (the essential NSCLC biomarkers)?"
     tier: 4
-    answer_schema: { type: string, enum: [yes, no, not_applicable, unknown] }
+    answer_schema: { type: string, enum: [yes, no, not_applicable, unclear] }
     depends_on: [MT2]
-    retrieval_hints: "Check each essential biomarker was covered. not_applicable if CGP (MT2 == yes) was done."
+    retrieval_hints: "Check each essential biomarker was covered. not_applicable if CGP (a named MT2 vendor) was done."

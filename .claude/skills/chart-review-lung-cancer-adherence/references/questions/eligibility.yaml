@@ -1,6 +1,6 @@
-# T0 — Eligibility + context. Establishes the patient is an in-scope lung cancer
-# case and captures the facts (histology, stage) that gate the molecular-testing
-# concordance rules. Answer these FIRST.
+# T0 — Eligibility + context. Answer options align with the lung-cancer-experiment
+# annotation tool's canonical QUESTION_LAYOUTS. Answer these FIRST — histology +
+# stage gate the molecular-testing concordance rules.
 
 questions:
   - question_id: MT0a
@@ -8,7 +8,7 @@ questions:
     tier: 0
     answer_schema:
       type: string
-      enum: [yes, no, unknown]
+      enum: [yes, no, unclear]
     guideline_reference: "Eligibility — lung cancer diagnosis confirmation."
     retrieval_hints: "Pathology report confirming lung cancer + date of diagnosis."
 
@@ -17,24 +17,24 @@ questions:
     tier: 0
     answer_schema:
       type: string
-      enum: [adenocarcinoma, squamous_cell, large_cell, NSCLC_NOS, SCLC, other, unknown]
-    guideline_reference: "Histology — drives the molecular-testing indication (SCLC is generally not required)."
-    retrieval_hints: "Pathology 'Diagnosis'/'Histologic type'. SCLC = small cell; the rest are NSCLC."
+      enum: [adenocarcinoma, squamous, small_cell, nsclc_nos, other, unclear]
+    guideline_reference: "Histology — drives the molecular-testing indication (small_cell is generally not required)."
+    retrieval_hints: "Pathology 'Diagnosis'/'Histologic type'. small_cell = SCLC; squamous, adenocarcinoma, nsclc_nos are NSCLC."
 
   - question_id: MT0c
     text: "What is the stage of the lung cancer at diagnosis?"
     tier: 0
     answer_schema:
       type: string
-      enum: ["I", "II", "IIIA", "IIIB", "III", "IV", "limited", "extensive", "unknown"]
-    guideline_reference: "Stage — advanced/metastatic NSCLC (IIIB/IV) has the strongest molecular-testing indication; resected IB–IIIA needs at minimum EGFR + ALK."
-    retrieval_hints: "AJCC stage in pathology/oncology staging notes. limited/extensive apply to SCLC."
+      enum: ["I", "II", "IIIA", "IIIB", "IV", "limited", "extensive", "unknown"]
+    guideline_reference: "Stage — advanced/metastatic NSCLC (IIIB/IV) has the strongest molecular-testing indication."
+    retrieval_hints: "AJCC stage in pathology/oncology staging notes. limited/extensive apply to small_cell."
 
   - question_id: MT0d
     text: "What is the patient's tobacco use history?"
     tier: 0
     answer_schema:
       type: string
-      enum: [current_smoker, former_smoker, never_smoker, unknown]
-    guideline_reference: "Smoking history — never-smokers have higher actionable-mutation prevalence."
+      enum: ["current smoker", "former smoker", "never smoker", "unknown"]
+    guideline_reference: "Smoking history — never smokers have higher actionable-mutation prevalence."
     retrieval_hints: "Social history / HPI smoking status."
