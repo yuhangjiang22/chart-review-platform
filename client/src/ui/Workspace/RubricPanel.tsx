@@ -52,7 +52,7 @@ interface FieldEditorProps {
   sessionId?: string | null;
 }
 
-function FieldEditor({ taskId, field, onSaved, sessionId }: FieldEditorProps) {
+export function FieldEditor({ taskId, field, onSaved, sessionId }: FieldEditorProps) {
   const [prompt, setPrompt] = useState(field.prompt);
   const [enumText, setEnumText] = useState(field.enum.join("\n"));
   const [definition, setDefinition] = useState(field.definition);
@@ -62,14 +62,20 @@ function FieldEditor({ taskId, field, onSaved, sessionId }: FieldEditorProps) {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Reset local state when field changes (e.g. after parent re-fetch)
+  // Reset local edit state only when we switch to a DIFFERENT field — keyed by
+  // field_id, NOT the field object. Keying on the object wiped in-progress edits
+  // on any incidental parent re-fetch (e.g. session activation) that handed down
+  // a fresh field object with the same id, before Save could read them. Version
+  // switches go through setData(null) → remount, which re-inits from the new
+  // field, so this effect doesn't need to handle them.
   useEffect(() => {
     setPrompt(field.prompt);
     setEnumText(field.enum.join("\n"));
     setDefinition(field.definition);
     setExtractionGuidance(field.extraction_guidance);
     setExamples(field.examples);
-  }, [field]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [field.field_id]);
 
   async function handleSave() {
     setSaving(true);
