@@ -25,7 +25,7 @@ import {
   type SessionManifest,
 } from "./lib/domain/iter/index.js";
 import { getRunManifest } from "./lib/infra/batch-run/index.js";
-import type { AgentSpec } from "@chart-review/agent-specs";
+import { validateAgentSpec, type AgentSpec } from "@chart-review/agent-specs";
 
 function gateMethodologist(
   req: Parameters<RouteEntry["handler"]>[1],
@@ -195,6 +195,17 @@ export const sessionRoutes: RouteEntry[] = [
         const err = new Error(
           "agent_specs must be a non-empty array — at least one agent is required to run a session",
         ) as Error & { status: number };
+        err.status = 400;
+        throw err;
+      }
+      // Validate the specs the SAME way run-start does (preset/role_prompt
+      // presence + axis), so create fails fast with a clear 400 instead of
+      // succeeding into a session that can never run (the run-start error would
+      // otherwise surface much later, detached from the create action).
+      try {
+        validateAgentSpec(specs);
+      } catch (e) {
+        const err = new Error((e as Error).message) as Error & { status: number };
         err.status = 400;
         throw err;
       }
