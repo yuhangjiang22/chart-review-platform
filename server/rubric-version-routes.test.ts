@@ -60,6 +60,25 @@ describe("rubric version routes", () => {
     ).rejects.toThrow(/no such version/i);
   });
 
+  it("DELETE removes a version (re-activating the parent when it was active)", async () => {
+    // active is s2 (parent s1) → delete it; parent s1 becomes active + re-materialized
+    const res = await route("DELETE", "/api/rubric/:taskId/sessions/:sessionId/versions/:versionId")
+      .handler(null, {} as never, { taskId: "x", sessionId: "s1", versionId: "s2" }, new URLSearchParams());
+    expect((res as { active: string }).active).toBe("s1");
+    const fork = sessionRubricRoot("x", "s1");
+    expect(fs.readFileSync(path.join(fork, "references", "criteria", "f.md"), "utf8")).toBe("one");
+    const log = await route("GET", "/api/rubric/:taskId/sessions/:sessionId/versions")
+      .handler(null, {} as never, { taskId: "x", sessionId: "s1" }, new URLSearchParams());
+    expect((log as { versions: { id: string }[] }).versions.map((v) => v.id)).toEqual(["s1"]);
+  });
+
+  it("DELETE refuses the base (fork-root) version", async () => {
+    await expect(
+      route("DELETE", "/api/rubric/:taskId/sessions/:sessionId/versions/:versionId")
+        .handler(null, {} as never, { taskId: "x", sessionId: "s1", versionId: "s1" }, new URLSearchParams()),
+    ).rejects.toThrow(/base/i);
+  });
+
   it("POST promote creates a new baseline version from the session's active version", async () => {
     const base = baselineRubricRoot("x");
     fs.mkdirSync(path.join(base, "references", "criteria"), { recursive: true });

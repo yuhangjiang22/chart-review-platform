@@ -106,6 +106,29 @@ export function switchVersion(root: string, id: string): void {
   atomicWriteJson(logPath(root), log);
 }
 
+/** Delete a version + its snapshot. Refuses the BASE version (the fork root,
+ *  parent=null) — there must always be a base to switch back to. If the deleted
+ *  version is active, re-materializes + activates its parent first. Children of
+ *  the deleted version are re-parented to its parent so the chain stays linked. */
+export function deleteVersion(root: string, id: string): void {
+  const log = readVersionLog(root);
+  if (!log) throw new Error("no version log");
+  const target = log.versions.find((v) => v.id === id);
+  if (!target) throw new Error(`no such version: ${id}`);
+  if (target.parent === null) throw new Error(`cannot delete the base version ${id}`);
+
+  // Deleting the active version: switch (re-materialize the working copy) to its
+  // parent first, so the live rubric still reflects a real version.
+  if (log.active === id) switchVersion(root, target.parent);
+
+  const fresh = readVersionLog(root)!; // switchVersion may have rewritten the log
+  for (const v of fresh.versions) if (v.parent === id) v.parent = target.parent;
+  fresh.versions = fresh.versions.filter((v) => v.id !== id);
+  if (fresh.active === id) fresh.active = target.parent;
+  atomicWriteJson(logPath(root), fresh);
+  rmTree(path.join(root, "versions", id));
+}
+
 export interface FileDiff { file: string; status: "changed" | "added" | "removed"; }
 
 /** Which criteria files differ between two snapshots (relative paths under

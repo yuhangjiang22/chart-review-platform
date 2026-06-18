@@ -11,6 +11,7 @@ import type { RouteEntry } from "./router.js";
 import {
   readVersionLog,
   switchVersion,
+  deleteVersion,
   diffVersions,
   snapshotVersion,
   getActiveVersion,
@@ -58,6 +59,23 @@ export const rubricVersionRoutes: RouteEntry[] = [
         throw httpErr(400, (e as Error).message);
       }
       return { ok: true, active: v };
+    },
+  },
+  {
+    // Delete a session rubric version (e.g. an author-edit you no longer want).
+    // The base version (s1, the fork root) cannot be deleted; deleting the active
+    // version re-materializes its parent first.
+    method: "DELETE",
+    pattern: "/api/rubric/:taskId/sessions/:sessionId/versions/:versionId",
+    handler: async (_b, _r, p) => {
+      const root = sessionRubricRoot(p.taskId, p.sessionId);
+      try {
+        deleteVersion(root, p.versionId);
+      } catch (e) {
+        throw httpErr(400, (e as Error).message);
+      }
+      const log = readVersionLog(root);
+      return { ok: true, active: log?.active ?? null, versions: log?.versions ?? [] };
     },
   },
   {

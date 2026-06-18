@@ -11,6 +11,8 @@ interface Version {
   id: string;
   source: string;
   created_at: string;
+  /** null = the base (fork-root) version, which cannot be deleted. */
+  parent?: string | null;
 }
 interface Props {
   taskId: string;
@@ -64,6 +66,19 @@ export function RubricVersionSwitcher({ taskId, sessionId, onSwitched }: Props) 
     }
   }
 
+  async function doDelete(id: string) {
+    if (!window.confirm(`Delete rubric version ${id}? This removes its snapshot permanently.`)) return;
+    const r = await authFetch(`${sBase}/versions/${encodeURIComponent(id)}`, { method: "DELETE" });
+    if (r.ok) {
+      await load();
+      // Deleting the active version re-materializes its parent — refetch the editor.
+      window.dispatchEvent(new Event("chartreview:rubric-switched"));
+    } else {
+      const b = (await r.json().catch(() => ({}))) as { error?: string };
+      setNote(b.error ?? `Delete failed: ${r.status}`);
+    }
+  }
+
   async function promote(confirmDrift = false) {
     if (!confirmDrift && !window.confirm(`Promote ${active} to a new BASELINE version? Future sessions will fork from it.`)) {
       return;
@@ -106,16 +121,28 @@ export function RubricVersionSwitcher({ taskId, sessionId, onSwitched }: Props) 
               {v.id}
             </span>
             <span className="truncate text-[10px] text-muted-foreground">{v.source}</span>
-            {v.id !== active && (
-              <button
-                type="button"
-                aria-label={`Switch to ${v.id}`}
-                onClick={() => doSwitch(v.id)}
-                className="ml-auto rounded border border-border/60 px-1.5 py-0.5 text-[10px] text-muted-foreground hover:border-border hover:text-foreground"
-              >
-                Switch
-              </button>
-            )}
+            <span className="ml-auto flex items-center gap-1.5">
+              {v.id !== active && (
+                <button
+                  type="button"
+                  aria-label={`Switch to ${v.id}`}
+                  onClick={() => doSwitch(v.id)}
+                  className="rounded border border-border/60 px-1.5 py-0.5 text-[10px] text-muted-foreground hover:border-border hover:text-foreground"
+                >
+                  Switch
+                </button>
+              )}
+              {v.parent !== null && v.parent !== undefined && (
+                <button
+                  type="button"
+                  aria-label={`Delete ${v.id}`}
+                  onClick={() => doDelete(v.id)}
+                  className="rounded border border-border/60 px-1.5 py-0.5 text-[10px] text-muted-foreground hover:border-[hsl(var(--oxblood))]/50 hover:text-[hsl(var(--oxblood))]"
+                >
+                  Delete
+                </button>
+              )}
+            </span>
           </li>
         ))}
       </ul>
