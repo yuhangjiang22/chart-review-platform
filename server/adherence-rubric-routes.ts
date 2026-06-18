@@ -9,6 +9,7 @@ import type { RouteEntry } from "./router.js";
 import { loadCompiledTask } from "./lib/tasks.js";
 import { loadAdherenceSkill } from "@chart-review/pipeline-extract-adherence";
 import { setAdherenceQuestionFields } from "./lib/refine/adherence-provenance.js";
+import { snapshotAfterEdit } from "./lib/rubric-edit-snapshot.js";
 
 function httpErr(status: number, message: string): Error & { status: number } {
   const e = new Error(message) as Error & { status: number };
@@ -29,9 +30,11 @@ export const adherenceRubricRoutes: RouteEntry[] = [
     // The full question rubric, tier-ordered, for the editable AUTHOR pane.
     method: "GET",
     pattern: "/api/tasks/:taskId/adherence-rubric",
-    handler: async (_b, _r, p) => {
+    handler: async (_b, _r, p, query) => {
       requireAdherence(p.taskId);
-      const skill = loadAdherenceSkill(p.taskId);
+      // Read the session's fork when a session is in context so AUTHOR edits +
+      // applied refinements are reflected (else the baseline).
+      const skill = loadAdherenceSkill(p.taskId, query.get("session_id") ?? undefined);
       const questions: Array<{
         question_id: string;
         tier: number;
@@ -63,8 +66,9 @@ export const adherenceRubricRoutes: RouteEntry[] = [
     // provenance (direct human edit), matching PUT /criteria.
     method: "PUT",
     pattern: "/api/tasks/:taskId/adherence-questions/:questionId",
-    handler: async (body, _r, p) => {
+    handler: async (body, _r, p, query) => {
       requireAdherence(p.taskId);
+      const sessionId = query.get("session_id") ?? undefined;
       const b = (body ?? {}) as { text?: unknown; retrieval_hints?: unknown };
       const fields: { text?: string; retrieval_hints?: string } = {};
       if (b.text !== undefined) {
@@ -79,10 +83,13 @@ export const adherenceRubricRoutes: RouteEntry[] = [
         throw httpErr(400, "provide at least one of: text, retrieval_hints");
       }
       try {
-        setAdherenceQuestionFields(p.taskId, p.questionId, fields);
+        setAdherenceQuestionFields(p.taskId, p.questionId, fields, sessionId);
       } catch (e) {
         throw httpErr(400, (e as Error).message);
       }
+      // A direct AUTHOR edit is a rubric change → snapshot a version on the same
+      // (session fork or baseline) root, mirroring PUT /criteria.
+      snapshotAfterEdit({ taskId: p.taskId, sessionId, source: "author-edit", by: "reviewer" });
       return { ok: true };
     },
   },

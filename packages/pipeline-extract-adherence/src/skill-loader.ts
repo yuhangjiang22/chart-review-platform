@@ -16,7 +16,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import YAML from "yaml";
-import { guidelineDir } from "@chart-review/rubric";
+import { resolveRubricRoot } from "@chart-review/rubric";
 import type { AttributionCategory } from "@chart-review/platform-types";
 import type { RuleDefinition } from "@chart-review/rule-engine";
 
@@ -52,8 +52,15 @@ function readYamlFile(filePath: string): unknown {
   return YAML.parse(fs.readFileSync(filePath, "utf8"));
 }
 
-export function loadAdherenceSkill(taskId: string): AdherenceSkill {
-  const root = guidelineDir(taskId);
+/**
+ * Load an adherence skill from the rubric root that (taskId, sessionId) resolves
+ * to. Server-side callers pass the session to read that session's fork; the run
+ * subprocess passes none and relies on CHART_REVIEW_RUBRIC_ROOT (set to the fork
+ * by buildMcpServersConfig), which resolveRubricRoot honors first. With neither,
+ * it falls back to the baseline. Mirrors loadPhenotypeCriteria(taskId, sessionId?).
+ */
+export function loadAdherenceSkill(taskId: string, sessionId?: string): AdherenceSkill {
+  const root = resolveRubricRoot(taskId, sessionId);
   const refs = path.join(root, "references");
   const questionsDir = path.join(refs, "questions");
   const rulesDir = path.join(refs, "rules");

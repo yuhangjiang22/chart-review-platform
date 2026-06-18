@@ -10,8 +10,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
-import { guidelineDir } from "@chart-review/rubric";
+import { guidelineDir, resolveRubricRoot } from "@chart-review/rubric";
 import { atomicWriteText } from "../criterion-md.js";
+import { snapshotAfterEdit } from "../rubric-edit-snapshot.js";
 
 // ── Shapes ─────────────────────────────────────────────────────────────────────
 
@@ -45,16 +46,22 @@ interface QuestionsDoc {
 
 // ── Bundle location ────────────────────────────────────────────────────────────
 
-function questionsDir(taskId: string): string {
-  return path.join(guidelineDir(taskId), "references", "questions");
+// The question bundles live on whichever rubric root the (task, session)
+// resolves to — the session fork when one exists (so a refinement edits THAT
+// session's rubric, not the shared baseline), else the baseline. Mirrors the
+// phenotype criterion-md path. Inside a run subprocess, resolveRubricRoot honors
+// CHART_REVIEW_RUBRIC_ROOT first, so no sessionId is needed there.
+function questionsDir(taskId: string, sessionId?: string): string {
+  return path.join(resolveRubricRoot(taskId, sessionId), "references", "questions");
 }
 
 /** Find the tier bundle file + the question object that holds question_id. */
 export function findQuestionInBundles(
   taskId: string,
   questionId: string,
+  sessionId?: string,
 ): { file: string; doc: QuestionsDoc; question: Record<string, unknown> } | null {
-  const dir = questionsDir(taskId);
+  const dir = questionsDir(taskId, sessionId);
   if (!fs.existsSync(dir)) return null;
   for (const f of fs.readdirSync(dir).sort()) {
     if (!f.endsWith(".yaml") && !f.endsWith(".yml")) continue;
@@ -80,12 +87,13 @@ export function setAdherenceQuestionFields(
   taskId: string,
   questionId: string,
   fields: { text?: string; retrieval_hints?: string },
+  sessionId?: string,
 ): void {
-  const found = findQuestionInBundles(taskId, questionId);
+  const found = findQuestionInBundles(taskId, questionId, sessionId);
   if (!found) throw new Error(`question ${questionId} not found in ${taskId} question bundles`);
   if (typeof fields.text === "string") found.question.text = fields.text;
   if (typeof fields.retrieval_hints === "string") found.question.retrieval_hints = fields.retrieval_hints;
-  atomicWriteText(path.join(questionsDir(taskId), found.file), stringifyYaml(found.doc));
+  atomicWriteText(path.join(questionsDir(taskId, sessionId), found.file), stringifyYaml(found.doc));
 }
 
 // ── Log IO ─────────────────────────────────────────────────────────────────────
@@ -147,7 +155,7 @@ export function applyAdherenceRefinement(input: ApplyAdherenceInput): AdherenceL
   const add = input.hintAddition.trim();
   if (!add) throw new Error("hintAddition is empty");
 
-  const found = findQuestionInBundles(input.taskId, input.questionId);
+  const found = findQuestionInBundles(input.taskId, input.questionId, input.sessionId);
   if (!found) throw new Error(`question ${input.questionId} not found in ${input.taskId} question bundles`);
 
   const priorRaw = getHints(found.question); // untrimmed snapshot, for exact revert
@@ -155,7 +163,16 @@ export function applyAdherenceRefinement(input: ApplyAdherenceInput): AdherenceL
   const next = prior ? `${prior}\n${add}` : add;
   found.question.retrieval_hints = next;
 
-  atomicWriteText(path.join(questionsDir(input.taskId), found.file), stringifyYaml(found.doc));
+  atomicWriteText(path.join(questionsDir(input.taskId, input.sessionId), found.file), stringifyYaml(found.doc));
+  // An applied refinement is a rubric change → snapshot a new version on the
+  // SAME root the write landed on (session fork when sessionId is set, prefix
+  // "s"; else baseline, prefix "v"). Mirrors the phenotype applyRefinement.
+  snapshotAfterEdit({
+    taskId: input.taskId,
+    sessionId: input.sessionId,
+    source: `refine:${input.questionId}`,
+    by: input.appliedBy,
+  });
 
   const now = input.now ?? new Date().toISOString();
   const entry: AdherenceLogEntry = {
@@ -195,12 +212,20 @@ export function revertAdherenceRefinement(opts: {
   const entry = all[idx];
   if (entry.reverted) throw new Error(`entry ${opts.entryId} is already reverted`);
 
-  const found = findQuestionInBundles(opts.taskId, entry.question_id);
+  // The edit landed on the entry's session fork (or baseline) — restore THERE.
+  const found = findQuestionInBundles(opts.taskId, entry.question_id, entry.session_id);
   if (!found) throw new Error(`question ${entry.question_id} not found for revert`);
 
   const intervening_edit = getHints(found.question).trim() !== entry.new_retrieval_hints.trim();
   found.question.retrieval_hints = entry.prior_retrieval_hints;
-  atomicWriteText(path.join(questionsDir(opts.taskId), found.file), stringifyYaml(found.doc));
+  atomicWriteText(path.join(questionsDir(opts.taskId, entry.session_id), found.file), stringifyYaml(found.doc));
+  // A revert is itself a rubric change → snapshot the restored state.
+  snapshotAfterEdit({
+    taskId: opts.taskId,
+    sessionId: entry.session_id,
+    source: `revert:${entry.question_id}`,
+    by: opts.by,
+  });
 
   const now = opts.now ?? new Date().toISOString();
   all[idx] = { ...entry, reverted: { at: now, by: opts.by, intervening_edit } };

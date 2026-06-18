@@ -5,7 +5,23 @@ import path from "node:path";
 import { parse as parseYaml } from "yaml";
 
 let skillDir = "";
-vi.mock("@chart-review/rubric", () => ({ phenotypeSkillDir: () => skillDir, guidelineDir: () => skillDir }));
+// resolveRubricRoot routes to the session fork (<skill>/sessions/<sid>/rubric)
+// when one exists, else the baseline skillDir — mirroring the real seam so the
+// session-scoping tests below can assert fork-vs-baseline targeting. The closures
+// run at call-time (not at mock-registration), so referencing the top-level
+// fs/path/skillDir is safe under vitest's hoisting.
+vi.mock("@chart-review/rubric", () => ({
+  phenotypeSkillDir: () => skillDir,
+  guidelineDir: () => skillDir,
+  baselineRubricRoot: () => skillDir,
+  resolveRubricRoot: (_taskId: string, sessionId?: string) => {
+    if (sessionId) {
+      const fork = path.join(skillDir, "sessions", sessionId, "rubric");
+      if (fs.existsSync(path.join(fork, "references"))) return fork;
+    }
+    return skillDir;
+  },
+}));
 
 import {
   applyAdherenceRefinement,
@@ -142,5 +158,60 @@ describe("readAdherenceRefinementLog + revert", () => {
     expect(res.intervening_edit).toBe(true);
     expect(() => revertAdherenceRefinement({ taskId: TASK, entryId: "e1", by: "r", now: "t4" })).toThrow(/already reverted/);
     expect(() => revertAdherenceRefinement({ taskId: TASK, entryId: "zz", by: "r" })).toThrow(/not found/);
+  });
+});
+
+describe("session scoping (fork-targeted writes + version snapshot)", () => {
+  // Seed a question bundle inside the session FORK (not the baseline) so the
+  // routed write target can be distinguished.
+  function writeForkBundle(sessionId: string, file: string, questions: Array<Record<string, unknown>>): void {
+    const dir = path.join(skillDir, "sessions", sessionId, "rubric", "references", "questions");
+    fs.mkdirSync(dir, { recursive: true });
+    const lines = ["questions:"];
+    for (const q of questions) {
+      lines.push(`  - question_id: ${q.question_id}`);
+      lines.push(`    text: ${JSON.stringify(q.text ?? "")}`);
+      if (q.retrieval_hints !== undefined) lines.push(`    retrieval_hints: ${JSON.stringify(q.retrieval_hints)}`);
+      lines.push(`    tier: ${q.tier ?? 1}`);
+    }
+    fs.writeFileSync(path.join(dir, file), lines.join("\n") + "\n");
+  }
+  function forkVersions(sessionId: string): Array<{ id: string; source: string }> {
+    const fp = path.join(skillDir, "sessions", sessionId, "rubric", "versions", "versions.json");
+    if (!fs.existsSync(fp)) return [];
+    return (JSON.parse(fs.readFileSync(fp, "utf8")) as { versions?: Array<{ id: string; source: string }> }).versions ?? [];
+  }
+
+  it("apply with a sessionId writes the fork, leaves baseline untouched, and snapshots a refine: version", () => {
+    writeBundle("T1.yaml", [{ question_id: "Q1", text: "Q?", retrieval_hints: "base hint", tier: 1 }]);
+    writeForkBundle("s1", "T1.yaml", [{ question_id: "Q1", text: "Q?", retrieval_hints: "fork hint", tier: 1 }]);
+
+    applyAdherenceRefinement({ taskId: TASK, questionId: "Q1", hintAddition: "ADDED", appliedBy: "r", sessionId: "s1", now: "t1", entryId: "e1" });
+
+    // the FORK bundle gained the addition …
+    expect(findQuestionInBundles(TASK, "Q1", "s1")!.question.retrieval_hints).toBe("fork hint\nADDED");
+    // … and the BASELINE bundle is untouched (no leak)
+    expect(readHints("Q1")).toBe("base hint");
+    // a session version (prefix "s") with source refine:Q1 was snapshotted on the fork
+    expect(forkVersions("s1").some((v) => v.source === "refine:Q1" && v.id.startsWith("s"))).toBe(true);
+  });
+
+  it("revert uses the log entry's session_id to restore the fork (baseline never touched)", () => {
+    writeBundle("T1.yaml", [{ question_id: "Q1", text: "Q?", retrieval_hints: "base hint", tier: 1 }]);
+    writeForkBundle("s1", "T1.yaml", [{ question_id: "Q1", text: "Q?", retrieval_hints: "fork hint", tier: 1 }]);
+    applyAdherenceRefinement({ taskId: TASK, questionId: "Q1", hintAddition: "ADDED", appliedBy: "r", sessionId: "s1", now: "t1", entryId: "e1" });
+
+    revertAdherenceRefinement({ taskId: TASK, entryId: "e1", by: "r2", now: "t2" });
+
+    expect(findQuestionInBundles(TASK, "Q1", "s1")!.question.retrieval_hints).toBe("fork hint"); // fork restored
+    expect(readHints("Q1")).toBe("base hint"); // baseline never touched
+  });
+
+  it("setAdherenceQuestionFields with a sessionId edits the fork, not the baseline", () => {
+    writeBundle("T1.yaml", [{ question_id: "Q1", text: "base?", retrieval_hints: "base", tier: 1 }]);
+    writeForkBundle("s1", "T1.yaml", [{ question_id: "Q1", text: "fork?", retrieval_hints: "fork", tier: 1 }]);
+    setAdherenceQuestionFields(TASK, "Q1", { retrieval_hints: "edited" }, "s1");
+    expect(findQuestionInBundles(TASK, "Q1", "s1")!.question.retrieval_hints).toBe("edited");
+    expect(readHints("Q1")).toBe("base"); // baseline untouched
   });
 });
