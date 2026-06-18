@@ -15,6 +15,7 @@ import { ChevronRight, ChevronLeft, FileText, ChevronDown, PanelRightClose } fro
 import { authFetch } from "../../auth";
 import { useDeepagentsModels } from "../../useDeepagentsModels";
 import { RubricVersionSwitcher } from "./RubricVersionSwitcher";
+import { TaskToolsPanel } from "./TaskToolsPanel";
 
 interface AgentSpecLite {
   id: string;
@@ -321,6 +322,7 @@ export function SessionSidebar({
               Edits made here affect THIS session's next iter — that's the inner loop.
             </p>
             <RubricVersionSwitcher taskId={taskId} sessionId={activeSessionId} />
+            <TaskToolsPanel taskId={taskId} />
           </div>
         </div>
       )}

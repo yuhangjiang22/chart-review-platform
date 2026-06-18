@@ -82,6 +82,7 @@ import { runRoutes } from "./run-routes.js";
 import { reviewRoutes } from "./review-routes.js";
 import { adherenceRoutes } from "./adherence-routes.js";
 import { phasesRoutes } from "./phases-routes.js";
+import { taskToolsRoutes } from "./task-tools-routes.js";
 import { scaffoldRoutes } from "./scaffold-routes.js";
 import { rubricRoutes } from "./rubric-routes.js";
 import { exportRoutes } from "./export-routes.js";
@@ -237,6 +238,7 @@ const paramRouter = makeRouter([
   ...reviewRoutes,
   ...adherenceRoutes,
   ...phasesRoutes,
+  ...taskToolsRoutes,
   ...scaffoldRoutes,
   ...rubricRoutes,
   ...exportRoutes,

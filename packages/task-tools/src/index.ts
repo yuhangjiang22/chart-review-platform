@@ -124,3 +124,6 @@ export function mcpAllowlist(p: ToolProfile): string {
     ...p.mcpTools,
   ].join(",");
 }
+
+// Tool descriptions + per-task tool resolver (display-ready).
+export * from "./descriptions.js";
