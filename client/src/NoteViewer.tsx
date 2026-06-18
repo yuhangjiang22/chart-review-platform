@@ -377,11 +377,15 @@ export function NoteViewer({
       return;
     }
     authFetch(`/api/patients/${patientId}/notes`)
-      .then((r) => r.json())
+      .then((r) => (r.ok ? r.json() : []))
       .then((list: NoteListing[]) => {
-        setNotes(list);
-        setActive(list[0] ? { kind: "note", filename: list[0].filename } : null);
-      });
+        // Guard a malformed/non-array body so visibleNotes (which iterates)
+        // never crashes the whole source pane.
+        const arr = Array.isArray(list) ? list : [];
+        setNotes(arr);
+        setActive(arr[0] ? { kind: "note", filename: arr[0].filename } : null);
+      })
+      .catch(() => { setNotes([]); setActive(null); });
     authFetch(`/api/patients/${patientId}/structured`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d: StructuredData | null) => setStructured(d))

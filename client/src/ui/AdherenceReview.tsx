@@ -45,6 +45,8 @@ import { ArrowLeft, ChevronRight, ChevronDown } from "lucide-react";
 import { authFetch } from "../auth";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { NoteViewer } from "../NoteViewer";
+import type { NoteFocus } from "../types";
 
 // ── Local shapes (mirror @chart-review/platform-types field-for-field) ──────
 // Declared locally because concur's client `../types` does not export the
@@ -159,6 +161,10 @@ export function AdherenceReview(props: AdherenceReviewProps) {
   const [error, setError] = useState<string | null>(null);
   const [expandedTiers, setExpandedTiers] = useState<Set<number>>(new Set([0, 1, 2]));
   const [busy, setBusy] = useState<string | null>(null);
+  // Source pane: which note (+ optional highlight span) to show, driven by
+  // clicking a citation. Gives adherence review the same notes access the
+  // phenotype PatientReview pane has.
+  const [noteFocus, setNoteFocus] = useState<NoteFocus | null>(null);
   // Mirror SpanReview: self-seed once if the review fetch returns empty AND
   // the state was never imported. App.tsx's auto-import (list runs → import
   // → refresh) reliably loses the race to this pane's own review fetch, so
@@ -401,6 +407,8 @@ export function AdherenceReview(props: AdherenceReviewProps) {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <Header patientDisplay={patientDisplay} taskId={taskId} onBack={onBack} />
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
       <div className="px-4 py-2 border-b border-border bg-muted/30 text-[12px] text-muted-foreground flex gap-4">
         <span>Questions: {validatedQuestionsInFramework} / {totalQuestions} validated</span>
         <span>Rules: {validatedRules.size} / {meta.rules.length} adjudicated</span>
@@ -443,6 +451,7 @@ export function AdherenceReview(props: AdherenceReviewProps) {
                         validated={validatedQuestions.has(q.question_id)}
                         busy={busy === `q:${q.question_id}`}
                         onSave={(a) => saveAnswer(q.question_id, a)}
+                        onJumpToSource={setNoteFocus}
                       />
                     ))}
                   </div>
@@ -475,6 +484,25 @@ export function AdherenceReview(props: AdherenceReviewProps) {
           </div>
         </section>
       </div>
+       </div>
+       {/* Source pane — the patient's notes + structured data, so the reviewer
+        *  can read the chart while adjudicating (parity with phenotype's
+        *  PatientReview). Clicking a citation jumps to that note. */}
+       <aside className="flex w-[520px] shrink-0 flex-col min-h-0 border-l border-border bg-paper/40">
+         <div className="flex h-10 shrink-0 items-center gap-2 border-b border-border px-4">
+           <span className="font-display text-[13px] tracking-tight">Source</span>
+           <span className="text-[11px] text-muted-foreground">notes · structured</span>
+         </div>
+         <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+           <NoteViewer
+             patientId={patientId}
+             reviewState={null}
+             noteFocus={noteFocus}
+             onJumpToSource={setNoteFocus}
+           />
+         </div>
+       </aside>
+      </div>
     </div>
   );
 }
@@ -495,7 +523,7 @@ function Header(props: { patientDisplay: string; taskId: string; onBack: () => v
 }
 
 function QuestionRow({
-  q, answer, agentIds, agentAnswers, validated, busy, onSave,
+  q, answer, agentIds, agentAnswers, validated, busy, onSave, onJumpToSource,
 }: {
   q: QuestionDefinition;
   answer: QuestionAnswer | undefined;
@@ -504,6 +532,7 @@ function QuestionRow({
   validated: boolean;
   busy: boolean;
   onSave: (a: QuestionAnswer["answer"]) => void;
+  onJumpToSource?: (focus: NoteFocus) => void;
 }) {
   const [draft, setDraft] = useState<QuestionAnswer["answer"]>(answer?.answer ?? null);
   useEffect(() => { setDraft(answer?.answer ?? null); }, [answer?.answer]);
@@ -753,10 +782,21 @@ function QuestionRow({
                 {a.evidence && a.evidence.length > 0 && (
                   <div className="mt-1 space-y-0.5">
                     {a.evidence.map((ev, i) => (
-                      <div key={i}>
-                        <span className="font-mono text-[10px] text-muted-foreground">{ev.note_id}: </span>
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => onJumpToSource?.({
+                          filename: ev.note_id,
+                          highlight: ev.start != null && ev.end != null
+                            ? { start: ev.start, end: ev.end }
+                            : undefined,
+                        })}
+                        className="block text-left w-full rounded px-0.5 -mx-0.5 hover:bg-[hsl(var(--sage))]/10"
+                        title="Open this note in the source pane"
+                      >
+                        <span className="font-mono text-[10px] text-[hsl(var(--oxblood))] underline-offset-2 hover:underline">{ev.note_id}: </span>
                         <span className="italic">&ldquo;{ev.quote}&rdquo;</span>
-                      </div>
+                      </button>
                     ))}
                   </div>
                 )}

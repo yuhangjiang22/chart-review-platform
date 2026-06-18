@@ -1,0 +1,74 @@
+# T1–T3 — Molecular workup facts. What testing was done, how/when, and what it
+# showed. These feed the concordance rules (C1–C4, C6). Answer with the exact
+# enum token; put detail (vendor, gene names, dates) in the rationale.
+
+questions:
+  - question_id: MT1
+    text: "Was genomic (molecular/mutation) testing performed at all?"
+    tier: 1
+    answer_schema: { type: string, enum: [yes, no, unknown] }
+    depends_on: [MT0a]
+    retrieval_hints: "Molecular/genomics reports; any NGS, single-gene, or panel result."
+
+  - question_id: MT7
+    text: "Was PD-L1 testing (immunohistochemistry) performed?"
+    tier: 1
+    answer_schema: { type: string, enum: [yes, no, unknown] }
+    depends_on: [MT0a]
+    retrieval_hints: "Pathology / IHC report for a PD-L1 / 22C3 / SP263 result."
+
+  - question_id: MT2
+    text: "Was comprehensive genomic profiling (CGP / large NGS panel) performed? Name the vendor/platform in the rationale (Tempus, Caris, Foundation Medicine, in-house panel, other)."
+    tier: 2
+    answer_schema: { type: string, enum: [yes, no, unknown] }
+    depends_on: [MT1]
+    retrieval_hints: "Molecular report header — a broad NGS panel (e.g. FoundationOne, Tempus xT, Caris). State the platform in the rationale."
+
+  - question_id: MT3
+    text: "If CGP was NOT performed, was single-gene testing or a targeted lung panel performed? Name the specific genes in the rationale."
+    tier: 2
+    answer_schema: { type: string, enum: [yes, no, not_applicable, unknown] }
+    depends_on: [MT1, MT2]
+    retrieval_hints: "EGFR/ALK/ROS1 single-gene or small-panel results. not_applicable if CGP was done."
+
+  - question_id: MT4
+    text: "Was genomic profiling done on tumor tissue, liquid biopsy (blood/ctDNA), or both?"
+    tier: 2
+    answer_schema: { type: string, enum: [tissue, liquid, both, not_applicable, unknown] }
+    depends_on: [MT1]
+    retrieval_hints: "Specimen type on the molecular report. not_applicable if no testing."
+
+  - question_id: MT5
+    text: "Relative to first-line therapy, when was genomic testing ORDERED? (state the first-line therapy type in the rationale: chemo, IO, chemo+IO, targeted, surgery, radiation)"
+    tier: 2
+    answer_schema: { type: string, enum: [before_1L, same_date, after_1L, no_systemic_therapy, unknown] }
+    depends_on: [MT1]
+    retrieval_hints: "Compare the molecular test ORDER date to the first-line therapy start date. no_systemic_therapy if surgery-only / palliative."
+
+  - question_id: MT6
+    text: "Were genomic testing RESULTS available before first-line therapy was initiated?"
+    tier: 2
+    answer_schema: { type: string, enum: [yes, no, no_systemic_therapy, unknown] }
+    depends_on: [MT1]
+    retrieval_hints: "Compare the molecular RESULT date to the first-line therapy start date."
+
+  - question_id: MT7a
+    text: "If PD-L1 testing was performed, what was the result (TPS band)?"
+    tier: 3
+    answer_schema: { type: string, enum: [lt_1, 1_to_49, gte_50, cps_reported, not_tested, unknown] }
+    depends_on: [MT7]
+    retrieval_hints: "PD-L1 TPS: lt_1 = <1%, 1_to_49 = 1–49%, gte_50 = ≥50%. cps_reported if only a CPS score is given."
+
+  - question_id: MT8
+    text: "What were the genomic testing results? Report each actionable finding with the exact gene and variant."
+    tier: 3
+    answer_schema: { type: string }
+    depends_on: [MT1]
+    retrieval_hints: "Free text — list gene + variant (e.g. 'EGFR exon 19 deletion', 'ALK fusion', 'KRAS G12C'). Write 'none' if no actionable findings."
+
+  - question_id: MT8a
+    text: "Was an actionable mutation identified that has an FDA-approved targeted therapy?"
+    tier: 3
+    answer_schema: { type: string, enum: [yes, no, unknown] }
+    depends_on: [MT8]
+    retrieval_hints: "EGFR/ALK/ROS1/BRAF V600E/RET/MET ex14/NTRK/KRAS G12C etc. with an approved drug = yes; MSS/no driver = no."

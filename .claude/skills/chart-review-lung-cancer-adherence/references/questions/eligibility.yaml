@@ -1,0 +1,40 @@
+# T0 — Eligibility + context. Establishes the patient is an in-scope lung cancer
+# case and captures the facts (histology, stage) that gate the molecular-testing
+# concordance rules. Answer these FIRST.
+
+questions:
+  - question_id: MT0a
+    text: "Does the patient have a confirmed lung cancer diagnosis (pathologically confirmed, with a date of diagnosis)?"
+    tier: 0
+    answer_schema:
+      type: string
+      enum: [yes, no, unknown]
+    guideline_reference: "Eligibility — lung cancer diagnosis confirmation."
+    retrieval_hints: "Pathology report confirming lung cancer + date of diagnosis."
+
+  - question_id: MT0b
+    text: "What is the histologic subtype of the lung cancer?"
+    tier: 0
+    answer_schema:
+      type: string
+      enum: [adenocarcinoma, squamous_cell, large_cell, NSCLC_NOS, SCLC, other, unknown]
+    guideline_reference: "Histology — drives the molecular-testing indication (SCLC is generally not required)."
+    retrieval_hints: "Pathology 'Diagnosis'/'Histologic type'. SCLC = small cell; the rest are NSCLC."
+
+  - question_id: MT0c
+    text: "What is the stage of the lung cancer at diagnosis?"
+    tier: 0
+    answer_schema:
+      type: string
+      enum: ["I", "II", "IIIA", "IIIB", "III", "IV", "limited", "extensive", "unknown"]
+    guideline_reference: "Stage — advanced/metastatic NSCLC (IIIB/IV) has the strongest molecular-testing indication; resected IB–IIIA needs at minimum EGFR + ALK."
+    retrieval_hints: "AJCC stage in pathology/oncology staging notes. limited/extensive apply to SCLC."
+
+  - question_id: MT0d
+    text: "What is the patient's tobacco use history?"
+    tier: 0
+    answer_schema:
+      type: string
+      enum: [current_smoker, former_smoker, never_smoker, unknown]
+    guideline_reference: "Smoking history — never-smokers have higher actionable-mutation prevalence."
+    retrieval_hints: "Social history / HPI smoking status."

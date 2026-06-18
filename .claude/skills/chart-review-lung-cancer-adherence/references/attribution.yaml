@@ -1,0 +1,30 @@
+# Attribution taxonomy for lung-cancer molecular-testing concordance verdicts.
+# Defined only for NON_CONCORDANT verdicts — the most likely real-world reason
+# the guideline was not followed. From the lung-cancer-experiment concordance
+# checklist (these are domain-specific, not the generic adherence categories).
+
+categories:
+  - MISSING_TESTING_DOCUMENTATION
+  - PLANNED_BUT_INCOMPLETE_TESTING
+  - TREATMENT_STARTED_BEFORE_TESTING_WAS_READY
+  - WRONG_FIRST_LINE_TREATMENT_FOR_KNOWN_BIOMARKER
+  - UNEXPLAINED_TREATMENT_CHOICE_OR_DELAY
+
+descriptions:
+  MISSING_TESTING_DOCUMENTATION: >-
+    Required biomarker or testing evidence is not present in the available chart.
+    There are signs testing may have happened, but the report / addendum /
+    outside result is missing.
+  PLANNED_BUT_INCOMPLETE_TESTING: >-
+    The chart shows molecular testing was intended or partially completed, but the
+    workup is unfinished for guideline purposes (planned CGP, pending biomarkers,
+    partial panel only).
+  TREATMENT_STARTED_BEFORE_TESTING_WAS_READY: >-
+    Treatment was initiated before testing was ordered, completed, or resulted —
+    the sequencing itself is the main deviation.
+  WRONG_FIRST_LINE_TREATMENT_FOR_KNOWN_BIOMARKER: >-
+    A documented actionable biomarker supported a specific guideline-recommended
+    therapy, but first-line treatment did not align with that biomarker.
+  UNEXPLAINED_TREATMENT_CHOICE_OR_DELAY: >-
+    A non-concordant treatment choice or delay is evident, but the available
+    record does not document a specific reason.
