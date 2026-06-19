@@ -223,6 +223,23 @@ export function diffDraftAgainstActive(root: string): DraftFileDiff[] {
   return out.sort((x, y) => x.file.localeCompare(y.file));
 }
 
+/** Undo one field's uncommitted edits: restore the file from the active version's
+ *  snapshot (or delete it if it was added in the draft). Throws if the file isn't
+ *  actually changed vs the active version. The working copy stays otherwise intact. */
+export function discardDraftField(root: string, relPath: string): void {
+  const changed = diffDraftAgainstActive(root).find((d) => d.file === relPath);
+  if (!changed) throw new Error(`no draft change for ${relPath}`);
+  const log = readVersionLog(root)!;
+  const src = path.join(versionRefsDir(root, log.active!), relPath);
+  const dst = path.join(refsDir(root), relPath);
+  if (changed.status === "added") {
+    rmTree(dst); // a plain file; rmTree force-removes whether file or dir
+    return;
+  }
+  fs.mkdirSync(path.dirname(dst), { recursive: true });
+  fs.copyFileSync(src, dst);
+}
+
 export interface ForkOpts { source: string; by: string; now: string; }
 
 /** Initialize a fresh rubric root by copying a source references/ tree into it
