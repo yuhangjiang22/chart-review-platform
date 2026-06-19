@@ -13,7 +13,9 @@ import path from "node:path";
 import { computeTaskSha } from "@chart-review/lock";
 import { atomicWriteJson } from "@chart-review/storage";
 
-export { diffLines, type LineDiff, type DiffLine, type DiffTag } from "./line-diff.js";
+import { diffLines, type DiffLine } from "./line-diff.js";
+export { diffLines };
+export type { LineDiff, DiffLine, DiffTag } from "./line-diff.js";
 
 export interface RubricVersion {
   id: string; // "v4" | "s2"
@@ -169,6 +171,56 @@ export function diffVersions(root: string, idA: string, idB: string): FileDiff[]
   }
   for (const f of mb.keys()) if (!ma.has(f)) diffs.push({ file: f, status: "added" });
   return diffs.sort((x, y) => x.file.localeCompare(y.file));
+}
+
+export interface DraftFileDiff {
+  /** relative path under references/, e.g. "criteria/a.md" */
+  file: string;
+  status: "changed" | "added" | "removed";
+  added: number;
+  removed: number;
+  lines: DiffLine[];
+}
+
+/** Diff the working copy (references/) against the ACTIVE version's snapshot,
+ *  per file, with line-level hunks. Empty array when clean. Drives the Working
+ *  Draft panel. */
+export function diffDraftAgainstActive(root: string): DraftFileDiff[] {
+  const log = readVersionLog(root);
+  if (!log || !log.active) return [];
+  const readTree = (base: string): Map<string, string> => {
+    const out = new Map<string, string>();
+    const walk = (d: string, rel: string) => {
+      if (!fs.existsSync(d)) return;
+      for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+        const r = rel ? `${rel}/${e.name}` : e.name;
+        if (e.isDirectory()) walk(path.join(d, e.name), r);
+        else out.set(r, fs.readFileSync(path.join(d, e.name), "utf8"));
+      }
+    };
+    walk(base, "");
+    return out;
+  };
+  const draft = readTree(refsDir(root));
+  const active = readTree(versionRefsDir(root, log.active));
+  const out: DraftFileDiff[] = [];
+  for (const [f, dtext] of draft) {
+    const atext = active.get(f);
+    if (atext === undefined) {
+      const ld = diffLines("", dtext);
+      out.push({ file: f, status: "added", added: ld.added, removed: ld.removed, lines: ld.lines });
+    } else if (atext !== dtext) {
+      const ld = diffLines(atext, dtext);
+      out.push({ file: f, status: "changed", added: ld.added, removed: ld.removed, lines: ld.lines });
+    }
+  }
+  for (const [f, atext] of active) {
+    if (!draft.has(f)) {
+      const ld = diffLines(atext, "");
+      out.push({ file: f, status: "removed", added: ld.added, removed: ld.removed, lines: ld.lines });
+    }
+  }
+  return out.sort((x, y) => x.file.localeCompare(y.file));
 }
 
 export interface ForkOpts { source: string; by: string; now: string; }
