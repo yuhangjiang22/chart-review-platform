@@ -6,7 +6,7 @@ test.describe("rubric switcher UI", () => {
   test.beforeEach(async ({ page }) => { token = await loginAsYuhang(page); pre = await snapshotActiveSessionIds(page, token, TASK); });
   test.afterEach(async ({ page }) => { if (token) await archiveSessionsNotIn(page, token, TASK, pre); });
 
-  test("version history renders in the AUTHOR workspace timeline and switches", async ({ page }) => {
+  test("version history renders in the Refine workspace timeline and switches", async ({ page }) => {
     const a = await startSession(page, token, TASK, "ui-switcher", ["patient_easy_neg_02"]);
     // Edit dirties the draft; Save-as-version snapshots s2 (working-draft model).
     await page.request.put(`${SERVER}/api/tasks/${TASK}/criteria/cancer_type?session_id=${encodeURIComponent(a)}`, {
@@ -18,7 +18,7 @@ test.describe("rubric switcher UI", () => {
       data: { note: "ui checkpoint" },
     });
     await setActiveSession(page, TASK, a);
-    await gotoWorkspace(page, TASK, "author");
+    await gotoWorkspace(page, TASK, "refine");
 
     // Version history renders in the refinement workspace with s2 active. Scope to
     // the version spans via [data-active] so we don't collide with the active-version

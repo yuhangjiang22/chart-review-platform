@@ -133,9 +133,10 @@ describe("PHASE_DEFS — AUTHOR phase", () => {
     });
   });
 
-  it("PHASE_ORDER leads with AUTHOR, then TRY", () => {
+  it("PHASE_ORDER leads with AUTHOR, then REFINE, then TRY", () => {
     expect(PHASE_ORDER[0]).toBe("AUTHOR");
-    expect(PHASE_ORDER[1]).toBe("TRY");
+    expect(PHASE_ORDER[1]).toBe("REFINE");
+    expect(PHASE_ORDER[2]).toBe("TRY");
   });
 
   it("the studio 'author' slug round-trips to the AUTHOR phase (and back)", () => {

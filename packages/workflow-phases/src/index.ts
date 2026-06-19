@@ -15,7 +15,7 @@
 // (Vite path-alias constraints — see workflow-phase-judge's note).
 
 export type PhaseId =
-  | "author" | "try" | "judge" | "validate" | "decide" | "lock" | "deploy";
+  | "author" | "refine" | "try" | "judge" | "validate" | "decide" | "lock" | "deploy";
 
 export interface PhaseModule {
   /** Stable id used in URLs, registry lookup, meta.yaml config. */

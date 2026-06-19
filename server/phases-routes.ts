@@ -14,10 +14,10 @@ import type { RouteEntry } from "./router.js";
 import { isMethodologist, readReviewerFromRequest } from "./auth.js";
 import { guidelineDir } from "@chart-review/rubric";
 import {
-  registerPhase, resolvePhasesForTask, allPhases, type PhaseId,
+  registerPhase, resolvePhasesForTask, allPhases, type PhaseId, type PhaseModule,
 } from "@chart-review/workflow-phases";
 
-// Register the 7 phase modules at boot.
+// Register the phase modules at boot.
 import PHASE_AUTHOR from "@chart-review/workflow-phase-author";
 import PHASE_TRY from "@chart-review/workflow-phase-try";
 import PHASE_JUDGE from "@chart-review/workflow-phase-judge";
@@ -26,7 +26,23 @@ import PHASE_DECIDE from "@chart-review/workflow-phase-decide";
 import PHASE_LOCK from "@chart-review/workflow-phase-lock";
 import PHASE_DEPLOY from "@chart-review/workflow-phase-deploy";
 
-for (const mod of [PHASE_AUTHOR, PHASE_TRY, PHASE_JUDGE, PHASE_VALIDATE, PHASE_DECIDE, PHASE_LOCK, PHASE_DEPLOY]) {
+// REFINE — the git-like refinement workspace (working-draft diff + version
+// history + proposals). Defined inline (no behavior package): it's a UI tab whose
+// React view lives in client/src/ui/Workspace. required:true so it's always
+// available as a tab, regardless of a task's meta.yaml phases list.
+const PHASE_REFINE: PhaseModule = {
+  id: "refine",
+  label: "Refine",
+  slug: "refine",
+  group: "iter",
+  optional: false,
+  required: true,
+  description:
+    "Review the working draft (diffs vs the last saved version), apply refinement proposals, and save or switch rubric versions.",
+  enabledByDefault: true,
+};
+
+for (const mod of [PHASE_AUTHOR, PHASE_REFINE, PHASE_TRY, PHASE_JUDGE, PHASE_VALIDATE, PHASE_DECIDE, PHASE_LOCK, PHASE_DEPLOY]) {
   registerPhase(mod);
 }
 

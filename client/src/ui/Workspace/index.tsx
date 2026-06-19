@@ -541,38 +541,47 @@ export function Workspace({
               </p>
             </div>
           ) : (
-            <div className="mx-auto max-w-[1080px] space-y-5 py-2">
-              {/* Git-like refinement workspace: a draft status bar on top, the
-                  rubric editor + proposal cards as the LEFT "make changes" pane,
-                  and the working-draft diff + version history on the RIGHT. With
-                  no active session there's no draft/fork, so show just the editor. */}
-              {activeSessionId ? (
-                <RefineWorkspace
-                  taskId={taskId}
-                  sessionId={activeSessionId}
-                  left={
-                    <>
-                      <RubricPanel taskId={taskId} alwaysOpen activeSessionId={activeSessionId} />
-                      {activeIter && (
-                        <RefineProposalCard
-                          taskId={taskId}
-                          iterId={activeIter.iter_id}
-                          sessionId={activeSessionId}
-                        />
-                      )}
-                    </>
-                  }
-                />
-              ) : (
-                <RubricPanel taskId={taskId} alwaysOpen activeSessionId={activeSessionId} />
-              )}
-              <div className="flex justify-end">
+            <div className="mx-auto max-w-[760px] space-y-5 py-2">
+              {/* AUTHOR is the focused rubric editor. The working-draft diff,
+                  version history, and refinement proposals live in the REFINE
+                  tab (the git-like workspace) so editing and reviewing each get
+                  full room. Edits here flow into the session's working draft. */}
+              <RubricPanel taskId={taskId} alwaysOpen activeSessionId={activeSessionId} />
+              <div className="flex justify-end gap-2">
+                {activeSessionId && (
+                  <Button variant="outline" onClick={() => setPhase("REFINE")} className="gap-1.5">
+                    Review draft & refine →
+                  </Button>
+                )}
                 <Button onClick={() => setPhase("TRY")} className="gap-1.5">
                   Try on patients →
                 </Button>
               </div>
             </div>
           )
+        )}
+
+        {/* REFINE — the git-like refinement workspace: draft status + agent
+            proposals (left) + the working-draft diff & version history (right).
+            Session-gated like the other non-AUTHOR phases. */}
+        {activePhase === "REFINE" && activeSessionId && (
+          <div className="mx-auto max-w-[1240px] py-2">
+            <RefineWorkspace
+              taskId={taskId}
+              sessionId={activeSessionId}
+              left={
+                // Phenotype proposal cards only (adherence proposals live in the
+                // Performance tab's AdherenceRefinePanel; NER has no proposal UI).
+                task?.task_type !== "ner" && task?.task_type !== "adherence" && activeIter ? (
+                  <RefineProposalCard
+                    taskId={taskId}
+                    iterId={activeIter.iter_id}
+                    sessionId={activeSessionId}
+                  />
+                ) : undefined
+              }
+            />
+          </div>
         )}
         {activePhase === "TRY" && activeSessionId && (
           <PhaseTry
