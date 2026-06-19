@@ -449,7 +449,7 @@ describe("per-field refinement affordance", () => {
     // The proposal card renders its ③ rule text + Apply control inline.
     await waitFor(() => screen.getByText(/Count any distant organ involvement/i));
     expect(screen.getByText(/does not say how to count liver mets/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^Apply$/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /apply to draft/i })).toBeInTheDocument();
   });
 
   it("a field whose only attribution is agent_error renders the 'model error' note (Why?), NO propose button", async () => {
@@ -468,7 +468,7 @@ describe("per-field refinement affordance", () => {
     expect(screen.getByText(/No rubric change needed/i)).toBeInTheDocument();
     // No propose call, no Apply button.
     expect(postsTo("/propose")).toHaveLength(0);
-    expect(screen.queryByRole("button", { name: /^Apply$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /apply to draft/i })).not.toBeInTheDocument();
   });
 
   it("a field whose only attribution is unjudged offers 'Analyze errors' (Why?), NO propose button", async () => {
@@ -543,7 +543,7 @@ describe("per-field refinement affordance", () => {
     await waitFor(() => screen.getByText("has_distant_metastasis"));
     expect(screen.getByText("cancer_type")).toBeInTheDocument();
     // No crash, no propose button auto-rendered.
-    expect(screen.queryByRole("button", { name: /^Apply$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /apply to draft/i })).not.toBeInTheDocument();
   });
 });
 
