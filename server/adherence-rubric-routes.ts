@@ -9,7 +9,6 @@ import type { RouteEntry } from "./router.js";
 import { loadCompiledTask } from "./lib/tasks.js";
 import { loadAdherenceSkill } from "@chart-review/pipeline-extract-adherence";
 import { setAdherenceQuestionFields } from "./lib/refine/adherence-provenance.js";
-import { snapshotAfterEdit } from "./lib/rubric-edit-snapshot.js";
 
 function httpErr(status: number, message: string): Error & { status: number } {
   const e = new Error(message) as Error & { status: number };
@@ -87,9 +86,6 @@ export const adherenceRubricRoutes: RouteEntry[] = [
       } catch (e) {
         throw httpErr(400, (e as Error).message);
       }
-      // A direct AUTHOR edit is a rubric change → snapshot a version on the same
-      // (session fork or baseline) root, mirroring PUT /criteria.
-      snapshotAfterEdit({ taskId: p.taskId, sessionId, source: "author-edit", by: "reviewer" });
       return { ok: true };
     },
   },

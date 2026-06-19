@@ -22,7 +22,6 @@ import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import type { RouteEntry } from "./router.js";
 import { loadCompiledTask } from "./lib/tasks.js";
 import { phenotypeSkillDir, resolveRubricRoot } from "@chart-review/rubric";
-import { snapshotAfterEdit } from "./lib/rubric-edit-snapshot.js";
 import {
   isSafeId,
   atomicWriteText,
@@ -188,8 +187,6 @@ export const rubricRoutes: RouteEntry[] = [
       });
 
       atomicWriteText(mdPath, newContent);
-      // Snapshot the edited rubric as a new version (session fork or baseline).
-      snapshotAfterEdit({ taskId, sessionId, source: "author-edit", by: "reviewer" });
       return { ok: true };
     },
   },
