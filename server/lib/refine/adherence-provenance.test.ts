@@ -182,7 +182,7 @@ describe("session scoping (fork-targeted writes + version snapshot)", () => {
     return (JSON.parse(fs.readFileSync(fp, "utf8")) as { versions?: Array<{ id: string; source: string }> }).versions ?? [];
   }
 
-  it("apply with a sessionId writes the fork, leaves baseline untouched, and snapshots a refine: version", () => {
+  it("apply with a sessionId writes the fork, leaves baseline untouched, and creates NO version", () => {
     writeBundle("T1.yaml", [{ question_id: "Q1", text: "Q?", retrieval_hints: "base hint", tier: 1 }]);
     writeForkBundle("s1", "T1.yaml", [{ question_id: "Q1", text: "Q?", retrieval_hints: "fork hint", tier: 1 }]);
 
@@ -190,10 +190,10 @@ describe("session scoping (fork-targeted writes + version snapshot)", () => {
 
     // the FORK bundle gained the addition …
     expect(findQuestionInBundles(TASK, "Q1", "s1")!.question.retrieval_hints).toBe("fork hint\nADDED");
-    // … and the BASELINE bundle is untouched (no leak)
+    // … the BASELINE bundle is untouched (no leak) …
     expect(readHints("Q1")).toBe("base hint");
-    // a session version (prefix "s") with source refine:Q1 was snapshotted on the fork
-    expect(forkVersions("s1").some((v) => v.source === "refine:Q1" && v.id.startsWith("s"))).toBe(true);
+    // … and NO version was snapshotted (apply edits the working draft only).
+    expect(forkVersions("s1")).toHaveLength(0);
   });
 
   it("revert uses the log entry's session_id to restore the fork (baseline never touched)", () => {

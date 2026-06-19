@@ -12,7 +12,6 @@ import path from "node:path";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import { guidelineDir, resolveRubricRoot } from "@chart-review/rubric";
 import { atomicWriteText } from "../criterion-md.js";
-import { snapshotAfterEdit } from "../rubric-edit-snapshot.js";
 
 // ── Shapes ─────────────────────────────────────────────────────────────────────
 
@@ -164,15 +163,6 @@ export function applyAdherenceRefinement(input: ApplyAdherenceInput): AdherenceL
   found.question.retrieval_hints = next;
 
   atomicWriteText(path.join(questionsDir(input.taskId, input.sessionId), found.file), stringifyYaml(found.doc));
-  // An applied refinement is a rubric change → snapshot a new version on the
-  // SAME root the write landed on (session fork when sessionId is set, prefix
-  // "s"; else baseline, prefix "v"). Mirrors the phenotype applyRefinement.
-  snapshotAfterEdit({
-    taskId: input.taskId,
-    sessionId: input.sessionId,
-    source: `refine:${input.questionId}`,
-    by: input.appliedBy,
-  });
 
   const now = input.now ?? new Date().toISOString();
   const entry: AdherenceLogEntry = {
@@ -219,13 +209,6 @@ export function revertAdherenceRefinement(opts: {
   const intervening_edit = getHints(found.question).trim() !== entry.new_retrieval_hints.trim();
   found.question.retrieval_hints = entry.prior_retrieval_hints;
   atomicWriteText(path.join(questionsDir(opts.taskId, entry.session_id), found.file), stringifyYaml(found.doc));
-  // A revert is itself a rubric change → snapshot the restored state.
-  snapshotAfterEdit({
-    taskId: opts.taskId,
-    sessionId: entry.session_id,
-    source: `revert:${entry.question_id}`,
-    by: opts.by,
-  });
 
   const now = opts.now ?? new Date().toISOString();
   all[idx] = { ...entry, reverted: { at: now, by: opts.by, intervening_edit } };
