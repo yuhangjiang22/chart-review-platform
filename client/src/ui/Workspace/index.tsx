@@ -16,7 +16,7 @@ import { taskKindFromTaskType } from "./task-kind-registry";
 import { PhaseTry } from "./PhaseTry";
 import { RubricPanel } from "./RubricPanel";
 import { RefineProposalCard } from "./RefineProposalCard";
-import { RefinementHistory } from "./RefinementHistory";
+import { RefineWorkspace } from "./RefineWorkspace";
 import { AdherenceRubricPanel } from "./AdherenceRubricPanel";
 import { PhaseValidate } from "./PhaseValidate";
 import { PhaseJudge } from "./PhaseJudge";
@@ -541,25 +541,30 @@ export function Workspace({
               </p>
             </div>
           ) : (
-            <div className="mx-auto max-w-[760px] space-y-5 py-2">
-              {/* RubricPanel is the existing editable rubric editor (also
-                  used in TRY). It has no read-only mode in this fork, so it
-                  isn't gated on isMethodologist here — matching TRY. */}
-              <RubricPanel taskId={taskId} alwaysOpen activeSessionId={activeSessionId} />
-              {/* Self-refinement provenance (S4): which rules were applied to
-                  this task's criteria, what they fixed (+held-out Δ), and a
-                  Revert. Renders nothing until the first rule is applied. */}
-              <RefinementHistory taskId={taskId} activeSessionId={activeSessionId} />
-              {/* Self-refinement (S2): surface transparent proposal cards built
-                  from the agent-vs-you disagreements on the active validated +
-                  judged iter. Only shown when a session + iter exist — refinement
-                  needs validated patients to learn from. */}
-              {activeSessionId && activeIter && (
-                <RefineProposalCard
+            <div className="mx-auto max-w-[1080px] space-y-5 py-2">
+              {/* Git-like refinement workspace: a draft status bar on top, the
+                  rubric editor + proposal cards as the LEFT "make changes" pane,
+                  and the working-draft diff + version history on the RIGHT. With
+                  no active session there's no draft/fork, so show just the editor. */}
+              {activeSessionId ? (
+                <RefineWorkspace
                   taskId={taskId}
-                  iterId={activeIter.iter_id}
                   sessionId={activeSessionId}
+                  left={
+                    <>
+                      <RubricPanel taskId={taskId} alwaysOpen activeSessionId={activeSessionId} />
+                      {activeIter && (
+                        <RefineProposalCard
+                          taskId={taskId}
+                          iterId={activeIter.iter_id}
+                          sessionId={activeSessionId}
+                        />
+                      )}
+                    </>
+                  }
                 />
+              ) : (
+                <RubricPanel taskId={taskId} alwaysOpen activeSessionId={activeSessionId} />
               )}
               <div className="flex justify-end">
                 <Button onClick={() => setPhase("TRY")} className="gap-1.5">
