@@ -46,6 +46,17 @@ export function getActiveVersion(root: string): string | null {
   return readVersionLog(root)?.active ?? null;
 }
 
+/** True when the working copy (references/) has uncommitted edits relative to the
+ *  active version's snapshot — i.e. the draft is "dirty". False when the draft
+ *  matches the active version, or when there is no active version to compare to. */
+export function draftDiffersFromActive(root: string): boolean {
+  const log = readVersionLog(root);
+  if (!log || !log.active) return false;
+  const active = log.versions.find((v) => v.id === log.active);
+  if (!active) return false;
+  return contentSha(refsDir(root)) !== active.sha;
+}
+
 /** Content hash of a references/ tree. Reuses the platform's task-SHA hasher,
  *  which sorts paths, hashes path+content, and skips `versions/` + `_`-prefixed
  *  subdirs — so it is stable and won't fold snapshots into the hash. */
