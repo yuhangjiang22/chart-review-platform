@@ -1,4 +1,4 @@
-// WorkingDraftPanel — the right pane of the refinement workspace. Lists every
+// WorkingDraftPanel — the wide pane of the refinement workspace. Lists every
 // uncommitted change in the session's rubric draft as a git-style line diff
 // (removed = red/struck, added = green) vs the last saved version, with a
 // per-change undo. Renders nothing when the draft is clean. See the
@@ -29,9 +29,9 @@ function fieldLabel(file: string): string {
 type HunkRow = DiffLine | { tag: "gap"; text: string };
 
 /** Git-style hunking: keep changed lines + `ctx` lines of surrounding context,
- *  collapsing longer unchanged runs into a "⋯ N unchanged lines" marker — so a
- *  one-line edit to a big file shows the change, not the whole file. */
-function hunkize(lines: DiffLine[], ctx = 2): HunkRow[] {
+ *  collapsing longer unchanged runs into a "⋯ N unchanged lines" marker (which
+ *  the panel renders clickable → reveal the full original). */
+function hunkize(lines: DiffLine[], ctx = 4): HunkRow[] {
   const keep = new Array(lines.length).fill(false);
   lines.forEach((l, i) => {
     if (l.tag !== "ctx") {
@@ -41,7 +41,7 @@ function hunkize(lines: DiffLine[], ctx = 2): HunkRow[] {
   const out: HunkRow[] = [];
   let skipped = 0;
   const flush = () => {
-    if (skipped > 0) out.push({ tag: "gap", text: `⋯ ${skipped} unchanged line${skipped === 1 ? "" : "s"}` });
+    if (skipped > 0) out.push({ tag: "gap", text: `⋯ ${skipped} unchanged line${skipped === 1 ? "" : "s"} — click to show` });
     skipped = 0;
   };
   for (let i = 0; i < lines.length; i++) {
@@ -54,6 +54,8 @@ function hunkize(lines: DiffLine[], ctx = 2): HunkRow[] {
 export function WorkingDraftPanel({ taskId, sessionId }: Props) {
   const [changes, setChanges] = useState<DraftFileDiff[]>([]);
   const [open, setOpen] = useState<Record<string, boolean>>({});
+  // Files whose diff is expanded to the full original (no context collapsing).
+  const [full, setFull] = useState<Record<string, boolean>>({});
   const base = `/api/rubric/${encodeURIComponent(taskId)}/sessions/${encodeURIComponent(sessionId)}`;
 
   const load = useCallback(async () => {
@@ -86,7 +88,6 @@ export function WorkingDraftPanel({ taskId, sessionId }: Props) {
     });
     if (r.ok) {
       await load();
-      // Tell the status bar / rubric editor to refresh.
       window.dispatchEvent(new Event("chartreview:rubric-edited"));
     }
   }
@@ -108,6 +109,9 @@ export function WorkingDraftPanel({ taskId, sessionId }: Props) {
       <ul className="space-y-2">
         {changes.map((c) => {
           const isOpen = open[c.file] ?? true; // expanded by default
+          const isFull = full[c.file] ?? false;
+          // Full view shows every original line; collapsed view shows hunks.
+          const rows: HunkRow[] = isFull ? c.lines : hunkize(c.lines);
           return (
             <li key={c.file} className="border-b border-border/40 pb-2 last:border-b-0 last:pb-0">
               <div className="flex items-center gap-2">
@@ -136,11 +140,16 @@ export function WorkingDraftPanel({ taskId, sessionId }: Props) {
               </div>
               {isOpen && (
                 <pre className="mt-1.5 overflow-hidden whitespace-pre-wrap break-words rounded border border-border/60 bg-background font-mono text-[11px] leading-[1.5]">
-                  {hunkize(c.lines).map((l, i) =>
+                  {rows.map((l, i) =>
                     l.tag === "gap" ? (
-                      <div key={i} className="select-none bg-muted/30 px-2 text-center text-[10px] text-muted-foreground/70">
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => setFull((f) => ({ ...f, [c.file]: true }))}
+                        className="block w-full select-none bg-muted/30 px-2 py-0.5 text-center text-[10px] text-muted-foreground/80 hover:bg-muted hover:text-foreground"
+                      >
                         {l.text}
-                      </div>
+                      </button>
                     ) : (
                       <div
                         key={i}
@@ -157,6 +166,15 @@ export function WorkingDraftPanel({ taskId, sessionId }: Props) {
                         {l.text || " "}
                       </div>
                     ),
+                  )}
+                  {isFull && c.lines.length > hunkize(c.lines).length && (
+                    <button
+                      type="button"
+                      onClick={() => setFull((f) => ({ ...f, [c.file]: false }))}
+                      className="block w-full select-none bg-muted/30 px-2 py-0.5 text-center text-[10px] text-muted-foreground/80 hover:bg-muted hover:text-foreground"
+                    >
+                      collapse unchanged lines
+                    </button>
                   )}
                 </pre>
               )}
