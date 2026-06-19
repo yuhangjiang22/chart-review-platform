@@ -13,6 +13,8 @@ import path from "node:path";
 import { computeTaskSha } from "@chart-review/lock";
 import { atomicWriteJson } from "@chart-review/storage";
 
+export { diffLines, type LineDiff, type DiffLine, type DiffTag } from "./line-diff.js";
+
 export interface RubricVersion {
   id: string; // "v4" | "s2"
   sha: string; // content hash of the snapshot's references/
