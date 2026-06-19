@@ -1,8 +1,9 @@
 // WorkingDraftPanel — the wide pane of the refinement workspace. Lists every
 // uncommitted change in the session's rubric draft as a git-style line diff
 // (removed = red/struck, added = green) vs the last saved version, with a
-// per-change undo. Renders nothing when the draft is clean. See the
-// refinement-workspace-redesign design.
+// per-change undo. Shows the FULL block (every line of the criterion/question)
+// so the change is read in its complete context. Renders nothing when the draft
+// is clean. See the refinement-workspace-redesign design.
 import { useCallback, useEffect, useState } from "react";
 import { authFetch } from "../../auth";
 
@@ -26,36 +27,9 @@ function fieldLabel(file: string): string {
   return file.split("/").pop()!.replace(/\.(md|ya?ml)$/i, "");
 }
 
-type HunkRow = DiffLine | { tag: "gap"; text: string };
-
-/** Git-style hunking: keep changed lines + `ctx` lines of surrounding context,
- *  collapsing longer unchanged runs into a "⋯ N unchanged lines" marker (which
- *  the panel renders clickable → reveal the full original). */
-function hunkize(lines: DiffLine[], ctx = 4): HunkRow[] {
-  const keep = new Array(lines.length).fill(false);
-  lines.forEach((l, i) => {
-    if (l.tag !== "ctx") {
-      for (let j = Math.max(0, i - ctx); j <= Math.min(lines.length - 1, i + ctx); j++) keep[j] = true;
-    }
-  });
-  const out: HunkRow[] = [];
-  let skipped = 0;
-  const flush = () => {
-    if (skipped > 0) out.push({ tag: "gap", text: `⋯ ${skipped} unchanged line${skipped === 1 ? "" : "s"} — click to show` });
-    skipped = 0;
-  };
-  for (let i = 0; i < lines.length; i++) {
-    if (keep[i]) { flush(); out.push(lines[i]); } else skipped++;
-  }
-  flush();
-  return out;
-}
-
 export function WorkingDraftPanel({ taskId, sessionId }: Props) {
   const [changes, setChanges] = useState<DraftFileDiff[]>([]);
   const [open, setOpen] = useState<Record<string, boolean>>({});
-  // Files whose diff is expanded to the full original (no context collapsing).
-  const [full, setFull] = useState<Record<string, boolean>>({});
   const base = `/api/rubric/${encodeURIComponent(taskId)}/sessions/${encodeURIComponent(sessionId)}`;
 
   const load = useCallback(async () => {
@@ -109,9 +83,6 @@ export function WorkingDraftPanel({ taskId, sessionId }: Props) {
       <ul className="space-y-2">
         {changes.map((c) => {
           const isOpen = open[c.file] ?? true; // expanded by default
-          const isFull = full[c.file] ?? false;
-          // Full view shows every original line; collapsed view shows hunks.
-          const rows: HunkRow[] = isFull ? c.lines : hunkize(c.lines);
           return (
             <li key={c.file} className="border-b border-border/40 pb-2 last:border-b-0 last:pb-0">
               <div className="flex items-center gap-2">
@@ -140,42 +111,22 @@ export function WorkingDraftPanel({ taskId, sessionId }: Props) {
               </div>
               {isOpen && (
                 <pre className="mt-1.5 overflow-hidden whitespace-pre-wrap break-words rounded border border-border/60 bg-background font-mono text-[11px] leading-[1.5]">
-                  {rows.map((l, i) =>
-                    l.tag === "gap" ? (
-                      <button
-                        key={i}
-                        type="button"
-                        onClick={() => setFull((f) => ({ ...f, [c.file]: true }))}
-                        className="block w-full select-none bg-muted/30 px-2 py-0.5 text-center text-[10px] text-muted-foreground/80 hover:bg-muted hover:text-foreground"
-                      >
-                        {l.text}
-                      </button>
-                    ) : (
-                      <div
-                        key={i}
-                        className={
-                          "whitespace-pre-wrap break-words " +
-                          (l.tag === "add"
-                            ? "bg-[#e7f0e7] px-2 text-[#2f5130]"
-                            : l.tag === "del"
-                            ? "bg-[#f6e4e4] px-2 text-[#7a2b2b] line-through"
-                            : "px-2 text-muted-foreground")
-                        }
-                      >
-                        {l.tag === "add" ? "+ " : l.tag === "del" ? "- " : "  "}
-                        {l.text || " "}
-                      </div>
-                    ),
-                  )}
-                  {isFull && c.lines.length > hunkize(c.lines).length && (
-                    <button
-                      type="button"
-                      onClick={() => setFull((f) => ({ ...f, [c.file]: false }))}
-                      className="block w-full select-none bg-muted/30 px-2 py-0.5 text-center text-[10px] text-muted-foreground/80 hover:bg-muted hover:text-foreground"
+                  {c.lines.map((l, i) => (
+                    <div
+                      key={i}
+                      className={
+                        "whitespace-pre-wrap break-words " +
+                        (l.tag === "add"
+                          ? "bg-[#e7f0e7] px-2 text-[#2f5130]"
+                          : l.tag === "del"
+                          ? "bg-[#f6e4e4] px-2 text-[#7a2b2b] line-through"
+                          : "px-2 text-muted-foreground")
+                      }
                     >
-                      collapse unchanged lines
-                    </button>
-                  )}
+                      {l.tag === "add" ? "+ " : l.tag === "del" ? "- " : "  "}
+                      {l.text || " "}
+                    </div>
+                  ))}
                 </pre>
               )}
             </li>
