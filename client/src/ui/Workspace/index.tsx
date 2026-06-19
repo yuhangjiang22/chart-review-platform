@@ -560,7 +560,7 @@ export function Workspace({
             proposals (left) + the working-draft diff & version history (right).
             Session-gated like the other non-AUTHOR phases. */}
         {activePhase === "REFINE" && activeSessionId && (
-          <div className="mx-auto max-w-[1240px] py-2">
+          <div className="py-2">
             <RefineWorkspace
               taskId={taskId}
               sessionId={activeSessionId}
@@ -644,17 +644,21 @@ export function Workspace({
       </main>
       </div>
 
-      <SessionSidebar
-        taskId={taskId}
-        activeSessionId={activeSessionId}
-        sessionIters={sessionIters}
-        activeIterId={activeIterId}
-        patientStatus={sidebarPatientStatus}
-        isOpen={sidebarOpen}
-        onToggle={() => setSidebarOpen(!sidebarOpen)}
-        onJumpToAuthor={() => setPhase("AUTHOR")}
-        taskKind={taskKind}
-      />
+      {/* The session rail (cohort/agents/iters/tools) is run-setup info — hidden
+          on REFINE so the git-like workspace gets the full page width. */}
+      {activePhase !== "REFINE" && (
+        <SessionSidebar
+          taskId={taskId}
+          activeSessionId={activeSessionId}
+          sessionIters={sessionIters}
+          activeIterId={activeIterId}
+          patientStatus={sidebarPatientStatus}
+          isOpen={sidebarOpen}
+          onToggle={() => setSidebarOpen(!sidebarOpen)}
+          onJumpToAuthor={() => setPhase("AUTHOR")}
+          taskKind={taskKind}
+        />
+      )}
     </div>
   );
 }

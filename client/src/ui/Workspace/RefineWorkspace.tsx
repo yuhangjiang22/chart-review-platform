@@ -17,23 +17,21 @@ interface Props {
 }
 
 export function RefineWorkspace({ taskId, sessionId, left }: Props) {
-  const right = (
-    <>
-      <WorkingDraftPanel taskId={taskId} sessionId={sessionId} />
-      <VersionHistory taskId={taskId} sessionId={sessionId} />
-    </>
-  );
   return (
     <div className="space-y-3">
       <DraftStatusBar taskId={taskId} sessionId={sessionId} />
-      {left ? (
-        <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[1.35fr_1fr]">
-          <div className="min-w-0 space-y-4">{left}</div>
-          <div className="min-w-0 space-y-3">{right}</div>
+      <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[1.7fr_1fr]">
+        {/* The working-draft diff is what you actually read — give it the wide
+            column so diffs never get cut off. */}
+        <div className="min-w-0">
+          <WorkingDraftPanel taskId={taskId} sessionId={sessionId} />
         </div>
-      ) : (
-        <div className="space-y-3">{right}</div>
-      )}
+        {/* Proposals (when any) + version history as a slim side column. */}
+        <div className="min-w-0 space-y-3">
+          {left}
+          <VersionHistory taskId={taskId} sessionId={sessionId} />
+        </div>
+      </div>
     </div>
   );
 }
