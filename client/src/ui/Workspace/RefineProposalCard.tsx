@@ -262,6 +262,9 @@ export function RefineProposalCard({ taskId, iterId, sessionId, initialFieldId }
         throw new Error(d.error ?? d.message ?? `Server error: ${r.status}`);
       }
       setApplied(true);
+      // The applied rule is now an uncommitted change in the working draft —
+      // tell the draft bar + Working-draft panel to refresh.
+      window.dispatchEvent(new Event("chartreview:rubric-edited"));
     } catch (e) {
       setApplyError((e as Error).message);
     } finally {
@@ -280,7 +283,7 @@ export function RefineProposalCard({ taskId, iterId, sessionId, initialFieldId }
   const refinable = (clusters ?? []).filter((c) => refinableCount(c) > 0);
 
   return (
-    <div className="rounded-md border border-border bg-paper/40">
+    <div className="rounded-md border border-border bg-paper">
       <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border">
         <Sparkles size={13} strokeWidth={1.75} className="text-[hsl(var(--sage))]" />
         <span className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
@@ -557,59 +560,61 @@ export function RefineProposalCard({ taskId, iterId, sessionId, initialFieldId }
               </section>
             )}
 
-            {/* Actions */}
-            <div className="flex items-center gap-2 pt-1 border-t border-border/60">
-              <Button
-                size="sm"
-                // Weak proposal (no held-out improvement / unvalidated): render
-                // Apply as a low-emphasis outline so the strong, proven path is
-                // the default visual affordance. Still clickable.
-                variant={weak ? "outline" : "default"}
-                className="gap-1.5 h-7"
-                onClick={apply}
-                disabled={applying || applied}
-                title={weak ? "Held-out validation did not show an improvement — review before applying" : undefined}
-              >
-                {applying ? (
-                  <Loader2 size={11} strokeWidth={1.75} className="animate-spin" />
-                ) : (
-                  <CheckCircle size={11} strokeWidth={1.75} />
-                )}
-                {applied ? "Applied" : editing ? "Apply edited rule" : weak ? "Apply anyway" : "Apply"}
-              </Button>
-              {editing && !applied && (
+            {/* Actions — once applied, the change lives in the Working draft
+                panel, so collapse to a quiet confirmation instead of a button row. */}
+            {applied ? (
+              <div className="flex items-center gap-1.5 pt-1 border-t border-border/60 text-[11.5px] text-[hsl(var(--sage))]">
+                <CheckCircle size={12} strokeWidth={1.75} />
+                In draft — see the Working draft panel.
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 pt-1 border-t border-border/60">
                 <Button
                   size="sm"
-                  variant="ghost"
+                  // Weak proposal (no held-out improvement / unvalidated): render
+                  // Apply as a low-emphasis outline so the strong, proven path is
+                  // the default visual affordance. Still clickable.
+                  variant={weak ? "outline" : "default"}
                   className="gap-1.5 h-7"
-                  onClick={() => {
-                    setEditing(false);
-                    setRuleDraft(card.proposed_rule_text);
-                  }}
+                  onClick={apply}
+                  disabled={applying}
+                  title={weak ? "Held-out validation did not show an improvement — review before applying" : undefined}
                 >
-                  Cancel edit
+                  {applying ? (
+                    <Loader2 size={11} strokeWidth={1.75} className="animate-spin" />
+                  ) : (
+                    <CheckCircle size={11} strokeWidth={1.75} />
+                  )}
+                  {editing ? "Apply edited rule to draft" : weak ? "Apply to draft anyway" : "Apply to draft"}
                 </Button>
-              )}
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-1.5 h-7"
-                onClick={reject}
-                disabled={applying}
-              >
-                <X size={11} strokeWidth={1.75} />
-                Reject
-              </Button>
-              {applied && (
-                <span className="inline-flex items-center gap-1 text-[11px] text-[hsl(var(--sage))]">
-                  <CheckCircle size={11} strokeWidth={1.75} />
-                  Appended to {card.field_id} extraction guidance
-                </span>
-              )}
-              {applyError && (
-                <span className="text-[11px] text-[hsl(var(--oxblood))]">{applyError}</span>
-              )}
-            </div>
+                {editing && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="gap-1.5 h-7"
+                    onClick={() => {
+                      setEditing(false);
+                      setRuleDraft(card.proposed_rule_text);
+                    }}
+                  >
+                    Cancel edit
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5 h-7"
+                  onClick={reject}
+                  disabled={applying}
+                >
+                  <X size={11} strokeWidth={1.75} />
+                  Dismiss
+                </Button>
+                {applyError && (
+                  <span className="text-[11px] text-[hsl(var(--oxblood))]">{applyError}</span>
+                )}
+              </div>
+            )}
           </div>
           );
         })()}
