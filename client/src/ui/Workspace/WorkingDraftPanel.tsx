@@ -26,6 +26,31 @@ function fieldLabel(file: string): string {
   return file.split("/").pop()!.replace(/\.(md|ya?ml)$/i, "");
 }
 
+type HunkRow = DiffLine | { tag: "gap"; text: string };
+
+/** Git-style hunking: keep changed lines + `ctx` lines of surrounding context,
+ *  collapsing longer unchanged runs into a "⋯ N unchanged lines" marker — so a
+ *  one-line edit to a big file shows the change, not the whole file. */
+function hunkize(lines: DiffLine[], ctx = 2): HunkRow[] {
+  const keep = new Array(lines.length).fill(false);
+  lines.forEach((l, i) => {
+    if (l.tag !== "ctx") {
+      for (let j = Math.max(0, i - ctx); j <= Math.min(lines.length - 1, i + ctx); j++) keep[j] = true;
+    }
+  });
+  const out: HunkRow[] = [];
+  let skipped = 0;
+  const flush = () => {
+    if (skipped > 0) out.push({ tag: "gap", text: `⋯ ${skipped} unchanged line${skipped === 1 ? "" : "s"}` });
+    skipped = 0;
+  };
+  for (let i = 0; i < lines.length; i++) {
+    if (keep[i]) { flush(); out.push(lines[i]); } else skipped++;
+  }
+  flush();
+  return out;
+}
+
 export function WorkingDraftPanel({ taskId, sessionId }: Props) {
   const [changes, setChanges] = useState<DraftFileDiff[]>([]);
   const [open, setOpen] = useState<Record<string, boolean>>({});
@@ -111,21 +136,27 @@ export function WorkingDraftPanel({ taskId, sessionId }: Props) {
               </div>
               {isOpen && (
                 <pre className="mt-1.5 overflow-x-auto rounded border border-border/60 bg-background font-mono text-[11px] leading-[1.5]">
-                  {c.lines.map((l, i) => (
-                    <div
-                      key={i}
-                      className={
-                        l.tag === "add"
-                          ? "bg-[#e7f0e7] px-2 text-[#2f5130]"
-                          : l.tag === "del"
-                          ? "bg-[#f6e4e4] px-2 text-[#7a2b2b] line-through"
-                          : "px-2 text-muted-foreground"
-                      }
-                    >
-                      {l.tag === "add" ? "+ " : l.tag === "del" ? "- " : "  "}
-                      {l.text || " "}
-                    </div>
-                  ))}
+                  {hunkize(c.lines).map((l, i) =>
+                    l.tag === "gap" ? (
+                      <div key={i} className="select-none bg-muted/30 px-2 text-center text-[10px] text-muted-foreground/70">
+                        {l.text}
+                      </div>
+                    ) : (
+                      <div
+                        key={i}
+                        className={
+                          l.tag === "add"
+                            ? "bg-[#e7f0e7] px-2 text-[#2f5130]"
+                            : l.tag === "del"
+                            ? "bg-[#f6e4e4] px-2 text-[#7a2b2b] line-through"
+                            : "px-2 text-muted-foreground"
+                        }
+                      >
+                        {l.tag === "add" ? "+ " : l.tag === "del" ? "- " : "  "}
+                        {l.text || " "}
+                      </div>
+                    ),
+                  )}
                 </pre>
               )}
             </li>
