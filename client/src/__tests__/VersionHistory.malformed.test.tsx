@@ -1,9 +1,7 @@
 // @vitest-environment jsdom
 //
-// Guard: the rubric-version timeline must not crash the whole session sidebar
-// when its /versions endpoint returns a 200 with a malformed/empty body. Before
-// hardening, setVersions(b.versions) stored `undefined`, and the next render
-// (versions.length / versions.map) threw. Now a non-array body resolves to [].
+// Guard: the version-history timeline must not crash when its /versions endpoint
+// returns a 200 with a malformed/empty body. A non-array `versions` resolves to [].
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen, cleanup, act } from "@testing-library/react";
 import * as matchers from "@testing-library/jest-dom/matchers";
@@ -11,7 +9,7 @@ expect.extend(matchers);
 
 afterEach(() => cleanup());
 
-import { RubricVersionSwitcher } from "../ui/Workspace/RubricVersionSwitcher";
+import { VersionHistory } from "../ui/Workspace/VersionHistory";
 
 function stubFetch(versionsBody: unknown) {
   vi.stubGlobal("fetch", vi.fn(async (url: RequestInfo | URL) => {
@@ -35,30 +33,28 @@ beforeEach(() => {
   } as unknown as Storage);
 });
 
-// Flush the load() fetch → json() → setState → re-render microtasks. A crash in
-// that re-render throws here and fails the test.
 async function settle() {
   await act(async () => { await Promise.resolve(); await Promise.resolve(); });
 }
 
-describe("RubricVersionSwitcher — malformed body hardening", () => {
+describe("VersionHistory — malformed body hardening", () => {
   it("renders nothing (no crash) when the body has no `versions`", async () => {
-    stubFetch({});                       // 200 but missing `versions`
-    render(<RubricVersionSwitcher taskId="rucam" sessionId="session_007" />);
+    stubFetch({});
+    render(<VersionHistory taskId="rucam" sessionId="session_007" />);
     await settle();
-    expect(screen.queryByText(/Rubric versions/i)).toBeNull();
+    expect(screen.queryByText(/Version history/i)).toBeNull();
   });
 
   it("renders nothing (no crash) when `versions` is explicitly null", async () => {
     stubFetch({ active: null, versions: null });
-    render(<RubricVersionSwitcher taskId="rucam" sessionId="session_007" />);
+    render(<VersionHistory taskId="rucam" sessionId="session_007" />);
     await settle();
-    expect(screen.queryByText(/Rubric versions/i)).toBeNull();
+    expect(screen.queryByText(/Version history/i)).toBeNull();
   });
 
   it("still renders the version list for a well-formed body", async () => {
     stubFetch({ active: "s1", versions: [{ id: "s1", source: "fork:v1", created_at: "" }] });
-    render(<RubricVersionSwitcher taskId="rucam" sessionId="session_007" />);
+    render(<VersionHistory taskId="rucam" sessionId="session_007" />);
     expect(await screen.findByText("s1")).toBeInTheDocument();
     expect(screen.getByText("fork:v1")).toBeInTheDocument();
   });

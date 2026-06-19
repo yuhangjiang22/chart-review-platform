@@ -14,7 +14,6 @@ import { cn } from "@/lib/utils";
 import { ChevronRight, ChevronLeft, FileText, ChevronDown, PanelRightClose } from "lucide-react";
 import { authFetch } from "../../auth";
 import { useDeepagentsModels } from "../../useDeepagentsModels";
-import { RubricVersionSwitcher } from "./RubricVersionSwitcher";
 import { TaskToolsPanel } from "./TaskToolsPanel";
 
 interface AgentSpecLite {
@@ -321,7 +320,6 @@ export function SessionSidebar({
             <p className="mt-1 text-[10px] text-muted-foreground/80 leading-[1.4]">
               Edits made here affect THIS session's next iter — that's the inner loop.
             </p>
-            <RubricVersionSwitcher taskId={taskId} sessionId={activeSessionId} />
             <TaskToolsPanel taskId={taskId} />
           </div>
         </div>

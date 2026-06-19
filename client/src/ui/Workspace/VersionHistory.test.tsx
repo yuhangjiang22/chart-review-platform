@@ -7,7 +7,7 @@ afterEach(cleanup);
 
 vi.mock("../../auth", () => ({ authFetch: vi.fn() }));
 import { authFetch } from "../../auth";
-import { RubricVersionSwitcher } from "./RubricVersionSwitcher";
+import { VersionHistory } from "./VersionHistory";
 
 const mockFetch = authFetch as ReturnType<typeof vi.fn>;
 
@@ -25,16 +25,16 @@ function versionsResponse(active: string) {
   } as Response;
 }
 
-describe("RubricVersionSwitcher", () => {
+describe("VersionHistory", () => {
   it("lists session versions with the active marked and switches on click", async () => {
-    mockFetch.mockImplementation((url: string, init?: RequestInit) => {
+    mockFetch.mockImplementation((url: string) => {
       if (url.endsWith("/versions")) return Promise.resolve(versionsResponse("s2"));
       if (url.endsWith("/switch")) return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, active: "s1" }) } as Response);
       return Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response);
     });
     vi.spyOn(window, "confirm").mockReturnValue(true);
     const onSwitched = vi.fn();
-    render(<RubricVersionSwitcher taskId="x" sessionId="s1" onSwitched={onSwitched} />);
+    render(<VersionHistory taskId="x" sessionId="s1" onSwitched={onSwitched} />);
 
     expect(await screen.findByText(/refine:cancer_type/)).toBeInTheDocument();
     expect(screen.getByText("s2")).toHaveAttribute("data-active", "true");
@@ -53,7 +53,7 @@ describe("RubricVersionSwitcher", () => {
       return Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response);
     });
     vi.spyOn(window, "confirm").mockReturnValue(true);
-    render(<RubricVersionSwitcher taskId="x" sessionId="s1" />);
+    render(<VersionHistory taskId="x" sessionId="s1" />);
 
     fireEvent.click(await screen.findByRole("button", { name: /promote to baseline/i }));
     await waitFor(() => expect(calls.some((c) => c.startsWith("POST") && c.endsWith("/promote"))).toBe(true));
