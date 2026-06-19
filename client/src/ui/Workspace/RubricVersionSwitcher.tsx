@@ -24,6 +24,7 @@ interface Props {
 export function RubricVersionSwitcher({ taskId, sessionId, onSwitched }: Props) {
   const [active, setActive] = useState<string | null>(null);
   const [versions, setVersions] = useState<Version[]>([]);
+  const [dirty, setDirty] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const sBase = `/api/rubric/${encodeURIComponent(taskId)}/sessions/${encodeURIComponent(sessionId)}`;
 
@@ -34,10 +35,11 @@ export function RubricVersionSwitcher({ taskId, sessionId, onSwitched }: Props) 
     // or the render (`versions.length`, `versions.map`) crashes the whole
     // sidebar. Array.isArray covers undefined / null / non-array alike.
     const b = (await r.json().catch(() => null)) as
-      | { active?: string | null; versions?: Version[] }
+      | { active?: string | null; versions?: Version[]; dirty?: boolean }
       | null;
     setActive(b?.active ?? null);
     setVersions(Array.isArray(b?.versions) ? b!.versions : []);
+    setDirty(Boolean(b?.dirty));
   }, [sBase]);
   useEffect(() => {
     void load();
@@ -52,7 +54,12 @@ export function RubricVersionSwitcher({ taskId, sessionId, onSwitched }: Props) 
   }, [load]);
 
   async function doSwitch(id: string) {
-    if (!window.confirm(`Switch this session's rubric to ${id}? The next run will use it.`)) return;
+    // Switching re-materializes the draft from the snapshot, discarding any
+    // uncommitted edits — warn when the draft is dirty.
+    const msg = dirty
+      ? `Switch this session's rubric to ${id}? Uncommitted edits to the current draft will be discarded — snapshot them first with "Create version" to keep them. The next run will use ${id}.`
+      : `Switch this session's rubric to ${id}? The next run will use it.`;
+    if (!window.confirm(msg)) return;
     const r = await authFetch(`${sBase}/switch`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -62,6 +69,21 @@ export function RubricVersionSwitcher({ taskId, sessionId, onSwitched }: Props) 
       await load();
       onSwitched?.(id);
       // Tell the rubric editor (+ any other listener) to refetch the now-active version.
+      window.dispatchEvent(new Event("chartreview:rubric-switched"));
+    }
+  }
+
+  async function createVersion() {
+    const name = window.prompt("Name this version (optional):") ?? "";
+    const r = await authFetch(`${sBase}/versions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(name.trim() ? { note: name.trim() } : {}),
+    });
+    if (r.ok) {
+      const b = (await r.json().catch(() => ({}))) as { unchanged?: boolean };
+      setNote(b.unchanged ? "No changes to checkpoint." : "Version created.");
+      await load();
       window.dispatchEvent(new Event("chartreview:rubric-switched"));
     }
   }
@@ -146,10 +168,22 @@ export function RubricVersionSwitcher({ taskId, sessionId, onSwitched }: Props) 
           </li>
         ))}
       </ul>
+      {dirty && (
+        <div className="mt-1 text-[10.5px] text-[hsl(var(--oxblood))]">
+          Unsaved changes since {active ?? "the last version"}
+        </div>
+      )}
+      <button
+        type="button"
+        onClick={() => void createVersion()}
+        className="mt-2 inline-flex items-center gap-1 rounded border border-border/60 px-1.5 py-0.5 text-[10.5px] text-muted-foreground hover:border-border hover:text-foreground"
+      >
+        Create version
+      </button>
       <button
         type="button"
         onClick={() => promote()}
-        className="mt-2 inline-flex items-center gap-1 rounded border border-border/60 px-1.5 py-0.5 text-[10.5px] text-muted-foreground hover:border-border hover:text-foreground"
+        className="mt-2 ml-1.5 inline-flex items-center gap-1 rounded border border-border/60 px-1.5 py-0.5 text-[10.5px] text-muted-foreground hover:border-border hover:text-foreground"
       >
         <GitBranchPlus size={11} strokeWidth={1.75} />
         Promote to baseline
