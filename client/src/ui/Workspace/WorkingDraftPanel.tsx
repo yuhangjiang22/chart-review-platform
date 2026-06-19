@@ -135,7 +135,7 @@ export function WorkingDraftPanel({ taskId, sessionId }: Props) {
                 </button>
               </div>
               {isOpen && (
-                <pre className="mt-1.5 overflow-x-auto rounded border border-border/60 bg-background font-mono text-[11px] leading-[1.5]">
+                <pre className="mt-1.5 overflow-hidden whitespace-pre-wrap break-words rounded border border-border/60 bg-background font-mono text-[11px] leading-[1.5]">
                   {hunkize(c.lines).map((l, i) =>
                     l.tag === "gap" ? (
                       <div key={i} className="select-none bg-muted/30 px-2 text-center text-[10px] text-muted-foreground/70">
@@ -145,11 +145,12 @@ export function WorkingDraftPanel({ taskId, sessionId }: Props) {
                       <div
                         key={i}
                         className={
-                          l.tag === "add"
+                          "whitespace-pre-wrap break-words " +
+                          (l.tag === "add"
                             ? "bg-[#e7f0e7] px-2 text-[#2f5130]"
                             : l.tag === "del"
                             ? "bg-[#f6e4e4] px-2 text-[#7a2b2b] line-through"
-                            : "px-2 text-muted-foreground"
+                            : "px-2 text-muted-foreground")
                         }
                       >
                         {l.tag === "add" ? "+ " : l.tag === "del" ? "- " : "  "}
