@@ -33,7 +33,10 @@ each change removed/added), and **Save as version** when ready.
    (`workflow-phases` + `phases-routes`, `required:true` so it's always an available tab);
    the client adds a non-optional REFINE phase to `phases.ts`. Diffs render full-width and
    are git-hunked (changed lines + 2 context, longer unchanged runs collapsed to
-   "⋯ N unchanged lines").
+   "⋯ N unchanged lines"). The always-on session rail (cohort/agents/iters/tools)
+   is hidden on REFINE so the workspace gets the full page width, and the layout
+   is diff-dominant: the working-draft diff is the wide column, with proposals +
+   version history as a slim side column.
 
 ## Layout
 
