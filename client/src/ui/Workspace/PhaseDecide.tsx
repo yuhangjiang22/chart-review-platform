@@ -3,7 +3,6 @@ import { Download, Sparkles, Info, ScanSearch } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { authFetch } from "../../auth";
-import { RefineProposalCard } from "./RefineProposalCard";
 import { AdherenceRefinePanel } from "./AdherenceRefinePanel";
 
 // Performance report (light platform DECIDE phase).
@@ -158,9 +157,12 @@ export interface PhaseDecideProps {
    *  the caller branches on the raw task_type and threads "ner" /
    *  "adherence" here (same as PhaseJudge). */
   taskKind?: "phenotype" | "ner" | "adherence";
+  /** Navigate to the Refine tab (where the proposal workspace lives). The
+   *  per-field "Refine" button calls this instead of expanding a card inline. */
+  onRefine?: () => void;
 }
 
-export function PhaseDecide({ taskId, activeSessionId, iterId, taskKind }: PhaseDecideProps) {
+export function PhaseDecide({ taskId, activeSessionId, iterId, taskKind, onRefine }: PhaseDecideProps) {
   const isNer = taskKind === "ner";
   const isAdherence = taskKind === "adherence";
   const [report, setReport] = useState<PerformanceReport | null>(null);
@@ -752,8 +754,10 @@ export function PhaseDecide({ taskId, activeSessionId, iterId, taskKind }: Phase
                           <button
                             type="button"
                             onClick={() => {
-                              // Clear any stale analyze error from a different
-                              // field when switching which row is expanded.
+                              // Refinable → jump to the Refine tab (the proposal
+                              // workspace lives there now). Otherwise toggle the
+                              // inline "why this isn't refinable" explanation.
+                              if (canPropose) { onRefine?.(); return; }
                               setAnalyzeErr(null);
                               setRefineField(expanded ? null : fid);
                             }}
@@ -780,20 +784,10 @@ export function PhaseDecide({ taskId, activeSessionId, iterId, taskKind }: Phase
                         )}
                       </td>
                     </tr>
-                    {expanded && showRefine && (
+                    {expanded && showRefine && !canPropose && (
                       <tr className="border-b border-border/30">
                         <td colSpan={totalCols} className="py-2 pl-2 pr-2">
-                          {canPropose ? (
-                            // Reuse the AUTHOR-phase proposal card in single-field
-                            // mode: it generates ②gap/③rule/④held-out for just this
-                            // field and renders Apply/Edit/Reject inline.
-                            <RefineProposalCard
-                              taskId={taskId}
-                              iterId={iterId as string}
-                              sessionId={activeSessionId as string}
-                              initialFieldId={fid}
-                            />
-                          ) : (
+                          {canPropose ? null : (
                             <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-[11.5px] text-muted-foreground leading-relaxed">
                               {cluster && cluster.n_agent_error > 0 ? (
                                 <>

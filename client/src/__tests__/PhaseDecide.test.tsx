@@ -430,26 +430,21 @@ describe("per-field refinement affordance", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: /Refine/i })).toBeInTheDocument());
   });
 
-  it("clicking 'Refine' POSTs /propose for that field and renders the RefineProposalCard inline", async () => {
+  it("clicking 'Refine' on a refinable field navigates to the Refine tab (no inline proposal card)", async () => {
     setupMocks({
       candidates: candResponse([cluster("has_distant_metastasis", { n_guideline_gap: 2 })]),
       propose: () => okJson(proposalCard("has_distant_metastasis")),
     });
-    render(<PhaseDecide taskId="cancer-diagnosis" activeSessionId="sess-1" iterId="i1" />);
+    const onRefine = vi.fn();
+    render(<PhaseDecide taskId="cancer-diagnosis" activeSessionId="sess-1" iterId="i1" onRefine={onRefine} />);
     const btn = await screen.findByRole("button", { name: /Refine/i });
     fireEvent.click(btn);
 
-    // POST went to /propose with the field_id in the body.
-    await waitFor(() => expect(postsTo("/propose").length).toBe(1));
-    const { url, init } = postsTo("/propose")[0];
-    expect(url).toContain("/api/refine/cancer-diagnosis/i1/propose");
-    expect(url).toContain("session_id=sess-1");
-    expect(JSON.parse(init!.body as string)).toEqual({ field_id: "has_distant_metastasis" });
-
-    // The proposal card renders its ③ rule text + Apply control inline.
-    await waitFor(() => screen.getByText(/Count any distant organ involvement/i));
-    expect(screen.getByText(/does not say how to count liver mets/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /apply to draft/i })).toBeInTheDocument();
+    // The proposal workspace now lives in the Refine tab — clicking Refine
+    // navigates there instead of expanding a card / POSTing /propose inline.
+    expect(onRefine).toHaveBeenCalledTimes(1);
+    expect(postsTo("/propose").length).toBe(0);
+    expect(screen.queryByRole("button", { name: /apply to draft/i })).not.toBeInTheDocument();
   });
 
   it("a field whose only attribution is agent_error renders the 'model error' note (Why?), NO propose button", async () => {
