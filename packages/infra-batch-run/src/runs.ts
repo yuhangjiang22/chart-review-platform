@@ -374,8 +374,8 @@ import { buildAuditHooks } from "@chart-review/audit-trail";
 import { loadCompiledTask, type CompiledTask } from "@chart-review/tasks";
 import type { QuestionAnswer, RuleVerdict } from "@chart-review/platform-types";
 import { computeTaskSha } from "@chart-review/lock";
-import { guidelineDir, phenotypeSkillDir, resolveRubricRoot } from "@chart-review/rubric";
-import { getActiveVersion } from "@chart-review/rubric-versions";
+import { guidelineDir, phenotypeSkillDir, resolveRubricRoot, baselineRubricRoot } from "@chart-review/rubric";
+import { getActiveVersion, snapshotVersion, draftDiffersFromActive } from "@chart-review/rubric-versions";
 import { patientDir, listNotes, isPhiPatient, patientPersonId } from "@chart-review/patients";
 import { resolveRolePrompt, validateAgentSpec } from "@chart-review/agent-specs";
 import { extractSpansDirect } from "@chart-review/pipeline-extract-ner";
@@ -668,7 +668,21 @@ export function startBatchRun(opts: StartBatchRunOptions): StartBatchRunResult {
   const runId = generateRunId();
   // The session rubric version this run executes against (provenance pin). For a
   // session run this resolves the fork's active version; baseline otherwise.
-  const rubricVersion = getActiveVersion(resolveRubricRoot(opts.task_id, opts.session_id)) ?? undefined;
+  const rubricRoot = resolveRubricRoot(opts.task_id, opts.session_id);
+  // Snapshot-if-dirty: a run must cite a real version SHA, so if the working
+  // draft has uncommitted edits, checkpoint it first (session fork → "s",
+  // baseline → "v"). Content-SHA dedup means a clean draft reuses the active
+  // version with no churn.
+  if (draftDiffersFromActive(rubricRoot)) {
+    const prefix = rubricRoot === baselineRubricRoot(opts.task_id) ? "v" : "s";
+    snapshotVersion(rubricRoot, {
+      prefix,
+      source: `run:${runId}`,
+      by: opts.started_by ?? "system",
+      now: new Date().toISOString(),
+    });
+  }
+  const rubricVersion = getActiveVersion(rubricRoot) ?? undefined;
   const manifest: RunManifest = {
     run_id: runId,
     label: opts.label,
