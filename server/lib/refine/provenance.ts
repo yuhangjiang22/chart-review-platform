@@ -20,7 +20,6 @@ import {
   buildCriterionMd,
   atomicWriteText,
 } from "../criterion-md.js";
-import { snapshotAfterEdit } from "../rubric-edit-snapshot.js";
 
 // ── Shapes ─────────────────────────────────────────────────────────────────────
 
@@ -163,14 +162,6 @@ export function applyRefinement(input: ApplyRefinementInput): RefinementLogEntry
     examples: parsed.examples,
   });
   atomicWriteText(mdPath, newMd);
-  // Snapshot the post-apply rubric as a new version on the same root the write
-  // landed on (session fork when sessionId is set, else baseline).
-  snapshotAfterEdit({
-    taskId: input.taskId,
-    sessionId: input.sessionId,
-    source: `refine:${input.fieldId}`,
-    by: input.appliedBy,
-  });
 
   const now = input.now ?? new Date().toISOString();
   const entry: RefinementLogEntry = {
@@ -240,14 +231,6 @@ export function revertRefinement(opts: {
     examples: parsed.examples,
   });
   atomicWriteText(mdPath, newMd);
-  // A revert is itself a rubric change → snapshot the restored state as a new
-  // version on the same (session or baseline) root.
-  snapshotAfterEdit({
-    taskId: opts.taskId,
-    sessionId: entry.session_id,
-    source: `revert:${entry.field_id}`,
-    by: opts.by,
-  });
 
   const now = opts.now ?? new Date().toISOString();
   all[idx] = { ...entry, reverted: { at: now, by: opts.by, intervening_edit } };
