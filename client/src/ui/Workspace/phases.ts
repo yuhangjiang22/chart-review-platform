@@ -13,11 +13,11 @@
 
 export type Phase =
   | "AUTHOR"
-  | "REFINE"
   | "TRY"
   | "JUDGE"
   | "VALIDATE"
-  | "DECIDE";
+  | "DECIDE"
+  | "REFINE";
 
 export interface PhaseDef {
   /** Stable ID. Used in URLs and React keys. */
@@ -40,11 +40,11 @@ export interface PhaseDef {
  *  (PHASE_ORDER, PHASE_LABEL, PHASE_SLUG_TO_ID, etc.) follow. */
 export const PHASE_DEFS: PhaseDef[] = [
   { id: "AUTHOR", label: "Author", slug: "author", group: "iter" },
-  { id: "REFINE", label: "Refine", slug: "refine", group: "iter" },
   { id: "TRY", label: "Try", slug: "try", group: "iter" },
   { id: "JUDGE", label: "Judge", slug: "judge", group: "iter", optional: true },
   { id: "VALIDATE", label: "Validate", slug: "validate", group: "iter" },
   { id: "DECIDE", label: "Performance", slug: "decide", group: "iter" },
+  { id: "REFINE", label: "Refine", slug: "refine", group: "iter" },
 ];
 
 /** Linear ordering of phases, IDs only. Derived. */

@@ -547,12 +547,7 @@ export function Workspace({
                   tab (the git-like workspace) so editing and reviewing each get
                   full room. Edits here flow into the session's working draft. */}
               <RubricPanel taskId={taskId} alwaysOpen activeSessionId={activeSessionId} />
-              <div className="flex justify-end gap-2">
-                {activeSessionId && (
-                  <Button variant="outline" onClick={() => setPhase("REFINE")} className="gap-1.5">
-                    Review draft & refine →
-                  </Button>
-                )}
+              <div className="flex justify-end">
                 <Button onClick={() => setPhase("TRY")} className="gap-1.5">
                   Try on patients →
                 </Button>

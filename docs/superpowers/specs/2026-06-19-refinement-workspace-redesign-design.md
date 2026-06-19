@@ -27,8 +27,9 @@ each change removed/added), and **Save as version** when ready.
    version**. Version history offers compare-to-baseline / version-to-version diffs.
 4. **The workspace is its own "Refine" tab** (revised after a live review — it was first
    embedded in AUTHOR and got cramped next to the session sidebar, cutting off diff lines).
-   AUTHOR is the focused rubric editor; a new **Refine** phase (`AUTHOR · Refine · TRY · …`)
-   hosts the full-width workspace. "refine" is registered server-side
+   AUTHOR is the focused rubric editor; a new **Refine** phase, placed **last**
+   (`AUTHOR · TRY · JUDGE · VALIDATE · PERFORMANCE · Refine`), hosts the full-width
+   workspace — you refine after seeing performance. "refine" is registered server-side
    (`workflow-phases` + `phases-routes`, `required:true` so it's always an available tab);
    the client adds a non-optional REFINE phase to `phases.ts`. Diffs render full-width and
    are git-hunked (changed lines + 2 context, longer unchanged runs collapsed to
