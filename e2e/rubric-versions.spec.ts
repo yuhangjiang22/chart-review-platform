@@ -13,7 +13,7 @@ import {
 const TASK = "cancer-diagnosis";
 const SERVER = "http://localhost:3002";
 
-type VersionsResp = { active: string | null; versions: Array<{ id: string; source: string }> };
+type VersionsResp = { active: string | null; dirty?: boolean; versions: Array<{ id: string; source: string }> };
 
 test.describe("rubric versioning", () => {
   let token: string;
@@ -46,13 +46,28 @@ test.describe("rubric versioning", () => {
     );
     expect(put.ok(), `PUT failed: ${put.status()} ${await put.text()}`).toBeTruthy();
 
-    // A advanced to s2; B is untouched at s1 — the isolation invariant.
+    // Working-draft model: an edit does NOT snapshot a version — it dirties the
+    // draft. A is now dirty at s1; B is untouched and clean — the isolation invariant.
     const a1 = (await apiGet(page, `/api/rubric/${TASK}/sessions/${a}/versions`, token)) as VersionsResp;
     const b1 = (await apiGet(page, `/api/rubric/${TASK}/sessions/${b}/versions`, token)) as VersionsResp;
-    expect(a1.active).toBe("s2");
-    expect(a1.versions.map((v) => v.id)).toEqual(["s1", "s2"]);
+    expect(a1.active).toBe("s1");
+    expect(a1.versions.map((v) => v.id)).toEqual(["s1"]);
+    expect(a1.dirty).toBe(true);
     expect(b1.active).toBe("s1");
     expect(b1.versions.map((v) => v.id)).toEqual(["s1"]);
+    expect(b1.dirty).toBe(false);
+
+    // Saving A's draft snapshots s2; B stays at s1 (isolation holds across the save).
+    const save = await page.request.post(`${SERVER}/api/rubric/${TASK}/sessions/${encodeURIComponent(a)}/versions`, {
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      data: { note: "session-A checkpoint" },
+    });
+    expect(save.ok(), `save failed: ${save.status()} ${await save.text()}`).toBeTruthy();
+    const a2 = (await apiGet(page, `/api/rubric/${TASK}/sessions/${a}/versions`, token)) as VersionsResp;
+    const b2 = (await apiGet(page, `/api/rubric/${TASK}/sessions/${b}/versions`, token)) as VersionsResp;
+    expect(a2.active).toBe("s2");
+    expect(a2.versions.map((v) => v.id)).toEqual(["s1", "s2"]);
+    expect(b2.versions.map((v) => v.id)).toEqual(["s1"]);
 
     // And the baseline is unchanged by a session edit (still its seeded version).
     const base = (await apiGet(page, `/api/rubric/${TASK}/versions`, token)) as VersionsResp;
@@ -61,10 +76,14 @@ test.describe("rubric versioning", () => {
 
   test("switching a session's active version is non-destructive", async ({ page }) => {
     const a = await startSession(page, token, TASK, "switch-test", ["patient_easy_neg_02"]);
-    // edit → s2
+    // edit dirties the draft, then Save-as-version snapshots s2
     await page.request.put(`${SERVER}/api/tasks/${TASK}/criteria/cancer_type?session_id=${encodeURIComponent(a)}`, {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       data: { extraction_guidance: "edit one" },
+    });
+    await page.request.post(`${SERVER}/api/rubric/${TASK}/sessions/${encodeURIComponent(a)}/versions`, {
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      data: { note: "checkpoint" },
     });
     // switch back to s1
     const sw = await page.request.post(`${SERVER}/api/rubric/${TASK}/sessions/${encodeURIComponent(a)}/switch`, {
