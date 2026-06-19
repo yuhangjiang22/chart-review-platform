@@ -130,4 +130,24 @@ describe("rubric version routes", () => {
       .handler({}, {} as never, { taskId: "x", sessionId: "s1" }, new URLSearchParams());
     expect((res as { unchanged: boolean }).unchanged).toBe(true);
   });
+
+  it("GET draft-diff returns the per-file line diff of the working draft", async () => {
+    const fork = sessionRubricRoot("x", "s1");
+    fs.writeFileSync(path.join(fork, "references", "criteria", "f.md"), "two\nEXTRA");
+    const res = await route("GET", "/api/rubric/:taskId/sessions/:sessionId/draft-diff")
+      .handler(null, {} as never, { taskId: "x", sessionId: "s1" }, new URLSearchParams());
+    const body = res as { changes: Array<{ file: string; added: number }> };
+    expect(body.changes.some((c) => c.file === "criteria/f.md" && c.added >= 1)).toBe(true);
+  });
+
+  it("POST draft/discard restores one field + clears dirty", async () => {
+    const fork = sessionRubricRoot("x", "s1");
+    fs.writeFileSync(path.join(fork, "references", "criteria", "f.md"), "two\nEXTRA");
+    await route("POST", "/api/rubric/:taskId/sessions/:sessionId/draft/discard")
+      .handler({ file: "criteria/f.md" }, {} as never, { taskId: "x", sessionId: "s1" }, new URLSearchParams());
+    expect(fs.readFileSync(path.join(fork, "references", "criteria", "f.md"), "utf8")).toBe("two");
+    const v = await route("GET", "/api/rubric/:taskId/sessions/:sessionId/versions")
+      .handler(null, {} as never, { taskId: "x", sessionId: "s1" }, new URLSearchParams());
+    expect((v as { dirty: boolean }).dirty).toBe(false);
+  });
 });

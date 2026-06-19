@@ -16,6 +16,8 @@ import {
   snapshotVersion,
   getActiveVersion,
   draftDiffersFromActive,
+  diffDraftAgainstActive,
+  discardDraftField,
 } from "@chart-review/rubric-versions";
 import { sessionRubricRoot, baselineRubricRoot } from "@chart-review/rubric";
 import { getSessionManifest } from "./lib/domain/iter/index.js";
@@ -70,6 +72,30 @@ export const rubricVersionRoutes: RouteEntry[] = [
         now: new Date().toISOString(),
       });
       return { version, unchanged: version.id === before };
+    },
+  },
+  {
+    // The working draft's per-file line diff vs the active version (Working Draft panel).
+    method: "GET",
+    pattern: "/api/rubric/:taskId/sessions/:sessionId/draft-diff",
+    handler: async (_b, _r, p) => {
+      const root = sessionRubricRoot(p.taskId, p.sessionId);
+      return { changes: diffDraftAgainstActive(root) };
+    },
+  },
+  {
+    // Undo one field's uncommitted edits — restore it from the active version.
+    method: "POST",
+    pattern: "/api/rubric/:taskId/sessions/:sessionId/draft/discard",
+    handler: async (body, _r, p) => {
+      const file = (body as { file?: unknown } | null)?.file;
+      if (typeof file !== "string" || !file.trim()) throw httpErr(400, "file is required");
+      try {
+        discardDraftField(sessionRubricRoot(p.taskId, p.sessionId), file);
+      } catch (e) {
+        throw httpErr(400, (e as Error).message);
+      }
+      return { ok: true };
     },
   },
   {
