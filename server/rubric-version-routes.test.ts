@@ -105,4 +105,29 @@ describe("rubric version routes", () => {
     expect(res.baseline_version).toBe("v1"); // dedup → no new baseline version
     expect(getActiveVersion(base)).toBe("v1");
   });
+
+  it("GET reports dirty=true when the working copy diverges from the active version", async () => {
+    const fork = sessionRubricRoot("x", "s1");
+    fs.writeFileSync(path.join(fork, "references", "criteria", "f.md"), "edited-since-s2");
+    const res = await route("GET", "/api/rubric/:taskId/sessions/:sessionId/versions")
+      .handler(null, {} as never, { taskId: "x", sessionId: "s1" }, new URLSearchParams());
+    expect((res as { dirty: boolean }).dirty).toBe(true);
+  });
+
+  it("POST versions snapshots the working draft as a new version", async () => {
+    const fork = sessionRubricRoot("x", "s1");
+    fs.writeFileSync(path.join(fork, "references", "criteria", "f.md"), "draft-edit");
+    const res = await route("POST", "/api/rubric/:taskId/sessions/:sessionId/versions")
+      .handler({ note: "my checkpoint" }, {} as never, { taskId: "x", sessionId: "s1" }, new URLSearchParams());
+    const body = res as { version: { id: string; source: string }; unchanged: boolean };
+    expect(body.unchanged).toBe(false);
+    expect(body.version.source).toBe("my checkpoint");
+    expect(getActiveVersion(fork)).toBe(body.version.id);
+  });
+
+  it("POST versions is a no-op (unchanged) when the draft matches the active version", async () => {
+    const res = await route("POST", "/api/rubric/:taskId/sessions/:sessionId/versions")
+      .handler({}, {} as never, { taskId: "x", sessionId: "s1" }, new URLSearchParams());
+    expect((res as { unchanged: boolean }).unchanged).toBe(true);
+  });
 });

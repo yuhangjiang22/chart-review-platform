@@ -15,6 +15,7 @@ import {
   diffVersions,
   snapshotVersion,
   getActiveVersion,
+  draftDiffersFromActive,
 } from "@chart-review/rubric-versions";
 import { sessionRubricRoot, baselineRubricRoot } from "@chart-review/rubric";
 import { getSessionManifest } from "./lib/domain/iter/index.js";
@@ -42,9 +43,33 @@ export const rubricVersionRoutes: RouteEntry[] = [
     method: "GET",
     pattern: "/api/rubric/:taskId/sessions/:sessionId/versions",
     handler: async (_b, _r, p) => {
-      const log = readVersionLog(sessionRubricRoot(p.taskId, p.sessionId));
+      const root = sessionRubricRoot(p.taskId, p.sessionId);
+      const log = readVersionLog(root);
       if (!log) throw httpErr(404, "no rubric versions for this session");
-      return { active: log.active, versions: log.versions };
+      return { active: log.active, versions: log.versions, dirty: draftDiffersFromActive(root) };
+    },
+  },
+  {
+    // Checkpoint the session's working draft as a new version. Body { note? } sets
+    // the version's source label (default "manual checkpoint"). Content-SHA dedup:
+    // an unchanged draft returns the active version with unchanged:true.
+    method: "POST",
+    pattern: "/api/rubric/:taskId/sessions/:sessionId/versions",
+    handler: async (body, _r, p) => {
+      const root = sessionRubricRoot(p.taskId, p.sessionId);
+      if (!fs.existsSync(path.join(root, "references"))) {
+        throw httpErr(404, `no rubric fork for session ${p.sessionId}`);
+      }
+      const note = (body as { note?: unknown } | null)?.note;
+      const source = typeof note === "string" && note.trim() ? note.trim() : "manual checkpoint";
+      const before = getActiveVersion(root);
+      const version = snapshotVersion(root, {
+        prefix: "s",
+        source,
+        by: "reviewer",
+        now: new Date().toISOString(),
+      });
+      return { version, unchanged: version.id === before };
     },
   },
   {
