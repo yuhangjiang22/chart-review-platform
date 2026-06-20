@@ -150,6 +150,46 @@ export function RefineProposalCard({ taskId, iterId, sessionId, initialFieldId }
   const [applied, setApplied] = useState(false);
   const [applyError, setApplyError] = useState<string | null>(null);
 
+  // Durable per-field lifecycle (suggested → pending → applied), derived from
+  // the working-draft diff + the refinement log so it survives reload/navigation
+  // (not just component-local). pending = the field has an uncommitted change in
+  // the draft; applied = it has a non-reverted refinement saved into the active
+  // version (logged + no longer dirty).
+  const [pendingFields, setPendingFields] = useState<Set<string>>(new Set());
+  const [appliedFields, setAppliedFields] = useState<Set<string>>(new Set());
+
+  const refreshLifecycle = useCallback(async () => {
+    const sBase = `/api/rubric/${encodeURIComponent(taskId)}/sessions/${encodeURIComponent(sessionId)}`;
+    const dd = (await (await authFetch(`${sBase}/draft-diff`)).json().catch(() => null)) as
+      | { changes?: { file: string }[] }
+      | null;
+    const dirty = new Set<string>(
+      (dd?.changes ?? []).map((c) => c.file.split("/").pop()!.replace(/\.(md|ya?ml)$/i, "")),
+    );
+    const lg = (await (await authFetch(
+      `/api/refine/${encodeURIComponent(taskId)}/log?session_id=${encodeURIComponent(sessionId)}`,
+    )).json().catch(() => null)) as { entries?: { field_id: string; reverted?: unknown }[] } | null;
+    const appliedEver = new Set<string>(
+      (lg?.entries ?? []).filter((e) => !e.reverted).map((e) => e.field_id),
+    );
+    setPendingFields(dirty);
+    // applied (saved) = logged refinement, no longer dirty (committed to a version)
+    setAppliedFields(new Set([...appliedEver].filter((f) => !dirty.has(f))));
+  }, [taskId, sessionId]);
+
+  useEffect(() => {
+    void refreshLifecycle();
+  }, [refreshLifecycle]);
+  useEffect(() => {
+    const r = () => void refreshLifecycle();
+    window.addEventListener("chartreview:rubric-edited", r);
+    window.addEventListener("chartreview:rubric-switched", r);
+    return () => {
+      window.removeEventListener("chartreview:rubric-edited", r);
+      window.removeEventListener("chartreview:rubric-switched", r);
+    };
+  }, [refreshLifecycle]);
+
   const fetchCandidates = useCallback(() => {
     setLoadState("loading");
     setLoadError(null);
@@ -263,8 +303,10 @@ export function RefineProposalCard({ taskId, iterId, sessionId, initialFieldId }
       }
       setApplied(true);
       // The applied rule is now an uncommitted change in the working draft —
-      // tell the draft bar + Working-draft panel to refresh.
+      // tell the draft bar + Working-draft panel to refresh, and recompute this
+      // card's per-field lifecycle (the field becomes "pending").
       window.dispatchEvent(new Event("chartreview:rubric-edited"));
+      await refreshLifecycle();
     } catch (e) {
       setApplyError((e as Error).message);
     } finally {
@@ -357,9 +399,13 @@ export function RefineProposalCard({ taskId, iterId, sessionId, initialFieldId }
                     <Sparkles size={11} strokeWidth={1.75} />
                   )}
                   <code className="font-mono text-[11px]">{c.field_id}</code>
-                  <span className="text-[10px] opacity-70">
-                    {refinableCount(c)} gap
-                  </span>
+                  {appliedFields.has(c.field_id) ? (
+                    <span className="text-[10px] text-[hsl(var(--sage))]">✓ applied</span>
+                  ) : pendingFields.has(c.field_id) ? (
+                    <span className="text-[10px] text-[hsl(var(--sage))]">● in draft</span>
+                  ) : (
+                    <span className="text-[10px] opacity-70">{refinableCount(c)} gap</span>
+                  )}
                 </Button>
               ))}
             </div>
@@ -560,12 +606,19 @@ export function RefineProposalCard({ taskId, iterId, sessionId, initialFieldId }
               </section>
             )}
 
-            {/* Actions — once applied, the change lives in the Working draft
-                panel, so collapse to a quiet confirmation instead of a button row. */}
-            {applied ? (
+            {/* Actions reflect the durable per-field lifecycle:
+                applied (saved) → done badge; pending (in the unsaved draft) →
+                "save to apply"; else → the Apply/Edit/Dismiss buttons. Pending /
+                applied have no Apply button, so a refinement can't be applied twice. */}
+            {appliedFields.has(card.field_id) ? (
               <div className="flex items-center gap-1.5 pt-1 border-t border-border/60 text-[11.5px] text-[hsl(var(--sage))]">
                 <CheckCircle size={12} strokeWidth={1.75} />
-                In draft — see the Working draft panel.
+                Applied — saved in this session's rubric.
+              </div>
+            ) : pendingFields.has(card.field_id) || applied ? (
+              <div className="flex items-center gap-1.5 pt-1 border-t border-border/60 text-[11.5px] text-[hsl(var(--sage))]">
+                <CheckCircle size={12} strokeWidth={1.75} />
+                In draft — “Save as version” (top) to apply it. See the Working draft panel.
               </div>
             ) : (
               <div className="flex items-center gap-2 pt-1 border-t border-border/60">
