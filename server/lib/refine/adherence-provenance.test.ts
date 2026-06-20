@@ -100,6 +100,17 @@ describe("applyAdherenceRefinement", () => {
     expect(readHints("Q1")).toBe("the only hint");
   });
 
+  it("is idempotent — re-applying the same addition doesn't duplicate it or re-log", () => {
+    writeBundle("T1.yaml", [{ question_id: "Q1", text: "Q?", retrieval_hints: "base.", tier: 1 }]);
+    applyAdherenceRefinement({ taskId: TASK, questionId: "Q1", hintAddition: "added clause", appliedBy: "r", sessionId: "s", now: "t1", entryId: "e1" });
+    const after1 = readHints("Q1")!;
+    applyAdherenceRefinement({ taskId: TASK, questionId: "Q1", hintAddition: "added clause", appliedBy: "r", sessionId: "s", now: "t2", entryId: "e2" });
+    const after2 = readHints("Q1")!;
+    expect(after2).toBe(after1); // unchanged on the second apply
+    expect(after2.split("added clause").length - 1).toBe(1); // appears once
+    expect(readAdherenceRefinementLog(TASK, "Q1").length).toBe(1); // no duplicate log entry
+  });
+
   it("throws on empty addition or unknown question", () => {
     writeBundle("T1.yaml", [{ question_id: "Q1", text: "Q?", tier: 1 }]);
     expect(() => applyAdherenceRefinement({ taskId: TASK, questionId: "Q1", hintAddition: "  ", appliedBy: "r" })).toThrow(/empty/);

@@ -146,6 +146,27 @@ export function applyRefinement(input: ApplyRefinementInput): RefinementLogEntry
   const parsed = parseCriterionMd(fs.readFileSync(mdPath, "utf8"));
   const fm = parsed.frontmatter;
   const prior = parsed.extraction_guidance.trim();
+
+  // Idempotency: if this exact rule is already in the guidance, re-applying would
+  // duplicate the paragraph. No-op — don't append, don't re-log. Return the
+  // existing non-reverted log entry for this field if present, else a no-op entry
+  // reflecting the unchanged guidance. Makes a double-apply harmless regardless
+  // of the UI.
+  if (prior.includes(`- ${rule}`)) {
+    const existing = readAll(input.taskId).find(
+      (e) => e.field_id === input.fieldId && e.session_id === input.sessionId &&
+        !e.reverted && e.proposed_rule_text.trim() === rule,
+    );
+    const now0 = input.now ?? new Date().toISOString();
+    return existing ?? {
+      entry_id: input.entryId ?? `${now0}-${input.fieldId}`,
+      task_id: input.taskId, field_id: input.fieldId, iter_id: input.iterId,
+      session_id: input.sessionId, applied_at: now0, applied_by: input.appliedBy,
+      proposed_rule_text: rule, prior_extraction_guidance: parsed.extraction_guidance,
+      new_extraction_guidance: parsed.extraction_guidance, card: input.card,
+    };
+  }
+
   const next = prior ? `${prior}\n\n- ${rule}` : `- ${rule}`;
 
   const schema = fm.answer_schema as { enum?: string[] } | undefined;

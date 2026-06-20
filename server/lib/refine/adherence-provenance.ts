@@ -159,6 +159,25 @@ export function applyAdherenceRefinement(input: ApplyAdherenceInput): AdherenceL
 
   const priorRaw = getHints(found.question); // untrimmed snapshot, for exact revert
   const prior = priorRaw.trim();
+
+  // Idempotency: if this exact addition is already in the hints, re-applying
+  // would duplicate it. No-op — don't append, don't re-log. Return the existing
+  // non-reverted log entry for this question if present, else a no-op entry.
+  if (prior.includes(add)) {
+    const existing = readAll(input.taskId).find(
+      (e) => e.question_id === input.questionId && e.session_id === input.sessionId &&
+        !e.reverted && e.proposed_hint_addition.trim() === add,
+    );
+    const now0 = input.now ?? new Date().toISOString();
+    return existing ?? {
+      entry_id: input.entryId ?? `${now0}-${input.questionId}`,
+      task_id: input.taskId, question_id: input.questionId, question_file: found.file,
+      iter_id: input.iterId, session_id: input.sessionId, applied_at: now0,
+      applied_by: input.appliedBy, proposed_hint_addition: add,
+      prior_retrieval_hints: priorRaw, new_retrieval_hints: priorRaw, card: input.card,
+    };
+  }
+
   const next = prior ? `${prior}\n${add}` : add;
   found.question.retrieval_hints = next;
 

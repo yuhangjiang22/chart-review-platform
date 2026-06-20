@@ -103,6 +103,17 @@ describe("applyRefinement", () => {
     expect(entry.applied_by).toBe("methodologist");
   });
 
+  it("is idempotent — re-applying the same rule doesn't duplicate it or re-log", () => {
+    writeCriterion("- existing");
+    applyRefinement({ taskId: "cancer-diagnosis", fieldId: FIELD, ruleText: "the new rule", appliedBy: "r", sessionId: "s", now: "t1", entryId: "e1" });
+    const after1 = readGuidance();
+    applyRefinement({ taskId: "cancer-diagnosis", fieldId: FIELD, ruleText: "the new rule", appliedBy: "r", sessionId: "s", now: "t2", entryId: "e2" });
+    const after2 = readGuidance();
+    expect(after2).toBe(after1); // guidance unchanged on the second apply
+    expect(after2.split("the new rule").length - 1).toBe(1); // rule appears exactly once
+    expect(readRefinementLog("cancer-diagnosis", FIELD).length).toBe(1); // no duplicate log entry
+  });
+
   it("writes '- rule' when there is no prior guidance", () => {
     writeCriterion("");
     applyRefinement({
