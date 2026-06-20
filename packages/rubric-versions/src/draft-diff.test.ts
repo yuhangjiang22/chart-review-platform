@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { snapshotVersion, diffDraftAgainstActive, diffDraftAgainstBase, discardDraftField } from "./index.js";
+import { snapshotVersion, diffDraftAgainstActive, diffDraftAgainstBase, currentVsBase, discardDraftField } from "./index.js";
 
 let root: string;
 const crit = (r: string, name: string) => path.join(r, "references", "criteria", name);
@@ -55,6 +55,19 @@ describe("diffDraftAgainstBase", () => {
     expect(a.lines.some((l) => l.tag === "add" && l.text === "ADDED-RULE")).toBe(true);
     // full current text present as context
     expect(a.lines.some((l) => l.tag === "ctx" && l.text === "line1")).toBe(true);
+  });
+});
+
+describe("currentVsBase alwaysInclude", () => {
+  it("returns a field that matches base as full all-context text when requested", () => {
+    // b.md == base ("keep"). Normally omitted; alwaysInclude forces it in, all ctx.
+    const out = currentVsBase(root, ["criteria/b.md"]);
+    const b = out.find((d) => d.file === "criteria/b.md")!;
+    expect(b).toBeTruthy();
+    expect(b.added).toBe(0);
+    expect(b.removed).toBe(0);
+    expect(b.lines.every((l) => l.tag === "ctx")).toBe(true); // full text, no highlight
+    expect(b.lines.some((l) => l.text === "keep")).toBe(true);
   });
 });
 

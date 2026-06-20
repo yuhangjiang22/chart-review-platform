@@ -236,16 +236,42 @@ export function diffDraftAgainstActive(root: string): DraftFileDiff[] {
   return diffDraftAgainstVersion(root, log.active);
 }
 
-/** Diff the working copy against the FORK BASE (the version with parent=null —
- *  the session's starting rubric). Added lines = everything this session has
- *  changed (refinements + edits, saved or pending). Shows the full current text
- *  with those additions marked — "the current rubric, refinements highlighted." */
-export function diffDraftAgainstBase(root: string): DraftFileDiff[] {
+/** The current rubric vs the FORK BASE (version with parent=null), per file.
+ *  Changed files are returned with line-level add/del/ctx; files identical to the
+ *  base are omitted UNLESS listed in `alwaysInclude` — those are returned as their
+ *  full text rendered all-context (added=removed=0), so a field that's been
+ *  refined in a LATER version still shows its full current text at THIS version
+ *  (e.g. on the base s1, a field refined in s4 shows its original text, no green).
+ *  Powers the transparent "what does each version look like" view. */
+export function currentVsBase(root: string, alwaysInclude: string[] = []): DraftFileDiff[] {
   const log = readVersionLog(root);
   if (!log) return [];
   const base = log.versions.find((v) => v.parent === null);
   if (!base) return [];
-  return diffDraftAgainstVersion(root, base.id);
+  const draft = readRefsTree(refsDir(root));
+  const baseTree = readRefsTree(versionRefsDir(root, base.id));
+  const files = new Set<string>([...alwaysInclude, ...draft.keys(), ...baseTree.keys()]);
+  const out: DraftFileDiff[] = [];
+  for (const f of files) {
+    const d = draft.get(f);
+    const b = baseTree.get(f);
+    if (d === undefined && b === undefined) continue; // alwaysInclude that doesn't exist
+    if (d !== undefined && b !== undefined && d === b) {
+      if (!alwaysInclude.includes(f)) continue; // unchanged + not requested → skip
+      out.push({ file: f, status: "changed", added: 0, removed: 0, lines: diffLines(b, d).lines });
+      continue;
+    }
+    const ld = diffLines(b ?? "", d ?? "");
+    const status = b === undefined ? "added" : d === undefined ? "removed" : "changed";
+    out.push({ file: f, status, added: ld.added, removed: ld.removed, lines: ld.lines });
+  }
+  return out.sort((x, y) => x.file.localeCompare(y.file));
+}
+
+/** Changed-only convenience: the current rubric vs the fork base, omitting files
+ *  identical to the base. */
+export function diffDraftAgainstBase(root: string): DraftFileDiff[] {
+  return currentVsBase(root, []);
 }
 
 /** Undo one field's uncommitted edits: restore the file from the active version's

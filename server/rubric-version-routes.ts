@@ -17,11 +17,12 @@ import {
   getActiveVersion,
   draftDiffersFromActive,
   diffDraftAgainstActive,
-  diffDraftAgainstBase,
+  currentVsBase,
   discardDraftField,
 } from "@chart-review/rubric-versions";
 import { sessionRubricRoot, baselineRubricRoot } from "@chart-review/rubric";
 import { getSessionManifest } from "./lib/domain/iter/index.js";
+import { readRefinementLog } from "./lib/refine/provenance.js";
 
 /** Recursively copy a directory tree (used to promote a session version's
  *  references/ into the baseline working copy before snapshotting it). */
@@ -86,14 +87,26 @@ export const rubricVersionRoutes: RouteEntry[] = [
     },
   },
   {
-    // The current rubric vs the FORK BASE — full current text per changed field
-    // with everything this session added (refinements + edits, saved or pending)
-    // marked. Drives the "current rubric, refinements highlighted" view.
+    // Transparent "what does the active version look like" view: for every field
+    // this session has refined (from the log) — plus anything else changed vs the
+    // fork base — return the field's FULL current text with additions-vs-base
+    // marked, and a `dirty` flag (unsaved vs the active version). A field refined
+    // in a later version still shows its full text here at an earlier active
+    // version (just without the green), so switching versions is never blank.
     method: "GET",
-    pattern: "/api/rubric/:taskId/sessions/:sessionId/draft-vs-base",
+    pattern: "/api/rubric/:taskId/sessions/:sessionId/rubric-view",
     handler: async (_b, _r, p) => {
       const root = sessionRubricRoot(p.taskId, p.sessionId);
-      return { changes: diffDraftAgainstBase(root) };
+      const refined = Array.from(
+        new Set(
+          readRefinementLog(p.taskId, undefined, p.sessionId)
+            .filter((e) => !e.reverted)
+            .map((e) => `criteria/${e.field_id}.md`),
+        ),
+      );
+      const dirty = new Set(diffDraftAgainstActive(root).map((c) => c.file));
+      const changes = currentVsBase(root, refined).map((c) => ({ ...c, dirty: dirty.has(c.file) }));
+      return { changes };
     },
   },
   {

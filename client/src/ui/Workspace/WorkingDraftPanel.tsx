@@ -16,6 +16,8 @@ interface DraftFileDiff {
   added: number;
   removed: number;
   lines: DiffLine[];
+  /** true = has unsaved changes vs the active version. */
+  dirty?: boolean;
 }
 
 interface Props {
@@ -29,23 +31,17 @@ function fieldLabel(file: string): string {
 }
 
 export function WorkingDraftPanel({ taskId, sessionId }: Props) {
-  // `marked` = current rubric vs the fork base (full text + highlighted additions).
-  // `dirty` = fields with UNSAVED changes (vs the active version) — for the
-  // saved/unsaved badge + undo.
+  // `marked` = the active version's full text per refined/changed field, with
+  // additions-vs-base highlighted + a per-field `dirty` flag (unsaved vs active).
   const [marked, setMarked] = useState<DraftFileDiff[]>([]);
-  const [dirty, setDirty] = useState<Set<string>>(new Set());
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const base = `/api/rubric/${encodeURIComponent(taskId)}/sessions/${encodeURIComponent(sessionId)}`;
 
   const load = useCallback(async () => {
-    const vb = (await (await authFetch(`${base}/draft-vs-base`)).json().catch(() => null)) as
+    const vb = (await (await authFetch(`${base}/rubric-view`)).json().catch(() => null)) as
       | { changes?: DraftFileDiff[] }
       | null;
-    const dd = (await (await authFetch(`${base}/draft-diff`)).json().catch(() => null)) as
-      | { changes?: { file: string }[] }
-      | null;
     setMarked(Array.isArray(vb?.changes) ? vb!.changes! : []);
-    setDirty(new Set((dd?.changes ?? []).map((c) => c.file)));
   }, [base]);
 
   useEffect(() => {
@@ -90,13 +86,13 @@ export function WorkingDraftPanel({ taskId, sessionId }: Props) {
   return (
     <div className="rounded-md border border-border/60 bg-paper/60 px-3 py-3">
       <div className="mb-2 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-        Current rubric · {marked.length} field{marked.length === 1 ? "" : "s"} changed since start ·{" "}
-        <span className="normal-case tracking-normal text-[hsl(var(--sage))]">green = added by refinement</span>
+        Current rubric (version in the sidebar) · {marked.length} field{marked.length === 1 ? "" : "s"} refined this session ·{" "}
+        <span className="normal-case tracking-normal text-[hsl(var(--sage))]">green = added vs the original</span>
       </div>
       <ul className="space-y-2">
         {marked.map((c) => {
           const isOpen = open[c.file] ?? true; // expanded by default
-          const isDirty = dirty.has(c.file);
+          const isDirty = Boolean(c.dirty);
           return (
             <li key={c.file} className="border-b border-border/40 pb-2 last:border-b-0 last:pb-0">
               <div className="flex items-center gap-2">

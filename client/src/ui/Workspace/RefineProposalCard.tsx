@@ -160,21 +160,22 @@ export function RefineProposalCard({ taskId, iterId, sessionId, initialFieldId }
 
   const refreshLifecycle = useCallback(async () => {
     const sBase = `/api/rubric/${encodeURIComponent(taskId)}/sessions/${encodeURIComponent(sessionId)}`;
-    const dd = (await (await authFetch(`${sBase}/draft-diff`)).json().catch(() => null)) as
-      | { changes?: { file: string }[] }
+    // rubric-view reflects the ACTIVE version's actual content: a field with
+    // additions-vs-base (added>0) genuinely contains a refinement here. So
+    // "applied" tracks the active version (not just the log) — switch to the base
+    // s1 and a field refined only in s4 is NOT shown applied (Apply is offered).
+    const rv = (await (await authFetch(`${sBase}/rubric-view`)).json().catch(() => null)) as
+      | { changes?: { file: string; added: number; dirty?: boolean }[] }
       | null;
-    const dirty = new Set<string>(
-      (dd?.changes ?? []).map((c) => c.file.split("/").pop()!.replace(/\.(md|ya?ml)$/i, "")),
-    );
-    const lg = (await (await authFetch(
-      `/api/refine/${encodeURIComponent(taskId)}/log?session_id=${encodeURIComponent(sessionId)}`,
-    )).json().catch(() => null)) as { entries?: { field_id: string; reverted?: unknown }[] } | null;
-    const appliedEver = new Set<string>(
-      (lg?.entries ?? []).filter((e) => !e.reverted).map((e) => e.field_id),
-    );
-    setPendingFields(dirty);
-    // applied (saved) = logged refinement, no longer dirty (committed to a version)
-    setAppliedFields(new Set([...appliedEver].filter((f) => !dirty.has(f))));
+    const fid = (f: string) => f.split("/").pop()!.replace(/\.(md|ya?ml)$/i, "");
+    const pending = new Set<string>();
+    const applied = new Set<string>();
+    for (const c of rv?.changes ?? []) {
+      if (c.dirty) pending.add(fid(c.file));
+      else if (c.added > 0) applied.add(fid(c.file)); // present in the active version, saved
+    }
+    setPendingFields(pending);
+    setAppliedFields(applied);
   }, [taskId, sessionId]);
 
   useEffect(() => {
