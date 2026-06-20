@@ -288,8 +288,8 @@ export function RefineProposalCard({ taskId, iterId, sessionId, initialFieldId }
         <Sparkles size={13} strokeWidth={1.75} className="text-[hsl(var(--sage))]" />
         <span className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
           {singleField
-            ? `Refine ${initialFieldId} — proposal from agent-vs-you disagreements`
-            : "Refine — proposals from agent-vs-you disagreements"}
+            ? `Suggested refinement for ${initialFieldId} (from agent-vs-you disagreements)`
+            : "Suggested refinements — from agent-vs-you disagreements"}
         </span>
         {!singleField && (
           <button

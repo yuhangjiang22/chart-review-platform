@@ -17,21 +17,19 @@ interface Props {
 }
 
 export function RefineWorkspace({ taskId, sessionId, left }: Props) {
+  // Single top-to-bottom flow (the tab has full width, no session rail): the
+  // page reads as a story — review suggestions → apply one → it appears in your
+  // working draft → save as a version. A reading-width cap keeps long proposal
+  // text + diffs legible. No competing columns, no empty panel hogging space.
   return (
-    <div className="space-y-3">
+    <div className="mx-auto max-w-[900px] space-y-4">
       <DraftStatusBar taskId={taskId} sessionId={sessionId} />
-      <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[1.7fr_1fr]">
-        {/* The working-draft diff is what you actually read — give it the wide
-            column so diffs never get cut off. */}
-        <div className="min-w-0">
-          <WorkingDraftPanel taskId={taskId} sessionId={sessionId} />
-        </div>
-        {/* Proposals (when any) + version history as a slim side column. */}
-        <div className="min-w-0 space-y-3">
-          {left}
-          <VersionHistory taskId={taskId} sessionId={sessionId} />
-        </div>
-      </div>
+      {/* 1 · Suggestions to review (the starting point) */}
+      {left}
+      {/* 2 · What you've accumulated in the draft */}
+      <WorkingDraftPanel taskId={taskId} sessionId={sessionId} />
+      {/* 3 · Saved versions */}
+      <VersionHistory taskId={taskId} sessionId={sessionId} />
     </div>
   );
 }
