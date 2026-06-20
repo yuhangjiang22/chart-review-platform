@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { snapshotVersion, diffDraftAgainstActive, discardDraftField } from "./index.js";
+import { snapshotVersion, diffDraftAgainstActive, diffDraftAgainstBase, discardDraftField } from "./index.js";
 
 let root: string;
 const crit = (r: string, name: string) => path.join(r, "references", "criteria", name);
@@ -40,6 +40,21 @@ describe("diffDraftAgainstActive", () => {
     const byFile = Object.fromEntries(d.map((x) => [x.file, x.status]));
     expect(byFile["criteria/c.md"]).toBe("added");
     expect(byFile["criteria/b.md"]).toBe("removed");
+  });
+});
+
+describe("diffDraftAgainstBase", () => {
+  it("marks everything added since the fork base, even after the change was saved", () => {
+    // s1 (base) = "line1\nline2". Edit + save s2; the addition stays marked vs base.
+    writeCrit("a.md", "line1\nline2\nADDED-RULE");
+    snapshotVersion(root, { prefix: "s", source: "refine", by: "y", now: "t" }); // s2, active
+    expect(diffDraftAgainstActive(root)).toEqual([]); // clean vs active (saved)
+    const base = diffDraftAgainstBase(root); // but vs the base, the addition shows
+    const a = base.find((d) => d.file === "criteria/a.md")!;
+    expect(a.added).toBe(1);
+    expect(a.lines.some((l) => l.tag === "add" && l.text === "ADDED-RULE")).toBe(true);
+    // full current text present as context
+    expect(a.lines.some((l) => l.tag === "ctx" && l.text === "line1")).toBe(true);
   });
 });
 

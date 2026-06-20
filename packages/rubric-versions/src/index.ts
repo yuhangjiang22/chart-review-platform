@@ -189,30 +189,28 @@ export interface DraftFileDiff {
   lines: DiffLine[];
 }
 
-/** Diff the working copy (references/) against the ACTIVE version's snapshot,
- *  per file, with line-level hunks. Empty array when clean. Drives the Working
- *  Draft panel. */
-export function diffDraftAgainstActive(root: string): DraftFileDiff[] {
-  const log = readVersionLog(root);
-  if (!log || !log.active) return [];
-  const readTree = (base: string): Map<string, string> => {
-    const out = new Map<string, string>();
-    const walk = (d: string, rel: string) => {
-      if (!fs.existsSync(d)) return;
-      for (const e of fs.readdirSync(d, { withFileTypes: true })) {
-        const r = rel ? `${rel}/${e.name}` : e.name;
-        if (e.isDirectory()) walk(path.join(d, e.name), r);
-        else out.set(r, fs.readFileSync(path.join(d, e.name), "utf8"));
-      }
-    };
-    walk(base, "");
-    return out;
+function readRefsTree(base: string): Map<string, string> {
+  const out = new Map<string, string>();
+  const walk = (d: string, rel: string) => {
+    if (!fs.existsSync(d)) return;
+    for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+      const r = rel ? `${rel}/${e.name}` : e.name;
+      if (e.isDirectory()) walk(path.join(d, e.name), r);
+      else out.set(r, fs.readFileSync(path.join(d, e.name), "utf8"));
+    }
   };
-  const draft = readTree(refsDir(root));
-  const active = readTree(versionRefsDir(root, log.active));
+  walk(base, "");
+  return out;
+}
+
+/** Diff the working copy (references/) against a given version's snapshot, per
+ *  file, with line-level hunks. Files identical to the version are omitted. */
+function diffDraftAgainstVersion(root: string, versionId: string): DraftFileDiff[] {
+  const draft = readRefsTree(refsDir(root));
+  const target = readRefsTree(versionRefsDir(root, versionId));
   const out: DraftFileDiff[] = [];
   for (const [f, dtext] of draft) {
-    const atext = active.get(f);
+    const atext = target.get(f);
     if (atext === undefined) {
       const ld = diffLines("", dtext);
       out.push({ file: f, status: "added", added: ld.added, removed: ld.removed, lines: ld.lines });
@@ -221,13 +219,33 @@ export function diffDraftAgainstActive(root: string): DraftFileDiff[] {
       out.push({ file: f, status: "changed", added: ld.added, removed: ld.removed, lines: ld.lines });
     }
   }
-  for (const [f, atext] of active) {
+  for (const [f, atext] of target) {
     if (!draft.has(f)) {
       const ld = diffLines(atext, "");
       out.push({ file: f, status: "removed", added: ld.added, removed: ld.removed, lines: ld.lines });
     }
   }
   return out.sort((x, y) => x.file.localeCompare(y.file));
+}
+
+/** Diff the working copy against the ACTIVE version's snapshot. Empty when clean
+ *  (no UNSAVED changes). Drives the dirty flag + per-change undo. */
+export function diffDraftAgainstActive(root: string): DraftFileDiff[] {
+  const log = readVersionLog(root);
+  if (!log || !log.active) return [];
+  return diffDraftAgainstVersion(root, log.active);
+}
+
+/** Diff the working copy against the FORK BASE (the version with parent=null —
+ *  the session's starting rubric). Added lines = everything this session has
+ *  changed (refinements + edits, saved or pending). Shows the full current text
+ *  with those additions marked — "the current rubric, refinements highlighted." */
+export function diffDraftAgainstBase(root: string): DraftFileDiff[] {
+  const log = readVersionLog(root);
+  if (!log) return [];
+  const base = log.versions.find((v) => v.parent === null);
+  if (!base) return [];
+  return diffDraftAgainstVersion(root, base.id);
 }
 
 /** Undo one field's uncommitted edits: restore the file from the active version's

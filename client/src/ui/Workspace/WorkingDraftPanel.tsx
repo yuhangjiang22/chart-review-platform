@@ -1,9 +1,10 @@
-// WorkingDraftPanel — the wide pane of the refinement workspace. Lists every
-// uncommitted change in the session's rubric draft as a git-style line diff
-// (removed = red/struck, added = green) vs the last saved version, with a
-// per-change undo. Shows the FULL block (every line of the criterion/question)
-// so the change is read in its complete context. Renders nothing when the draft
-// is clean. See the refinement-workspace-redesign design.
+// WorkingDraftPanel — the wide pane of the refinement workspace. Shows the
+// CURRENT rubric for each field this session has touched, as its full text with
+// everything added since the session's start (refinements + edits) marked green
+// — "the current version, with where the refinement applied highlighted." A
+// per-field badge says whether those changes are saved into the active version
+// or still unsaved (pending); unsaved fields offer undo. See the
+// refinement-workspace-redesign design.
 import { useCallback, useEffect, useState } from "react";
 import { authFetch } from "../../auth";
 
@@ -28,15 +29,23 @@ function fieldLabel(file: string): string {
 }
 
 export function WorkingDraftPanel({ taskId, sessionId }: Props) {
-  const [changes, setChanges] = useState<DraftFileDiff[]>([]);
+  // `marked` = current rubric vs the fork base (full text + highlighted additions).
+  // `dirty` = fields with UNSAVED changes (vs the active version) — for the
+  // saved/unsaved badge + undo.
+  const [marked, setMarked] = useState<DraftFileDiff[]>([]);
+  const [dirty, setDirty] = useState<Set<string>>(new Set());
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const base = `/api/rubric/${encodeURIComponent(taskId)}/sessions/${encodeURIComponent(sessionId)}`;
 
   const load = useCallback(async () => {
-    const d = (await (await authFetch(`${base}/draft-diff`)).json().catch(() => null)) as
+    const vb = (await (await authFetch(`${base}/draft-vs-base`)).json().catch(() => null)) as
       | { changes?: DraftFileDiff[] }
       | null;
-    setChanges(Array.isArray(d?.changes) ? d!.changes! : []);
+    const dd = (await (await authFetch(`${base}/draft-diff`)).json().catch(() => null)) as
+      | { changes?: { file: string }[] }
+      | null;
+    setMarked(Array.isArray(vb?.changes) ? vb!.changes! : []);
+    setDirty(new Set((dd?.changes ?? []).map((c) => c.file)));
   }, [base]);
 
   useEffect(() => {
@@ -54,7 +63,7 @@ export function WorkingDraftPanel({ taskId, sessionId }: Props) {
   }, [load]);
 
   async function undo(file: string) {
-    if (!window.confirm(`Undo the uncommitted changes to ${fieldLabel(file)}?`)) return;
+    if (!window.confirm(`Discard the unsaved changes to ${fieldLabel(file)}?`)) return;
     const r = await authFetch(`${base}/draft/discard`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -66,11 +75,14 @@ export function WorkingDraftPanel({ taskId, sessionId }: Props) {
     }
   }
 
-  if (changes.length === 0) {
+  if (marked.length === 0) {
     return (
       <div className="rounded-md border border-border/60 bg-paper/60 px-3 py-3">
-        <div className="mb-1 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Working draft</div>
-        <p className="text-[11.5px] text-muted-foreground">No unsaved changes. Apply a refinement or edit a criterion and it'll show up here as a diff.</p>
+        <div className="mb-1 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Current rubric</div>
+        <p className="text-[11.5px] text-muted-foreground">
+          No refinements applied yet this session. Apply a suggested refinement (right) and the
+          updated criterion will show here with the change highlighted.
+        </p>
       </div>
     );
   }
@@ -78,11 +90,13 @@ export function WorkingDraftPanel({ taskId, sessionId }: Props) {
   return (
     <div className="rounded-md border border-border/60 bg-paper/60 px-3 py-3">
       <div className="mb-2 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-        Working draft · {changes.length} change{changes.length === 1 ? "" : "s"}
+        Current rubric · {marked.length} field{marked.length === 1 ? "" : "s"} changed since start ·{" "}
+        <span className="normal-case tracking-normal text-[hsl(var(--sage))]">green = added by refinement</span>
       </div>
       <ul className="space-y-2">
-        {changes.map((c) => {
+        {marked.map((c) => {
           const isOpen = open[c.file] ?? true; // expanded by default
+          const isDirty = dirty.has(c.file);
           return (
             <li key={c.file} className="border-b border-border/40 pb-2 last:border-b-0 last:pb-0">
               <div className="flex items-center gap-2">
@@ -93,21 +107,25 @@ export function WorkingDraftPanel({ taskId, sessionId }: Props) {
                 >
                   <span className="text-muted-foreground">{isOpen ? "▾" : "▸"}</span>
                   <span className="font-mono text-[11.5px]">{fieldLabel(c.file)}</span>
-                  <span className="text-[10.5px] text-muted-foreground">
-                    {c.status === "added" ? "new" : c.status === "removed" ? "removed" : "edited"}
-                  </span>
                 </button>
+                {isDirty ? (
+                  <span className="text-[10px] text-[hsl(var(--oxblood))]">● unsaved</span>
+                ) : (
+                  <span className="text-[10px] text-[hsl(var(--sage))]">✓ saved</span>
+                )}
                 <span className="ml-auto font-mono text-[11px]">
                   <span className="text-[hsl(var(--sage))]">+{c.added}</span>{" "}
                   <span className="text-[hsl(var(--oxblood))]">−{c.removed}</span>
                 </span>
-                <button
-                  type="button"
-                  onClick={() => void undo(c.file)}
-                  className="rounded border border-border/60 px-1.5 py-0.5 text-[10.5px] text-muted-foreground hover:border-border hover:text-foreground"
-                >
-                  undo
-                </button>
+                {isDirty && (
+                  <button
+                    type="button"
+                    onClick={() => void undo(c.file)}
+                    className="rounded border border-border/60 px-1.5 py-0.5 text-[10.5px] text-muted-foreground hover:border-border hover:text-foreground"
+                  >
+                    undo
+                  </button>
+                )}
               </div>
               {isOpen && (
                 <pre className="mt-1.5 overflow-hidden whitespace-pre-wrap break-words rounded border border-border/60 bg-background font-mono text-[11px] leading-[1.5]">

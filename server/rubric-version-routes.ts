@@ -17,6 +17,7 @@ import {
   getActiveVersion,
   draftDiffersFromActive,
   diffDraftAgainstActive,
+  diffDraftAgainstBase,
   discardDraftField,
 } from "@chart-review/rubric-versions";
 import { sessionRubricRoot, baselineRubricRoot } from "@chart-review/rubric";
@@ -75,12 +76,24 @@ export const rubricVersionRoutes: RouteEntry[] = [
     },
   },
   {
-    // The working draft's per-file line diff vs the active version (Working Draft panel).
+    // The working draft's per-file line diff vs the active version — UNSAVED
+    // changes only (drives dirty flag + per-change undo).
     method: "GET",
     pattern: "/api/rubric/:taskId/sessions/:sessionId/draft-diff",
     handler: async (_b, _r, p) => {
       const root = sessionRubricRoot(p.taskId, p.sessionId);
       return { changes: diffDraftAgainstActive(root) };
+    },
+  },
+  {
+    // The current rubric vs the FORK BASE — full current text per changed field
+    // with everything this session added (refinements + edits, saved or pending)
+    // marked. Drives the "current rubric, refinements highlighted" view.
+    method: "GET",
+    pattern: "/api/rubric/:taskId/sessions/:sessionId/draft-vs-base",
+    handler: async (_b, _r, p) => {
+      const root = sessionRubricRoot(p.taskId, p.sessionId);
+      return { changes: diffDraftAgainstBase(root) };
     },
   },
   {
