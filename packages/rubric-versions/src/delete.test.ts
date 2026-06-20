@@ -46,4 +46,15 @@ describe("deleteVersion", () => {
   it("throws on an unknown version", () => {
     expect(() => deleteVersion(root, "s9")).toThrow(/no such version/);
   });
+
+  it("assigns a fresh, non-colliding id after a delete (max+1, not count+1)", () => {
+    // s1, s2, s3 exist. Delete the middle one → s1, s3 (count 2). A naive
+    // count+1 nextId would re-issue "s3" and collide.
+    deleteVersion(root, "s2");
+    fs.writeFileSync(fmd(root), "four");
+    const v = snapshotVersion(root, { prefix: "s", source: "edit", by: "y", now: "t" });
+    expect(v.id).toBe("s4"); // NOT "s3" (already taken)
+    const ids = readVersionLog(root)!.versions.map((x) => x.id);
+    expect(new Set(ids).size).toBe(ids.length); // no duplicate ids
+  });
 });

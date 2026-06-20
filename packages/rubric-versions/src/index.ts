@@ -83,7 +83,14 @@ function rmTree(dir: string): void {
 }
 
 function nextId(log: VersionLog | null, prefix: string): string {
-  const n = (log?.versions ?? []).filter((v) => v.id.startsWith(prefix)).length + 1;
+  // Number from the MAX existing suffix, not the count — otherwise deleting a
+  // version drops the count and the next snapshot re-issues an id that already
+  // exists (e.g. delete s2 from s1,s2,s3 → count 2 → "s3" collision).
+  const nums = (log?.versions ?? [])
+    .filter((v) => v.id.startsWith(prefix))
+    .map((v) => parseInt(v.id.slice(prefix.length), 10))
+    .filter((n) => Number.isFinite(n));
+  const n = (nums.length ? Math.max(...nums) : 0) + 1;
   return `${prefix}${n}`;
 }
 
