@@ -638,7 +638,6 @@ export function Workspace({
                   ? "adherence"
                   : "phenotype"
               }
-              onRefine={() => setPhase("REFINE")}
             />
           </>
         )}

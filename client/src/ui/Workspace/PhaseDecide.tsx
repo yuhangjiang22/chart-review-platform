@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useState } from "react";
-import { Download, Sparkles, Info, ScanSearch } from "lucide-react";
+import { Download, Info, ScanSearch } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { authFetch } from "../../auth";
@@ -157,12 +157,9 @@ export interface PhaseDecideProps {
    *  the caller branches on the raw task_type and threads "ner" /
    *  "adherence" here (same as PhaseJudge). */
   taskKind?: "phenotype" | "ner" | "adherence";
-  /** Navigate to the Refine tab (where the proposal workspace lives). The
-   *  per-field "Refine" button calls this instead of expanding a card inline. */
-  onRefine?: () => void;
 }
 
-export function PhaseDecide({ taskId, activeSessionId, iterId, taskKind, onRefine }: PhaseDecideProps) {
+export function PhaseDecide({ taskId, activeSessionId, iterId, taskKind }: PhaseDecideProps) {
   const isNer = taskKind === "ner";
   const isAdherence = taskKind === "adherence";
   const [report, setReport] = useState<PerformanceReport | null>(null);
@@ -750,14 +747,15 @@ export function PhaseDecide({ taskId, activeSessionId, iterId, taskKind, onRefin
                         );
                       })}
                       <td className="py-2 pl-2 text-right whitespace-nowrap">
-                        {showRefine && (
+                        {/* Refinement lives in the Refine tab — Performance is
+                            metrics-only. For a NON-refinable disagreement we still
+                            offer a "Why?" note (model error / run analyze-errors),
+                            which is unique to this view; refinable fields get no
+                            button (refine them from the Refine tab). */}
+                        {showRefine && !canPropose && (
                           <button
                             type="button"
                             onClick={() => {
-                              // Refinable → jump to the Refine tab (the proposal
-                              // workspace lives there now). Otherwise toggle the
-                              // inline "why this isn't refinable" explanation.
-                              if (canPropose) { onRefine?.(); return; }
                               setAnalyzeErr(null);
                               setRefineField(expanded ? null : fid);
                             }}
@@ -769,17 +767,8 @@ export function PhaseDecide({ taskId, activeSessionId, iterId, taskKind, onRefin
                             )}
                             aria-expanded={expanded}
                           >
-                            {canPropose ? (
-                              <>
-                                <Sparkles size={10} strokeWidth={1.75} />
-                                Refine
-                              </>
-                            ) : (
-                              <>
-                                <Info size={10} strokeWidth={1.75} />
-                                Why?
-                              </>
-                            )}
+                            <Info size={10} strokeWidth={1.75} />
+                            Why?
                           </button>
                         )}
                       </td>

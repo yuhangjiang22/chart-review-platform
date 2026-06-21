@@ -420,31 +420,17 @@ describe("per-field refinement affordance", () => {
     expect(getsTo("/candidates")).toHaveLength(0);
   });
 
-  it("a <100% field with a guideline-gap cluster gets a 'Refine' (Propose rule) affordance", async () => {
+  it("a <100% field with a refinable (guideline-gap) cluster shows NO inline button — refinement lives in the Refine tab", async () => {
+    // singleGapPerf: only has_distant_metastasis is <100%, and it's refinable.
     setupMocks({
+      performance: singleGapPerf(),
       candidates: candResponse([cluster("has_distant_metastasis", { n_guideline_gap: 2 })]),
     });
     render(<PhaseDecide taskId="cancer-diagnosis" activeSessionId="sess-1" iterId="i1" />);
     await waitFor(() => screen.getByText("has_distant_metastasis"));
-    // Refine button present (refinable gap > 0).
-    await waitFor(() => expect(screen.getByRole("button", { name: /Refine/i })).toBeInTheDocument());
-  });
-
-  it("clicking 'Refine' on a refinable field navigates to the Refine tab (no inline proposal card)", async () => {
-    setupMocks({
-      candidates: candResponse([cluster("has_distant_metastasis", { n_guideline_gap: 2 })]),
-      propose: () => okJson(proposalCard("has_distant_metastasis")),
-    });
-    const onRefine = vi.fn();
-    render(<PhaseDecide taskId="cancer-diagnosis" activeSessionId="sess-1" iterId="i1" onRefine={onRefine} />);
-    const btn = await screen.findByRole("button", { name: /Refine/i });
-    fireEvent.click(btn);
-
-    // The proposal workspace now lives in the Refine tab — clicking Refine
-    // navigates there instead of expanding a card / POSTing /propose inline.
-    expect(onRefine).toHaveBeenCalledTimes(1);
+    // Performance is metrics-only; a refinable field gets no Refine/Why button.
+    expect(screen.queryByRole("button", { name: /Refine|Why\?/i })).not.toBeInTheDocument();
     expect(postsTo("/propose").length).toBe(0);
-    expect(screen.queryByRole("button", { name: /apply to draft/i })).not.toBeInTheDocument();
   });
 
   it("a field whose only attribution is agent_error renders the 'model error' note (Why?), NO propose button", async () => {
@@ -502,23 +488,23 @@ describe("per-field refinement affordance", () => {
     fireEvent.click(await screen.findByRole("button", { name: /Why\?/i }));
     fireEvent.click(await screen.findByRole("button", { name: /Analyze errors/i }));
     await waitFor(() => expect(postsTo("/analyze-errors")).toHaveLength(1));
-    // After attribution the row offers Refine (true_ambiguity is refinable).
-    await waitFor(() => screen.getByRole("button", { name: /Refine/i }));
+    // After attribution the field becomes refinable → its inline "Why?" note goes
+    // away (refine it from the Refine tab; Performance stays metrics-only).
+    await waitFor(() => expect(screen.queryByRole("button", { name: /Why\?|Refine/i })).not.toBeInTheDocument());
   });
 
-  it("a 100% field with no cluster gets NO refine affordance", async () => {
-    // singleGapPerf has cancer_type at 100% (both agents) and no cluster.
+  it("neither a 100% field nor a refinable field gets an inline affordance", async () => {
+    // singleGapPerf has cancer_type at 100% (no cluster); has_distant_metastasis is
+    // refinable (guideline-gap) — and refinable fields no longer get an inline
+    // button (refine from the Refine tab). So there are zero Refine/Why controls.
     setupMocks({
       performance: singleGapPerf(),
       candidates: candResponse([cluster("has_distant_metastasis", { n_guideline_gap: 2 })]),
     });
     render(<PhaseDecide taskId="cancer-diagnosis" activeSessionId="sess-1" iterId="i1" />);
     await waitFor(() => screen.getByText("cancer_type"));
-    // cancer_type row carries no Refine/Why? control…
-    await waitFor(() => expect(screen.getByRole("button", { name: /Refine/i })).toBeInTheDocument());
     expect(within(rowFor("cancer_type")).queryByRole("button")).not.toBeInTheDocument();
-    // …and there is exactly one affordance overall (on has_distant_metastasis).
-    expect(screen.queryAllByRole("button", { name: /Refine|Why\?/i })).toHaveLength(1);
+    expect(screen.queryAllByRole("button", { name: /Refine|Why\?/i })).toHaveLength(0);
   });
 
   it("a <100% field with NO cluster (candidates failed / unjudged-absent) still gets a 'Why?' affordance", async () => {
