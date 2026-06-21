@@ -444,16 +444,20 @@ export function Workspace({
   return (
     <div className="flex gap-2 animate-rise-in">
       <div className="flex-1 min-w-0 max-w-[1240px] mx-auto space-y-0">
-      {/* Top bar: pill bar + session switcher + toggle */}
+      {/* Top bar: pill bar + session switcher + toggle. The pill bar can shrink
+          and scroll horizontally (min-w-0) so a 5th phase never overflows under
+          the session switcher, which stays pinned on the right (shrink-0). */}
       <div className="flex items-center justify-between gap-4 border-b border-border/60 pb-2">
-        <PhasePillBar
-          activePhase={activePhase}
-          donePhases={donePhases}
-          maturity={maturity}
-          onPhaseClick={(phase) => setPhase(phase)}
-          enabledPhases={enabledPhases ?? undefined}
-        />
-        <div className="flex items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <PhasePillBar
+            activePhase={activePhase}
+            donePhases={donePhases}
+            maturity={maturity}
+            onPhaseClick={(phase) => setPhase(phase)}
+            enabledPhases={enabledPhases ?? undefined}
+          />
+        </div>
+        <div className="flex shrink-0 items-center gap-3">
           <SessionSwitcher
             sessions={sessions}
             activeSessionId={activeSessionId}

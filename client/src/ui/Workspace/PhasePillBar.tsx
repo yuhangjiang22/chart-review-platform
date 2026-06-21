@@ -88,7 +88,7 @@ export function PhasePillBar({
           <span
             aria-hidden
             className={cn(
-              "h-px w-5 shrink-0 transition-colors",
+              "h-px w-3.5 shrink-0 transition-colors",
               isDone || isActive ? "bg-foreground/30" : "bg-border",
             )}
           />
@@ -97,7 +97,7 @@ export function PhasePillBar({
           type="button"
           onClick={() => onPhaseClick?.(phase)}
           className={cn(
-            "flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] transition-all",
+            "flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.12em] transition-all",
             isActive
               ? "border-foreground bg-foreground text-background"
               : isDone
@@ -122,7 +122,7 @@ export function PhasePillBar({
   return (
     <nav
       aria-label="Workflow phases"
-      className="flex items-center gap-2 overflow-x-auto py-2"
+      className="flex items-center gap-1.5 overflow-x-auto py-2"
     >
       {/* Workflow cycle: TRY → VALIDATE → DECIDE */}
       <div className="flex items-center gap-1 rounded-full border border-dashed border-border/70 px-2 py-1">
