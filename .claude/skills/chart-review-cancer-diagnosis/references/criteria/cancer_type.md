@@ -1,6 +1,6 @@
 ---
 field_id: cancer_type
-prompt: x
+prompt: What is the histologic type of the patient's primary malignancy?
 answer_schema:
   enum:
     - squamous_cell_carcinoma
