@@ -15,6 +15,7 @@ import { ChevronRight, ChevronLeft, FileText, ChevronDown, PanelRightClose } fro
 import { authFetch } from "../../auth";
 import { useDeepagentsModels } from "../../useDeepagentsModels";
 import { TaskToolsPanel } from "./TaskToolsPanel";
+import { VersionHistory } from "./VersionHistory";
 
 interface AgentSpecLite {
   id: string;
@@ -320,6 +321,9 @@ export function SessionSidebar({
             <p className="mt-1 text-[10px] text-muted-foreground/80 leading-[1.4]">
               Edits made here affect THIS session's next iter — that's the inner loop.
             </p>
+            {/* Rubric version timeline — shown on every tab's sidebar (the Refine
+                tab hides the sidebar and renders its own copy in the workspace). */}
+            {activeSessionId && <VersionHistory taskId={taskId} sessionId={activeSessionId} />}
             <TaskToolsPanel taskId={taskId} />
           </div>
         </div>
