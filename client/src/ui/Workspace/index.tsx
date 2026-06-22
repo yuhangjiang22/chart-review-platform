@@ -573,13 +573,26 @@ export function Workspace({
               left={
                 // Phenotype proposal cards only (adherence proposals live in the
                 // Performance tab's AdherenceRefinePanel; NER has no proposal UI).
-                task?.task_type !== "ner" && task?.task_type !== "adherence" && activeIter ? (
+                task?.task_type === "ner" || task?.task_type === "adherence" ? undefined
+                : activeIter ? (
                   <RefineProposalCard
                     taskId={taskId}
                     iterId={activeIter.iter_id}
                     sessionId={activeSessionId}
                   />
-                ) : undefined
+                ) : (
+                  // No agent run yet → no agent-vs-you disagreements to propose from.
+                  // Show an explanatory placeholder so the panel doesn't just vanish.
+                  <div className="rounded-md border border-border/60 bg-paper/60 px-3 py-3">
+                    <div className="mb-1 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                      Suggested refinements
+                    </div>
+                    <p className="text-[11.5px] text-muted-foreground leading-relaxed">
+                      No agent run on this session yet. Run agents on patients (Try) and validate
+                      them — refinement suggestions from agent-vs-you disagreements will appear here.
+                    </p>
+                  </div>
+                )
               }
             />
           </div>
