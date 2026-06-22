@@ -92,7 +92,10 @@ export function SessionSwitcher({
 
       {open && (
         <div
-          className="absolute z-50 mt-1 w-[320px] max-h-[400px] overflow-y-auto rounded-md border border-border bg-paper shadow-lg"
+          // Right-anchored so the menu opens leftward and never spills past the
+          // viewport's right edge (the switcher sits near the right in both the
+          // top bar and the sidebar) — which was forcing horizontal page scroll.
+          className="absolute right-0 z-50 mt-1 w-[320px] max-w-[calc(100vw-2rem)] max-h-[400px] overflow-y-auto rounded-md border border-border bg-paper shadow-lg"
           role="listbox"
         >
           <div className="p-2">
