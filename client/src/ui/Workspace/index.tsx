@@ -569,7 +569,7 @@ export function Workspace({
             proposals (left) + the working-draft diff & version history (right).
             Session-gated like the other non-AUTHOR phases. */}
         {activePhase === "REFINE" && activeSessionId && (
-          <div className="py-2">
+          <div className="mx-auto max-w-[1040px] py-2">
             <RefineWorkspace
               taskId={taskId}
               sessionId={activeSessionId}
