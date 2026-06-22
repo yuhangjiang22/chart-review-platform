@@ -92,10 +92,12 @@ export function SessionSwitcher({
 
       {open && (
         <div
-          // Right-anchored so the menu opens leftward and never spills past the
-          // viewport's right edge (the switcher sits near the right in both the
-          // top bar and the sidebar) — which was forcing horizontal page scroll.
-          className="absolute right-0 z-50 mt-1 w-[320px] max-w-[calc(100vw-2rem)] max-h-[400px] overflow-y-auto rounded-md border border-border bg-paper shadow-lg"
+          // Right-anchored so it opens leftward (the switcher sits near the right
+          // in both the top bar and the sidebar) without spilling past the
+          // viewport. Width fits inside the ~276px sidebar — a wider menu got
+          // clipped by the sidebar's overflow ("…IVE", "…tient"). Caps to the
+          // viewport too.
+          className="absolute right-0 z-50 mt-1 w-[264px] max-w-[calc(100vw-2rem)] max-h-[400px] overflow-y-auto rounded-md border border-border bg-paper shadow-lg"
           role="listbox"
         >
           <div className="p-2">
