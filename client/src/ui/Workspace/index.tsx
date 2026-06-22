@@ -444,10 +444,19 @@ export function Workspace({
   return (
     <div className="flex gap-2 animate-rise-in">
       <div className="flex-1 min-w-0 max-w-[1240px] mx-auto space-y-0">
-      {/* Top bar: pill bar + session switcher + toggle. The pill bar can shrink
-          and scroll horizontally (min-w-0) so a 5th phase never overflows under
-          the session switcher, which stays pinned on the right (shrink-0). */}
-      <div className="flex items-center justify-between gap-4 border-b border-border/60 pb-2">
+      {/* Top bar: session switcher (far left) · pill bar (fills, scrolls) ·
+          settings (right). The switcher sits on the left so its dropdown opens
+          into open space — no right-edge overflow / sidebar clipping. */}
+      <div className="flex items-center gap-4 border-b border-border/60 pb-2">
+        <div className="shrink-0">
+          <SessionSwitcher
+            sessions={sessions}
+            activeSessionId={activeSessionId}
+            onSelect={setActiveSessionId}
+            onNewSession={() => setNewSessionOpen(true)}
+            onArchive={isMethodologist ? archiveSession : undefined}
+          />
+        </div>
         <div className="min-w-0 flex-1">
           <PhasePillBar
             activePhase={activePhase}
@@ -457,19 +466,7 @@ export function Workspace({
             enabledPhases={enabledPhases ?? undefined}
           />
         </div>
-        {/* Session switcher lives at the top of the sidebar — but the REFINE tab
-            hides the sidebar, so surface the switcher in the top bar there so the
-            active session is always visible/switchable. Exactly one, either way. */}
         <div className="flex shrink-0 items-center gap-3">
-          {activePhase === "REFINE" && (
-            <SessionSwitcher
-              sessions={sessions}
-              activeSessionId={activeSessionId}
-              onSelect={setActiveSessionId}
-              onNewSession={() => setNewSessionOpen(true)}
-              onArchive={isMethodologist ? archiveSession : undefined}
-            />
-          )}
           <WorkspaceSettings taskId={taskId} onShowAllToolsChange={() => { /* show-all-tools not used in light platform */ }} />
         </div>
       </div>
@@ -666,10 +663,6 @@ export function Workspace({
           onToggle={() => setSidebarOpen(!sidebarOpen)}
           onJumpToAuthor={() => setPhase("AUTHOR")}
           taskKind={taskKind}
-          sessions={sessions}
-          onSelectSession={setActiveSessionId}
-          onNewSession={() => setNewSessionOpen(true)}
-          onArchiveSession={isMethodologist ? archiveSession : undefined}
         />
       )}
     </div>
