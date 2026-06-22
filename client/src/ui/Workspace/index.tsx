@@ -457,14 +457,19 @@ export function Workspace({
             enabledPhases={enabledPhases ?? undefined}
           />
         </div>
+        {/* Session switcher lives at the top of the sidebar — but the REFINE tab
+            hides the sidebar, so surface the switcher in the top bar there so the
+            active session is always visible/switchable. Exactly one, either way. */}
         <div className="flex shrink-0 items-center gap-3">
-          <SessionSwitcher
-            sessions={sessions}
-            activeSessionId={activeSessionId}
-            onSelect={setActiveSessionId}
-            onNewSession={() => setNewSessionOpen(true)}
-            onArchive={isMethodologist ? archiveSession : undefined}
-          />
+          {activePhase === "REFINE" && (
+            <SessionSwitcher
+              sessions={sessions}
+              activeSessionId={activeSessionId}
+              onSelect={setActiveSessionId}
+              onNewSession={() => setNewSessionOpen(true)}
+              onArchive={isMethodologist ? archiveSession : undefined}
+            />
+          )}
           <WorkspaceSettings taskId={taskId} onShowAllToolsChange={() => { /* show-all-tools not used in light platform */ }} />
         </div>
       </div>
@@ -661,6 +666,10 @@ export function Workspace({
           onToggle={() => setSidebarOpen(!sidebarOpen)}
           onJumpToAuthor={() => setPhase("AUTHOR")}
           taskKind={taskKind}
+          sessions={sessions}
+          onSelectSession={setActiveSessionId}
+          onNewSession={() => setNewSessionOpen(true)}
+          onArchiveSession={isMethodologist ? archiveSession : undefined}
         />
       )}
     </div>

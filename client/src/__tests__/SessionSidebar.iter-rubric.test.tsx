@@ -57,6 +57,9 @@ const BASE = {
   isOpen: true,
   onToggle: () => {},
   onJumpToAuthor: () => {},
+  sessions: [],
+  onSelectSession: () => {},
+  onNewSession: () => {},
 } as const;
 
 describe("SessionSidebar — iter rubric version", () => {

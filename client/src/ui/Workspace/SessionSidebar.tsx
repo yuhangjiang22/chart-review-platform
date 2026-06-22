@@ -16,6 +16,7 @@ import { authFetch } from "../../auth";
 import { useDeepagentsModels } from "../../useDeepagentsModels";
 import { TaskToolsPanel } from "./TaskToolsPanel";
 import { VersionHistory } from "./VersionHistory";
+import { SessionSwitcher, type SessionListItem } from "./SessionSwitcher";
 
 interface AgentSpecLite {
   id: string;
@@ -62,6 +63,12 @@ interface SessionSidebarProps {
   onToggle: () => void;
   /** Navigate to AUTHOR phase (skill snapshot link). */
   onJumpToAuthor: () => void;
+  /** Session switcher (moved here from the top bar) — full session list +
+   *  select / new / archive. */
+  sessions: SessionListItem[];
+  onSelectSession: (sessionId: string) => void;
+  onNewSession: () => void;
+  onArchiveSession?: (sessionId: string) => void;
   /** task_kind drives agent-vs-reviewer terminology, matching the
    *  PhaseTry pane. NER = reviewers (direct LLM); pheno/adh = agents
    *  (agent loop). */
@@ -80,6 +87,7 @@ function fmtDate(iso: string): string {
 export function SessionSidebar({
   taskId, activeSessionId, sessionIters, activeIterId,
   patientStatus, isOpen, onToggle, onJumpToAuthor, taskKind,
+  sessions, onSelectSession, onNewSession, onArchiveSession,
 }: SessionSidebarProps) {
   const agentSectionLabel = taskKind === "ner" ? "Reviewers" : "Agents";
   const [session, setSession] = useState<SessionShape | null>(null);
@@ -125,9 +133,9 @@ export function SessionSidebar({
         "border-l border-border bg-paper/30",
       )}
     >
-      {/* Minimal top gutter — just the collapse affordance. The session
-          name + state below carry the identification; an additional
-          "SESSION" label would just duplicate the top-bar switcher. */}
+      {/* Top gutter: the collapse affordance + the session switcher (moved here
+          from the top bar). The switcher always shows — even with no active
+          session — so you can pick/create one. */}
       <div className="flex items-center justify-end px-2 pt-2 pb-1">
         <button
           type="button"
@@ -139,6 +147,15 @@ export function SessionSidebar({
           <PanelRightClose size={14} strokeWidth={1.75} />
         </button>
       </div>
+      <div className="px-3 pb-1">
+        <SessionSwitcher
+          sessions={sessions}
+          activeSessionId={activeSessionId}
+          onSelect={onSelectSession}
+          onNewSession={onNewSession}
+          onArchive={onArchiveSession}
+        />
+      </div>
 
       {!activeSessionId || !session ? (
         <div className="px-3 py-6 text-[12px] text-muted-foreground italic text-center">
@@ -146,10 +163,10 @@ export function SessionSidebar({
         </div>
       ) : (
         <div className="px-3 py-3 space-y-5 text-[11.5px]">
-          {/* Header */}
+          {/* Header — the name now lives in the switcher above, so just the
+              state + date + snapshot here. */}
           <div>
-            <div className="font-medium text-[13px] text-ink truncate">{session.name}</div>
-            <div className="mt-0.5 flex items-center gap-2">
+            <div className="flex items-center gap-2">
               <span
                 className={cn(
                   "rounded px-1.5 py-[1px] text-[9.5px] uppercase tracking-[0.12em]",
