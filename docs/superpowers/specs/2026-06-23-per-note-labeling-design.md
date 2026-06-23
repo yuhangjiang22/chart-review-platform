@@ -61,9 +61,10 @@ so the review surface groups by note rather than inventing a parallel shape.
 - **(a) ACTS-first, generic flag.** `per_note` is a generic session flag, but
   only tasks that opt in via `meta.yaml` (`supports_per_note: true`) show the
   toggle and run the per-note loop. ACTS opts in; others do not (yet).
-- **(b) Per-note metrics deferred.** Performance/metrics stay patient-level.
-  Per-note has no per-note ground truth yet and the immediate ask is
-  *annotation*, not scoring. Per-note mode is extraction + review only.
+- **(b) Per-note scoring included.** Per-note runs produce note-level metrics:
+  per-field accuracy/F1 and κ computed over (patient, note, field) cells,
+  scored against the reviewer's validated per-note labels and, when present,
+  per-note corpus ground truth. (See components 7–8.)
 - **(c) No patient rollup.** Output is purely per-note; no "any-note-positive"
   aggregate (YAGNI — can be added later).
 
@@ -156,6 +157,65 @@ that scopes every field to the single note in context:
 The prompt lives alongside the skill (e.g. `references/pernote_prompt.md`) so
 it is versioned with the rubric and editable like other criteria text.
 
+### 7. Per-note ground truth (corpus)
+
+`ground_truth.json` is patient-level today (`leaf_answers: { field_id:
+answer }`). Add an **optional** sibling map for per-note labels:
+
+```jsonc
+{
+  "patient_id": "...",
+  "leaf_answers": { ... },          // unchanged — patient-level
+  "note_answers": {                 // NEW — per-note labels
+    "<note_id>": { "impaired_cognition": "1", "apoe2": "0", ... }
+  }
+}
+```
+
+`note_id` is the note filename without `.txt` (same convention as NER /
+`validated_notes`). The key is optional and only consumed in per-note mode;
+patient-level scoring ignores it. The demo patient `patient_acts_demo_01`
+gets a `note_answers` entry for its single note (identical to its
+`leaf_answers`, since it has one note). A small typed reader
+(`packages/patients`, alongside the existing ground-truth read) returns
+`note_answers` when present.
+
+### 8. Per-note metrics + Performance surface
+
+Add `computePerNotePerformance(sessionId, taskId, fieldIds, runOverride?)`
+(new file `server/lib/pernote-performance.ts`, called from
+`performance-routes.ts`) that mirrors `computePerformance` but scores at
+**(patient, note, field)** cell granularity instead of (patient, field):
+
+- Walk the session's `reviewer_validated` review_states. Per-note assessments
+  carry `encounter_id = note_id`, so each `(field_id, encounter_id)` is one
+  scoring cell.
+- **Two references**, reported side by side:
+  1. **Agent vs reviewer** — the agent's original label
+     (`FieldAssessment.original_agent_snapshot.answer`, or the draft answer
+     when the reviewer left it untouched) vs the reviewer's final answer.
+     This is the existing agent-vs-human semantics at note granularity; it
+     does not need per-agent run files because per-note mode writes one
+     extractor draft directly into the review_state.
+  2. **Agent vs ground truth** and **reviewer vs ground truth** — when the
+     patient has `note_answers` for that note, compare against the corpus
+     label. Cells without per-note GT are simply omitted from the
+     GT-referenced numbers (reported as coverage `n_with_gt / n_total`).
+- **Outputs:** per-field `{ n_evaluable, n_correct, accuracy }`, a macro
+  accuracy across fields, an overall agreement rate over all note×field
+  cells, and Cohen's κ per field (reuse the κ helper in
+  `server/adherence-iaa-routes.ts`; κ needs ≥2 distinct categories present).
+  Plus a disagreement list — `{ note_id, field_id, agent_answer,
+  reviewer_answer, gt_answer? }` — mirroring the adherence
+  `question_disagreements` rows, so the reviewer can see exactly which note ×
+  field cells diverged.
+
+`GET /api/performance/:taskId` gains a `per_note=1` (or auto-detect from the
+session's `per_note` flag) path that returns the per-note report. The
+Performance UI, when the session is per-note, renders the per-note table
+(fields × {accuracy, κ, n}) and the disagreement list instead of the
+patient-level leaderboard.
+
 ## Data flow
 
 ```
@@ -170,6 +230,9 @@ NewSessionDialog (per_note toggle)
                            → upsert Encounter + 5 FieldAssessments (encounter_id=note_id)
                   └─ review_state.json (encounters + encounter-scoped assessments)
         VALIDATE → PerNoteReview grid (note × field), reviewer edits
+        PERFORMANCE → computePerNotePerformance (note×field cells):
+                        agent-vs-reviewer + agent/reviewer-vs-note_answers GT
+                        → per-field accuracy/κ + disagreement list
 ```
 
 ## Error handling
@@ -200,13 +263,17 @@ NewSessionDialog (per_note toggle)
   OpenRouter) produces per-note labels for its single note matching the
   ground truth (`impaired_cognition=1`, APOE ε3/ε4 → `apoe2=0/apoe3=1/apoe4=1`,
   `postmenopause=1`), ignoring the family-history distractor.
+- **Metrics test** (`pernote-performance`): a fixture with two notes and
+  known agent/reviewer/`note_answers` values yields the expected per-field
+  accuracy, macro accuracy, κ, and disagreement rows; cells lacking per-note
+  GT are excluded from GT numbers and counted in coverage.
 - **UI smoke** (`e2e`): the per-note toggle appears for ACTS, is absent for a
   non-opted-in task, and a created session carries `per_note`; the
-  PerNoteReview grid renders one row per note × the 5 columns.
+  PerNoteReview grid renders one row per note × the 5 columns; the Performance
+  view shows the per-note table for a per-note session.
 
 ## Out of scope (deferred)
 
-- Per-note ground truth + per-note metrics (Performance stays patient-level).
-- Patient-level rollup of per-note labels.
+- Patient-level rollup of per-note labels ("any-note-positive").
 - Per-note mode for NER (already per-note) and adherence.
 - The deferred ACTS numeric scales / span fields (tracked separately).
