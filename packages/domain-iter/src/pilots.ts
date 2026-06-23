@@ -456,6 +456,7 @@ export interface StartPilotOptions {
    *  views (sidebar, switcher, scoped phase panes) will associate the
    *  iter with the session. Absent = legacy ungrouped iter. */
   session_id?: string;
+  per_note?: boolean;
 }
 
 export interface StartPilotResult {
@@ -569,6 +570,7 @@ export function startPilotIteration(opts: StartPilotOptions): StartPilotResult {
     target_field_ids: targetFieldIds,
     provider: opts.provider,
     session_id: opts.session_id,
+    per_note: opts.per_note,
     onStatus: opts.onRunStatus,
   });
 

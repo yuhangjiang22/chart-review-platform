@@ -396,6 +396,7 @@ export const pilotWriteRoutes: RouteEntry[] = [
         provider: resolvedProvider,
         model: typeof model === "string" && model.trim().length > 0 ? model.trim() : undefined,
         session_id,
+        per_note: session.per_note,
         onRunStatus: onPilotRunStatus,
       });
     },

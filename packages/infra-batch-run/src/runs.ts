@@ -93,6 +93,9 @@ export interface RunManifest {
    *  AGENT_PROVIDER env var. Absent on manifests written before
    *  v0.7.1 — readers should fall back to the env-var default. */
   provider?: ProviderName;
+  /** When true, this run labels each note individually (per-note phenotype
+   *  mode). Copied from the session manifest at run-start. */
+  per_note?: boolean;
 }
 
 export interface RunStatus {
@@ -597,6 +600,8 @@ export interface StartBatchRunOptions {
   /** Per-run agent provider override. When omitted, falls back to the
    *  AGENT_PROVIDER env var resolved at server start. */
   provider?: ProviderName;
+  /** Per-note phenotype mode (read from the session manifest by the caller). */
+  per_note?: boolean;
   /** Optional callback invoked after each status mutation. The driver
    *  calls this with the latest status; the route layer can broadcast
    *  on WS. */
@@ -704,6 +709,7 @@ export function startBatchRun(opts: StartBatchRunOptions): StartBatchRunResult {
     ...(opts.cohort_id ? { cohort_id: opts.cohort_id } : {}),
     ...(opts.session_id ? { session_id: opts.session_id } : {}),
     ...(rubricVersion ? { rubric_version: rubricVersion } : {}),
+    ...(opts.per_note ? { per_note: true } : {}),
   };
 
   fs.mkdirSync(runDir(runId), { recursive: true });
