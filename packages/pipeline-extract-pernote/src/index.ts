@@ -25,8 +25,6 @@ export interface PerNoteFieldResult {
   confidence?: "low" | "medium" | "high";
   evidence?: NoteEvidence[];
   rationale?: string;
-  /** true when the model gave an answer the enum doesn't allow (answer left unset). */
-  invalid_answer?: boolean;
   /** Raw model quote before faithfulness resolution; the orchestrator resolves
    *  it into `evidence`. parseLabelResponse populates this; the final result
    *  keeps it for transparency. */
@@ -89,8 +87,8 @@ export function parseLabelResponse(text: string, fields: PerNoteField[]): PerNot
     const conf = raw?.confidence;
     return {
       field_id: f.field_id,
+      // An out-of-enum answer is dropped (left undefined) rather than persisted.
       answer: valid ? ans : undefined,
-      invalid_answer: ans != null && !valid,
       confidence: conf === "low" || conf === "medium" || conf === "high" ? conf : undefined,
       rationale: raw?.rationale != null ? String(raw.rationale) : undefined,
       evidence: undefined,

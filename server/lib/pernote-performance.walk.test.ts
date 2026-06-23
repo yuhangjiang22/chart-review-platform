@@ -37,4 +37,21 @@ describe("computePerNotePerformance", () => {
     expect(imp.accuracy).toBe(1);    // untouched → agree
     expect(r.validated_notes).toBe(1);
   });
+
+  it("excludes a cleared cell (reviewer answer \"\") from scoring", async () => {
+    const { computePerNotePerformance } = await import("./pernote-performance.js");
+    writeState("session_002", "p1", "chart-review-acts", {
+      validated_notes: ["n1"],
+      encounters: [{ encounter_id: "n1" }],
+      field_assessments: [
+        // reviewer cleared the cell to "" — not a label, must not be scored
+        { field_id: "apoe4", encounter_id: "n1", answer: "", source: "reviewer", status: "approved",
+          original_agent_snapshot: { answer: "0" } },
+      ],
+    });
+    const r = computePerNotePerformance("session_002", "chart-review-acts", ["apoe4"]);
+    const apoe = r.agent_vs_reviewer.per_field.find((f) => f.field_id === "apoe4")!;
+    expect(apoe.n).toBe(0);          // cleared cell excluded, no pair formed
+    expect(apoe.accuracy).toBeNull();
+  });
 });

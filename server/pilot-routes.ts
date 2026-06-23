@@ -432,6 +432,9 @@ export const pilotWriteRoutes: RouteEntry[] = [
       // legacy ungrouped iters, fall back to the source iter's values.
       let lockedPatientIds: string[];
       let lockedAgentSpecs: typeof run.agent_specs;
+      // Per-note mode is a session property; carry it forward on re-run so a
+      // per-note iter doesn't silently degrade to a per-patient agent loop.
+      let perNote: boolean | undefined;
       if (m.session_id) {
         const session = getSessionManifest(p.taskId, m.session_id);
         if (!session) {
@@ -444,6 +447,7 @@ export const pilotWriteRoutes: RouteEntry[] = [
         }
         lockedPatientIds = session.cohort.patient_ids;
         lockedAgentSpecs = session.agent_specs;
+        perNote = session.per_note;
       } else {
         lockedPatientIds = run.patient_ids;
         lockedAgentSpecs = run.agent_specs;
@@ -458,6 +462,7 @@ export const pilotWriteRoutes: RouteEntry[] = [
         // Carry the session_id forward so the new iter stays inside the
         // same session as its source.
         session_id: m.session_id,
+        per_note: perNote,
         onRunStatus: onPilotRunStatus,
       });
     },

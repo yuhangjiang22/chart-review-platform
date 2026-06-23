@@ -81,7 +81,9 @@ function readJson<T>(p: string): T | null {
   try { return JSON.parse(fs.readFileSync(p, "utf8")) as T; } catch { return null; }
 }
 function asStr(v: unknown): string | null {
-  if (v === undefined || v === null) return null;
+  // An empty string is an intentionally-cleared cell ("—" in the grid), not a
+  // label — exclude it from scoring rather than counting it as a disagreement.
+  if (v === undefined || v === null || v === "") return null;
   return typeof v === "string" ? v : JSON.stringify(v);
 }
 
