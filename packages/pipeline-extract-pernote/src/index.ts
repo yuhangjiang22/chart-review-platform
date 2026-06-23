@@ -48,9 +48,12 @@ export interface ExtractLabelsOpts {
   call?: typeof callLlm;
 }
 
-/** Pull leaf fields + their enums off the compiled task. */
+/** Pull EXTRACTED leaf fields + their enums off the compiled task. Fields with
+ *  a `derivation` are computed (not extracted), so they are excluded — the
+ *  model never labels a derived field; it is recomputed from its leaf inputs. */
 export function fieldsFromTask(task: CompiledTask): PerNoteField[] {
   return (task.fields ?? [])
+    .filter((f) => !(f as { derivation?: string }).derivation)
     .map((f) => {
       const id = (f as { field_id?: string; id?: string }).field_id ?? (f as { id: string }).id;
       const schema = (f as { answer_schema?: { enum?: unknown[] } }).answer_schema;
