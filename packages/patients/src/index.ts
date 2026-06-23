@@ -298,6 +298,25 @@ export function readStructured(patientId: string): StructuredResponse {
   };
 }
 
+export interface GroundTruth {
+  patient_id?: string;
+  leaf_answers?: Record<string, string>;
+  /** Per-note labels: note_id (no .txt) → { field_id: answer }. Optional;
+   *  consumed only by per-note scoring. */
+  note_answers?: Record<string, Record<string, string>>;
+}
+
+/** Read a patient's corpus ground_truth.json, or null when absent/unreadable. */
+export function readGroundTruth(patientId: string): GroundTruth | null {
+  try {
+    const fp = path.join(patientDir(patientId), "ground_truth.json");
+    if (!fs.existsSync(fp)) return null;
+    return JSON.parse(fs.readFileSync(fp, "utf8")) as GroundTruth;
+  } catch {
+    return null;
+  }
+}
+
 function prettyId(id: string): string {
   // patient_easy_nsclc_01 → "easy nsclc 01"
   const trimmed = id.startsWith("patient_") ? id.slice("patient_".length) : id;
