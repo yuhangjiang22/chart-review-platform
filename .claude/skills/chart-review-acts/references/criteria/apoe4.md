@@ -1,6 +1,6 @@
 ---
 field_id: apoe4
-prompt: Is an APOE ε4 allele documented for this patient (from APOE genotype testing)?
+prompt: Is an APOE ε4 allele present?
 answer_schema:
   enum:
     - "1"
@@ -8,45 +8,24 @@ answer_schema:
     - "NA"
 cardinality: one
 group: genotype
+derivation: 'apoe_genotype in ["e2/e4","e3/e4","e4/e4","e4_carrier"] ? "1" : apoe_genotype in ["e2/e2","e2/e3","e3/e3"] ? "0" : "NA"'
 ---
 
-# Criterion: apoe4
+# Criterion: apoe4 (computed)
 
 ## Definition
 
 Whether the patient's documented APOE genotype includes at least one **ε4**
-allele (the principal Alzheimer's risk allele). Use only **explicitly documented
-APOE genotype / genetic testing** — never infer from an AD diagnosis, cognitive
-impairment, family history, or risk statements.
+allele (the principal Alzheimer's risk allele). This field is **computed** —
+not extracted directly — from `apoe_genotype`:
 
-Three values:
-- **`1`** — at least one ε4 allele present (ε2/ε4, ε3/ε4, or ε4/ε4), or an
-  explicit ε4-carrier statement ("APOE4 carrier", "ε4 positive", "heterozygous/
-  homozygous for ε4").
-- **`0`** — a documented genotype rules ε4 out (ε2/ε2, ε2/ε3, ε3/ε3).
-- **`NA`** — no APOE genotype documented, or only partial info that doesn't
-  establish ε4's presence/absence.
-
-> If no genotype is documented, all three APOE labels are **`NA`** (never 0/0/0).
+- **`1`** — ε4 present: `e2/e4`, `e3/e4`, `e4/e4`, or `e4_carrier`.
+- **`0`** — a full genotype rules ε4 out: `e2/e2`, `e2/e3`, `e3/e3`.
+- **`NA`** — `none` (no genotype), or a carrier of a different allele
+  (`e2_carrier` / `e3_carrier`) where ε4's presence can't be established.
 
 ## Extraction guidance
 
-- Read the documented APOE genotype / ε4 carrier status from genetic testing,
-  neurology / genetics / AD-clinic notes, labs, or problem list. Recognize APOE /
-  ApoE / Apolipoprotein E and ε4 / e4 / E4 spellings.
-- Map: ε4 present in ε2/ε4, ε3/ε4, ε4/ε4 → `1`; absent in ε2/ε2, ε2/ε3, ε3/ε3 → `0`.
-- Unlike ε2/ε3, an explicit **ε4 carrier / ε4 positive** statement is sufficient
-  for `1` even without the full two-allele genotype.
-
-**Evidence:** cite the genotype span or the explicit ε4-carrier statement. For
-`NA`, cite the checked section or note no genotype documented.
-
-## Examples
-
-- "APOE genotype: ε3/ε4" → `1`
-- "Patient is heterozygous APOE4 carrier." → `1`
-- "APOE ε4 positive" → `1`
-- "APOE ε4/ε4" → `1`
-- "APOE e2/e3" → `0`
-- "APOE ε3/ε3" → `0`
-- No APOE testing documented → `NA`
+Do not answer this field directly — it is auto-derived from `apoe_genotype` and
+shown on the **Computed** panel. To change it, fix `apoe_genotype`; this value
+recomputes. Confirm the computed value during validation.

@@ -1,6 +1,6 @@
 ---
 field_id: apoe3
-prompt: Is an APOE ε3 allele documented for this patient (from APOE genotype testing)?
+prompt: Is an APOE ε3 allele present?
 answer_schema:
   enum:
     - "1"
@@ -8,40 +8,24 @@ answer_schema:
     - "NA"
 cardinality: one
 group: genotype
+derivation: 'apoe_genotype in ["e2/e3","e3/e3","e3/e4","e3_carrier"] ? "1" : apoe_genotype in ["e2/e2","e2/e4","e4/e4"] ? "0" : "NA"'
 ---
 
-# Criterion: apoe3
+# Criterion: apoe3 (computed)
 
 ## Definition
 
 Whether the patient's documented APOE genotype includes at least one **ε3**
-allele. Use only **explicitly documented APOE genotype / genetic testing**
-results — never infer from diagnosis, cognition, family history, or risk.
+allele. This field is **computed** — not extracted directly — from
+`apoe_genotype`:
 
-Three values:
-- **`1`** — at least one ε3 allele present (ε2/ε3, ε3/ε3, or ε3/ε4).
-- **`0`** — a documented genotype rules ε3 out (ε2/ε2, ε2/ε4, ε4/ε4).
-- **`NA`** — no APOE genotype documented, or only partial info that doesn't
-  establish ε3's presence/absence.
-
-> If no genotype is documented, all three APOE labels are **`NA`** (never 0/0/0).
+- **`1`** — ε3 present: `e2/e3`, `e3/e3`, `e3/e4`, or `e3_carrier`.
+- **`0`** — a full genotype rules ε3 out: `e2/e2`, `e2/e4`, `e4/e4`.
+- **`NA`** — `none` (no genotype), or a carrier of a different allele
+  (`e2_carrier` / `e4_carrier`) where ε3's presence can't be established.
 
 ## Extraction guidance
 
-- Read the documented APOE genotype from genetic testing / neurology / genetics /
-  lab / problem-list sources. Recognize APOE / ApoE / Apolipoprotein E and
-  ε3 / e3 / E3 spellings.
-- Map: ε3 present in ε2/ε3, ε3/ε3, ε3/ε4 → `1`; absent in ε2/ε2, ε2/ε4, ε4/ε4 → `0`.
-- An ε4-only statement without the full genotype does not establish ε3 → `NA`.
-
-**Evidence:** cite the documented genotype span. For `NA`, cite the checked
-section or note no genotype documented.
-
-## Examples
-
-- "APOE genotype: ε3/ε4" → `1`
-- "APOE e3/e3" → `1`
-- "APOE ε2/ε4" → `0`
-- "APOE ε4/ε4" → `0`
-- "Heterozygous APOE4 carrier" (no full genotype) → `NA`
-- No APOE testing documented → `NA`
+Do not answer this field directly — it is auto-derived from `apoe_genotype` and
+shown on the **Computed** panel. To change it, fix `apoe_genotype`; this value
+recomputes. Confirm the computed value during validation.

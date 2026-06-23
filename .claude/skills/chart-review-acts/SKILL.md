@@ -3,21 +3,25 @@ name: chart-review-acts
 description: >
   ACTS Alzheimer's/dementia phenotyping — extract from a patient's clinical
   notes: whether impaired cognition (MCI/dementia) is documented
-  (impaired_cognition), the APOE genotype as ε2/ε3/ε4 allele presence (apoe2,
-  apoe3, apoe4), and postmenopausal status (postmenopause). Evidence-cited.
+  (impaired_cognition), the documented APOE genotype (apoe_genotype, from which
+  ε2/ε3/ε4 allele presence apoe2/apoe3/apoe4 is computed), and postmenopausal
+  status (postmenopause). Evidence-cited.
   Triggers on: impaired cognition, MCI, dementia, APOE genotype, ε2/ε3/ε4,
   postmenopause, ACTS.
 ---
 
 # Procedure
 
-This is a **notes-only** phenotype task. You answer **five independent leaf
-fields** directly, each with one allowed value and an evidence citation:
+This is a **notes-only** phenotype task. You extract **three leaf fields**
+directly, each with one allowed value and an evidence citation. The three APOE
+allele flags (`apoe2`/`apoe3`/`apoe4`) are **computed** from the genotype — do
+NOT set them.
 
 - `impaired_cognition` — `1` (MCI/dementia/cognitive impairment documented) / `0`.
-- `apoe2` / `apoe3` / `apoe4` — `1` (allele present) / `0` (genotype rules it out) /
-  `NA` (no/partial genotype documented). If **no APOE genotype is documented at
-  all, set all three to `NA`** (never 0/0/0 — that is genotypically impossible).
+- `apoe_genotype` — the documented APOE genotype: a full genotype (`e2/e2`,
+  `e2/e3`, `e2/e4`, `e3/e3`, `e3/e4`, `e4/e4`), a single-allele carrier
+  (`e2_carrier` / `e3_carrier` / `e4_carrier`), or `none` when no genotype is
+  documented. `apoe2`/`apoe3`/`apoe4` derive automatically from this value.
 - `postmenopause` — `1` (postmenopausal/menopause documented) / `0`.
 
 1. `list_notes` to see the chart. Use **`search_notes`** for high-signal terms to
@@ -49,9 +53,11 @@ fields** directly, each with one allowed value and an evidence citation:
   ("memory workup planned", "APOE testing ordered"), and **negations**.
 - **Do not infer APOE** from an AD diagnosis, cognitive status, risk, or family
   history — only from a documented genotype / ε4-carrier statement.
-- **APOE coupling:** when a full two-allele genotype is documented, set the three
-  alleles per the genotype mapping (a fully documented genotype always yields ≥1
-  allele = `1`). When none is documented, all three are `NA`.
+- **APOE = one extraction:** read the documented genotype into `apoe_genotype`
+  (a full genotype, a single-allele `*_carrier`, or `none`). The three allele
+  flags derive from it automatically — never set them by hand. A single-allele
+  carrier statement ("ε4 carrier") → `e4_carrier`; "homozygous ε4" is the full
+  genotype `e4/e4`.
 - **Cognition:** subjective concern alone, transient delirium, or evaluation-only
   → `0`; a confirmed MCI/dementia diagnosis, clinician-corroborated decline, or
   impaired objective testing → `1`.
@@ -59,6 +65,8 @@ fields** directly, each with one allowed value and an evidence citation:
   postmenopausal statement; `medium` = narrative inference within the rules;
   `low` = ambiguous → prefer `0`/`NA` over a low-confidence guess.
 
-4. **Commit all five fields** via `set_field_assessment` before finishing — every
-   field must have a value. **Do NOT call `set_review_status`.** Once the five are
-   committed, emit a one-line summary and stop.
+4. **Commit the three leaf fields** (`impaired_cognition`, `apoe_genotype`,
+   `postmenopause`) via `set_field_assessment` before finishing — do NOT set the
+   derived `apoe2`/`apoe3`/`apoe4` (they auto-compute from `apoe_genotype`).
+   **Do NOT call `set_review_status`.** Once the three leaves are committed, emit
+   a one-line summary and stop.
