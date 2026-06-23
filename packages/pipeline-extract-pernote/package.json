@@ -1,0 +1,16 @@
+{
+  "name": "@chart-review/pipeline-extract-pernote",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Direct-LLM per-note phenotype extractor. One LLM call per note returns each leaf field's answer (from the field's answer_schema.enum) + evidence quote + rationale, scoped to that note alone. Evidence quotes are faithfulness-checked per note. Transport reuses @chart-review/pipeline-extract-ner callLlm (OpenRouter / Azure Responses).",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": { ".": { "types": "./src/index.ts", "default": "./src/index.ts" } },
+  "dependencies": {
+    "@chart-review/faithfulness": "*",
+    "@chart-review/patients": "*",
+    "@chart-review/tasks": "*",
+    "@chart-review/pipeline-extract-ner": "*"
+  }
+}
