@@ -342,6 +342,63 @@ export function mutate(
   return current;
 }
 
+export interface PerNoteWriteInput {
+  noteId: string;
+  date?: string;
+  label?: string;
+  fields: Array<{
+    field_id: string;
+    answer?: unknown;
+    confidence?: "low" | "medium" | "high";
+    evidence?: Evidence[];
+    rationale?: string;
+  }>;
+}
+
+/** Direct (non-MCP) writer for per-note phenotype labels. Upserts one Encounter
+ *  per note (keyed by note_id) and one agent FieldAssessment per (field, note).
+ *  Runs through `mutate`, so it respects the ambient reviews-root override the
+ *  batch runner sets via withReviewsRoot. */
+export function writePerNoteAssessments(
+  patientId: string,
+  task: CompiledTask,
+  input: PerNoteWriteInput,
+): ReviewState {
+  return mutate(patientId, task, "agent", (s) => {
+    s.task_kind = "phenotype";
+    if (!s.encounters) s.encounters = [];
+    if (!s.encounters.some((e) => e.encounter_id === input.noteId)) {
+      s.encounters.push({
+        encounter_id: input.noteId,
+        kind: "encounter",
+        date: input.date,
+        label: input.label,
+        note_ids: [input.noteId],
+      });
+    }
+    const now = new Date().toISOString();
+    for (const f of input.fields) {
+      const idx = s.field_assessments.findIndex(
+        (a) => a.field_id === f.field_id && a.encounter_id === input.noteId,
+      );
+      const assessment: FieldAssessment = {
+        field_id: f.field_id,
+        answer: f.answer,
+        confidence: f.confidence,
+        evidence: f.evidence,
+        rationale: f.rationale,
+        source: "agent",
+        status: "agent_proposed",
+        updated_at: now,
+        updated_by: "agent",
+        encounter_id: input.noteId,
+      };
+      if (idx >= 0) s.field_assessments[idx] = assessment;
+      else s.field_assessments.push(assessment);
+    }
+  });
+}
+
 export interface SetAssessmentInput {
   field_id: string;
   answer?: unknown;
@@ -353,6 +410,9 @@ export interface SetAssessmentInput {
   edit_reason?: EditReason;
   edit_note?: string;
   comment?: string;
+  /** When set, scopes this assessment to one encounter/note. Upserts are keyed
+   *  on (field_id, encounter_id) so per-note labels for the same field coexist. */
+  encounter_id?: string;
 }
 
 export interface SetAssessmentResult {
@@ -424,7 +484,7 @@ function applySetAssessmentMutation(
   task?: CompiledTask,
 ): void {
   const idx = s.field_assessments.findIndex(
-    (a) => a.field_id === action.field_id,
+    (a) => a.field_id === action.field_id && a.encounter_id === action.encounter_id,
   );
   const existing = idx >= 0 ? s.field_assessments[idx] : undefined;
 
@@ -520,6 +580,7 @@ function applySetAssessmentMutation(
     original_agent_snapshot,
     comment: action.comment,
     captured_against_schema_hash,
+    encounter_id: action.encounter_id,
   };
 
   if (idx >= 0) s.field_assessments[idx] = assessment;
