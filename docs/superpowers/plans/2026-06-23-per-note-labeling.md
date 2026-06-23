@@ -369,6 +369,10 @@ export interface PerNoteFieldResult {
   rationale?: string;
   /** true when the model gave an answer the enum doesn't allow (answer left unset). */
   invalid_answer?: boolean;
+  /** Raw model quote before faithfulness resolution; the orchestrator resolves
+   *  it into `evidence`. parseLabelResponse populates this; the final result
+   *  keeps it for transparency. */
+  evidence_quote?: string;
 }
 
 export interface ExtractLabelsResult {
@@ -432,10 +436,10 @@ export function parseLabelResponse(text: string, fields: PerNoteField[]): PerNot
       invalid_answer: ans != null && !valid,
       confidence: conf === "low" || conf === "medium" || conf === "high" ? conf : undefined,
       rationale: raw?.rationale != null ? String(raw.rationale) : undefined,
-      // evidence is resolved later (needs note bytes); stash the quote on rationale-adjacent field
+      // evidence is resolved later (needs note bytes); keep the raw quote here
       evidence: undefined,
-      _quote: raw?.evidence_quote != null ? String(raw.evidence_quote) : undefined,
-    } as PerNoteFieldResult & { _quote?: string };
+      evidence_quote: raw?.evidence_quote != null ? String(raw.evidence_quote) : undefined,
+    };
   });
 }
 
@@ -491,12 +495,10 @@ export async function extractLabelsForNote(opts: ExtractLabelsOpts): Promise<Ext
   } catch (e) {
     return { fields: [], error: `LLM call failed: ${(e as Error).message}` };
   }
-  const parsed = parseLabelResponse(res.text, fields) as Array<PerNoteFieldResult & { _quote?: string }>;
+  const parsed = parseLabelResponse(res.text, fields);
   const out: PerNoteFieldResult[] = parsed.map((p) => {
-    const ev = p._quote ? resolveEvidence(opts.patientId, opts.noteId, noteText, p._quote) : null;
-    const { _quote, ...rest } = p;
-    void _quote;
-    return { ...rest, evidence: ev ? [ev] : undefined };
+    const ev = p.evidence_quote ? resolveEvidence(opts.patientId, opts.noteId, noteText, p.evidence_quote) : null;
+    return { ...p, evidence: ev ? [ev] : undefined };
   });
   return { fields: out, usage: res.usage };
 }
