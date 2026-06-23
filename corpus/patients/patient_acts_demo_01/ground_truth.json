@@ -1,0 +1,13 @@
+{
+  "patient_id": "patient_acts_demo_01",
+  "category": "acts_demo",
+  "leaf_answers": {
+    "impaired_cognition": "1",
+    "apoe2": "0",
+    "apoe3": "1",
+    "apoe4": "1",
+    "postmenopause": "1"
+  },
+  "difficulty": "easy",
+  "difficulty_notes": "Synthetic ACTS demo. MCI/early AD (MoCA 21, amnestic deficits) → impaired_cognition=1; APOE ε3/ε4 → apoe2=0/apoe3=1/apoe4=1; natural menopause at 51 → postmenopause=1. Distractor: mother with Alzheimer's (family history, must NOT count)."
+}
