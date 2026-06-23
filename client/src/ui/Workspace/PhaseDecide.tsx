@@ -125,6 +125,25 @@ interface AdherenceIaaReport {
   inter_agent: AdherenceInterAgent | null;
 }
 
+// ── Per-note performance shapes (GET /api/performance/:taskId?per_note=1) ─────
+// When the active session was created in per-note mode, each note carries its
+// own field labels; performance is scored per note (not per patient). Agent
+// answers are compared to the reviewer's validated labels (agent_vs_reviewer)
+// and, where a note has ground truth, to that too (agent_vs_gt). Mirrors the
+// server's computePerNotePerformance shape (server/lib/pernote-performance.ts).
+interface PerNotePerf {
+  validated_notes: number;
+  field_ids: string[];
+  agent_vs_reviewer: {
+    per_field: Array<{ field_id: string; n: number; accuracy: number | null; kappa: number | null }>;
+    macro_accuracy: number | null;
+  };
+  agent_vs_gt: {
+    per_field: Array<{ field_id: string; n: number; accuracy: number | null; kappa: number | null }>;
+  };
+  gt_coverage: { n_with_gt: number; n_total: number };
+}
+
 function pct(x: number | null): string {
   return x == null ? "—" : `${(x * 100).toFixed(0)}%`;
 }
@@ -166,6 +185,13 @@ export function PhaseDecide({ taskId, activeSessionId, iterId, taskKind }: Phase
   const [nerReport, setNerReport] = useState<NerCalibrationReport | null>(null);
   const [adhReport, setAdhReport] = useState<AdherenceIaaReport | null>(null);
   const [state, setState] = useState<"loading" | "error" | "ready">("loading");
+
+  // Per-note mode: resolved from the active session's manifest (mirrors the
+  // App.tsx effect). When true, PERFORMANCE scores notes individually via
+  // /api/performance/:taskId?per_note=1 and renders ONLY the per-note table —
+  // the phenotype/NER/adherence tables are gated off (see render gates below).
+  const [perNote, setPerNote] = useState(false);
+  const [perNoteReport, setPerNoteReport] = useState<PerNotePerf | null>(null);
 
   // Phenotype-only: attributed disagreement clusters keyed by field_id, fetched
   // alongside the performance report so each <100% matrix row can offer an
@@ -254,9 +280,55 @@ export function PhaseDecide({ taskId, activeSessionId, iterId, taskKind }: Phase
     }
   }
 
+  // Resolve whether the active session is per-note. PhaseDecide receives only
+  // the session id, not its manifest, so fetch the session to read `per_note`
+  // and gate the per-note fetch + render on it (mirrors the App.tsx effect).
+  useEffect(() => {
+    if (!activeSessionId) {
+      setPerNote(false);
+      return;
+    }
+    let cancelled = false;
+    authFetch(
+      `/api/sessions/${encodeURIComponent(taskId)}/${encodeURIComponent(activeSessionId)}`,
+    )
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { session?: { per_note?: boolean } } | null) => {
+        if (!cancelled) setPerNote(!!d?.session?.per_note);
+      })
+      .catch(() => {
+        if (!cancelled) setPerNote(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [taskId, activeSessionId]);
+
   useEffect(() => {
     let cancelled = false;
     setState("loading");
+
+    // Per-note mode wins over every other branch: the session labels each note
+    // individually, so we score notes (not patients/spans/answers) and render
+    // only the per-note table.
+    if (perNote) {
+      const params = new URLSearchParams();
+      if (activeSessionId) params.set("session_id", activeSessionId);
+      params.set("per_note", "1");
+      authFetch(`/api/performance/${encodeURIComponent(taskId)}?${params.toString()}`)
+        .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+        .then((d: PerNotePerf) => {
+          if (cancelled) return;
+          setPerNoteReport(d);
+          setState("ready");
+        })
+        .catch(() => {
+          if (!cancelled) setState("error");
+        });
+      return () => {
+        cancelled = true;
+      };
+    }
 
     if (isNer) {
       // NER tasks score spans against the reviewer-validated ground truth.
@@ -346,7 +418,7 @@ export function PhaseDecide({ taskId, activeSessionId, iterId, taskKind }: Phase
     return () => {
       cancelled = true;
     };
-  }, [taskId, activeSessionId, iterId, isNer, isAdherence]);
+  }, [taskId, activeSessionId, iterId, isNer, isAdherence, perNote]);
 
   const hasData = !!report && report.n_patients > 0 && report.agents.length > 0;
   const nerHasData = !!nerReport && nerReport.n_validated_notes > 0 && nerReport.agents.length > 0;
@@ -407,7 +479,9 @@ export function PhaseDecide({ taskId, activeSessionId, iterId, taskKind }: Phase
       <div>
         <h2 className="text-lg font-semibold">Performance</h2>
         <p className="text-[12.5px] text-muted-foreground">
-          {isNer
+          {perNote
+            ? "Per-note accuracy (and κ) between the agent's drafted note labels and your validated labels — and, where a note has ground truth, against that too."
+            : isNer
             ? "F1 between each agent's drafted spans and your validated spans, scoped to notes you marked validated, per entity type."
             : isAdherence
             ? "Match rate (and κ) between each agent's drafted answers/verdicts and the answers you validated, per question and per rule."
@@ -426,14 +500,14 @@ export function PhaseDecide({ taskId, activeSessionId, iterId, taskKind }: Phase
       )}
 
       {/* ── NER performance: per-agent macro F1 + tuple-κ + per-entity-type ── */}
-      {isNer && state === "ready" && !nerHasData && (
+      {!perNote && isNer && state === "ready" && !nerHasData && (
         <div className="rounded-md border border-border/60 bg-muted/30 px-4 py-3 text-[12.5px] text-muted-foreground">
           No validated patients yet. Run the agents (TRY), validate at least one
           note and mark it validated (VALIDATE) to see performance.
         </div>
       )}
 
-      {isNer && state === "ready" && nerHasData && nerReport && (
+      {!perNote && isNer && state === "ready" && nerHasData && nerReport && (
         <div className="space-y-4">
           <div className="text-[12.5px] text-muted-foreground">
             Across <strong>{nerReport.n_validated_notes}</strong> validated note
@@ -510,7 +584,7 @@ export function PhaseDecide({ taskId, activeSessionId, iterId, taskKind }: Phase
       )}
 
       {/* ── Adherence performance: per-agent question + rule match rate + κ ── */}
-      {isAdherence && state === "ready" && !adhHasData && (
+      {!perNote && isAdherence && state === "ready" && !adhHasData && (
         <div className="rounded-md border border-border/60 bg-muted/30 px-4 py-3 text-[12.5px] text-muted-foreground">
           No validated answers yet. Run the agents (TRY), then validate at least
           one question or adjudicate one rule (VALIDATE) to score the agents
@@ -518,7 +592,7 @@ export function PhaseDecide({ taskId, activeSessionId, iterId, taskKind }: Phase
         </div>
       )}
 
-      {isAdherence && state === "ready" && adhHasData && adhReport && (
+      {!perNote && isAdherence && state === "ready" && adhHasData && adhReport && (
         <div className="space-y-4">
           <div className="text-[12.5px] text-muted-foreground">
             Per-agent agreement vs your validated answers · across{" "}
@@ -695,14 +769,14 @@ export function PhaseDecide({ taskId, activeSessionId, iterId, taskKind }: Phase
         </div>
       )}
 
-      {!isNer && !isAdherence && state === "ready" && report && report.n_patients === 0 && (
+      {!perNote && !isNer && !isAdherence && state === "ready" && report && report.n_patients === 0 && (
         <div className="rounded-md border border-border/60 bg-muted/30 px-4 py-3 text-[12.5px] text-muted-foreground">
           No validated patients yet. Run the agents (TRY), validate at least one
           patient and mark it validated (VALIDATE) to see performance.
         </div>
       )}
 
-      {!isNer && !isAdherence && state === "ready" && hasData && report && (
+      {!perNote && !isNer && !isAdherence && state === "ready" && hasData && report && (
         <div className="space-y-4">
           <div className="text-[12.5px] text-muted-foreground">
             Across <strong>{report.n_patients}</strong> validated patient
@@ -854,6 +928,61 @@ export function PhaseDecide({ taskId, activeSessionId, iterId, taskKind }: Phase
             attributes an unjudged mismatch by comparing the model's answer to your
             annotation; <strong>Why?</strong> explains a disagreement the rubric
             doesn't need to change for.
+          </p>
+        </div>
+      )}
+
+      {/* ── Per-note performance: per-field accuracy + κ, agent vs reviewer / GT ── */}
+      {perNote && state === "ready" && perNoteReport && perNoteReport.validated_notes === 0 && (
+        <div className="rounded-md border border-border/60 bg-muted/30 px-4 py-3 text-[12.5px] text-muted-foreground">
+          No validated notes yet. Run the agents (TRY), validate at least one note
+          and mark it validated (VALIDATE) to see per-note performance.
+        </div>
+      )}
+
+      {perNote && state === "ready" && perNoteReport && perNoteReport.validated_notes > 0 && (
+        <div className="space-y-3">
+          <p className="text-[11.5px] text-muted-foreground">
+            {perNoteReport.validated_notes} note
+            {perNoteReport.validated_notes === 1 ? "" : "s"} validated · GT coverage{" "}
+            {perNoteReport.gt_coverage.n_with_gt}/{perNoteReport.gt_coverage.n_total}
+          </p>
+          <table className="text-[11.5px] border-collapse">
+            <thead>
+              <tr>
+                <th className="text-left px-2 py-1 border-b border-border">Field</th>
+                <th className="px-2 py-1 border-b border-border">Agent vs reviewer (acc)</th>
+                <th className="px-2 py-1 border-b border-border">κ</th>
+                <th className="px-2 py-1 border-b border-border">Agent vs GT (acc)</th>
+                <th className="px-2 py-1 border-b border-border">n</th>
+              </tr>
+            </thead>
+            <tbody>
+              {perNoteReport.field_ids.map((fid) => {
+                const ar = perNoteReport.agent_vs_reviewer.per_field.find((f) => f.field_id === fid);
+                const ag = perNoteReport.agent_vs_gt.per_field.find((f) => f.field_id === fid);
+                return (
+                  <tr key={fid}>
+                    <td className="px-2 py-1 font-mono">{fid}</td>
+                    <td className="px-2 py-1 text-center">
+                      {ar?.accuracy == null ? "—" : (ar.accuracy * 100).toFixed(0) + "%"}
+                    </td>
+                    <td className="px-2 py-1 text-center">
+                      {ar?.kappa == null ? "—" : ar.kappa.toFixed(2)}
+                    </td>
+                    <td className="px-2 py-1 text-center">
+                      {ag?.accuracy == null ? "—" : (ag.accuracy * 100).toFixed(0) + "%"}
+                    </td>
+                    <td className="px-2 py-1 text-center">{ar?.n ?? 0}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          <p className="text-[11px] text-muted-foreground">
+            Accuracy = fraction of validated notes where the agent's label matched
+            yours for the field. Agent vs GT is scored only on notes that carry
+            ground truth. κ shown when ≥ 2 paired observations make it meaningful.
           </p>
         </div>
       )}
