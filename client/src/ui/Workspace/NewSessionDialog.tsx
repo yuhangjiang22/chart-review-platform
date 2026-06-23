@@ -29,6 +29,8 @@ interface NewSessionDialogProps {
   /** Called after a successful session+iter creation. Parent should refetch
    *  the session list and switch the active session to the new id. */
   onCreated: (sessionId: string) => void;
+  /** When true, show the "label each note individually" toggle. */
+  supportsPerNote?: boolean;
 }
 
 const DEFAULT_AGENT_SPECS: AgentSpecForm[] = [
@@ -95,7 +97,7 @@ function packageDropdownAnnotation(pkg: PackageItem): string {
 }
 
 export function NewSessionDialog({
-  open, onClose, taskId, onCreated,
+  open, onClose, taskId, onCreated, supportsPerNote,
 }: NewSessionDialogProps) {
   const { noModels } = useDeepagentsModels();
   // Two ways to start a session: configure a cohort+agent to RUN, or IMPORT
@@ -119,6 +121,7 @@ export function NewSessionDialog({
   const [selectedPackageId, setSelectedPackageId] = useState<string>("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [agentSpecs, setAgentSpecs] = useState<AgentSpecForm[]>(DEFAULT_AGENT_SPECS);
+  const [perNote, setPerNote] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -128,6 +131,7 @@ export function NewSessionDialog({
       setAgentSpecs(DEFAULT_AGENT_SPECS);
       setSelectedPackageId("");
       setMode("run"); setSelectedRunId("");
+      setPerNote(false);
       setSubmitting(false); setError(null);
     }
   }, [open]);
@@ -274,6 +278,7 @@ export function NewSessionDialog({
           patient_ids: patientIds,
           notes: notes.trim() || undefined,
           agent_specs: apiSpecs,
+          per_note: perNote || undefined,
         }),
       });
       if (!r1.ok) {
@@ -448,6 +453,24 @@ export function NewSessionDialog({
               ))}
             </div>
           </div>
+          )}
+
+          {/* Per-note labeling toggle (run mode only, task opt-in) */}
+          {mode === "run" && supportsPerNote && (
+            <label className="flex items-start gap-2 rounded-md border border-border bg-paper/40 px-3 py-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={perNote}
+                onChange={(e) => setPerNote(e.target.checked)}
+                className="mt-0.5"
+              />
+              <span className="text-[11.5px]">
+                <span className="text-ink font-medium">Label each note individually</span>
+                <span className="block text-[10.5px] text-muted-foreground">
+                  Each note gets its own labels for the task's fields, instead of one answer per patient.
+                </span>
+              </span>
+            </label>
           )}
 
           {/* Step 3 — agent config (run mode only) */}

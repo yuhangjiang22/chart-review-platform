@@ -59,6 +59,7 @@ export interface WorkspaceProps {
     field_count: number;
     task_type?: string;
     manual_version?: string;
+    supports_per_note?: boolean;
   }>;
   onTaskChange: (taskId: string) => void;
   reviewerId: string;
@@ -475,6 +476,7 @@ export function Workspace({
         open={newSessionOpen}
         onClose={() => setNewSessionOpen(false)}
         taskId={taskId}
+        supportsPerNote={task?.supports_per_note}
         onCreated={async (sid) => {
           await refreshSessions();
           setActiveSessionId(sid);
