@@ -13,6 +13,7 @@ import { QueueView } from "./QueueView";
 import { PatientReview } from "./PatientReview";
 import { SpanReview } from "./SpanReview";
 import { AdherenceReview } from "./AdherenceReview";
+import { PerNoteReview } from "./PerNoteReview";
 import { CommandPalette, type PaletteAction } from "./CommandPalette";
 import { Studio } from "./Studio";
 import { Workspace } from "./Workspace";
@@ -115,6 +116,20 @@ export function App() {
     window.addEventListener("chart-review:session-changed", read);
     return () => window.removeEventListener("chart-review:session-changed", read);
   }, [task?.task_id]);
+
+  // Resolve whether the active session is per-note. App holds only the
+  // session id (string), not the manifest, so fetch the session to read
+  // `per_note` and gate the per-note review grid on it.
+  const [activePerNote, setActivePerNote] = useState(false);
+  useEffect(() => {
+    if (!task || !activeSessionId) { setActivePerNote(false); return; }
+    let cancelled = false;
+    authFetch(`/api/sessions/${encodeURIComponent(task.task_id)}/${encodeURIComponent(activeSessionId)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { session?: { per_note?: boolean } } | null) => { if (!cancelled) setActivePerNote(!!d?.session?.per_note); })
+      .catch(() => { if (!cancelled) setActivePerNote(false); });
+    return () => { cancelled = true; };
+  }, [task, activeSessionId]);
 
   // Subscribe a single agent socket to whichever patient×task is active.
   // Mirrors how the legacy App lifts useAgentSocket. Until the user picks
@@ -396,7 +411,24 @@ export function App() {
         // The TaskSummary's task_type is the raw meta.yaml field; the
         // server tags NER tasks with task_type:"ner" and adherence tasks
         // with task_type:"adherence" (mirrors v2).
-        (task.task_type === "ner" ? (
+        (task.supports_per_note && activePerNote ? (
+          // Per-note labeling mode: one row per note × one column per field.
+          // Wins over the task_type checks below, but only when the active
+          // session is actually per-note (resolved from its manifest above).
+          <PerNoteReview
+            patientId={route.patientId}
+            patientDisplay={activePatient?.display_name ?? route.patientId}
+            taskId={task.task_id}
+            fields={(taskFields as Array<{ field_id?: string; id?: string; answer_schema?: { enum?: unknown[] } }>).map((f) => ({
+              field_id: f.field_id ?? (f as { id: string }).id,
+              enum: Array.isArray(f.answer_schema?.enum) ? f.answer_schema!.enum!.map(String) : [],
+            })).filter((f) => f.enum.length > 0)}
+            activeSessionId={activeSessionId}
+            onBack={() =>
+              navigate(studioHash(task.task_id, lastStudioSubTabRef.current ?? "validate"))
+            }
+          />
+        ) : task.task_type === "ner" ? (
           <SpanReview
             patientId={route.patientId}
             patientDisplay={activePatient?.display_name ?? route.patientId}
