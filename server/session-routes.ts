@@ -145,7 +145,7 @@ export const sessionRoutes: RouteEntry[] = [
       // Accept either `agent_specs` (canonical) or `default_agent_specs`
       // (legacy alias from the pre-strict-lock era). Drop the alias once
       // all callers update.
-      const { name, patient_ids, notes, agent_specs, default_agent_specs, import_run_id } = (body ?? {}) as {
+      const { name, patient_ids, notes, agent_specs, default_agent_specs, import_run_id, per_note } = (body ?? {}) as {
         name?: string;
         patient_ids?: string[];
         notes?: string;
@@ -156,6 +156,7 @@ export const sessionRoutes: RouteEntry[] = [
          *  run manifest and the run is attached as iter_001 (ready to
          *  validate). This is TRY's "import" path — no agent work is re-run. */
         import_run_id?: string;
+        per_note?: boolean;
       };
       let specs = agent_specs ?? default_agent_specs;
       let resolvedPatientIds = patient_ids;
@@ -217,6 +218,7 @@ export const sessionRoutes: RouteEntry[] = [
           patient_ids: resolvedPatientIds,
           notes,
           agent_specs: specs,
+          per_note: per_note === true,
         });
         // Attach the existing run as this session's first iter so VALIDATE /
         // Performance light up immediately with no agent re-run.

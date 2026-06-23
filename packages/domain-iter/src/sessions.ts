@@ -68,6 +68,10 @@ export interface SessionManifest {
    *  loop). The current rubric SHA is recorded per-iter as
    *  PilotManifest.guideline_sha. */
   skill_snapshot_sha: string;
+  /** When true, runs under this session label EACH note individually with the
+   *  task's leaf fields (encounter-scoped assessments, encounter_id = note_id)
+   *  instead of one patient-wide answer per field. Phenotype tasks only. */
+  per_note?: boolean;
 }
 
 export interface SessionListing extends SessionManifest {
@@ -161,6 +165,7 @@ export interface CreateSessionInput {
   patient_ids: string[];
   notes?: string;
   agent_specs?: AgentSpec[];
+  per_note?: boolean;
 }
 
 export function createSession(input: CreateSessionInput): SessionManifest {
@@ -181,6 +186,7 @@ export function createSession(input: CreateSessionInput): SessionManifest {
     started_by: input.started_by,
     state: "active",
     cohort: { patient_ids: [...input.patient_ids] },
+    ...(input.per_note ? { per_note: true } : {}),
     agent_specs: input.agent_specs,
     skill_snapshot_sha: computeTaskSha(guidelineDir(input.task_id)),
   };
