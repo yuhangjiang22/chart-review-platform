@@ -1,5 +1,6 @@
 task_type: phenotype_validation
 uses_structured_data: false
+supports_per_note: true
 review_unit: patient
 manual_version: 2026-06-23
 final_output: acts_entities

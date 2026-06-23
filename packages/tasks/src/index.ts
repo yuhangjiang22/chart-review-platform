@@ -48,6 +48,9 @@ export interface CompiledTask {
    * loadSkillBundle. See runOneAgent's tool-allowlist construction.
    */
   uses_structured_data?: boolean;
+  /** When true, the Studio offers per-note labeling for this task (a toggle at
+   *  session creation). Read from meta.yaml; spread through loadSkillBundle. */
+  supports_per_note?: boolean;
   review_unit?: string;
   manual_version?: string;
   source_document_sha: string;

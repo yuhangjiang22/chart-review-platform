@@ -47,6 +47,7 @@ interface TaskSummary {
   task_type?: string;
   manual_version?: string;
   final_output?: string;
+  supports_per_note?: boolean;
 }
 
 interface CompiledTaskFull extends TaskSummary {
@@ -365,6 +366,7 @@ export function App() {
             field_count: t.field_count,
             task_type: t.task_type,
             manual_version: t.manual_version,
+            supports_per_note: t.supports_per_note,
           }))}
           onOpen={selectGuideline}
           onCreateTask={() => setKindPickerOpen(true)}
@@ -481,6 +483,7 @@ export function App() {
             field_count: t.field_count,
             task_type: t.task_type,
             manual_version: t.manual_version,
+            supports_per_note: t.supports_per_note,
           }))}
           onTaskChange={selectGuideline}
           tab={route.subTab}

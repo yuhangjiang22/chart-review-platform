@@ -98,6 +98,7 @@ export const coreRoutes: RouteEntry[] = [
       manual_version: t.manual_version,
       field_count: t.fields.length,
       final_output: t.final_output,
+      supports_per_note: t.supports_per_note,
     })),
   },
 
