@@ -27,6 +27,7 @@
     "@chart-review/patients": "*",
     "@chart-review/pipeline-extract-adherence": "*",
     "@chart-review/pipeline-extract-ner": "*",
+    "@chart-review/pipeline-extract-pernote": "*",
     "@chart-review/platform-types": "*",
     "@chart-review/rubric": "*",
     "@chart-review/rule-engine": "*",

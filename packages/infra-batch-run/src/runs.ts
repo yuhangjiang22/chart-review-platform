@@ -382,6 +382,8 @@ import { getActiveVersion, snapshotVersion, draftDiffersFromActive } from "@char
 import { patientDir, listNotes, isPhiPatient, patientPersonId } from "@chart-review/patients";
 import { resolveRolePrompt, validateAgentSpec } from "@chart-review/agent-specs";
 import { extractSpansDirect } from "@chart-review/pipeline-extract-ner";
+import { extractLabelsForNote } from "@chart-review/pipeline-extract-pernote";
+import { writePerNoteAssessments } from "@chart-review/domain-review";
 import { pathFor } from "@chart-review/storage";
 // server/lib is the deployment's app code; packages reach into it via a
 // relative path (same pattern as pipeline-validate's v1-judge). This is the
@@ -389,6 +391,15 @@ import { pathFor } from "@chart-review/storage";
 // return the LLM connection details the direct-LLM NER extractor needs. It is
 // never wired into an Express route (unlike the presence-only `listModels`).
 import { resolveModelEndpoint } from "../../../server/lib/model-registry.js";
+
+/** Load the per-note labeling prompt body from the task's skill bundle
+ *  (references/pernote_prompt.md). Falls back to a minimal instruction when the
+ *  task ships no per-note prompt file. */
+function loadPerNotePrompt(taskId: string): string {
+  const fp = path.join(guidelineDir(taskId), "references", "pernote_prompt.md");
+  try { return fs.readFileSync(fp, "utf8"); }
+  catch { return "You label one clinical note at a time. Answer each field only from THIS note, using only the allowed values."; }
+}
 
 /** Fold one AgentEvent into the running tally for an agent run. Counts
  *  set_field_assessment writes from the EVENT STREAM (not the SDK PostToolUse
@@ -945,6 +956,7 @@ async function runOneAgent(
 
   const isNerTask = task.task_kind === "ner";
   const isAdherenceTask = task.task_kind === "adherence";
+  const isPerNote = !!manifest.per_note && task.task_kind === "phenotype";
 
   const ppDir = perPatientDir(runId, patientId);
   fs.mkdirSync(path.join(ppDir, "agents"), { recursive: true });
@@ -1317,6 +1329,60 @@ async function runOneAgent(
         lock_task_sha: manifest.guideline_sha,
       });
       adherenceDraftWritten = true;
+      return;
+    }
+
+    if (isPerNote) {
+      // Per-note phenotype mode: one direct-LLM call per note labels each leaf
+      // field for THAT note. Writes encounter-scoped assessments to the scratch
+      // review_state via writePerNoteAssessments; the normal phenotype promote
+      // (fs.renameSync below) then carries them to the per-patient agent draft.
+      const endpoint = resolveModelEndpoint(effectiveModel ?? "");
+      if (!endpoint) {
+        agentError = `per-note: model '${effectiveModel ?? "(unset)"}' has no python/models.json entry`;
+        return;
+      }
+      const promptPreamble = loadPerNotePrompt(taskId);
+      const notes = listNotes(patientId);
+      const transcriptFp = agentTranscriptPath(runId, patientId, spec.id);
+      try {
+        fs.mkdirSync(path.dirname(transcriptFp), { recursive: true });
+        fs.appendFileSync(transcriptFp, JSON.stringify({
+          ts: new Date().toISOString(), type: "text",
+          text: `per-note: ${notes.length} note(s) for ${patientId}`,
+        }) + "\n");
+      } catch { /* ignore */ }
+
+      for (const n of notes) {
+        const noteId = n.filename.replace(/\.txt$/, "");
+        let r: Awaited<ReturnType<typeof extractLabelsForNote>>;
+        try {
+          r = await extractLabelsForNote({
+            patientId, task, noteId,
+            endpoint, promptPreamble,
+          });
+        } catch (e) {
+          agentError = (e as Error).message ?? String(e);
+          break;
+        }
+        if (r.error) { agentError = r.error; break; }
+        writePerNoteAssessments(patientId, task, {
+          noteId, date: n.date, label: n.filename,
+          fields: r.fields,
+        });
+        writeCount += r.fields.filter((f) => f.answer !== undefined).length;
+        if (r.usage?.input_tokens) {
+          const inT = r.usage.input_tokens ?? 0;
+          const outT = r.usage.output_tokens ?? 0;
+          cost = (cost ?? 0) + ((inT * 2 + outT * 10) / 1e6);
+        }
+        try {
+          fs.appendFileSync(transcriptFp, JSON.stringify({
+            ts: new Date().toISOString(), type: "text",
+            text: `note ${noteId}: ${r.fields.filter((f) => f.answer !== undefined).length}/${r.fields.length} fields labeled`,
+          }) + "\n");
+        } catch { /* ignore */ }
+      }
       return;
     }
 

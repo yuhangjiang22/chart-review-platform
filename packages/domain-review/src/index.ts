@@ -38,6 +38,9 @@ export {
   writeReviewState,
   load,
   mutate,
+  // Per-note phenotype writer
+  writePerNoteAssessments,
+  type PerNoteWriteInput,
   // Pure transition core + atomic ops
   transitionReviewState,
   applySetAssessment,
