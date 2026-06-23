@@ -191,6 +191,10 @@ export const performanceRoutes: RouteEntry[] = [
         err.status = 400;
         throw err;
       }
+      if (query.get("per_note") === "1") {
+        const { computePerNotePerformance } = await import("./lib/pernote-performance.js");
+        return computePerNotePerformance(sessionId, p.taskId, primaryCriterionIds);
+      }
       // Optional iter_id → score that specific run (the run-tab selection);
       // absent → latest iter's run.
       const iterId = query.get("iter_id");
