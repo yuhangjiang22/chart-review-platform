@@ -92,6 +92,10 @@ export interface PatientReviewProps {
    *  is responsible for ensuring a session is active before opening a
    *  patient review. */
   activeSessionId?: string | null;
+  /** Per-note labeling: when set, scopes the review to ONE note/encounter —
+   *  only assessments with this encounter_id are shown, and writes carry it.
+   *  Undefined = patient-level (the standard review, unchanged). */
+  encounterId?: string;
 }
 
 export function PatientReview(p: PatientReviewProps) {
@@ -109,10 +113,16 @@ export function PatientReview(p: PatientReviewProps) {
   const assessmentByField = useMemo(() => {
     const m = new Map<string, FieldAssessment>();
     if (reviewFresh) {
-      for (const fa of p.reviewState?.field_assessments ?? []) m.set(fa.field_id, fa);
+      for (const fa of p.reviewState?.field_assessments ?? []) {
+        // Scope to the active encounter. Patient-level review keeps encounter_id
+        // undefined on both sides (undefined === undefined), so this is a no-op
+        // for the standard (non-per-note) review.
+        if (fa.encounter_id !== p.encounterId) continue;
+        m.set(fa.field_id, fa);
+      }
     }
     return m;
-  }, [p.reviewState, reviewFresh]);
+  }, [p.reviewState, reviewFresh, p.encounterId]);
 
   // Progress calculation — count leaf criteria (the ones the reviewer must
   // touch). Derived criteria are computed by the system and don't need
@@ -235,6 +245,9 @@ export function PatientReview(p: PatientReviewProps) {
         const m = new Map<string, AgentFieldDraft[]>();
         for (const d of drafts) {
           for (const fa of d.field_assessments ?? []) {
+            // Per-note: only this note's agent draft (encounter_id === p.encounterId).
+            // Patient-level: undefined === undefined → all drafts kept.
+            if ((fa as { encounter_id?: string }).encounter_id !== p.encounterId) continue;
             const fid = String(fa.field_id ?? "");
             if (!fid) continue;
             const entry: AgentFieldDraft = {
@@ -261,7 +274,7 @@ export function PatientReview(p: PatientReviewProps) {
     return () => {
       cancelled = true;
     };
-  }, [p.patientId, p.taskId, p.activeSessionId]);
+  }, [p.patientId, p.taskId, p.activeSessionId, p.encounterId]);
 
   // Soft-focus: which citer's marks should "stand out" in the source pane.
   // Replaces the hard-filter `selectedAgentId` flow — every citer's marks
@@ -618,6 +631,7 @@ export function PatientReview(p: PatientReviewProps) {
                             rationale,
                             comment: "applied via Judge panel",
                             status: "approved",
+                            encounter_id: p.encounterId,
                           }),
                         });
                         try {
@@ -648,6 +662,7 @@ export function PatientReview(p: PatientReviewProps) {
                           rationale,
                           comment,
                           status: "approved",
+                          encounter_id: p.encounterId,
                         }),
                       });
                       // Apply the returned state immediately so the done-count

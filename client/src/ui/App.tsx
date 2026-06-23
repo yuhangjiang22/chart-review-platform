@@ -412,18 +412,27 @@ export function App() {
         // server tags NER tasks with task_type:"ner" and adherence tasks
         // with task_type:"adherence" (mirrors v2).
         (task.supports_per_note && activePerNote ? (
-          // Per-note labeling mode: one row per note × one column per field.
-          // Wins over the task_type checks below, but only when the active
-          // session is actually per-note (resolved from its manifest above).
+          // Per-note labeling mode: the SAME PatientReview criterion-row UI,
+          // scoped to one note at a time with a note switcher (PerNoteReview
+          // wraps PatientReview + passes encounterId). Wins over the task_type
+          // checks below, but only when the active session is actually per-note
+          // (resolved from its manifest above). Same props as the standard
+          // PatientReview branch — PerNoteReview takes PatientReviewProps.
           <PerNoteReview
             patientId={route.patientId}
             patientDisplay={activePatient?.display_name ?? route.patientId}
             taskId={task.task_id}
-            fields={(taskFields as Array<{ field_id?: string; id?: string; answer_schema?: { enum?: unknown[] } }>).map((f) => ({
-              field_id: f.field_id ?? (f as { id: string }).id,
-              enum: Array.isArray(f.answer_schema?.enum) ? f.answer_schema!.enum!.map(String) : [],
-            })).filter((f) => f.enum.length > 0)}
+            fields={taskFields}
+            reviewState={sock.reviewState}
+            onStateChanged={sock.refreshReviewState}
+            noteFocus={noteFocus}
+            onJumpToSource={setNoteFocus}
+            criterionId={route.criterionId ?? null}
             activeSessionId={activeSessionId}
+            onCriterionChange={(id, opts) =>
+              navigate(patientHash(task.task_id, route.patientId!, id ?? undefined), opts)
+            }
+            onOpenPatient={(pid) => navigate(patientHash(task.task_id, pid))}
             onBack={() =>
               navigate(studioHash(task.task_id, lastStudioSubTabRef.current ?? "validate"))
             }
