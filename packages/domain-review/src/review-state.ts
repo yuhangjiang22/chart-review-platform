@@ -396,6 +396,10 @@ export function writePerNoteAssessments(
       if (idx >= 0) s.field_assessments[idx] = assessment;
       else s.field_assessments.push(assessment);
     }
+    // Refresh derived fields for this note's scope (e.g. apoe2/3/4 from the
+    // genotype). The custom mutator above bypasses applySetAssessmentMutation,
+    // so derivation must be triggered here explicitly.
+    recomputeDerivedAssessments(s, task);
   });
 }
 
@@ -605,44 +609,66 @@ function applySetAssessmentMutation(
  * O(fields × derived) per write on small rubrics.
  */
 function recomputeDerivedAssessments(s: ReviewState, task: CompiledTask): void {
-  const answers: Record<string, unknown> = {};
-  for (const fa of s.field_assessments) {
-    if (fa.answer !== undefined) answers[fa.field_id] = fa.answer;
-  }
-  const now = nowIso();
-  for (const f of task.fields) {
-    if (!f.derivation) continue;
-    const existingIdx = s.field_assessments.findIndex((x) => x.field_id === f.id);
-    const existing = existingIdx >= 0 ? s.field_assessments[existingIdx] : null;
-    // Preserve manual reviewer-authored answers on derived fields.
-    if (existing && existing.source === "reviewer") continue;
+  const derivedFields = task.fields.filter((f) => f.derivation);
+  if (derivedFields.length === 0) return;
+  const derivedIds = new Set(derivedFields.map((f) => f.id));
 
-    const value = evalDerivation(task, answers, f.id);
-    if (value === null || value === undefined) {
-      // Inputs not yet complete — leave the slot empty so the dropdown still
-      // shows "Pending" rather than a stale or fabricated value.
-      continue;
+  // Derivation is evaluated once per ENCOUNTER SCOPE. A scope is the
+  // encounter_id carried by the leaf (non-derived) answers: per-note tasks
+  // yield one scope per note (encounter_id = note_id); patient-level tasks
+  // yield a single `undefined` scope — identical to the pre-encounter
+  // behavior (undefined === undefined upserts), so this is backward
+  // compatible for tasks like cancer's disease_extent.
+  const scopes = new Set<string | undefined>();
+  for (const fa of s.field_assessments) {
+    if (derivedIds.has(fa.field_id)) continue;
+    if (fa.answer !== undefined) scopes.add(fa.encounter_id);
+  }
+  if (scopes.size === 0) scopes.add(undefined);
+
+  const now = nowIso();
+  for (const scope of scopes) {
+    // Env from the answers in THIS scope only (so each note derives from its
+    // own genotype, not a mix). Includes derived answers in-scope for any
+    // chained derivations, matching the prior single-env semantics.
+    const answers: Record<string, unknown> = {};
+    for (const fa of s.field_assessments) {
+      if (fa.encounter_id !== scope) continue;
+      if (fa.answer !== undefined) answers[fa.field_id] = fa.answer;
     }
-    // If the recomputed value is identical to what's already stored,
-    // skip the overwrite. This preserves `updated_by` and `updated_at`
-    // metadata from the prior write — important when the reviewer just
-    // clicked Re-confirm (which sets updated_by to their reviewer_id).
-    // Without this, every leaf write would clobber the reviewer's
-    // confirmation back to updated_by="system".
-    if (existing && JSON.stringify(existing.answer) === JSON.stringify(value)) {
-      continue;
+    for (const f of derivedFields) {
+      const existingIdx = s.field_assessments.findIndex(
+        (x) => x.field_id === f.id && x.encounter_id === scope,
+      );
+      const existing = existingIdx >= 0 ? s.field_assessments[existingIdx] : null;
+      // Preserve manual reviewer-authored answers on derived fields.
+      if (existing && existing.source === "reviewer") continue;
+
+      const value = evalDerivation(task, answers, f.id);
+      if (value === null || value === undefined) {
+        // Inputs not yet complete — leave the slot empty so the dropdown still
+        // shows "Pending" rather than a stale or fabricated value.
+        continue;
+      }
+      // If the recomputed value is identical to what's already stored, skip the
+      // overwrite to preserve `updated_by`/`updated_at` (e.g. a reviewer's
+      // Re-confirm). Without this, every leaf write clobbers it to "system".
+      if (existing && JSON.stringify(existing.answer) === JSON.stringify(value)) {
+        continue;
+      }
+      const derived: FieldAssessment = {
+        field_id: f.id,
+        answer: value,
+        rationale: `auto-derived: ${f.derivation}`,
+        source: "derived",
+        status: "approved",
+        updated_at: now,
+        updated_by: "system",
+        encounter_id: scope,
+      };
+      if (existingIdx >= 0) s.field_assessments[existingIdx] = derived;
+      else s.field_assessments.push(derived);
     }
-    const derived: FieldAssessment = {
-      field_id: f.id,
-      answer: value,
-      rationale: `auto-derived: ${f.derivation}`,
-      source: "derived",
-      status: "approved",
-      updated_at: now,
-      updated_by: "system",
-    };
-    if (existingIdx >= 0) s.field_assessments[existingIdx] = derived;
-    else s.field_assessments.push(derived);
   }
 }
 
