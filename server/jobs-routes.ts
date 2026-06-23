@@ -59,6 +59,36 @@ function requireAuth(req: Parameters<RouteEntry["handler"]>[1]): string {
   return reviewerId;
 }
 
+/**
+ * Pure builder for the base review_state produced when importing an agent
+ * draft into a session. Exported so tests can exercise it without spinning
+ * up the HTTP server. The handler calls this and then mutates the returned
+ * object to add NER / adherence / merge-preserve fields — those remain
+ * inline because they depend on complex handler-local state.
+ */
+export function buildImportedReviewState(
+  patientId: string,
+  taskId: string,
+  runId: string,
+  primaryDraft: { field_assessments?: unknown[]; encounters?: unknown[] },
+  importedAgents: string[],
+  reviewStatus: string,
+): Record<string, unknown> {
+  const state: Record<string, unknown> = {
+    patient_id: patientId,
+    task_id: taskId,
+    review_status: reviewStatus,
+    field_assessments: Array.isArray(primaryDraft.field_assessments) ? primaryDraft.field_assessments : [],
+    imported_from_run: runId,
+    imported_at: new Date().toISOString(),
+    imported_agents: importedAgents,
+  };
+  if (Array.isArray(primaryDraft.encounters) && primaryDraft.encounters.length > 0) {
+    state.encounters = primaryDraft.encounters;
+  }
+  return state;
+}
+
 export const jobsRoutes: RouteEntry[] = [
   // ── /api/jobs/* ─────────────────────────────────────────────────────
   {
@@ -207,6 +237,7 @@ export const jobsRoutes: RouteEntry[] = [
         excluded?: boolean;
         exclusion_reason?: string;
         task_kind?: string;
+        encounters?: unknown[];
       };
 
       // Phenotype field_assessments: use the first agent's draft (or
@@ -215,6 +246,7 @@ export const jobsRoutes: RouteEntry[] = [
       // question_answers + rule_verdicts: take the first agent's
       // verbatim (single-agent pattern; multi-agent reconciliation TBD).
       let fieldAssessments: unknown[] = [];
+      let encounters: unknown[] | undefined;
       let questionAnswers: unknown[] = [];
       let ruleVerdicts: unknown[] = [];
       let adherenceExcluded: boolean | undefined;
@@ -231,6 +263,9 @@ export const jobsRoutes: RouteEntry[] = [
       const ingest = (id: string, draft: AnyDraft) => {
         if (Array.isArray(draft.field_assessments) && fieldAssessments.length === 0) {
           fieldAssessments = draft.field_assessments;
+        }
+        if (Array.isArray(draft.encounters) && !encounters) {
+          encounters = draft.encounters;
         }
         if (Array.isArray(draft.question_answers)) {
           if (questionAnswers.length === 0) questionAnswers = draft.question_answers;
@@ -291,17 +326,18 @@ export const jobsRoutes: RouteEntry[] = [
         catch { /* malformed → fall through to fresh write */ }
       }
 
-      const reviewState: Record<string, unknown> = {
-        patient_id: p.patientId,
-        task_id: taskId,
-        review_status: (existing.review_status && existing.review_status !== "agent_drafted"
-          ? existing.review_status
-          : "agent_drafted"),
-        field_assessments: fieldAssessments,
-        imported_from_run: p.runId,
-        imported_at: new Date().toISOString(),
-        imported_agents: hasMultiAgent ? agentDrafts.map((a) => a.id) : ["agent"],
-      };
+      const reviewStatus = (existing.review_status && existing.review_status !== "agent_drafted"
+        ? existing.review_status as string
+        : "agent_drafted");
+      const importedAgents = hasMultiAgent ? agentDrafts.map((a) => a.id) : ["agent"];
+      const reviewState = buildImportedReviewState(
+        p.patientId,
+        taskId,
+        p.runId,
+        { field_assessments: fieldAssessments, encounters },
+        importedAgents,
+        reviewStatus,
+      );
 
       if (mergedSpans.size > 0) {
         reviewState.span_labels = [...mergedSpans.values()];
