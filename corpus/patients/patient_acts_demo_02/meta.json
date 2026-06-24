@@ -1,0 +1,9 @@
+{
+  "patient_id": "patient_acts_demo_02",
+  "category": "acts_demo",
+  "demographics": { "age": 72, "sex": "F", "region": "Midwest" },
+  "index_date": "2026-03-15",
+  "doc_types": ["memory_clinic_note"],
+  "generated_by": "claude_synthetic_acts_demo",
+  "generation_run_id": "acts-scales-2026-06-24"
+}

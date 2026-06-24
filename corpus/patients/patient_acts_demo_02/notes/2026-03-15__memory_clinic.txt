@@ -1,0 +1,37 @@
+DATE: 2026-03-15
+PATIENT: Female, 72 yo | PROVIDER: Dr. M. Okafor, MD — Memory & Aging Center (Neurology)
+VISIT: Comprehensive cognitive evaluation
+
+CC: Progressive memory and functional decline over ~2 years.
+
+HPI: Mrs. [K.] is a 72-year-old woman with a college education (16 years of formal
+education) seen for a comprehensive cognitive battery. Her husband reports worsening
+short-term memory, getting lost while driving, and difficulty managing finances.
+
+COGNITIVE TESTING (this visit):
+- MMSE 22/30.
+- MoCA 19/30 (deficits in delayed recall, visuospatial, and executive domains).
+- Mattis Dementia Rating Scale (DRS-2) total 120/144.
+- Telephone Interview for Cognitive Status (TICS): 30/41 on a prior telehealth visit.
+- Global CDR 1 (mild dementia); CDR Sum-of-Boxes 6.5.
+- Global Deterioration Scale (Reisberg) stage 4.
+- Hachinski Ischemic Score 3 (favors a primary degenerative etiology).
+
+NEUROPSYCHIATRIC / MOOD:
+- Neuropsychiatric Inventory (NPI) total score 18.
+- Geriatric Depression Scale (GDS-15) 6/15, suggesting mild depressive symptoms.
+- Cornell Scale for Depression in Dementia 8/38.
+
+GENETICS: APOE genotype: ε4/ε4 (homozygous ε4), from prior AD risk evaluation.
+
+GYN HISTORY: Postmenopausal; natural menopause at age 50. No postmenopausal bleeding.
+
+SOCIAL: Former smoker, quit in 2008 (prior ~20 pack-year history). No alcohol.
+
+PMH: Hypertension; hypothyroidism.
+
+ASSESSMENT: Mild dementia due to Alzheimer's disease. APOE ε4 homozygosity confers
+high genetic risk. Mood screening shows mild depressive symptoms; will monitor.
+
+PLAN: Start cholinesterase inhibitor; repeat cognitive testing in 6 months; counsel
+family on safety and driving evaluation.

@@ -7,7 +7,9 @@
     "apoe2": "0",
     "apoe3": "1",
     "apoe4": "1",
-    "postmenopause": "1"
+    "postmenopause": "1",
+    "moca_score": 21,
+    "moca_severity": "mild"
   },
   "note_answers": {
     "2026-02-10__memory_clinic": {
@@ -16,7 +18,9 @@
       "apoe2": "0",
       "apoe3": "1",
       "apoe4": "1",
-      "postmenopause": "1"
+      "postmenopause": "1",
+      "moca_score": 21,
+      "moca_severity": "mild"
     }
   },
   "difficulty": "easy",
