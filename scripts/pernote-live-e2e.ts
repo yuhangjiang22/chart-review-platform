@@ -25,8 +25,8 @@ const { writePerNoteAssessments, load } = await import("@chart-review/domain-rev
 const { resolveModelEndpoint } = await import("../server/lib/model-registry.ts");
 const { computePerNoteMetrics } = await import("../server/lib/pernote-performance.ts");
 
-const PATIENT = "patient_acts_demo_01";
-const NOTE_ID = "2026-02-10__memory_clinic";
+const PATIENT = process.env.E2E_PATIENT || "patient_acts_demo_01";
+const NOTE_ID = process.env.E2E_NOTE || "2026-02-10__memory_clinic";
 const MODEL_KEY = "claude-sonnet"; // vllm → OpenRouter
 
 const task = loadCompiledTask("acts"); // guidelineDir() prepends "chart-review-"
@@ -69,11 +69,12 @@ let correct = 0;
 for (const fid of fieldIds) {
   const got = stored.get(fid);
   const exp = gt[fid];
+  const expS = exp == null ? undefined : String(exp); // GT numerics are numbers; compare as strings
   const kind = task.fields.find((f) => f.id === fid)?.derivation ? "derived" : "leaf";
-  const ok = got === exp;
+  const ok = got === expS;
   if (ok) correct++;
-  pairs.push({ note_id: NOTE_ID, field_id: fid, a: got ?? "", b: exp });
-  console.log(`  ${ok ? "✓" : "✗"} ${fid.padEnd(18)} ${kind.padEnd(8)} got=${String(got).padEnd(8)} gt=${exp}`);
+  pairs.push({ note_id: NOTE_ID, field_id: fid, a: got ?? "", b: expS ?? "" });
+  console.log(`  ${ok ? "✓" : "✗"} ${fid.padEnd(20)} ${kind.padEnd(8)} got=${String(got).padEnd(10)} gt=${String(exp)}`);
 }
 console.log(`\naccuracy (leaves + derived) vs GT: ${correct}/${fieldIds.length}`);
 const metrics = computePerNoteMetrics(pairs, fieldIds);
