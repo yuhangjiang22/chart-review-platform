@@ -17,11 +17,17 @@ export interface PerNoteField {
   field_id: string;
   enum: string[];
   prompt?: string;
+  /** "integer"/"number" → numeric field (answer kept as a number, validated
+   *  within [min,max]); "string" → free-text single value. Absent + non-empty
+   *  enum → categorical. */
+  type?: "integer" | "number" | "string";
+  min?: number;
+  max?: number;
 }
 
 export interface PerNoteFieldResult {
   field_id: string;
-  answer?: string;
+  answer?: string | number;
   confidence?: "low" | "medium" | "high";
   evidence?: NoteEvidence[];
   rationale?: string;
@@ -56,11 +62,25 @@ export function fieldsFromTask(task: CompiledTask): PerNoteField[] {
     .filter((f) => !(f as { derivation?: string }).derivation)
     .map((f) => {
       const id = (f as { field_id?: string; id?: string }).field_id ?? (f as { id: string }).id;
-      const schema = (f as { answer_schema?: { enum?: unknown[] } }).answer_schema;
+      const schema = (f as {
+        answer_schema?: { enum?: unknown[]; type?: string; minimum?: number; maximum?: number };
+      }).answer_schema;
       const en = Array.isArray(schema?.enum) ? schema!.enum!.map((v) => String(v)) : [];
-      return { field_id: id, enum: en, prompt: (f as { prompt?: string }).prompt };
+      const t = schema?.type;
+      const type: PerNoteField["type"] =
+        t === "integer" || t === "number" || t === "string" ? (t as PerNoteField["type"]) : undefined;
+      return {
+        field_id: id,
+        enum: en,
+        prompt: (f as { prompt?: string }).prompt,
+        type,
+        min: typeof schema?.minimum === "number" ? schema.minimum : undefined,
+        max: typeof schema?.maximum === "number" ? schema.maximum : undefined,
+      };
     })
-    .filter((f) => f.enum.length > 0);
+    // Extractable = categorical (enum), numeric (integer/number), or free-text
+    // (string). Drop anything with none of those (nothing to ask the model for).
+    .filter((f) => f.enum.length > 0 || f.type === "integer" || f.type === "number" || f.type === "string");
 }
 
 /** PURE: parse the model's JSON into one result per requested field, keeping
@@ -85,13 +105,33 @@ export function parseLabelResponse(text: string, fields: PerNoteField[]): PerNot
 
   return fields.map((f) => {
     const raw = obj[f.field_id];
-    const ans = raw?.answer != null ? String(raw.answer) : undefined;
-    const valid = ans != null && f.enum.includes(ans);
+    const rawAns = raw?.answer;
+    let answer: string | number | undefined;
+    if (rawAns != null && rawAns !== "") {
+      if (f.enum.length > 0) {
+        // Categorical: keep only an on-list value.
+        const s = String(rawAns);
+        answer = f.enum.includes(s) ? s : undefined;
+      } else if (f.type === "integer" || f.type === "number") {
+        // Numeric: coerce to a number, keep only finite + in-range (and integer
+        // for integer fields). Out-of-range / non-numeric is dropped.
+        const n = typeof rawAns === "number" ? rawAns : Number(String(rawAns).trim());
+        const ok =
+          Number.isFinite(n) &&
+          (f.type !== "integer" || Number.isInteger(n)) &&
+          (f.min === undefined || n >= f.min) &&
+          (f.max === undefined || n <= f.max);
+        answer = ok ? n : undefined;
+      } else if (f.type === "string") {
+        // Free-text single value: keep any non-empty string.
+        const s = String(rawAns).trim();
+        answer = s.length > 0 ? s : undefined;
+      }
+    }
     const conf = raw?.confidence;
     return {
       field_id: f.field_id,
-      // An out-of-enum answer is dropped (left undefined) rather than persisted.
-      answer: valid ? ans : undefined,
+      answer,
       confidence: conf === "low" || conf === "medium" || conf === "high" ? conf : undefined,
       rationale: raw?.rationale != null ? String(raw.rationale) : undefined,
       evidence: undefined,
@@ -118,16 +158,29 @@ export function resolveEvidence(patientId: string, noteId: string, noteText: str
   return ev;
 }
 
+function describeField(f: PerNoteField): string {
+  if (f.enum.length > 0) return `(one of: ${f.enum.map((e) => JSON.stringify(e)).join(", ")})`;
+  if (f.type === "integer" || f.type === "number") {
+    const range = f.min !== undefined && f.max !== undefined ? ` ${f.min}–${f.max}` : "";
+    return `(${f.type}${range} — the numeric score; omit if not documented)`;
+  }
+  if (f.type === "string") return `(free-text value; omit if not documented)`;
+  return "";
+}
+
 function buildUserPrompt(noteId: string, noteText: string, fields: PerNoteField[]): string {
-  const fieldLines = fields.map((f) => `  - ${f.field_id} (allowed: ${f.enum.map((e) => JSON.stringify(e)).join(", ")})${f.prompt ? ` — ${f.prompt}` : ""}`).join("\n");
+  const fieldLines = fields.map((f) => `  - ${f.field_id} ${describeField(f)}${f.prompt ? ` — ${f.prompt}` : ""}`).join("\n");
   return [
     `Note id: ${noteId}`,
     "",
-    "Fields to label (answer MUST be one of the allowed values for each):",
+    "Fields to label. For each field the value must match its type: a listed",
+    "value for categorical fields, the numeric score (a number) for numeric",
+    "fields, or the free-text value for free-text fields. OMIT a field (or use",
+    "null) when THIS note does not document it.",
     fieldLines,
     "",
     "Return ONLY a JSON object keyed by field_id, each value an object",
-    `{ "answer": <one allowed value>, "confidence": "low"|"medium"|"high", "evidence_quote": <smallest verbatim span from THIS note, or "">, "rationale": <one sentence> }.`,
+    `{ "answer": <value of the field's type, or null>, "confidence": "low"|"medium"|"high", "evidence_quote": <smallest verbatim span from THIS note, or "">, "rationale": <one sentence> }.`,
     "No prose, no markdown fences.",
     "",
     "--- NOTE TEXT ---",
