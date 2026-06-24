@@ -13,7 +13,11 @@ export type Env = Record<string, unknown>;
  *  IMPORTANT: never expand the allowed-character regex without updating the
  *  cross-evaluator parity test against lib/applicability.py. */
 export function safeEval(expr: string, env: Env): unknown {
-  if (!/^[\w\s\.\=\!\>\<\?\:\(\)\[\]\,\'"@&|]+$/i.test(expr)) return null;
+  // Parity with server contract-eval safeEval: allow arithmetic operators
+  // `+ - * /` too. The `/` is load-bearing for string literals that contain a
+  // slash (e.g. APOE genotype values "e3/e4"); without it the whole expression
+  // is rejected and a derived field wrongly shows "waiting for inputs".
+  if (!/^[\w\s\.\=\!\>\<\?\:\(\)\[\]\,\'"@&|+\-*/]+$/i.test(expr)) return null;
   let js = expr
     .replace(/\bAND\b/g, "&&")
     .replace(/\bOR\b/g, "||")
