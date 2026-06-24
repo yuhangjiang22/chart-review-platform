@@ -749,6 +749,51 @@ export function canonicalizeEnumAnswer(
 }
 
 /**
+ * Range gate for numeric criteria. When answer_schema declares a numeric type
+ * (integer / number), a non-null answer must be a finite number (an integer for
+ * integer fields) within [minimum, maximum]. Enum / free-text fields and
+ * null/empty answers (cleared / not answered) are skipped. Run alongside
+ * assertAnswerInEnum so an off-range score can't poison numeric scoring.
+ */
+export function assertAnswerInRange(
+  field: { id: string; answer_schema?: unknown },
+  answer: unknown,
+): void {
+  const schema = field.answer_schema as { type?: string; minimum?: number; maximum?: number } | undefined;
+  const t = schema?.type;
+  if (t !== "integer" && t !== "number") return; // not a numeric field
+  if (answer == null || answer === "") return; // not answered / cleared
+  const n = typeof answer === "number" ? answer : Number(String(answer).trim());
+  const lo = schema?.minimum, hi = schema?.maximum;
+  const bad =
+    !Number.isFinite(n) ||
+    (t === "integer" && !Number.isInteger(n)) ||
+    (typeof lo === "number" && n < lo) ||
+    (typeof hi === "number" && n > hi);
+  if (bad) {
+    const range = typeof lo === "number" && typeof hi === "number" ? ` in [${lo}, ${hi}]` : "";
+    throw new ReviewStateError(
+      "answer_out_of_range",
+      `answer ${JSON.stringify(answer)} for field "${field.id}" must be a${t === "integer" ? "n integer" : " number"}${range}.`,
+    );
+  }
+}
+
+/** Coerce a numeric field's answer to a number ("21" -> 21) so reviewer and
+ *  agent store the same type — exact-match scoring depends on it. Non-numeric
+ *  fields / null pass through. Run AFTER assertAnswerInRange. */
+export function canonicalizeNumericAnswer(
+  field: { answer_schema?: unknown },
+  answer: unknown,
+): unknown {
+  const schema = field.answer_schema as { type?: string } | undefined;
+  const t = schema?.type;
+  if ((t !== "integer" && t !== "number") || answer == null || answer === "") return answer;
+  const n = typeof answer === "number" ? answer : Number(String(answer).trim());
+  return Number.isFinite(n) ? n : answer;
+}
+
+/**
  * Faithfulness gate for set_field_assessment. Throws on fabrication;
  * returns any non-fatal warnings. Pure: no state writes.
  */
@@ -1030,9 +1075,10 @@ export function transitionReviewState(
         );
       }
       assertAnswerInEnum(field, action.payload.answer);
+      assertAnswerInRange(field, action.payload.answer);
       const canonicalPayload = {
         ...action.payload,
-        answer: canonicalizeEnumAnswer(field, action.payload.answer),
+        answer: canonicalizeNumericAnswer(field, canonicalizeEnumAnswer(field, action.payload.answer)),
       };
       applySetAssessmentMutation(s, by, by_id, canonicalPayload, task);
       break;
