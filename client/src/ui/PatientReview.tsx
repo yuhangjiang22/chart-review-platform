@@ -38,7 +38,7 @@ import { CriterionCard } from "../PatientReview/CriterionCard";
 import { FeedbackStrip } from "../PatientReview/FeedbackStrip";
 import { JudgePanel, type JudgeAnalysisRecord } from "../PatientReview/JudgePanel";
 import type { DerivedAdjudication } from "../PatientReview/types";
-import { evalDerivation, derivedInputs } from "../contractEvalClient";
+import { evalDerivation, derivedInputs, fieldApplicability } from "../contractEvalClient";
 import { buildCiterEvidence, type Citer, type CiterEvidence, citerKey } from "../citers";
 
 /** A per-agent assessment for a single field, shaped like FieldAssessment
@@ -124,10 +124,31 @@ export function PatientReview(p: PatientReviewProps) {
     return m;
   }, [p.reviewState, reviewFresh, p.encounterId]);
 
+  // Current (encounter-scoped) answers env — for derivation + applicability.
+  const answersEnv = useMemo(() => {
+    const env: Record<string, unknown> = {};
+    for (const [fid, fa] of assessmentByField) if (fa.answer !== undefined) env[fid] = fa.answer;
+    return env;
+  }, [assessmentByField]);
+
+  // Applicability per field, evaluated against the current answers (the
+  // `is_applicable_when` gate). A field whose gate is currently false is
+  // out of scope — e.g. pack_year when smoking_status === "never".
+  const applicabilityByField = useMemo(() => {
+    const minimalTask = { fields: p.fields };
+    const m = new Map<string, "applicable" | "not_applicable" | "unknown">();
+    for (const f of p.fields) m.set(f.id, fieldApplicability(minimalTask, answersEnv, f.id));
+    return m;
+  }, [p.fields, answersEnv]);
+
   // Progress calculation — count leaf criteria (the ones the reviewer must
   // touch). Derived criteria are computed by the system and don't need
-  // human action.
-  const leaves = useMemo(() => p.fields.filter((f) => !f.derivation), [p.fields]);
+  // human action; criteria whose applicability gate is currently false are
+  // out of scope and don't count as a pending decision.
+  const leaves = useMemo(
+    () => p.fields.filter((f) => !f.derivation && applicabilityByField.get(f.id) !== "not_applicable"),
+    [p.fields, applicabilityByField],
+  );
   const terminal = leaves.filter((f) => {
     const fa = assessmentByField.get(f.id);
     return fa && (fa.status === "approved" || fa.status === "overridden" || fa.status === "not_applicable");
@@ -188,6 +209,9 @@ export function PatientReview(p: PatientReviewProps) {
     for (let i = 1; i <= orderedFields.length; i++) {
       const idx = (start + i) % orderedFields.length;
       const f = orderedFields[idx].field;
+      // Skip derived + not-applicable (gate currently false) criteria — neither
+      // needs a reviewer decision.
+      if (f.derivation || applicabilityByField.get(f.id) === "not_applicable") continue;
       const a = assessmentByField.get(f.id);
       if (!a || (a.status !== "approved" && a.status !== "overridden" && a.status !== "not_applicable")) {
         setSelectedFieldId(f.id);
@@ -568,18 +592,16 @@ export function PatientReview(p: PatientReviewProps) {
                     } | undefined;
                     if (selected.field.derivation) {
                       const minimalTask = { fields: p.fields };
-                      const answers: Record<string, unknown> = {};
-                      for (const fa of p.reviewState?.field_assessments ?? []) {
-                        if (fa.answer !== undefined) answers[fa.field_id] = fa.answer;
-                      }
+                      // Encounter-scoped answers (answersEnv) so per-note
+                      // derivations compute from THIS note's leaves, not a mix.
                       const inputs = derivedInputs(minimalTask, selected.field.id).map((id) => ({
                         id,
-                        answer: answers[id],
-                        missing: answers[id] === undefined,
+                        answer: answersEnv[id],
+                        missing: answersEnv[id] === undefined,
                       }));
                       derivedView = {
                         formula: selected.field.derivation,
-                        value: evalDerivation(minimalTask, answers, selected.field.id),
+                        value: evalDerivation(minimalTask, answersEnv, selected.field.id),
                         inputs,
                       };
                     }
@@ -650,6 +672,8 @@ export function PatientReview(p: PatientReviewProps) {
                     isLocked={isLocked}
                     hasNext={selectedIndex < orderedFields.length - 1}
                     derivedView={derivedView}
+                    notApplicable={applicabilityByField.get(selected.field.id) === "not_applicable"}
+                    applicabilityGate={typeof selected.field.is_applicable_when === "string" ? selected.field.is_applicable_when : undefined}
                     onSubmit={async ({ field_id, answer, evidence, rationale, comment }) => {
                       const submitQs = p.activeSessionId ? `?session_id=${encodeURIComponent(p.activeSessionId)}` : "";
                       const res = await authFetch(`/api/reviews/${p.patientId}/${p.taskId}/actions${submitQs}`, {

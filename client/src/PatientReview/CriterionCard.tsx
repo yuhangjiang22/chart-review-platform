@@ -49,6 +49,12 @@ export interface CriterionCardProps {
     value: unknown;
     inputs: { id: string; answer: unknown; missing: boolean }[];
   };
+  /** When true, this field's `is_applicable_when` gate is currently false (e.g.
+   *  pack_year when smoking_status is "never"). The card shows a read-only
+   *  "Not applicable" panel instead of the annotation form. */
+  notApplicable?: boolean;
+  /** The applicability gate expression, shown in the not-applicable panel. */
+  applicabilityGate?: string;
 }
 
 interface FormState {
@@ -102,6 +108,8 @@ export function CriterionCard(props: CriterionCardProps) {
     evidence,
     onEvidenceChange,
     derivedView,
+    notApplicable,
+    applicabilityGate,
     softFocusCiter,
     onSoftFocus,
     citerEvidence: _citerEvidence,
@@ -161,7 +169,8 @@ export function CriterionCard(props: CriterionCardProps) {
   // Derived fields are read-only — no manual annotation form. Disagreement
   // with the formula's output is fixed at the leaves, not here.
   const isDerivedField = !!derivedView;
-  const showManualForm = !isDerivedField;
+  // Not-applicable fields (gate currently false) are read-only too — no form.
+  const showManualForm = !isDerivedField && !notApplicable;
 
   const a1 = agentDrafts[0];
   const a2 = agentDrafts[1];
@@ -377,6 +386,24 @@ export function CriterionCard(props: CriterionCardProps) {
         {/* Derived/final criterion — read-only "Computed" panel. Shown
          *  whenever the field has a derivation expression. The manual
          *  annotation form below is gated behind the Override toggle. */}
+        {notApplicable && !isDerivedField && (
+          <div className="rounded-md border border-border bg-muted/40 p-3 space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground font-semibold">
+                Not applicable
+              </span>
+              <span className="text-[10.5px] text-muted-foreground italic ml-auto">
+                gate not met — no decision needed
+              </span>
+            </div>
+            <p className="text-[11.5px] text-muted-foreground">
+              This criterion only applies when{" "}
+              <code className="font-mono text-foreground">{applicabilityGate ?? "its gate condition is met"}</code>.
+              Based on the current answers it does not apply to this case, so it is
+              excluded from the decision count.
+            </p>
+          </div>
+        )}
         {isDerivedField && derivedView && !isLocked && (
           <div className="rounded-md border border-[hsl(var(--sage))]/40 bg-[hsl(var(--sage))]/5 p-3 space-y-3">
             <div className="flex items-center gap-2">
