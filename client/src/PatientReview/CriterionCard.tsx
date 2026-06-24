@@ -120,6 +120,14 @@ export function CriterionCard(props: CriterionCardProps) {
   const answerOptions: string[] = Array.isArray((field.answer_schema as { enum?: unknown[] } | undefined)?.enum)
     ? ((field.answer_schema as { enum: unknown[] }).enum.map(String))
     : [];
+  // Numeric fields (e.g. a MoCA score 0-30) render a number input and submit a
+  // NUMBER, not a string — otherwise exact-match scoring false-fails against the
+  // agent's numeric answer (number 21 vs string "21"). enum still wins over this.
+  const numericSchema = field.answer_schema as
+    | { type?: string; minimum?: number; maximum?: number }
+    | undefined;
+  const numericType = numericSchema?.type;
+  const isNumeric = numericType === "integer" || numericType === "number";
 
   // When the committed assessment arrives later (e.g. on initial page load
   // the WebSocket-driven reviewState lands AFTER the component mounts),
@@ -164,9 +172,18 @@ export function CriterionCard(props: CriterionCardProps) {
     if (busy) return;
     setBusy(true);
     try {
+      // Coerce numeric fields to a NUMBER so exact-match scoring lines up with
+      // the agent's numeric answer (the server gate also validates min/max, so
+      // we only need to fix the type here, not enforce range). enum/free-text
+      // keep their string value.
+      const trimmed = form.answer.trim();
+      const answer =
+        isNumeric && trimmed !== "" && !Number.isNaN(Number(trimmed))
+          ? Number(trimmed)
+          : form.answer;
       await onSubmit({
         field_id: field.id,
-        answer: form.answer,
+        answer,
         evidence,
         rationale: form.rationale,
         comment: form.comment.trim() || undefined,
@@ -498,6 +515,16 @@ export function CriterionCard(props: CriterionCardProps) {
                     <option key={o} value={o}>{o}</option>
                   ))}
                 </select>
+              ) : isNumeric ? (
+                <input
+                  type="number"
+                  value={form.answer}
+                  min={numericSchema?.minimum}
+                  max={numericSchema?.maximum}
+                  step={numericType === "integer" ? 1 : "any"}
+                  onChange={(e) => setForm((s) => ({ ...s, answer: e.target.value }))}
+                  className="border border-border rounded-sm px-2 py-1 text-[12.5px]"
+                />
               ) : (
                 <input
                   value={form.answer}
