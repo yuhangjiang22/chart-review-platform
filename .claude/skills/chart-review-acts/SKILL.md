@@ -36,6 +36,10 @@ must NOT set them: the APOE allele flags (`apoe2`/`apoe3`/`apoe4`) derive from
   Depression Scale, 0–30), `cornell_csdd` (0–38), `npi_total` (0–144).
 - **Demographics:** `education_years` (integer), `smoking_status`
   (`current`/`former`/`never`/`unknown`).
+- **Smoking detail (only for current/former smokers):** `pack_year` (number),
+  `pack_per_day` (number, may be decimal), `smoking_duration` (years),
+  `quit_time` (free-text: year / age-at-quit / relative time — former smokers
+  only). Record only numbers/expressions the note states; do not compute them.
 - **Allergy / vaccine (free-text, one value listing all; `none` if absent):**
   `allergen` (substance(s) the patient reacts to), `vaccine_name` (vaccines
   administered/received), `vaccine_category` (each vaccine's category — Live /

@@ -29,6 +29,11 @@ Rules (apply per field, per note):
   Scale): the documented value; omit if absent. Do not convert CDR Sum-of-Boxes.
 - smoking_status: current / former / never / unknown ("denies tobacco" → never,
   "quit 2015" → former, "1 ppd"/"smokes" → current); omit if not documented.
+- Smoking detail (only if a current/former smoker; omit otherwise): pack_year
+  (number, "30 pack-year history" → 30), pack_per_day (number, "0.5 ppd" → 0.5),
+  smoking_duration (years, "smoked 40 years" → 40), quit_time (former smokers
+  only — free-text: "quit in 2008" → "2008", "quit at age 55" → "age 55"). Record
+  only what the note states; do not compute pack-years yourself.
 - allergen: the substance(s) the patient is allergic/hypersensitive/intolerant to
   in THIS note, as a free-text value (multiple → "penicillin; shellfish");
   substance only, not the reaction; include resolved; "none" for NKDA / no
