@@ -18,6 +18,19 @@ Rules (apply per field, per note):
   are computed from this — do NOT output them.)
 - postmenopause: 1 when this note documents postmenopausal status / menopause.
   If this note does not mention it → 0.
+- lmp_date: the documented last menstrual period as a date/time EXPRESSION only
+  ("LMP 05/10/2026" → "05/10/2026"); an age of menopause is NOT an LMP; omit if
+  not documented.
+- Numeric scale scores (moca_score, mmse_score, hachinski_score, mattis_drs,
+  tics_score, gds_depression_score, cornell_csdd, npi_total, education_years):
+  return the RAW number documented in THIS note (e.g. "MoCA 21/30" → 21). Do not
+  infer a score from a severity word; OMIT the field if this note gives no number.
+- cdr_global (0/0.5/1/2/3) and gds_stage (1–7, Reisberg Global Deterioration
+  Scale): the documented value; omit if absent. Do not convert CDR Sum-of-Boxes.
+- smoking_status: current / former / never / unknown ("denies tobacco" → never,
+  "quit 2015" → former, "1 ppd"/"smokes" → current); omit if not documented.
+- Do NOT output the computed fields (apoe2/apoe3/apoe4, moca_severity,
+  mmse_severity, cdr_severity) — they are derived.
 - Evidence: quote the SMALLEST verbatim span from THIS note that supports the
   answer. Never cite a negated sentence to support a 1.
 

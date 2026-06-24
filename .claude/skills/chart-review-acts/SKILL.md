@@ -2,71 +2,81 @@
 name: chart-review-acts
 description: >
   ACTS Alzheimer's/dementia phenotyping — extract from a patient's clinical
-  notes: whether impaired cognition (MCI/dementia) is documented
-  (impaired_cognition), the documented APOE genotype (apoe_genotype, from which
-  ε2/ε3/ε4 allele presence apoe2/apoe3/apoe4 is computed), and postmenopausal
-  status (postmenopause). Evidence-cited.
-  Triggers on: impaired cognition, MCI, dementia, APOE genotype, ε2/ε3/ε4,
-  postmenopause, ACTS.
+  notes: impaired cognition (impaired_cognition), the documented APOE genotype
+  (apoe_genotype → ε2/ε3/ε4 allele flags computed), postmenopausal status +
+  last menstrual period, documented cognitive / depression / neuropsychiatric
+  scale scores (MoCA, MMSE, CDR, Hachinski, Mattis DRS, TICS, GDS, Cornell,
+  NPI, Global Deterioration stage), education years, and smoking status.
+  Evidence-cited. Triggers on: impaired cognition, MCI, dementia, APOE,
+  ε2/ε3/ε4, postmenopause, LMP, MoCA, MMSE, CDR, Hachinski, NPI, GDS, smoking,
+  ACTS.
 ---
 
 # Procedure
 
-This is a **notes-only** phenotype task. You extract **three leaf fields**
-directly, each with one allowed value and an evidence citation. The three APOE
-allele flags (`apoe2`/`apoe3`/`apoe4`) are **computed** from the genotype — do
-NOT set them.
+This is a **notes-only** phenotype task. You extract each **leaf** field that the
+chart documents, with an evidence citation. Some fields are **computed** and you
+must NOT set them: the APOE allele flags (`apoe2`/`apoe3`/`apoe4`) derive from
+`apoe_genotype`, and the severity bands (`moca_severity`, `mmse_severity`,
+`cdr_severity`) derive from their scores.
 
-- `impaired_cognition` — `1` (MCI/dementia/cognitive impairment documented) / `0`.
-- `apoe_genotype` — the documented APOE genotype: a full genotype (`e2/e2`,
-  `e2/e3`, `e2/e4`, `e3/e3`, `e3/e4`, `e4/e4`), a single-allele carrier
-  (`e2_carrier` / `e3_carrier` / `e4_carrier`), or `none` when no genotype is
-  documented. `apoe2`/`apoe3`/`apoe4` derive automatically from this value.
-- `postmenopause` — `1` (postmenopausal/menopause documented) / `0`.
+**Leaf fields you extract (only when the note documents them):**
 
-1. `list_notes` to see the chart. Use **`search_notes`** for high-signal terms to
-   jump to the relevant spans on a large chart:
-   - cognition: "MCI", "dementia", "Alzheimer", "cognitive impairment", "MoCA",
-     "MMSE", "neuropsych".
-   - APOE: "APOE", "ApoE", "Apolipoprotein E", "ε2/ε3/ε4", "e2/e3/e4", "genotype".
-   - menopause: "postmenopausal", "menopause", "LMP".
-   Use `read_note`/`read_notes` to read candidates in full.
-2. `list_criteria` + `read_criteria([...])` to get each field's allowed values and
-   its extraction guidance. **Follow each criterion's mappings and NA/0 rules
-   exactly.**
-3. For each field, commit one answer via
+- **Cognition / status:** `impaired_cognition` (`1`/`0`).
+- **APOE:** `apoe_genotype` — full genotype (`e2/e2`,`e2/e3`,`e2/e4`,`e3/e3`,
+  `e3/e4`,`e4/e4`), single-allele carrier (`e2_carrier`/`e3_carrier`/`e4_carrier`),
+  or `none`. (`apoe2`/`apoe3`/`apoe4` auto-derive.)
+- **Reproductive:** `postmenopause` (`1`/`0`), `lmp_date` (free-text date/expr).
+- **Cognitive scale SCORES (numeric, raw integer as documented):** `moca_score`
+  (0–30), `mmse_score` (0–30), `mattis_drs` (0–144), `tics_score` (0–41),
+  `hachinski_score` (0–18).
+- **Staging (enum):** `cdr_global` (`0`/`0.5`/`1`/`2`/`3`), `gds_stage` (`1`–`7`,
+  the Reisberg Global Deterioration Scale).
+- **Depression / neuropsych SCORES (numeric):** `gds_depression_score` (Geriatric
+  Depression Scale, 0–30), `cornell_csdd` (0–38), `npi_total` (0–144).
+- **Demographics:** `education_years` (integer), `smoking_status`
+  (`current`/`former`/`never`/`unknown`).
+
+1. `list_notes`; use **`search_notes`** for high-signal terms (MCI, dementia,
+   Alzheimer, APOE, ε4, MoCA, MMSE, CDR, Hachinski, NPI, GDS, Cornell, DRS,
+   TICS, postmenopausal, LMP, smoking, pack, education). `read_note`/`read_notes`
+   to read candidates in full.
+2. `list_criteria` + `read_criteria([...])` for each field's schema + guidance.
+   **Follow each criterion's rules exactly.**
+3. For each DOCUMENTED field, commit one answer via
    `set_field_assessment(field_id, answer, confidence, evidence, rationale)`. The
-   `answer` MUST be one of the field's enum values.
+   `answer` must match the field's type: a listed value for enum fields, the
+   **raw numeric score** (a number) for numeric fields, or the free-text value
+   (LMP). **Leave a field unanswered if the note does not document it** — do not
+   guess a score.
 
-   Evidence rules — cite the SMALLEST span that supports the answer:
-   - Quote the single justifying sentence/phrase (well under ~300 chars) and use
-     `find_quote_offsets` for exact offsets so the faithfulness gate passes.
-   - The span must be **affirmative** for a `1` — never cite a negated sentence
-     ("no cognitive impairment") to support `impaired_cognition=1`.
-   - For `0` / `NA`, cite the short section you checked where the info would
-     appear if present (assessment, genetics/labs, GYN history).
+   Evidence rules — cite the SMALLEST affirmative span (e.g. "MoCA 21/30",
+   "APOE ε3/ε4", "Postmenopausal"). Use `find_quote_offsets` for exact offsets.
+   Never cite a negated sentence to support a positive.
 
-## Decision rules (apply to all fields)
+## Decision rules
 
 - **Patient-only, affirmative:** extract only what is documented for THIS
-  patient. **Exclude family history** ("mother had Alzheimer's"), **plans/orders**
-  ("memory workup planned", "APOE testing ordered"), and **negations**.
-- **Do not infer APOE** from an AD diagnosis, cognitive status, risk, or family
-  history — only from a documented genotype / ε4-carrier statement.
+  patient. Exclude family history, plans/orders ("memory workup planned", "APOE
+  testing ordered"), and negations.
+- **Numeric scores:** record the raw documented number only (e.g. "MoCA 21/30" →
+  `21`). Do NOT infer a score from a severity word, and do NOT compute the
+  severity bands — those derive automatically. Omit a scale entirely if the note
+  gives no number for it.
 - **APOE = one extraction:** read the documented genotype into `apoe_genotype`
-  (a full genotype, a single-allele `*_carrier`, or `none`). The three allele
-  flags derive from it automatically — never set them by hand. A single-allele
-  carrier statement ("ε4 carrier") → `e4_carrier`; "homozygous ε4" is the full
-  genotype `e4/e4`.
+  (full, `*_carrier`, or `none`); never set the allele flags by hand. "homozygous
+  ε4" = `e4/e4`; "ε4 carrier" = `e4_carrier`. Do not infer APOE from an AD
+  diagnosis, cognitive status, risk, or family history.
 - **Cognition:** subjective concern alone, transient delirium, or evaluation-only
-  → `0`; a confirmed MCI/dementia diagnosis, clinician-corroborated decline, or
-  impaired objective testing → `1`.
-- **Confidence:** `high` = explicit diagnosis / documented genotype / explicit
-  postmenopausal statement; `medium` = narrative inference within the rules;
-  `low` = ambiguous → prefer `0`/`NA` over a low-confidence guess.
+  → `0`; confirmed MCI/dementia, clinician-corroborated decline, or impaired
+  objective testing → `1`.
+- **LMP:** extract the date/time EXPRESSION only; an age of menopause is NOT an
+  LMP. **Smoking:** "denies tobacco" → `never`, "quit 2015" → `former`, "1 ppd" →
+  `current`.
+- **Confidence:** `high` = explicit documented value; `medium` = narrative
+  inference within the rules; `low` = ambiguous → prefer omitting over guessing.
 
-4. **Commit the three leaf fields** (`impaired_cognition`, `apoe_genotype`,
-   `postmenopause`) via `set_field_assessment` before finishing — do NOT set the
-   derived `apoe2`/`apoe3`/`apoe4` (they auto-compute from `apoe_genotype`).
-   **Do NOT call `set_review_status`.** Once the three leaves are committed, emit
-   a one-line summary and stop.
+4. Commit every documented leaf field via `set_field_assessment`; leave
+   undocumented fields unanswered. Do NOT set the **computed** fields (`apoe2`,
+   `apoe3`, `apoe4`, `moca_severity`, `mmse_severity`, `cdr_severity`). **Do NOT
+   call `set_review_status`.** Emit a one-line summary and stop.
