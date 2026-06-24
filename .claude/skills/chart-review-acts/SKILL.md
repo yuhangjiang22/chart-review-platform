@@ -36,6 +36,11 @@ must NOT set them: the APOE allele flags (`apoe2`/`apoe3`/`apoe4`) derive from
   Depression Scale, 0–30), `cornell_csdd` (0–38), `npi_total` (0–144).
 - **Demographics:** `education_years` (integer), `smoking_status`
   (`current`/`former`/`never`/`unknown`).
+- **Allergy / vaccine (free-text, one value listing all; `none` if absent):**
+  `allergen` (substance(s) the patient reacts to), `vaccine_name` (vaccines
+  administered/received), `vaccine_category` (each vaccine's category — Live /
+  Non-Live / BCG / Active Amyloid or Tau Immunization — assigned via the
+  `references/CDC_Vaccine_Reference_Table.md` + `Active_Amyloid_Tau_Immunization_Reference_Table.md`).
 
 1. `list_notes`; use **`search_notes`** for high-signal terms (MCI, dementia,
    Alzheimer, APOE, ε4, MoCA, MMSE, CDR, Hachinski, NPI, GDS, Cornell, DRS,
@@ -73,6 +78,13 @@ must NOT set them: the APOE allele flags (`apoe2`/`apoe3`/`apoe4`) derive from
 - **LMP:** extract the date/time EXPRESSION only; an age of menopause is NOT an
   LMP. **Smoking:** "denies tobacco" → `never`, "quit 2015" → `former`, "1 ppd" →
   `current`.
+- **Allergen:** the SUBSTANCE only (not the reaction); include resolved/inactive;
+  exclude NKDA (→ `none`), family history, refuted/entered-in-error, suspected,
+  panel orders, bare reaction words. **Vaccine:** only administered/received/
+  completed (exclude planned/declined/contraindicated/discussed). **Vaccine
+  category:** assign from the reference tables (brand→abbreviation→disease, brand
+  wins; `Ambiguous` for disease-only mixed-category; passive mAbs = `Not a
+  vaccine`) — do not guess from memory.
 - **Confidence:** `high` = explicit documented value; `medium` = narrative
   inference within the rules; `low` = ambiguous → prefer omitting over guessing.
 

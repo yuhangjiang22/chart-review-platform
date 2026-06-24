@@ -29,6 +29,18 @@ Rules (apply per field, per note):
   Scale): the documented value; omit if absent. Do not convert CDR Sum-of-Boxes.
 - smoking_status: current / former / never / unknown ("denies tobacco" → never,
   "quit 2015" → former, "1 ppd"/"smokes" → current); omit if not documented.
+- allergen: the substance(s) the patient is allergic/hypersensitive/intolerant to
+  in THIS note, as a free-text value (multiple → "penicillin; shellfish");
+  substance only, not the reaction; include resolved; "none" for NKDA / no
+  allergen. Exclude family history, refuted, suspected, panel orders.
+- vaccine_name: vaccine(s) documented as administered/received/completed in THIS
+  note (free-text, multiple → "MMR; influenza"); "none" if none. Exclude
+  planned/declined/contraindicated/discussed-only.
+- vaccine_category: for each vaccine in vaccine_name, its category — Live Vaccine /
+  Non-Live Vaccine / BCG / Active Amyloid or Tau Immunization (parallel order,
+  "; "-separated); "none" if no vaccine. (e.g. MMR→Live, influenza/Shingrix/COVID/
+  Tdap/pneumococcal→Non-Live, BCG→BCG, amyloid/tau immunization→Active Amyloid or
+  Tau Immunization; passive mAbs like lecanemab→Not a vaccine.)
 - Do NOT output the computed fields (apoe2/apoe3/apoe4, moca_severity,
   mmse_severity, cdr_severity) — they are derived.
 - Evidence: quote the SMALLEST verbatim span from THIS note that supports the

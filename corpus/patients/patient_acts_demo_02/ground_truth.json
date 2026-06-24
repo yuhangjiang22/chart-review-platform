@@ -11,6 +11,9 @@
     "cdr_global": "1", "gds_stage": "4",
     "gds_depression_score": 6, "cornell_csdd": 8, "npi_total": 18,
     "education_years": 16, "smoking_status": "former",
+    "allergen": "penicillin; sulfa drugs",
+    "vaccine_name": "MMR; influenza; Shingrix",
+    "vaccine_category": "Live Vaccine; Non-Live Vaccine; Non-Live Vaccine",
     "mmse_severity": "mild", "moca_severity": "mild", "cdr_severity": "mild"
   },
   "note_answers": {
@@ -24,6 +27,9 @@
       "cdr_global": "1", "gds_stage": "4",
       "gds_depression_score": 6, "cornell_csdd": 8, "npi_total": 18,
       "education_years": 16, "smoking_status": "former",
+      "allergen": "penicillin; sulfa drugs",
+      "vaccine_name": "MMR; influenza; Shingrix",
+      "vaccine_category": "Live Vaccine; Non-Live Vaccine; Non-Live Vaccine",
       "mmse_severity": "mild", "moca_severity": "mild", "cdr_severity": "mild"
     }
   },

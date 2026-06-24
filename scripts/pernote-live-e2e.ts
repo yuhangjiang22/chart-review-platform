@@ -23,7 +23,6 @@ const { loadCompiledTask } = await import("@chart-review/tasks");
 const { extractLabelsForNote } = await import("@chart-review/pipeline-extract-pernote");
 const { writePerNoteAssessments, load } = await import("@chart-review/domain-review");
 const { resolveModelEndpoint } = await import("../server/lib/model-registry.ts");
-const { computePerNoteMetrics } = await import("../server/lib/pernote-performance.ts");
 
 const PATIENT = process.env.E2E_PATIENT || "patient_acts_demo_01";
 const NOTE_ID = process.env.E2E_NOTE || "2026-02-10__memory_clinic";
@@ -63,22 +62,35 @@ const gt = JSON.parse(fs.readFileSync(path.join(ROOT, "corpus/patients", PATIENT
   .note_answers[NOTE_ID] as Record<string, string>;
 
 console.log(`3) compare stored (leaves + derived) vs ground truth:\n`);
+// Normalized set for free-text comparison: lowercase, split on ; / , , trim, sort.
+const norm = (s: string | undefined) =>
+  (s ?? "").toLowerCase().split(/[;,]/).map((x) => x.trim()).filter(Boolean).sort().join(" | ");
+
 const fieldIds = Object.keys(gt);
-const pairs = [];
-let correct = 0;
+const strict: Array<{ fid: string; got?: string; exp?: string; ok: boolean; kind: string }> = [];
+const freetext: Array<{ fid: string; got?: string; exp?: string; ok: boolean }> = [];
 for (const fid of fieldIds) {
+  const f = task.fields.find((ff) => ff.id === fid);
   const got = stored.get(fid);
-  const exp = gt[fid];
-  const expS = exp == null ? undefined : String(exp); // GT numerics are numbers; compare as strings
-  const kind = task.fields.find((f) => f.id === fid)?.derivation ? "derived" : "leaf";
-  const ok = got === expS;
-  if (ok) correct++;
-  pairs.push({ note_id: NOTE_ID, field_id: fid, a: got ?? "", b: expS ?? "" });
-  console.log(`  ${ok ? "✓" : "✗"} ${fid.padEnd(20)} ${kind.padEnd(8)} got=${String(got).padEnd(10)} gt=${String(exp)}`);
+  const exp = gt[fid] == null ? undefined : String(gt[fid]);
+  if ((f?.answer_schema as { type?: string } | undefined)?.type === "string") {
+    freetext.push({ fid, got, exp, ok: norm(got) === norm(exp) });
+  } else {
+    strict.push({ fid, got, exp, ok: got === exp, kind: f?.derivation ? "derived" : "leaf" });
+  }
 }
-console.log(`\naccuracy (leaves + derived) vs GT: ${correct}/${fieldIds.length}`);
-const metrics = computePerNoteMetrics(pairs, fieldIds);
-console.log(`macro_accuracy=${metrics.macro_accuracy} overall_agreement=${metrics.overall_agreement}`);
-console.log(`faithful evidence on leaves: ${r.fields.filter((f) => (f.evidence?.length ?? 0) > 0).map((f) => f.field_id).join(", ")}`);
+let correct = 0;
+for (const s of strict) {
+  if (s.ok) correct++;
+  console.log(`  ${s.ok ? "✓" : "✗"} ${s.fid.padEnd(20)} ${s.kind.padEnd(8)} got=${String(s.got).padEnd(10)} gt=${s.exp}`);
+}
+console.log(`\nstrict accuracy (enum + numeric + derived) vs GT: ${correct}/${strict.length}`);
+if (freetext.length) {
+  console.log(`\nfree-text fields (normalized set match):`);
+  for (const ft of freetext) {
+    console.log(`  ${ft.ok ? "✓" : "~"} ${ft.fid.padEnd(18)} got="${ft.got ?? ""}"  gt="${ft.exp ?? ""}"`);
+  }
+}
+console.log(`\nfaithful evidence on: ${r.fields.filter((f) => (f.evidence?.length ?? 0) > 0).map((f) => f.field_id).join(", ")}`);
 
 fs.rmSync(process.env.CHART_REVIEW_REVIEWS_ROOT, { recursive: true, force: true });
