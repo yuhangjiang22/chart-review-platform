@@ -31,4 +31,25 @@ describe("computePerNoteMetrics", () => {
     const r = computePerNoteMetrics(pairs, ["apoe4"]);
     expect(r.disagreements).toEqual([{ note_id: "n2", field_id: "apoe4", a: "1", b: "0" }]);
   });
+
+  it("numeric field: matches within tolerance and suppresses kappa", () => {
+    const pairs: CellPair[] = [
+      { note_id: "n1", field_id: "moca_score", a: "21", b: "21" }, // exact
+      { note_id: "n2", field_id: "moca_score", a: "20", b: "21" }, // |Δ|=1 ≤ tol=1 → correct
+      { note_id: "n3", field_id: "moca_score", a: "18", b: "21" }, // |Δ|=3 > tol → wrong
+    ];
+    const r = computePerNoteMetrics(pairs, ["moca_score"], { moca_score: { tolerance: 1 } });
+    const moca = r.per_field.find((f) => f.field_id === "moca_score")!;
+    expect(moca.n).toBe(3);
+    expect(moca.n_correct).toBe(2);
+    expect(moca.accuracy).toBeCloseTo(2 / 3, 5);
+    expect(moca.kappa).toBeNull(); // numeric → κ suppressed
+    expect(r.disagreements).toEqual([{ note_id: "n3", field_id: "moca_score", a: "18", b: "21" }]);
+  });
+
+  it("numeric field with tolerance 0 requires exact match", () => {
+    const pairs: CellPair[] = [{ note_id: "n1", field_id: "mmse", a: "20", b: "21" }];
+    const r = computePerNoteMetrics(pairs, ["mmse"], { mmse: { tolerance: 0 } });
+    expect(r.per_field[0]!.n_correct).toBe(0);
+  });
 });

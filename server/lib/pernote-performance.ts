@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
-import { cohensKappa, type KappaCell } from "@chart-review/eval-adherence-iaa";
+import { cohensKappa } from "@chart-review/eval-adherence-iaa";
 import { PLATFORM_ROOT, readGroundTruth } from "@chart-review/patients";
+import { loadCompiledTask } from "@chart-review/tasks";
 
 /** One scored cell: rater `a` (agent) vs rater `b` (reviewer or ground truth). */
 export interface CellPair {
@@ -26,14 +27,34 @@ export interface PerNoteMetrics {
   disagreements: Array<{ note_id: string; field_id: string; a: string; b: string }>;
 }
 
-/** PURE: accuracy + Cohen's κ over note×field cells, grouped by field. */
-export function computePerNoteMetrics(pairs: CellPair[], fieldIds: string[]): PerNoteMetrics {
+/** Per-numeric-field scoring spec: a cell counts correct when |a-b| ≤ tolerance. */
+export interface NumericFieldSpec { tolerance: number; }
+
+/** PURE: accuracy + Cohen's κ over note×field cells, grouped by field. For
+ *  fields listed in `numericFields`, cells match within ±tolerance and κ is
+ *  suppressed (a numeric scale isn't a nominal category set). */
+export function computePerNoteMetrics(
+  pairs: CellPair[],
+  fieldIds: string[],
+  numericFields?: Record<string, NumericFieldSpec>,
+): PerNoteMetrics {
+  const isNumeric = (fid: string) => !!numericFields && fid in numericFields;
+  const matches = (fid: string, a: string, b: string): boolean => {
+    if (isNumeric(fid)) {
+      const na = Number(a), nb = Number(b);
+      if (Number.isFinite(na) && Number.isFinite(nb)) return Math.abs(na - nb) <= numericFields![fid]!.tolerance;
+    }
+    return a === b;
+  };
   const per_field: PerFieldMetric[] = fieldIds.map((fid) => {
     const cells = pairs.filter((p) => p.field_id === fid);
     const n = cells.length;
-    const n_correct = cells.filter((c) => c.a === c.b).length;
-    const kCells: KappaCell[] = cells.map((c) => ({ rater_a: c.a, rater_b: c.b }));
-    const k = cells.length >= 2 ? cohensKappa(kCells) : Number.NaN;
+    const n_correct = cells.filter((c) => matches(fid, c.a, c.b)).length;
+    // κ is meaningless for a numeric scale (each value is a distinct nominal
+    // category) — compute it only for categorical fields.
+    const k = !isNumeric(fid) && cells.length >= 2
+      ? cohensKappa(cells.map((c) => ({ rater_a: c.a, rater_b: c.b })))
+      : Number.NaN;
     return {
       field_id: fid,
       n,
@@ -48,15 +69,31 @@ export function computePerNoteMetrics(pairs: CellPair[], fieldIds: string[]): Pe
       ? null
       : scored.reduce((s, f) => s + (f.accuracy as number), 0) / scored.length;
   const totalN = pairs.length;
-  const totalCorrect = pairs.filter((p) => p.a === p.b).length;
+  const totalCorrect = pairs.filter((p) => matches(p.field_id, p.a, p.b)).length;
   return {
     per_field,
     macro_accuracy,
     overall_agreement: totalN === 0 ? null : totalCorrect / totalN,
     disagreements: pairs
-      .filter((p) => p.a !== p.b)
+      .filter((p) => !matches(p.field_id, p.a, p.b))
       .map((p) => ({ note_id: p.note_id, field_id: p.field_id, a: p.a, b: p.b })),
   };
+}
+
+/** Read numeric field specs (id → tolerance) off a compiled task. A criterion
+ *  declares numeric scoring via answer_schema.type integer/number, with an
+ *  optional answer_schema.tolerance (default 0 = exact). */
+function numericFieldsOf(taskId: string): Record<string, NumericFieldSpec> {
+  const out: Record<string, NumericFieldSpec> = {};
+  const task = loadCompiledTask(taskId);
+  for (const f of task?.fields ?? []) {
+    const schema = (f as { answer_schema?: { type?: string; tolerance?: number } }).answer_schema;
+    if (schema?.type === "integer" || schema?.type === "number") {
+      const fid = (f as { id?: string; field_id?: string }).id ?? (f as { id?: string; field_id?: string }).field_id;
+      if (fid) out[fid] = { tolerance: typeof schema.tolerance === "number" ? schema.tolerance : 0 };
+    }
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -145,13 +182,14 @@ export function computePerNotePerformance(
     }
   }
 
+  const numericFields = numericFieldsOf(taskId);
   return {
     task_id: taskId,
     validated_notes: validatedNoteCount,
     field_ids: fieldIds,
-    agent_vs_reviewer: computePerNoteMetrics(arPairs, fieldIds),
-    agent_vs_gt: computePerNoteMetrics(agPairs, fieldIds),
-    reviewer_vs_gt: computePerNoteMetrics(rgPairs, fieldIds),
+    agent_vs_reviewer: computePerNoteMetrics(arPairs, fieldIds, numericFields),
+    agent_vs_gt: computePerNoteMetrics(agPairs, fieldIds, numericFields),
+    reviewer_vs_gt: computePerNoteMetrics(rgPairs, fieldIds, numericFields),
     gt_coverage: { n_with_gt: nWithGt, n_total: nTotal },
   };
 }
