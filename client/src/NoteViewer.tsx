@@ -139,6 +139,29 @@ function normalizeWS(s: string): string {
     .trim();
 }
 
+// ---- Helper: compact display of an answer for the "Reviewing" header.
+// Entity-list answers (answer_schema.type === "array") are a JS array of
+// records; stringifying them yields "[object Object]". Summarize them as their
+// entity values (value_key) instead; "none" for an empty list.
+function summarizeAnswer(answer: unknown, field?: CompiledField | null): string {
+  if (Array.isArray(answer)) {
+    if (answer.length === 0) return "none";
+    const vk = (field?.answer_schema as { entity?: { value_key?: string } } | undefined)?.entity?.value_key;
+    return answer
+      .map((r) => {
+        if (r && typeof r === "object") {
+          const rec = r as Record<string, unknown>;
+          const v = vk ? rec[vk] : Object.values(rec).find((x) => typeof x === "string");
+          return v != null ? String(v) : "";
+        }
+        return String(r);
+      })
+      .filter(Boolean)
+      .join(", ");
+  }
+  return String(answer);
+}
+
 // ---- buildSegments: merge cited, failed, and search intervals ------------
 function buildSegments(
   text: string,
@@ -797,7 +820,7 @@ export function NoteViewer({
               </span>
               {selectedAssessment?.answer != null && (
                 <span className="font-mono text-[11px] text-foreground bg-[hsl(var(--ochre)/0.10)] text-[hsl(var(--ochre))] rounded px-1.5 py-0.5">
-                  {String(selectedAssessment.answer)}
+                  {summarizeAnswer(selectedAssessment.answer, selectedField)}
                 </span>
               )}
               {selectedAssessment?.confidence && (

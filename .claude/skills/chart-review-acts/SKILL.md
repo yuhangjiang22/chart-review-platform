@@ -40,11 +40,21 @@ must NOT set them: the APOE allele flags (`apoe2`/`apoe3`/`apoe4`) derive from
   `pack_per_day` (number, may be decimal), `smoking_duration` (years),
   `quit_time` (free-text: year / age-at-quit / relative time — former smokers
   only). Record only numbers/expressions the note states; do not compute them.
-- **Allergy / vaccine (free-text, one value listing all; `none` if absent):**
-  `allergen` (substance(s) the patient reacts to), `vaccine_name` (vaccines
-  administered/received), `vaccine_category` (each vaccine's category — Live /
-  Non-Live / BCG / Active Amyloid or Tau Immunization — assigned via the
-  `references/CDC_Vaccine_Reference_Table.md` + `Active_Amyloid_Tau_Immunization_Reference_Table.md`).
+- **Allergy / vaccine (structured ENTITY LISTS — a JSON array of records, one
+  per substance/vaccine; `[]` when none):**
+  - `allergen` — a JSON list of allergen records, one per substance the patient
+    reacts to. Each record: `{ "Allergen": <verbatim substance>,
+    "Supporting_Evidence": <verbatim snippet>, + optional Category / Type /
+    Reaction / Severity / Clinical_Status / Verification_Status }`. `[]` for
+    NKDA / no allergen.
+  - `vaccine_name` — a JSON list of vaccine records, one per administered/
+    received/completed vaccine. Each record: `{ "Vaccine_Name": <verbatim>,
+    "Category": <Live / Non-Live / BCG / Active Amyloid or Tau Immunization /
+    Not a vaccine / Ambiguous>, "Administration_Date": <date or omit>,
+    "Supporting_Evidence": <verbatim snippet> }`. `Category` is now an
+    **attribute folded into each vaccine entity**, assigned via
+    `references/CDC_Vaccine_Reference_Table.md` +
+    `Active_Amyloid_Tau_Immunization_Reference_Table.md`. `[]` when no vaccine.
 
 1. `list_notes`; use **`search_notes`** for high-signal terms (MCI, dementia,
    Alzheimer, APOE, ε4, MoCA, MMSE, CDR, Hachinski, NPI, GDS, Cornell, DRS,
@@ -69,9 +79,14 @@ must NOT set them: the APOE allele flags (`apoe2`/`apoe3`/`apoe4`) derive from
   patient. Exclude family history, plans/orders ("memory workup planned", "APOE
   testing ordered"), and negations.
 - **Numeric scores:** record the raw documented number only (e.g. "MoCA 21/30" →
-  `21`). Do NOT infer a score from a severity word, and do NOT compute the
-  severity bands — those derive automatically. Omit a scale entirely if the note
-  gives no number for it.
+  `21`), and cite the note span containing that number. Do NOT infer a score from
+  a severity word, and do NOT compute the severity bands — those derive
+  automatically. If the note documents NO number for a scale, set its answer to
+  `null` (leave it unanswered) — **never write `0` as a placeholder.** `0` is a
+  real, severe score (a MoCA/MMSE of 0 = profound impairment) and would both
+  corrupt the scale and cascade a bogus "severe" band into its derived severity.
+  (The platform rejects an agent's numeric answer whose value is not in the cited
+  quote, so an ungrounded `0` will be refused — answer `null` instead.)
 - **APOE = one extraction:** read the documented genotype into `apoe_genotype`
   (full, `*_carrier`, or `none`); never set the allele flags by hand. "homozygous
   ε4" = `e4/e4`; "ε4 carrier" = `e4_carrier`. Do not infer APOE from an AD
@@ -82,13 +97,16 @@ must NOT set them: the APOE allele flags (`apoe2`/`apoe3`/`apoe4`) derive from
 - **LMP:** extract the date/time EXPRESSION only; an age of menopause is NOT an
   LMP. **Smoking:** "denies tobacco" → `never`, "quit 2015" → `former`, "1 ppd" →
   `current`.
-- **Allergen:** the SUBSTANCE only (not the reaction); include resolved/inactive;
-  exclude NKDA (→ `none`), family history, refuted/entered-in-error, suspected,
-  panel orders, bare reaction words. **Vaccine:** only administered/received/
-  completed (exclude planned/declined/contraindicated/discussed). **Vaccine
-  category:** assign from the reference tables (brand→abbreviation→disease, brand
-  wins; `Ambiguous` for disease-only mixed-category; passive mAbs = `Not a
-  vaccine`) — do not guess from memory.
+- **Allergen (JSON entity list, `[]` when none):** one record per substance,
+  `Allergen` = the SUBSTANCE only (not the reaction — that goes in the optional
+  `Reaction` attribute); include resolved/inactive (set `Clinical_Status`);
+  exclude NKDA (→ `[]`), family history, refuted/entered-in-error, suspected,
+  panel orders, bare reaction words. **Vaccine (JSON entity list, `[]` when
+  none):** one record per vaccine, only administered/received/completed (exclude
+  planned/declined/contraindicated/discussed). `Category` is now an attribute
+  **inside each vaccine entity** — assign from the reference tables
+  (brand→abbreviation→disease, brand wins; `Ambiguous` for disease-only
+  mixed-category; passive mAbs = `Not a vaccine`) — do not guess from memory.
 - **Confidence:** `high` = explicit documented value; `medium` = narrative
   inference within the rules; `low` = ambiguous → prefer omitting over guessing.
 

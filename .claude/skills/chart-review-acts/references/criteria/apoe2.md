@@ -29,3 +29,10 @@ allele. This field is **computed** — not extracted directly — from
 Do not answer this field directly — it is auto-derived from `apoe_genotype` and
 shown on the **Computed** panel. To change it, fix `apoe_genotype`; this value
 recomputes. Confirm the computed value during validation.
+
+## Examples
+
+- `apoe_genotype = e2/e3` → `1` (ε2 present)
+- `apoe_genotype = e3/e4` → `0` (full genotype, no ε2)
+- `apoe_genotype = e4_carrier` → `NA` (different-allele carrier; ε2 cannot be established)
+- `apoe_genotype = none` → `NA` (no genotype documented)

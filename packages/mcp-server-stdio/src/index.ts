@@ -109,6 +109,12 @@ if (want("set_field_assessment")) {
         "When the field defines an enum (answer_schema), the answer must be",
         "EXACTLY one of those allowed values — off-enum free text is rejected.",
         "Map the finding to the closest allowed value, or use \"other\"/\"no_info\".",
+        "For a NUMERIC SCALE field (answer_schema type integer/number, e.g. a",
+        "MoCA/MMSE/NPI score): only answer with a number the chart actually",
+        "documents, and cite the exact note span that contains that number —",
+        "the platform rejects a numeric answer whose value is absent from the",
+        "cited quote. If the chart documents NO value for the scale, set answer",
+        "to null (do NOT write 0 or any placeholder — 0 is a real, severe score).",
       ].join(" "),
       inputSchema: {
         field_id: z.string(),

@@ -68,6 +68,58 @@ describe("parseLabelResponse — numeric + free-text fields", () => {
   });
 });
 
+describe("parseLabelResponse — entity-list (array) fields", () => {
+  const ALLERGEN: PerNoteField[] = [
+    {
+      field_id: "allergen", enum: [], type: "array",
+      entity: { value_key: "Allergen", attributes: { Category: { enum: ["medication", "food", "environment", "biologic"] }, Reaction: {} } },
+    },
+  ];
+  it("keeps records with value + Supporting_Evidence; preserves valid attrs", () => {
+    const text = JSON.stringify({
+      allergen: { answer: [
+        { Allergen: "penicillin", Category: "medication", Reaction: "rash", Supporting_Evidence: "allergic to penicillin (rash)" },
+        { Allergen: "sulfa drugs", Category: "medication", Supporting_Evidence: "sulfa allergy" },
+      ] },
+    });
+    const out = parseLabelResponse(text, ALLERGEN);
+    const a = out[0]!.answer as Array<Record<string, unknown>>;
+    expect(Array.isArray(a)).toBe(true);
+    expect(a.length).toBe(2);
+    expect(a[0]).toMatchObject({ Allergen: "penicillin", Category: "medication", Reaction: "rash" });
+  });
+  it("drops a record missing the value or Supporting_Evidence, and drops off-enum attrs", () => {
+    const text = JSON.stringify({
+      allergen: { answer: [
+        { Allergen: "penicillin", Category: "lunar", Supporting_Evidence: "penicillin allergy" }, // off-enum Category dropped
+        { Category: "food", Supporting_Evidence: "x" },          // no value → dropped
+        { Allergen: "shellfish" },                                // no evidence → dropped
+      ] },
+    });
+    const a = parseLabelResponse(text, ALLERGEN)[0]!.answer as Array<Record<string, unknown>>;
+    expect(a.length).toBe(1);
+    expect(a[0]!.Allergen).toBe("penicillin");
+    expect(a[0]!.Category).toBeUndefined(); // off-enum attr dropped
+  });
+  it("yields [] for an empty list (none documented / NKDA)", () => {
+    const a = parseLabelResponse(JSON.stringify({ allergen: { answer: [] } }), ALLERGEN)[0]!.answer;
+    expect(a).toEqual([]);
+  });
+});
+
+describe("fieldsFromTask — entity field", () => {
+  it("captures type:array + the entity spec (value_key + attribute enums)", () => {
+    const task = { task_id: "acts", fields: [
+      { id: "allergen", answer_schema: { type: "array", entity: { value_key: "Allergen", attributes: { Category: { enum: ["medication", "food"] }, Reaction: {} } } } },
+    ] };
+    const f = fieldsFromTask(task as never).find((x) => x.field_id === "allergen")!;
+    expect(f.type).toBe("array");
+    expect(f.entity?.value_key).toBe("Allergen");
+    expect(f.entity?.attributes.Category.enum).toEqual(["medication", "food"]);
+    expect(f.entity?.attributes.Reaction.enum).toBeUndefined();
+  });
+});
+
 describe("fieldsFromTask", () => {
   it("includes enum, numeric, and free-text leaves; EXCLUDES derived + untyped", () => {
     const task = {

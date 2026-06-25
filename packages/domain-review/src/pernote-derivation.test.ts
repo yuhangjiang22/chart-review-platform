@@ -46,3 +46,37 @@ describe("encounter-aware derivation recompute", () => {
     expect(a4?.encounter_id).toBeUndefined();
   });
 });
+
+const SEV_TASK = {
+  task_id: "acts", task_kind: "phenotype" as const, source_document_sha: "x",
+  fields: [
+    { id: "moca_score", answer_schema: { type: "integer", minimum: 0, maximum: 30 } },
+    {
+      id: "moca_severity",
+      answer_schema: { enum: ["normal", "mild", "moderate", "severe"] },
+      derivation: 'moca_score >= 26 ? "normal" : moca_score >= 18 ? "mild" : moca_score >= 10 ? "moderate" : "severe"',
+    },
+  ],
+};
+
+describe("derived severity does not cascade from an ABSENT score", () => {
+  it("does NOT fabricate 'severe' when moca_score is null (the real-data bug)", async () => {
+    const m = await import("./review-state.js");
+    m.applyUiAction("ps1", SEV_TASK as never, "reviewer", "r", {
+      type: "set_field_assessment", payload: { field_id: "moca_score", answer: null },
+    });
+    const sev = m.load("ps1", "acts")!.field_assessments.find((a) => a.field_id === "moca_severity");
+    expect(sev?.answer ?? null).toBeNull(); // Pending, not a bogus "severe"
+  });
+  it("DOES derive the correct band from a real score", async () => {
+    const m = await import("./review-state.js");
+    m.applyUiAction("ps2", SEV_TASK as never, "reviewer", "r", {
+      type: "set_field_assessment", payload: { field_id: "moca_score", answer: 8 },
+    });
+    expect(m.load("ps2", "acts")!.field_assessments.find((a) => a.field_id === "moca_severity")?.answer).toBe("severe");
+    m.applyUiAction("ps3", SEV_TASK as never, "reviewer", "r", {
+      type: "set_field_assessment", payload: { field_id: "moca_score", answer: 28 },
+    });
+    expect(m.load("ps3", "acts")!.field_assessments.find((a) => a.field_id === "moca_severity")?.answer).toBe("normal");
+  });
+});

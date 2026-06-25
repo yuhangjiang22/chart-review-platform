@@ -25,7 +25,7 @@
 import { randomUUID } from "crypto";
 import fs from "fs";
 import path from "path";
-import { PLATFORM_ROOT } from "@chart-review/patients";
+import { PLATFORM_ROOT, listNotes, readNote } from "@chart-review/patients";
 import { getReviewsRootOverride, withReviewsRoot as _withReviewsRoot } from "@chart-review/reviews-context";
 import type { Evidence } from "@chart-review/faithfulness";
 import { verifyEvidence } from "@chart-review/faithfulness";
@@ -793,6 +793,156 @@ export function canonicalizeNumericAnswer(
   return Number.isFinite(n) ? n : answer;
 }
 
+/** Coerce a free-text (answer_schema type "string") field's answer to a string,
+ *  so a numeric-looking value (e.g. a quit year written as 2008) is stored as
+ *  "2008" rather than the JS number 2008 — keeping the persisted answer
+ *  schema-conformant for downstream equality / scoring / display. Non-string
+ *  fields and null/undefined pass through unchanged. */
+export function canonicalizeStringAnswer(
+  field: { answer_schema?: unknown },
+  answer: unknown,
+): unknown {
+  const schema = field.answer_schema as { type?: string } | undefined;
+  if (schema?.type !== "string" || answer == null) return answer;
+  return typeof answer === "string" ? answer : String(answer);
+}
+
+/**
+ * Numeric-grounding gate. A numeric SCALE criterion (answer_schema type
+ * integer/number, NOT an enum) answered with a concrete value must have that
+ * value present in at least one cited note quote.
+ *
+ * This blocks a failure mode seen on real (sparse) charts: the commit gate
+ * pushes the agent to answer every criterion, so for an UNDOCUMENTED scale it
+ * defaults to 0 (or any placeholder) with a non-numeric citation — injecting a
+ * fake score (e.g. MoCA 0 = profound impairment) that then cascades into the
+ * derived severity bands. When the chart documents no value, the legitimate
+ * answer is null: the commit gate accepts a null assessment (presence, not
+ * value) and the range gate skips null — so the agent never needs to fabricate
+ * a number. Only pure numeric scales are gated; binary/categorical enum flags
+ * (impaired_cognition=0, CDR staging) are skipped — there a 0 / negation answer
+ * is legitimate and its evidence carries no digit. Run AFTER assertAnswerInRange.
+ */
+export function assertNumericAnswerCited(
+  field: { id: string; answer_schema?: unknown },
+  answer: unknown,
+  evidence: Array<{ source?: string; verbatim_quote?: string }> | undefined,
+): void {
+  const schema = field.answer_schema as { type?: string; enum?: unknown[] } | undefined;
+  const t = schema?.type;
+  if (t !== "integer" && t !== "number") return; // not a numeric field
+  if (Array.isArray(schema?.enum) && schema!.enum!.length > 0) return; // numeric-coded enum (staging) → categorical
+  if (answer == null || answer === "") return; // null/absent IS the "not documented" path
+  const n = typeof answer === "number" ? answer : Number(String(answer).trim());
+  if (!Number.isFinite(n)) return; // non-numbers are assertAnswerInRange's job
+  const token = String(n).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // the answer's numeric value must appear as a standalone number in a cited span
+  const re = new RegExp(`(?<![\\d.])${token}(?![\\d.])`);
+  const grounded = (evidence ?? [])
+    .filter((e) => e?.source === "note")
+    .some((e) => re.test(e?.verbatim_quote ?? ""));
+  if (!grounded) {
+    throw new ReviewStateError(
+      "numeric_not_cited",
+      `numeric field "${field.id}" was answered ${JSON.stringify(answer)} but no cited note quote contains that number. ` +
+        "If the chart documents no value for this scale, leave the answer null (do NOT write 0 or a placeholder). " +
+        "If a value IS documented, cite the exact note span that contains the number.",
+    );
+  }
+}
+
+interface EntitySchema {
+  type?: string;
+  entity?: {
+    value_key?: string;
+    attributes?: Record<string, { enum?: unknown[] } | undefined>;
+  };
+}
+
+/**
+ * Entity-array gate. When answer_schema.type === "array" the answer is a JSON
+ * list of entity records — the guideline's entity-span output (e.g. allergen,
+ * vaccine_name). Each record must carry a non-empty value at the entity's
+ * value_key plus a non-empty Supporting_Evidence; any attribute that IS present
+ * must (if enum-typed) be in its allowed set. An empty list `[]` (= none
+ * documented / NKDA) and null/"" (not answered) are both valid.
+ */
+export function assertAnswerEntities(
+  field: { id: string; answer_schema?: unknown },
+  answer: unknown,
+  requireEvidence = true,
+): void {
+  const schema = field.answer_schema as EntitySchema | undefined;
+  if (schema?.type !== "array") return; // not an entity-array field
+  if (answer == null || answer === "") return; // not answered
+  if (!Array.isArray(answer)) {
+    throw new ReviewStateError(
+      "answer_not_array",
+      `field "${field.id}" expects a list of entity records, got ${typeof answer}.`,
+    );
+  }
+  const valueKey = schema.entity?.value_key ?? "value";
+  const attrs = schema.entity?.attributes ?? {};
+  answer.forEach((item, i) => {
+    if (typeof item !== "object" || item === null || Array.isArray(item)) {
+      throw new ReviewStateError("entity_not_object", `field "${field.id}" entity[${i}] must be an object.`);
+    }
+    const rec = item as Record<string, unknown>;
+    if (rec[valueKey] == null || String(rec[valueKey]).trim() === "") {
+      throw new ReviewStateError("entity_missing_value", `field "${field.id}" entity[${i}] is missing required "${valueKey}".`);
+    }
+    // Supporting_Evidence is required of the AGENT (anti-fabrication); a human
+    // reviewer adjudicating may enter an entity without pasting a quote.
+    if (requireEvidence && (rec.Supporting_Evidence == null || String(rec.Supporting_Evidence).trim() === "")) {
+      throw new ReviewStateError("entity_missing_evidence", `field "${field.id}" entity[${i}] is missing required "Supporting_Evidence".`);
+    }
+    for (const [k, spec] of Object.entries(attrs)) {
+      const av = rec[k];
+      if (av == null || String(av).trim() === "") continue; // attributes optional
+      const en = spec?.enum;
+      if (Array.isArray(en) && !en.map(String).includes(String(av).trim())) {
+        throw new ReviewStateError(
+          "entity_attr_off_enum",
+          `field "${field.id}" entity[${i}].${k}="${av}" is not one of [${en.map(String).join(", ")}].`,
+        );
+      }
+    }
+  });
+}
+
+/**
+ * Per-entity faithfulness (AGENT writes only — reviewers exempt, mirroring the
+ * numeric guard). Each entity's Supporting_Evidence quote must be verbatim
+ * present (whitespace-normalized) in one of the patient's notes — blocking a
+ * fabricated allergen/vaccine that cites text not in the chart.
+ */
+export function assertEntityEvidenceFaithful(
+  patientId: string,
+  field: { id: string; answer_schema?: unknown },
+  answer: unknown,
+): void {
+  const schema = field.answer_schema as EntitySchema | undefined;
+  if (schema?.type !== "array" || !Array.isArray(answer) || answer.length === 0) return;
+  const norm = (s: string) => s.replace(/\s+/g, " ").trim().toLowerCase();
+  let corpus: string;
+  try {
+    corpus = listNotes(patientId).map((n) => readNote(patientId, n.filename)).join("\n");
+  } catch {
+    return; // notes unreadable → don't block on infra error (cited-span gate still applies)
+  }
+  const nc = norm(corpus);
+  answer.forEach((item, i) => {
+    const q = (item as Record<string, unknown> | null)?.Supporting_Evidence;
+    const nq = typeof q === "string" ? norm(q) : "";
+    if (nq && !nc.includes(nq)) {
+      throw new ReviewStateError(
+        "entity_evidence_unfaithful",
+        `field "${field.id}" entity[${i}] cites Supporting_Evidence not found verbatim in any note — cite the exact documented span, do not fabricate.`,
+      );
+    }
+  });
+}
+
 /**
  * Faithfulness gate for set_field_assessment. Throws on fabrication;
  * returns any non-fatal warnings. Pure: no state writes.
@@ -1076,9 +1226,23 @@ export function transitionReviewState(
       }
       assertAnswerInEnum(field, action.payload.answer);
       assertAnswerInRange(field, action.payload.answer);
+      assertAnswerEntities(field, action.payload.answer, by === "agent");
+      // Numeric-grounding gate applies to AGENT writes only — reviewers are the
+      // trusted adjudicators and may enter a chart-read value without machine
+      // citation; the gate exists to stop an agent fabricating an undocumented score.
+      if (by === "agent") {
+        assertNumericAnswerCited(
+          field,
+          action.payload.answer,
+          action.payload.evidence as Array<{ source?: string; verbatim_quote?: string }> | undefined,
+        );
+      }
       const canonicalPayload = {
         ...action.payload,
-        answer: canonicalizeNumericAnswer(field, canonicalizeEnumAnswer(field, action.payload.answer)),
+        answer: canonicalizeStringAnswer(
+          field,
+          canonicalizeNumericAnswer(field, canonicalizeEnumAnswer(field, action.payload.answer)),
+        ),
       };
       applySetAssessmentMutation(s, by, by_id, canonicalPayload, task);
       break;
@@ -1327,6 +1491,12 @@ export function applyUiAction(
 ): ApplyUiActionResult {
   // 1. Pre-transition gates (any of these THROWS to abort the action).
   const warnings = verifyFaithfulnessForAction(patientId, action);
+  // Per-entity faithfulness for entity-array fields (agent writes only) — each
+  // entity's Supporting_Evidence must be verbatim in a note.
+  if (action.type === "set_field_assessment" && by === "agent") {
+    const f = task.fields.find((x) => x.id === action.payload.field_id);
+    if (f) assertEntityEvidenceFaithful(patientId, f, action.payload.answer);
+  }
 
   const current = loadOrCreate(patientId, task);
   if (current.review_status === "locked") {

@@ -182,14 +182,21 @@ export function evalDerivation(task: MinimalTask, answers: Env, fieldId: string,
   const env: Env = {};
   for (const x of task.fields) {
     if (x.id === fieldId) { env[x.id] = undefined; continue; }
-    if (answers[x.id] !== undefined) env[x.id] = answers[x.id];
+    const a = answers[x.id];
+    // A null / empty answer means "not documented" — treat it like an absent
+    // input, NOT a value. Otherwise a null numeric (e.g. an unanswered MoCA)
+    // flows into a comparison as 0-ish (`null >= 26` is false in JS) and
+    // cascades the derivation to its lowest band ("severe"), fabricating a
+    // severity for a patient who never had the test. With it excluded, the
+    // missing-input guard below yields null (Pending) instead.
+    if (a !== undefined && a !== null && a !== "") env[x.id] = a;
     else if (x.derivation) env[x.id] = evalDerivation(task, answers, x.id, visited);
     else env[x.id] = undefined;
   }
   visited.delete(fieldId);
-  // Return null when any referenced input is missing (undefined in env).
+  // Return null when any referenced input is missing (undefined/null in env).
   const inputs = derivedInputs(task, fieldId);
-  if (inputs.some((id) => env[id] === undefined)) return null;
+  if (inputs.some((id) => env[id] === undefined || env[id] === null)) return null;
   return safeEval(f.derivation, env);
 }
 

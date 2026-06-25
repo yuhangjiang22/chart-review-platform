@@ -2,9 +2,10 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { assertAnswerInRange, canonicalizeNumericAnswer } from "./review-state.js";
+import { assertAnswerInRange, assertNumericAnswerCited, canonicalizeNumericAnswer, canonicalizeStringAnswer } from "./review-state.js";
 
 const moca = { id: "moca_score", answer_schema: { type: "integer", minimum: 0, maximum: 30 } };
+const note = (q: string) => [{ source: "note", verbatim_quote: q }];
 
 describe("assertAnswerInRange", () => {
   it("accepts an in-range integer (incl. numeric string)", () => {
@@ -27,6 +28,38 @@ describe("assertAnswerInRange", () => {
   });
 });
 
+describe("assertNumericAnswerCited", () => {
+  it("accepts a numeric answer whose value appears in a cited note quote", () => {
+    expect(() => assertNumericAnswerCited(moca, 22, note("MoCA 22/30, mild impairment"))).not.toThrow();
+    expect(() => assertNumericAnswerCited(moca, "22", note("Montreal Cognitive Assessment: 22"))).not.toThrow();
+    const ppd = { id: "pack_per_day", answer_schema: { type: "number", minimum: 0, maximum: 20 } };
+    expect(() => assertNumericAnswerCited(ppd, 0.5, note("0.5 ppd for 30 years"))).not.toThrow();
+  });
+  it("REJECTS a number not present in any cited quote (the 0-default bug)", () => {
+    expect(() => assertNumericAnswerCited(moca, 0, note("no cognitive testing performed this visit"))).toThrow(/numeric_not_cited|no cited note quote/);
+    expect(() => assertNumericAnswerCited(moca, 0, [])).toThrow();
+    expect(() => assertNumericAnswerCited(moca, 22, note("MMSE 28/30"))).toThrow(); // wrong number cited
+  });
+  it("does not match a digit embedded in a larger number", () => {
+    // answer 2 must NOT be considered grounded by '2026' or '22'
+    expect(() => assertNumericAnswerCited(moca, 2, note("seen on 2026-01-02 visit, score 22"))).toThrow();
+    expect(() => assertNumericAnswerCited(moca, 2, note("scored 2 of 30"))).not.toThrow();
+  });
+  it("skips null/empty (the legitimate 'not documented' path)", () => {
+    expect(() => assertNumericAnswerCited(moca, null, undefined)).not.toThrow();
+    expect(() => assertNumericAnswerCited(moca, "", note("anything"))).not.toThrow();
+  });
+  it("skips enum-coded staging and binary flags (0/negation is legitimate there)", () => {
+    const cdr = { id: "cdr_global", answer_schema: { type: "number", enum: [0, 0.5, 1, 2, 3] } };
+    const flag = { id: "impaired_cognition", answer_schema: { enum: ["1", "0"] } };
+    expect(() => assertNumericAnswerCited(cdr, 0, note("no dementia rating documented"))).not.toThrow();
+    expect(() => assertNumericAnswerCited(flag, "0", note("denies memory complaints"))).not.toThrow();
+  });
+  it("ignores omop evidence — only note quotes can ground a numeric scale", () => {
+    expect(() => assertNumericAnswerCited(moca, 22, [{ source: "omop", verbatim_quote: "22" } as never])).toThrow();
+  });
+});
+
 describe("canonicalizeNumericAnswer", () => {
   it("coerces a numeric string to a number", () => {
     expect(canonicalizeNumericAnswer(moca, "21")).toBe(21);
@@ -35,6 +68,19 @@ describe("canonicalizeNumericAnswer", () => {
   it("leaves free-text / null untouched", () => {
     expect(canonicalizeNumericAnswer({ answer_schema: { type: "string" } }, "05/10/2026")).toBe("05/10/2026");
     expect(canonicalizeNumericAnswer(moca, null)).toBeNull();
+  });
+});
+
+describe("canonicalizeStringAnswer", () => {
+  const quit = { answer_schema: { type: "string" } };
+  it("stringifies a numeric-looking free-text answer (quit year 2008 → '2008')", () => {
+    expect(canonicalizeStringAnswer(quit, 2008)).toBe("2008");
+    expect(typeof canonicalizeStringAnswer(quit, 2008)).toBe("string");
+    expect(canonicalizeStringAnswer(quit, "age 55")).toBe("age 55");
+  });
+  it("leaves non-string fields / null untouched", () => {
+    expect(canonicalizeStringAnswer(moca, 21)).toBe(21);
+    expect(canonicalizeStringAnswer(quit, null)).toBeNull();
   });
 });
 

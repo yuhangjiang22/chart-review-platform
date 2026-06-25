@@ -34,18 +34,24 @@ Rules (apply per field, per note):
   smoking_duration (years, "smoked 40 years" → 40), quit_time (former smokers
   only — free-text: "quit in 2008" → "2008", "quit at age 55" → "age 55"). Record
   only what the note states; do not compute pack-years yourself.
-- allergen: the substance(s) the patient is allergic/hypersensitive/intolerant to
-  in THIS note, as a free-text value (multiple → "penicillin; shellfish");
-  substance only, not the reaction; include resolved; "none" for NKDA / no
+- allergen: a JSON LIST of allergen entity objects for THIS note, one object per
+  substance the patient is allergic/hypersensitive/intolerant to:
+  [{"Allergen": <verbatim substance>, "Supporting_Evidence": <verbatim snippet>,
+  ...optional Category/Type/Reaction/Severity/Clinical_Status/Verification_Status}].
+  Allergen = the substance only, not the reaction (put the reaction in the optional
+  "Reaction" attribute); include resolved (set "Clinical_Status"); [] for NKDA / no
   allergen. Exclude family history, refuted, suspected, panel orders.
-- vaccine_name: vaccine(s) documented as administered/received/completed in THIS
-  note (free-text, multiple → "MMR; influenza"); "none" if none. Exclude
-  planned/declined/contraindicated/discussed-only.
-- vaccine_category: for each vaccine in vaccine_name, its category — Live Vaccine /
-  Non-Live Vaccine / BCG / Active Amyloid or Tau Immunization (parallel order,
-  "; "-separated); "none" if no vaccine. (e.g. MMR→Live, influenza/Shingrix/COVID/
-  Tdap/pneumococcal→Non-Live, BCG→BCG, amyloid/tau immunization→Active Amyloid or
-  Tau Immunization; passive mAbs like lecanemab→Not a vaccine.)
+- vaccine_name: a JSON LIST of vaccine entity objects for THIS note, one per
+  vaccine documented as administered/received/completed:
+  [{"Vaccine_Name": <verbatim>, "Category": <Live Vaccine / Non-Live Vaccine / BCG /
+  Active Amyloid or Tau Immunization / Not a vaccine / Ambiguous>,
+  "Administration_Date": <date or omit>, "Supporting_Evidence": <verbatim snippet>}].
+  Category is an attribute INSIDE each vaccine object — assign per the CDC /
+  Alzforum reference tables (e.g. MMR→Live, influenza/Shingrix/COVID/Tdap/
+  pneumococcal→Non-Live, BCG→BCG, amyloid/tau immunization→Active Amyloid or Tau
+  Immunization; passive mAbs like lecanemab→Not a vaccine; disease-only mixed
+  products→Ambiguous). [] if none. Exclude planned/declined/contraindicated/
+  discussed-only.
 - Do NOT output the computed fields (apoe2/apoe3/apoe4, moca_severity,
   mmse_severity, cdr_severity) — they are derived.
 - Evidence: quote the SMALLEST verbatim span from THIS note that supports the
