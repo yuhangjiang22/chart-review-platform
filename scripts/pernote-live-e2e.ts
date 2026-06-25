@@ -24,7 +24,7 @@ const { extractLabelsForNote } = await import("@chart-review/pipeline-extract-pe
 const { writePerNoteAssessments, load } = await import("@chart-review/domain-review");
 const { resolveModelEndpoint } = await import("../server/lib/model-registry.ts");
 
-const PATIENT = process.env.E2E_PATIENT || "patient_acts_demo_01";
+const PATIENT = process.env.E2E_PATIENT || "patient_fake_acts_01";
 const NOTE_ID = process.env.E2E_NOTE || "2026-02-10__memory_clinic";
 const MODEL_KEY = "claude-sonnet"; // vllm → OpenRouter
 

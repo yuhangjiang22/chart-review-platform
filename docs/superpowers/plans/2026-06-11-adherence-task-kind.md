@@ -43,7 +43,7 @@ structure (task bundle + run-loop branch + review UI + routing + test patient).
   questions are answerable; if concur can't surface OMOP, the agent falls back to
   notes.
 
-**Reference (v2):** `packages/{mcp-core-adherence,mcp-server-adherence-*,pipeline-extract-adherence,rule-engine}`, `packages/infra-batch-run/src/runs.ts:903-1193` (the `isAdherenceTask` branch), `server/adherence-routes.ts`, `client/src/ui/AdherenceReview.tsx`, `client/src/ui/App.tsx:343-359`, `.agents/skills/chart-review-asthma-adherence/`, `corpus/patients/patient_demo_asthma_01/`.
+**Reference (v2):** `packages/{mcp-core-adherence,mcp-server-adherence-*,pipeline-extract-adherence,rule-engine}`, `packages/infra-batch-run/src/runs.ts:903-1193` (the `isAdherenceTask` branch), `server/adherence-routes.ts`, `client/src/ui/AdherenceReview.tsx`, `client/src/ui/App.tsx:343-359`, `.agents/skills/chart-review-asthma-adherence/`, `corpus/patients/patient_fake_asthma_01/`.
 
 ---
 
@@ -57,11 +57,11 @@ structure (task bundle + run-loop branch + review UI + routing + test patient).
 
 ## Task A2: Adherence task bundle + test patient
 
-**Files:** `.agents/skills/chart-review-asthma-adherence/` (+ `.claude/skills/` runtime copy — separate real dir in concur); `corpus/patients/patient_demo_asthma_01/`.
+**Files:** `.agents/skills/chart-review-asthma-adherence/` (+ `.claude/skills/` runtime copy — separate real dir in concur); `corpus/patients/patient_fake_asthma_01/`.
 
 - [ ] **Step 1 — copy** v2's `.agents/skills/chart-review-asthma-adherence/` verbatim (meta.yaml `task_type: adherence` + `review_unit: patient`, `references/questions/{T0,T1,T2}.yaml`, `references/rules/{eligibility,control_concordance,management_concordance}.yaml`, `references/attribution.yaml`, SKILL.md). Populate BOTH `.agents/skills/` (committed) and `.claude/skills/` (gitignored runtime).
-- [ ] **Step 2 — copy** v2's `corpus/patients/patient_demo_asthma_01/` (`meta.json`, `notes/`, `omop/`) into concur's corpus. (Check concur's `.gitignore` — if it's a `patient_demo_*` it may be committable, unlike the gitignored `patient_private_*`.)
-- [ ] **Step 3 — confirm discovery:** server up → `GET /api/tasks` lists `asthma-adherence` (`task_kind:adherence`), `GET /api/patients` lists `patient_demo_asthma_01`. **Commit** `feat(concur): asthma-adherence task bundle + demo patient`.
+- [ ] **Step 2 — copy** v2's `corpus/patients/patient_fake_asthma_01/` (`meta.json`, `notes/`, `omop/`) into concur's corpus. (Check concur's `.gitignore` — if it's a `patient_demo_*` it may be committable, unlike the gitignored `patient_private_*`.)
+- [ ] **Step 3 — confirm discovery:** server up → `GET /api/tasks` lists `asthma-adherence` (`task_kind:adherence`), `GET /api/patients` lists `patient_fake_asthma_01`. **Commit** `feat(concur): asthma-adherence task bundle + demo patient`.
 
 ## Task A3: Adherence MCP tools on the stdio server  ← RISKIEST
 
@@ -104,7 +104,7 @@ structure (task bundle + run-loop branch + review UI + routing + test patient).
 ## Task A7: End-to-end verification (run the app)
 
 - [ ] typecheck 0 · `vite build` builds · `vitest run` no NEW failures.
-- [ ] Create a session on **asthma-adherence** with `patient_demo_asthma_01` + 1 agent on an OpenRouter model. TRY → run → the adherence branch runs the agent loop → `set_question_answer` per question → after the loop `evaluateAllRules` → draft has `question_answers[]` + `rule_verdicts[]`. Confirm in `agents/agent_1.json`.
+- [ ] Create a session on **asthma-adherence** with `patient_fake_asthma_01` + 1 agent on an OpenRouter model. TRY → run → the adherence branch runs the agent loop → `set_question_answer` per question → after the loop `evaluateAllRules` → draft has `question_answers[]` + `rule_verdicts[]`. Confirm in `agents/agent_1.json`.
 - [ ] Confirm the rule engine fired: verdicts are CONCORDANT/NON_CONCORDANT/EXCLUDED with attribution; the eligibility gate behaves (if T0 EXCLUDED, all EXCLUDED).
 - [ ] VALIDATE → patient opens in **AdherenceReview** → questions render by tier with agent answers; rule verdicts render; reviewer override of an answer + a verdict persists (the two POST routes); `validated_questions`/`validated_rules` update.
 - [ ] **Watch (riskiest):** the adherence MCP tools under deepagents — confirm the sidecar sees `set_question_answer` (agent isn't stuck with no write tool → loud-fail). Second: OMOP — if `read_structured_data` returns empty, confirm the agent still answers from notes (no crash).

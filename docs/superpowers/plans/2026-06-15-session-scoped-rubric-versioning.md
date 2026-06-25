@@ -1154,8 +1154,8 @@ test.describe("rubric versioning", () => {
   test.afterEach(async ({ page }) => { await archiveSessionsNotIn(page, token, TASK, pre); });
 
   test("editing one session's rubric does not change another's", async ({ page }) => {
-    const a = await startSession(page, token, TASK, "ver A", ["patient_easy_neg_02"]);
-    const b = await startSession(page, token, TASK, "ver B", ["patient_easy_neg_02"]);
+    const a = await startSession(page, token, TASK, "ver A", ["patient_fake_cancer_05"]);
+    const b = await startSession(page, token, TASK, "ver B", ["patient_fake_cancer_05"]);
     // both forks start at s1 with identical content
     const va = await apiGet(page, `/api/rubric/${TASK}/sessions/${a}/versions`, token) as { versions: unknown[] };
     expect(va.versions.length).toBe(1);

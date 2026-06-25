@@ -24,7 +24,7 @@ careful human annotation of each chart.
 
 **Finding 1 — the model + rubric are robust.** Near-zero model-vs-human
 mismatches. The model correctly handled: the re-read addendum
-(`patient_confirmed_reread_01` → `adenocarcinoma`, following the IHC + most-recent
+(`patient_fake_cancer_01` → `adenocarcinoma`, following the IHC + most-recent
 read), Stage IIIA N2 staging (`has_distant_metastasis=no_info`: regional node ≠
 distant), and billing-code-only charts (`no_info`). Both agents agreed on every
 field, all high-confidence.
@@ -42,7 +42,7 @@ most recent wins") but never states the **re-read / addendum convention**: when 
 pathology *addendum or second-opinion re-read* (e.g. after IHC) reclassifies the
 original morphologic diagnosis, the re-read is authoritative **regardless of
 which appears first in the report or whether the addendum is dated**. The model
-survived `patient_confirmed_reread_01` only because the chart spoon-fed it ("the
+survived `patient_fake_cancer_01` only because the chart spoon-fed it ("the
 re-read is authoritative", addendum dated later, oncology note confirming). The
 gap bites on the common real-world shape — a **same-day or undated addendum with
 no oncology disambiguation** — where "most recent" cannot resolve it and the

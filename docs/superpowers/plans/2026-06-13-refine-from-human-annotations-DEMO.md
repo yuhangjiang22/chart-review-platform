@@ -11,11 +11,11 @@ predominant-component convention (`adenocarcinoma` for adenosquamous).
 
 | patient | histology in chart | model | human (gold) | split |
 |---|---|---|---|---|
-| patient_test_adenosq_01 | adenosquamous 60/40 | `other` | adenocarcinoma | held-out |
-| patient_test_adenosq_02 | adenosquamous 70/30 | (agent errored) | adenocarcinoma | refine |
-| patient_test_adenosq_03 | adenosquamous 55/45 | `other` | adenocarcinoma | **refine** |
-| patient_test_adenosq_04 | adenosquamous 65/35 | `other` | adenocarcinoma | held-out |
-| patient_easy_nsclc_02 | pure squamous | `squamous_cell_carcinoma` | squamous_cell_carcinoma | held-out (no-regression control) |
+| patient_fake_cancer_23 | adenosquamous 60/40 | `other` | adenocarcinoma | held-out |
+| patient_fake_cancer_24 | adenosquamous 70/30 | (agent errored) | adenocarcinoma | refine |
+| patient_fake_cancer_25 | adenosquamous 55/45 | `other` | adenocarcinoma | **refine** |
+| patient_fake_cancer_26 | adenosquamous 65/35 | `other` | adenocarcinoma | held-out |
+| patient_fake_cancer_09 | pure squamous | `squamous_cell_carcinoma` | squamous_cell_carcinoma | held-out (no-regression control) |
 
 All 5 agreed/validated; the 3 adenosquamous mismatches are agent-agrees-with-itself
 (both agents on adenosq_01 said `other`) → invisible to the agent-vs-agent judge.

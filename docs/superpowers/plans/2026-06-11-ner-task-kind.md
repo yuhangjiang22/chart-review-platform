@@ -59,7 +59,7 @@
 
 - [ ] **Step 1 — copy** v2's `.agents/skills/chart-review-bso-ad-ner/` verbatim (meta.yaml `task_kind: ner` + `ontology_pin`, `references/ontology/concepts.json`, `references/entity_type_guidance/*.yaml`) and `.agents/skills/chart-review-ner/` (universal skill). Note: for the direct-extract path the skill prose isn't strictly required (the prompt is inlined), but copy it for parity/agentic-future.
 - [ ] **Step 2 — ontology path:** ensure the ontology resolves where `resolveOntologyPath`/the run-loop expects (`references/ontology/concepts.json` under the skill dir, or `var/ontologies/<pin>/` — match what Step N2 Step 3 uses; pick the skill-dir location to keep it self-contained).
-- [ ] **Step 3 — test patient:** the cancer corpus won't exercise a social-determinants ontology. Copy a BSO-AD-appropriate patient from v2's corpus (e.g. `corpus/patients/patient_private_bso_ad_01/`) into concur's `corpus/patients/`, OR pick a cancer patient whose notes mention demographics/behavior/SDOH (most discharge summaries do). Confirm the task loads (`GET /api/tasks` lists `bso-ad-ner`).
+- [ ] **Step 3 — test patient:** the cancer corpus won't exercise a social-determinants ontology. Copy a BSO-AD-appropriate patient from v2's corpus (e.g. `corpus/patients/patient_real_acts_01/`) into concur's `corpus/patients/`, OR pick a cancer patient whose notes mention demographics/behavior/SDOH (most discharge summaries do). Confirm the task loads (`GET /api/tasks` lists `bso-ad-ner`).
 - [ ] **Step 4 — register** the task if concur uses a task registry/`tasks.yaml`; otherwise confirm task discovery picks up the new skill dir.
 - [ ] **Step 5 — commit** `feat(concur): bso-ad-ner task bundle + universal NER skill + test patient`.
 

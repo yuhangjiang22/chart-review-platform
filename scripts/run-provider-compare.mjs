@@ -7,7 +7,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 const TASK = "lung-cancer-phenotype";
-const PATIENT = "patient_easy_nsclc_01";
+const PATIENT = "patient_fake_cancer_08";
 
 async function runOnce(provider) {
   console.log(`\n══════ provider=${provider} ══════`);

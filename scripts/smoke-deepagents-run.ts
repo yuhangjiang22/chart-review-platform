@@ -13,7 +13,7 @@ import { loadCompiledTask } from "@chart-review/tasks";
 import { guidelineDir } from "@chart-review/rubric";
 import { patientDir } from "@chart-review/patients";
 
-const patientId = process.argv[2] ?? "patient_easy_nsclc_01";
+const patientId = process.argv[2] ?? "patient_fake_cancer_08";
 const taskId = "cancer-diagnosis";
 const sessionId = "smoke-g3";
 

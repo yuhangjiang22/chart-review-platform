@@ -127,4 +127,4 @@ python omop_etl.py --cohort-csv cohort_smoke.csv \
 ```
 
 Then inspect `smoke/<anon_id>/omop/*.json` and confirm shapes match a
-known-good demo patient under `corpus/patients/patient_demo_asthma_01/`.
+known-good demo patient under `corpus/patients/patient_fake_asthma_01/`.

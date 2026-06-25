@@ -723,9 +723,9 @@ Expected: typecheck 0; all tests pass (existing + the new deploy-runner unit tes
 ```bash
 cd <repo>/chart-review-platform-light
 # assemble a 2-patient cohort in the expected layout
-mkdir -p /tmp/deploy_cohort/patient_easy_nsclc_02/notes /tmp/deploy_cohort/patient_probable_fhx_01/notes
-cp corpus/patients/patient_easy_nsclc_02/notes/*.txt /tmp/deploy_cohort/patient_easy_nsclc_02/notes/
-cp corpus/patients/patient_probable_fhx_01/notes/*.txt /tmp/deploy_cohort/patient_probable_fhx_01/notes/
+mkdir -p /tmp/deploy_cohort/patient_fake_cancer_09/notes /tmp/deploy_cohort/patient_fake_cancer_22/notes
+cp corpus/patients/patient_fake_cancer_09/notes/*.txt /tmp/deploy_cohort/patient_fake_cancer_09/notes/
+cp corpus/patients/patient_fake_cancer_22/notes/*.txt /tmp/deploy_cohort/patient_fake_cancer_22/notes/
 # pick an existing export package
 PKG=$(ls -d var/exports/lung-cancer-phenotype-light/*/ | head -1)
 npm run deploy -- --package "$PKG" --data-dir /tmp/deploy_cohort --out /tmp/deploy_out

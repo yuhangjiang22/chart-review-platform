@@ -318,7 +318,7 @@ export function readGroundTruth(patientId: string): GroundTruth | null {
 }
 
 function prettyId(id: string): string {
-  // patient_easy_nsclc_01 → "easy nsclc 01"
+  // patient_fake_cancer_08 → "easy nsclc 01"
   const trimmed = id.startsWith("patient_") ? id.slice("patient_".length) : id;
   return trimmed.replace(/_/g, " ");
 }

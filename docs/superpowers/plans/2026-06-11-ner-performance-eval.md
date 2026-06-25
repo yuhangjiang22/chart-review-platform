@@ -29,7 +29,7 @@ report agent accuracy. Today `performance-routes.ts` is phenotype-only
 `client/src/ui/Workspace/PhaseDecide.tsx` (+ any NER calibration figure).
 **Concur:** `server/performance-routes.ts` + `PhaseDecide.tsx` (phenotype path —
 leave unchanged), `packages/eval-span-iaa` (the math), fixture session_002 /
-bso-ad-ner / patient_private_bso_ad_01 (reviewer_validated, 7 validated_notes).
+bso-ad-ner / patient_real_acts_01 (reviewer_validated, 7 validated_notes).
 
 ---
 

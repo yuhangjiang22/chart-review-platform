@@ -174,7 +174,7 @@ answer }`). Add an **optional** sibling map for per-note labels:
 
 `note_id` is the note filename without `.txt` (same convention as NER /
 `validated_notes`). The key is optional and only consumed in per-note mode;
-patient-level scoring ignores it. The demo patient `patient_acts_demo_01`
+patient-level scoring ignores it. The demo patient `patient_fake_acts_01`
 gets a `note_answers` entry for its single note (identical to its
 `leaf_answers`, since it has one note). A small typed reader
 (`packages/patients`, alongside the existing ground-truth read) returns
@@ -259,7 +259,7 @@ NewSessionDialog (per_note toggle)
   `Encounter`s; re-running upserts in place (idempotent).
 - **Session test** (`domain-iter`): `createSession({per_note:true})` persists
   the flag; omitted when false.
-- **Run integration**: a per-note run on `patient_acts_demo_01` (synthetic →
+- **Run integration**: a per-note run on `patient_fake_acts_01` (synthetic →
   OpenRouter) produces per-note labels for its single note matching the
   ground truth (`impaired_cognition=1`, APOE ε3/ε4 → `apoe2=0/apoe3=1/apoe4=1`,
   `postmenopause=1`), ignoring the family-history distractor.

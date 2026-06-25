@@ -7,7 +7,7 @@ test.describe("rubric switcher UI", () => {
   test.afterEach(async ({ page }) => { if (token) await archiveSessionsNotIn(page, token, TASK, pre); });
 
   test("version history renders in the Refine workspace timeline and switches", async ({ page }) => {
-    const a = await startSession(page, token, TASK, "ui-switcher", ["patient_easy_neg_02"]);
+    const a = await startSession(page, token, TASK, "ui-switcher", ["patient_fake_cancer_05"]);
     // Edit dirties the draft; Save-as-version snapshots s2 (working-draft model).
     await page.request.put(`${SERVER}/api/tasks/${TASK}/criteria/cancer_type?session_id=${encodeURIComponent(a)}`, {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },

@@ -49,7 +49,7 @@ async function main() {
     runJudge: true,
   });
 
-  const subjectId = process.env.CHART_REVIEW_SUBJECT ?? "patient_easy_neg_04";
+  const subjectId = process.env.CHART_REVIEW_SUBJECT ?? "patient_fake_cancer_07";
   const subject = { type: "patient" as const, id: subjectId };
 
   console.log("  subject:       ", subjectId);

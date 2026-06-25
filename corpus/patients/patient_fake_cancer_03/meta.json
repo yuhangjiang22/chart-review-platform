@@ -1,0 +1,18 @@
+{
+  "patient_id": "patient_fake_cancer_03",
+  "category": "icd_only",
+  "demographics": {
+    "age": 74,
+    "sex": "F",
+    "region": "West"
+  },
+  "smoking": "30 pack-years, quit 2008",
+  "index_date": "2024-11-04",
+  "doc_types": [
+    "er_visit",
+    "discharge_summary",
+    "pcp_followup"
+  ],
+  "generated_by": "claude_api",
+  "generation_run_id": "claude-subagent-2026-04-29"
+}

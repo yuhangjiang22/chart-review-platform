@@ -43,7 +43,7 @@
 - `packages/domain-review/src/review-state.ts` — `writePerNoteAssessments`; `encounter_id` on `SetAssessmentInput` + upsert key.
 - `server/jobs-routes.ts` — preserve `encounters` on import.
 - `packages/patients/src/index.ts` — `readGroundTruth(patientId)`.
-- `corpus/patients/patient_acts_demo_01/ground_truth.json` — add `note_answers`.
+- `corpus/patients/patient_fake_acts_01/ground_truth.json` — add `note_answers`.
 - `packages/tasks/src/index.ts` — `supports_per_note?: boolean` on `CompiledTask`.
 - `server/core-routes.ts` — expose `supports_per_note` in `GET /api/tasks`.
 - `server/performance-routes.ts` — per-note path on `GET /api/performance/:taskId`.
@@ -988,7 +988,7 @@ git commit -m "fix(concur): preserve encounters through run-draft → session im
 
 **Files:**
 - Modify: `packages/patients/src/index.ts` (add `readGroundTruth`)
-- Modify: `corpus/patients/patient_acts_demo_01/ground_truth.json` (add `note_answers`)
+- Modify: `corpus/patients/patient_fake_acts_01/ground_truth.json` (add `note_answers`)
 - Test: `packages/patients/src/ground-truth.test.ts` (create)
 
 - [ ] **Step 1: Write the failing test**
@@ -1065,7 +1065,7 @@ export function readGroundTruth(patientId: string): GroundTruth | null {
 
 - [ ] **Step 4: Add `note_answers` to the demo patient**
 
-Edit `corpus/patients/patient_acts_demo_01/ground_truth.json` — add a `note_answers` key alongside `leaf_answers` (the demo has one note: `2026-02-10__memory_clinic`):
+Edit `corpus/patients/patient_fake_acts_01/ground_truth.json` — add a `note_answers` key alongside `leaf_answers` (the demo has one note: `2026-02-10__memory_clinic`):
 
 ```json
   "note_answers": {
@@ -1089,7 +1089,7 @@ Expected: PASS (2 tests).
 Run: `npm run typecheck`
 
 ```bash
-git add packages/patients/src/index.ts packages/patients/src/ground-truth.test.ts corpus/patients/patient_acts_demo_01/ground_truth.json
+git add packages/patients/src/index.ts packages/patients/src/ground-truth.test.ts corpus/patients/patient_fake_acts_01/ground_truth.json
 git commit -m "feat(concur): corpus ground-truth reader + per-note note_answers for demo"
 ```
 
@@ -1934,9 +1934,9 @@ git commit -m "feat(concur): per-note performance view + UI smoke"
 
 With the dev server running and OpenRouter configured (synthetic patient → OpenRouter, NOT Azure):
 
-1. ACTS task → Start a new session → select `patient_acts_demo_01` → enable "Label each note individually" → Create.
+1. ACTS task → Start a new session → select `patient_fake_acts_01` → enable "Label each note individually" → Create.
 2. TRY → Run.
-3. After the run completes, open `patient_acts_demo_01` from VALIDATE.
+3. After the run completes, open `patient_fake_acts_01` from VALIDATE.
 
 Expected: the per-note grid shows one row (`2026-02-10__memory_clinic`) with `impaired_cognition=1`, `apoe2=0`, `apoe3=1`, `apoe4=1`, `postmenopause=1` (the family-history distractor must NOT flip APOE).
 

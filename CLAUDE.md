@@ -11,7 +11,7 @@ adherence (`asthma-adherence`) — over clinical notes **and EHR structured
 data** (OMOP tables, read via the `list_structured_data` / `read_structured_data`
 MCP tools; evidence can be `source:"omop"`). Notes are the primary source;
 structured data corroborates. Available to a patient with an `omop/` dir —
-currently the asthma patient plus `patient_test_adenosq_01`; missing tables
+currently the asthma patient plus `patient_fake_cancer_23`; missing tables
 resolve to empty and the agent falls back to notes. One agent provider
 (`deepagents`). Phases: **AUTHOR · TRY · JUDGE (optional) · VALIDATE ·
 PERFORMANCE** (LOCK/DEPLOY deferred). Plus an **automatic rubric

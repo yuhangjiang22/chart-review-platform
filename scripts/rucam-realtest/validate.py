@@ -41,9 +41,9 @@ def main():
                 return p
         return None
 
-    fixtures = sorted(Path(args.corpus).glob("patient_phi_*"))
+    fixtures = sorted(Path(args.corpus).glob("patient_real_rucam_*"))
     if not fixtures:
-        sys.exit("no patient_phi_* fixtures found")
+        sys.exit("no patient_real_rucam_* fixtures found")
 
     rows = []
     for fx in fixtures:

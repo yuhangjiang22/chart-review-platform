@@ -27,8 +27,8 @@ test.describe("rubric versioning", () => {
   });
 
   test("a session forks the baseline at s1, and editing one session does not touch another", async ({ page }) => {
-    const a = await startSession(page, token, TASK, "ver-A", ["patient_easy_neg_02"]);
-    const b = await startSession(page, token, TASK, "ver-B", ["patient_easy_neg_02"]);
+    const a = await startSession(page, token, TASK, "ver-A", ["patient_fake_cancer_05"]);
+    const b = await startSession(page, token, TASK, "ver-B", ["patient_fake_cancer_05"]);
 
     // Both forks start at s1.
     const a0 = (await apiGet(page, `/api/rubric/${TASK}/sessions/${a}/versions`, token)) as VersionsResp;
@@ -75,7 +75,7 @@ test.describe("rubric versioning", () => {
   });
 
   test("switching a session's active version is non-destructive", async ({ page }) => {
-    const a = await startSession(page, token, TASK, "switch-test", ["patient_easy_neg_02"]);
+    const a = await startSession(page, token, TASK, "switch-test", ["patient_fake_cancer_05"]);
     // edit dirties the draft, then Save-as-version snapshots s2
     await page.request.put(`${SERVER}/api/tasks/${TASK}/criteria/cancer_type?session_id=${encodeURIComponent(a)}`, {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
@@ -105,7 +105,7 @@ test.describe("rubric GET session-awareness", () => {
 
   test("the AUTHOR rubric GET reads the session fork (displays what it writes)", async ({ page }) => {
     const T = "cancer-diagnosis"; const S = "http://localhost:3002";
-    const a = await startSession(page, token, T, "get-fork", ["patient_easy_neg_02"]);
+    const a = await startSession(page, token, T, "get-fork", ["patient_fake_cancer_05"]);
     await page.request.put(`${S}/api/tasks/${T}/criteria/cancer_type?session_id=${encodeURIComponent(a)}`, {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       data: { extraction_guidance: "FORK-ONLY-GUIDANCE-XYZ" },

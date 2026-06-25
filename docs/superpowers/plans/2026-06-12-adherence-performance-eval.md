@@ -36,7 +36,7 @@ precision/recall-swap class of bug from the NER port **cannot recur** here.
 **Concur:** `packages/eval-span-iaa` (the parallel already-ported package),
 `server/ner-calibration-routes.ts` (the parallel route I built),
 `PhaseDecide.tsx` (NER branch to mirror), validated fixture session_001 /
-asthma-adherence / patient_demo_asthma_01 (reviewer_validated, 16 Q + 11 R).
+asthma-adherence / patient_fake_asthma_01 (reviewer_validated, 16 Q + 11 R).
 
 ---
 

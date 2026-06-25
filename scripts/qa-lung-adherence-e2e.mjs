@@ -6,7 +6,7 @@
 //   node scripts/qa-lung-adherence-e2e.mjs result <iter> <patient>
 const B = "http://localhost:3002";
 const T = "lung-cancer-adherence";
-const PID = "patient_lung_demo_01";
+const PID = "patient_fake_cancer_18";
 const MODEL = process.env.QA_MODEL || "claude-sonnet";
 
 const login = async () => (await (await fetch(`${B}/api/auth/login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reviewer_id: "yuhang" }) })).json()).token;

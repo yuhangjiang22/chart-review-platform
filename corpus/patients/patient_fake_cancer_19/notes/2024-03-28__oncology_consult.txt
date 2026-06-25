@@ -1,0 +1,26 @@
+MEDICAL ONCOLOGY CONSULTATION
+Date of service: 2024-03-28
+Provider: M. Reyes, MD, Thoracic Oncology
+
+HISTORY OF PRESENT ILLNESS
+68-year-old never-smoker woman with newly diagnosed lung adenocarcinoma
+(date of diagnosis 2024-03-05). Staging CT chest/abdomen/pelvis and bone scan
+show a right lower lobe primary with multiple bony metastases. No CNS disease
+on brain MRI.
+
+STAGE
+AJCC Stage IV (cT2a cN0 M1b — bone metastases). Metastatic NSCLC.
+
+MOLECULAR / BIOMARKERS
+Comprehensive genomic profiling (FoundationOne, tissue) resulted 2024-03-20:
+EGFR exon 19 deletion — actionable, osimertinib-sensitive. PD-L1 TPS 5%.
+Testing was ordered (2024-03-08) and resulted (2024-03-20) before any systemic
+therapy.
+
+ASSESSMENT & PLAN
+Metastatic EGFR exon 19-deletion lung adenocarcinoma.
+- Initiate FIRST-LINE osimertinib 80 mg PO daily, starting today (2024-03-28).
+  This is the guideline-recommended first-line targeted therapy for the
+  identified EGFR alteration. No prior systemic therapy was given.
+- Time from diagnosis (2024-03-05) to first-line therapy (2024-03-28): 23 days.
+- Zoledronic acid for bony metastases; oncology follow-up in 4 weeks.

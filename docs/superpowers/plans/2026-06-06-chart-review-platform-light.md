@@ -758,7 +758,7 @@ rm -rf packages/mcp-core-ner packages/mcp-core-adherence \
 rm -rf .agents/skills/chart-review-*-ner .agents/skills/chart-review-ner* \
        .agents/skills/chart-review-*adherence* .agents/skills/chart-review-bso-ad* \
        .agents/skills/chart-review-ad-cde-ner
-rm -rf corpus/patients/patient_demo_asthma_01 corpus/patients/patient_private_bso_ad_01
+rm -rf corpus/patients/patient_fake_asthma_01 corpus/patients/patient_real_acts_01
 ```
 
 - [ ] **Step 3: Reinstall + typecheck to enumerate danglers**
@@ -1148,12 +1148,12 @@ MCP_TRANSPORT=subprocess
 
 - [ ] **Step 2: Run TRY on one patient via the UI or run endpoint**
 
-Boot `npm run dev`. In the UI: open `lung-cancer-phenotype-light` → TRY → select `patient_easy_nsclc_01` → 1 agent → Start. Watch the agent log panel.
+Boot `npm run dev`. In the UI: open `lung-cancer-phenotype-light` → TRY → select `patient_fake_cancer_08` → 1 agent → Start. Watch the agent log panel.
 Expected: the agent calls `list_notes` / `read_notes` / `list_criteria` / `set_field_assessment` (visible in the live log), then completes.
 
 - [ ] **Step 3: Verify `review_state.json` was written with both fields, faithfulness-clean**
 
-Run: `cat var/runs/<latest>/per_patient/patient_easy_nsclc_01/agents/agent_1.json` (or the scratch review_state path the run reports).
+Run: `cat var/runs/<latest>/per_patient/patient_fake_cancer_08/agents/agent_1.json` (or the scratch review_state path the run reports).
 Expected: `field_assessments` contains `cancer_type` and `disease_extent`, each with `answer`, `confidence`, `evidence[].verbatim_quote`, `rationale`. No faithfulness rejection error in the log.
 
 - [ ] **Step 4: Run with 2 agents to confirm the selector works**
@@ -1182,11 +1182,11 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 - [ ] **Step 1: Validate one patient**
 
-With the Task G3 run in place, open VALIDATE for `patient_easy_nsclc_01`. Confirm: the note viewer shows the notes; each agent answer for `cancer_type` / `disease_extent` shows confidence + a clickable evidence quote that highlights the span; accept one and override the other with an edit reason.
+With the Task G3 run in place, open VALIDATE for `patient_fake_cancer_08`. Confirm: the note viewer shows the notes; each agent answer for `cancer_type` / `disease_extent` shows confidence + a clickable evidence quote that highlights the span; accept one and override the other with an edit reason.
 
 - [ ] **Step 2: Confirm the human decision persists**
 
-Run: `cat var/reviews/patient_easy_nsclc_01/lung-cancer-phenotype-light/review_state.json`
+Run: `cat var/reviews/patient_fake_cancer_08/lung-cancer-phenotype-light/review_state.json`
 Expected: the overridden field has `source: human` and the edit reason recorded.
 
 - [ ] **Step 3:** If any NER/adherence-only widget errors in the pane, remove that dead branch, typecheck, and commit. Otherwise no commit.

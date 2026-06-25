@@ -5,7 +5,7 @@
 //   poll <iter_id>   → poll the iter until terminal; prints final state
 const B = "http://localhost:3002";
 const T = "cancer-diagnosis";
-const PID = process.env.QA_PID || "patient_test_adenosq_01";
+const PID = process.env.QA_PID || "patient_fake_cancer_23";
 
 async function login() {
   const r = await fetch(`${B}/api/auth/login`, {

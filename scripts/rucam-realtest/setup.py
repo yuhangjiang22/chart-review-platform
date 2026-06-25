@@ -2,17 +2,17 @@
 """Build gitignored concur fixtures for the adjudicated RUCAM validation set.
 
 Default: builds ALL adjudicated cases that have cohort data + notes as
-patient_phi_001..00N (sorted by gold total, descending). --one builds just the
+patient_real_rucam_01..00N (sorted by gold total, descending). --one builds just the
 top case (for a quick single-patient run).
 
-For each: corpus/patients/patient_phi_00K/{meta.json, notes/, expected_rucam.json}.
+For each: corpus/patients/patient_real_rucam_0K/{meta.json, notes/, expected_rucam.json}.
 expected_rucam.json carries the full human gold: total, category, and per-item
 scores (parsed from the FINAL RUCAM SCORE block, reconciled against the
 annotation block + the total).
 
 PHI discipline: reads real data and copies note files but prints only
 NON-identifying summary (per-fixture note count + gold total/category). Never
-prints person_id or clinical text. Fixtures match the gitignored patient_phi_*
+prints person_id or clinical text. Fixtures match the gitignored patient_real_rucam_*
 pattern; the real person_id lives only in the (ignored) meta.json.
 
 Usage (from concur root):
@@ -256,18 +256,18 @@ def main():
         cands = cands[:1]
 
     # clear stale fixtures
-    for d in corpus.glob("patient_phi_*"):
+    for d in corpus.glob("patient_real_rucam_*"):
         shutil.rmtree(d)
 
     print(f"[setup] building {len(cands)} fixture(s) from {data_dir.name}")
     for k, g in enumerate(cands, 1):
-        fid = f"patient_phi_{k:03d}"
+        fid = f"patient_real_rucam_{k:02d}"
         n, omop = build_fixture(fid, g["pid"], g, data_dir, corpus, args.note_window)
         flag = "" if g["complete"] else "  (gold per-item incomplete — total reliable)"
         print(f"[setup]   {fid}: notes={n:>3}  omop(meas/drug/cond)="
               f"{omop['measurements']}/{omop['drugs']}/{omop['conditions']}  gold_total={g['total']:>3}  "
               f"category={g['category']:<16} items={[g['items'][i] for i in range(1,8)]}{flag}")
-    print(f"[setup] fixtures under {corpus}/patient_phi_*  (gitignored)")
+    print(f"[setup] fixtures under {corpus}/patient_real_rucam_*  (gitignored)")
 
 
 if __name__ == "__main__":

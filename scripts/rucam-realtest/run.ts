@@ -35,10 +35,10 @@ process.env.CHART_REVIEW_RUCAM_DATA_DIR = DATA_DIR;
 const CORPUS = path.join(CONCUR_ROOT, "corpus", "patients");
 const patients = process.argv.slice(2).length
   ? process.argv.slice(2)
-  : fs.readdirSync(CORPUS).filter((d) => d.startsWith("patient_phi_")).sort();
+  : fs.readdirSync(CORPUS).filter((d) => d.startsWith("patient_real_rucam_")).sort();
 
 if (patients.length === 0) {
-  console.error("[run] FATAL: no patients (none given and no patient_phi_* fixtures)");
+  console.error("[run] FATAL: no patients (none given and no patient_real_rucam_* fixtures)");
   process.exit(1);
 }
 if (!fs.existsSync(DATA_DIR)) {

@@ -69,7 +69,7 @@ describe("lung concordance rules — parse + evaluate (experiment tokens)", () =
   });
 
   it("SCLC patient → ALL rules CONCORDANT (molecular testing not required), even with everything else unclear", () => {
-    // Mirrors the real patient_phi_lung_01 profile: small_cell, limited stage,
+    // Mirrors the real patient_real_cancer_01 profile: small_cell, limited stage,
     // all molecular questions unclear/null. The SCLC exemption must win over the
     // doc-absent EXCLUDED gates.
     const sclc = { MT0a: "yes", MT0b: "small_cell", MT0c: "limited", MT1: "unclear", MT5: "unclear", MT6: "unclear", MT7: "no", MT8a: "unclear", MT9: "unclear", MT12: "unclear" };

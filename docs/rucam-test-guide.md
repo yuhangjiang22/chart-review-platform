@@ -14,7 +14,7 @@ MCP tools. Seven items → leaf criteria; `rucam_total_score` + `rucam_causality
 are derived.
 
 > ⚠️ This is a **synthetic-cohort proof**, not a clinical validation. There is one
-> synthetic patient (`patient_rucam_synth_01`, hepatocellular amox-clav DILI). Real
+> synthetic patient (`patient_fake_rucam_01`, hepatocellular amox-clav DILI). Real
 > validation needs the real `RUCAM/data` CSVs + the human-adjudicated scores in
 > `RUCAM_chart_review_tables` — and those CSVs are real clinical data; do **not**
 > commit them.
@@ -36,7 +36,7 @@ are derived.
 ## 1. Run it
 
 Start the server with the cohort dir set, then run the `rucam` task on the synthetic
-patient (UI: pick the **RUCAM** task → new session on `patient_rucam_synth_01` → TRY;
+patient (UI: pick the **RUCAM** task → new session on `patient_fake_rucam_01` → TRY;
 or API: `POST /api/sessions/rucam` then `POST /api/pilots/rucam`). Set the session's
 agent model to `claude-sonnet`.
 
@@ -67,8 +67,8 @@ the total should land in **probable→highly probable** for this case.
 
 Find the run under `var/runs/<run_id>/`. Key artifacts:
 - `status.json` — run state (`complete` / `failed`).
-- `per_patient/patient_rucam_synth_01/agent_draft.json` — the **scores** (`field_assessments`).
-- `per_patient/patient_rucam_synth_01/agents/agent_1_transcript.jsonl` — every tool call + reasoning.
+- `per_patient/patient_fake_rucam_01/agent_draft.json` — the **scores** (`field_assessments`).
+- `per_patient/patient_fake_rucam_01/agents/agent_1_transcript.jsonl` — every tool call + reasoning.
 - the server stdout/log — `[skills] loaded …`, `[plugins] loaded …`, `[deepagents-stderr] …`.
 
 Check, in order:
@@ -95,7 +95,7 @@ Check, in order:
 
 Quick draft read:
 ```sh
-node -e "const d=require('./var/runs/<RUN>/per_patient/patient_rucam_synth_01/agent_draft.json');
+node -e "const d=require('./var/runs/<RUN>/per_patient/patient_fake_rucam_01/agent_draft.json');
 for(const f of d.field_assessments) console.log(f.field_id,'=',JSON.stringify(f.answer))"
 ```
 
@@ -116,7 +116,7 @@ for(const f of d.field_assessments) console.log(f.field_id,'=',JSON.stringify(f.
 When a run misbehaves, give Claude Code the **evidence**, not just the symptom:
 
 1. **Point it at the run.** "RUCAM run `<run_id>` `failed` — read
-   `var/runs/<run_id>/per_patient/patient_rucam_synth_01/error.txt`, its
+   `var/runs/<run_id>/per_patient/patient_fake_rucam_01/error.txt`, its
    `agent_1_transcript.jsonl`, and the `[deepagents-stderr]` lines in the server
    log, and tell me why."
 2. **Triage tree** (what Claude Code should check):

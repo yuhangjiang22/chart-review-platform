@@ -52,7 +52,7 @@ function input(over: Partial<AnalyzeMismatchInput> = {}): AnalyzeMismatchInput {
     criterionDef:
       "What is the cancer histology type?\n\nMap small cell → neuroendocrine_tumor; " +
       "take the most recent pathologic diagnosis on conflict.",
-    patientId: "patient_confirmed_reread_01",
+    patientId: "patient_fake_cancer_01",
     humanAnswer: "adenocarcinoma",
     modelAnswer: "neuroendocrine_tumor",
     modelRationale: "The original diagnosis line says small-cell carcinoma.",

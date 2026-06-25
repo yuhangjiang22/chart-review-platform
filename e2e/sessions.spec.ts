@@ -21,7 +21,7 @@ import {
 
 // Light platform: one phenotype task only.
 const TASK_ID = "cancer-diagnosis";
-const COHORT_PATIENT = "patient_easy_nsclc_01";
+const COHORT_PATIENT = "patient_fake_cancer_08";
 
 type TestState = { _token: string; _preexisting: Set<string> };
 

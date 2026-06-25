@@ -35,7 +35,7 @@ A run is invoked with:
 
 | Parameter | Example | Notes |
 |---|---|---|
-| `subject` | `patient_easy_sclc_01` | A patient under `corpus/patients/` |
+| `subject` | `patient_fake_cancer_14` | A patient under `corpus/patients/` |
 | `task_id` | `bso-ad-ner` | An NER task at `.agents/skills/chart-review-<task_id>/` |
 
 The patient's notes are in your `cwd` as `<note_id>.txt` files (e.g.

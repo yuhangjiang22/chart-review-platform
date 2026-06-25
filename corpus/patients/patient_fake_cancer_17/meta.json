@@ -1,0 +1,17 @@
+{
+  "patient_id": "patient_fake_cancer_17",
+  "category": "icd_only",
+  "demographics": {
+    "age": 67,
+    "sex": "M",
+    "region": "Midwest"
+  },
+  "smoking": "Former smoker, 30 pack-years, quit 2010",
+  "index_date": "2025-07-21",
+  "doc_types": [
+    "er_visit",
+    "discharge_summary",
+    "pcp_followup"
+  ],
+  "generated_by": "hand"
+}

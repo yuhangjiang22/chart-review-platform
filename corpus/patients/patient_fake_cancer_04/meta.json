@@ -1,0 +1,17 @@
+{
+  "patient_id": "patient_fake_cancer_04",
+  "category": "negative",
+  "demographics": {
+    "age": 58,
+    "sex": "F",
+    "region": "Northeast"
+  },
+  "smoking": "never",
+  "index_date": "2025-07-15",
+  "doc_types": [
+    "pcp_visit",
+    "pcp_followup"
+  ],
+  "generated_by": "claude_api",
+  "generation_run_id": "claude-subagent-2026-04-29"
+}

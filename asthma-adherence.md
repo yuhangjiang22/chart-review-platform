@@ -122,11 +122,11 @@ second-guess the human).
 
 ## Demo patient
 
-`corpus/patients/patient_demo_asthma_01/` ships with realistic
+`corpus/patients/patient_fake_asthma_01/` ships with realistic
 asthma fixtures so smoke tests work without a real EHR:
 
 ```
-patient_demo_asthma_01/
+patient_fake_asthma_01/
 ├── meta.json
 ├── notes/
 │   ├── 2025-11-04__pcp_progress.txt          (Janet R. — recent control assessment)
@@ -159,7 +159,7 @@ plan documentation is missing (a real gap). The agent should detect:
 ## Preparing data for a new patient
 
 To run the agent on your own patients, drop them under `corpus/patients/`
-in the same shape as `patient_demo_asthma_01`. Minimum required:
+in the same shape as `patient_fake_asthma_01`. Minimum required:
 `meta.json` + at least one `.txt` file under `notes/`. OMOP files are
 optional but strongly recommended — without them the verifier can't
 cross-check answers and the agent falls back to notes-only retrieval.
@@ -222,7 +222,7 @@ Content is plain text — paste from your EHR's note view. No formatting
 required, but realistic prose helps the agent (section headers,
 "ASSESSMENT:", "PLAN:", med lists, ACT scores written like `ACT 19/25`,
 etc.). For a runnable example, look at the demo patient's three notes
-under [`corpus/patients/patient_demo_asthma_01/notes/`](corpus/patients/patient_demo_asthma_01/notes/).
+under [`corpus/patients/patient_fake_asthma_01/notes/`](corpus/patients/patient_fake_asthma_01/notes/).
 
 ### OMOP rows
 
@@ -504,7 +504,7 @@ The 16 questions + 11 rules are already drafted (this skill is in
 # Or via API:
 curl -s -X POST http://localhost:3002/api/pilots/asthma-adherence \
   -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
-  -d '{"patient_ids":["patient_demo_asthma_01"],
+  -d '{"patient_ids":["patient_fake_asthma_01"],
        "agent_specs":[{"id":"agent_1","interpretation_preset":"default"},
                        {"id":"agent_2","interpretation_preset":"skeptical"}],
        "max_concurrency":2,"max_turns_per_patient":60,"cost_cap_usd":3.0}'
@@ -654,14 +654,14 @@ TOKEN=$(curl -s -X POST http://localhost:3002/api/auth/login \
 # 2. Start a single-patient single-agent test run
 RUN_ID=$(curl -s -X POST http://localhost:3002/api/pilots/asthma-adherence \
   -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
-  -d '{"patient_ids":["patient_demo_asthma_01"],
+  -d '{"patient_ids":["patient_fake_asthma_01"],
        "agent_specs":[{"id":"agent_1","interpretation_preset":"default"}],
        "max_concurrency":1,"max_turns_per_patient":40,"cost_cap_usd":2.0}' \
   | python3 -c "import sys,json;print(json.load(sys.stdin)['pilot']['run_id'])")
 
 # 3. Wait + watch the agent log
 sleep 60
-curl -s "http://localhost:3002/api/runs/$RUN_ID/patients/patient_demo_asthma_01/audit" \
+curl -s "http://localhost:3002/api/runs/$RUN_ID/patients/patient_fake_asthma_01/audit" \
   | python3 -c "
 import sys, json, collections
 calls = collections.Counter()

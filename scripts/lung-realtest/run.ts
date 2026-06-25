@@ -19,7 +19,7 @@ if (!process.env.CHART_REVIEW_PHI_MODEL) {
   process.exit(1);
 }
 
-const patients = process.argv.slice(2).length ? process.argv.slice(2) : ["patient_phi_lung_01"];
+const patients = process.argv.slice(2).length ? process.argv.slice(2) : ["patient_real_cancer_01"];
 const batch = await import("@chart-review/infra-batch-run");
 const { startBatchRun, getRunStatus } = batch as any;
 

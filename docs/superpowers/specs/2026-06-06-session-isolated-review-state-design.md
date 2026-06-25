@@ -22,7 +22,7 @@ Today `review_state.json` is keyed **per-patient-per-task and shared across all
 sessions**: `var/reviews/<pid>/<taskId>/review_state.json`. Validation,
 performance, export, and patient-status all read this one file.
 
-Observed failure: an earlier session ran gpt-4o on `patient_probable_cytology_01`
+Observed failure: an earlier session ran gpt-4o on `patient_fake_cancer_21`
 and wrote answers to the shared file. Later, session9 ran `llama-3.3-70b` with no
 vLLM server; both agents hit `APIConnectionError` and wrote nothing. But the
 shared file still held gpt-4o's answers, so the run reported "1/1 drafted →
