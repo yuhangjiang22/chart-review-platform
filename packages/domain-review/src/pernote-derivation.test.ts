@@ -59,6 +59,47 @@ const SEV_TASK = {
   ],
 };
 
+const VAX_TASK = {
+  task_id: "acts", task_kind: "phenotype" as const, source_document_sha: "x",
+  fields: [
+    { id: "vaccine_name", answer_schema: { type: "array", entity: { value_key: "vaccine", attributes: { Category: { enum: ["Live Vaccine", "Non-Live Vaccine", "BCG", "Active Amyloid or Tau Immunization", "Not a vaccine", "Ambiguous"] } } } } },
+    { id: "vaccine_category", answer_schema: { type: "array" }, derivation: "entity_attr(vaccine_name, Category)" },
+  ],
+};
+
+describe("entity-attribute projection (vaccine_category from vaccine_name)", () => {
+  it("parseEntityProjection recognizes entity_attr(...) and ignores scalar DSL", async () => {
+    const m = await import("./review-state.js");
+    expect(m.parseEntityProjection("entity_attr(vaccine_name, Category)")).toEqual({ field: "vaccine_name", attribute: "Category" });
+    expect(m.parseEntityProjection('moca_score >= 26 ? "normal" : "x"')).toBeNull();
+    expect(m.parseEntityProjection(undefined)).toBeNull();
+  });
+
+  it("projectEntityAttribute returns distinct sorted real categories; excludes sentinels; null when none", async () => {
+    const m = await import("./review-state.js");
+    const ents = [
+      { vaccine: "MMR", Category: "Live Vaccine" },
+      { vaccine: "Influenza", Category: "Non-Live Vaccine" },
+      { vaccine: "Zoster", Category: "Non-Live Vaccine" },
+      { vaccine: "Vitamin D", Category: "Not a vaccine" },
+    ];
+    expect(m.projectEntityAttribute(ents, "Category")).toEqual(["Live Vaccine", "Non-Live Vaccine"]);
+    expect(m.projectEntityAttribute([], "Category")).toBeNull();
+    expect(m.projectEntityAttribute(null, "Category")).toBeNull();
+  });
+
+  it("recompute derives a standalone vaccine_category array PER NOTE from the vaccine entities", async () => {
+    const m = await import("./review-state.js");
+    m.writePerNoteAssessments("pv1", VAX_TASK as never, { noteId: "n1", fields: [{ field_id: "vaccine_name", answer: [
+      { vaccine: "MMR", Category: "Live Vaccine" }, { vaccine: "Influenza", Category: "Non-Live Vaccine" },
+    ] }] });
+    const s = m.load("pv1", "acts")!;
+    const vc = s.field_assessments.find((a) => a.field_id === "vaccine_category" && a.encounter_id === "n1");
+    expect(vc?.answer).toEqual(["Live Vaccine", "Non-Live Vaccine"]);
+    expect(vc?.source).toBe("derived");
+  });
+});
+
 describe("derived severity does not cascade from an ABSENT score", () => {
   it("does NOT fabricate 'severe' when moca_score is null (the real-data bug)", async () => {
     const m = await import("./review-state.js");
