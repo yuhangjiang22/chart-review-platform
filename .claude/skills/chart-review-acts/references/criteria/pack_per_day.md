@@ -1,6 +1,6 @@
 ---
 field_id: pack_per_day
-prompt: How many packs of cigarettes per day does/did the patient smoke?
+prompt: How many PACKS of cigarettes per day (1 pack = 20 cigarettes)? Record only a documented packs/day figure; do NOT report a cigarettes-per-day count as if it were packs/day.
 answer_schema:
   type: number
   minimum: 0

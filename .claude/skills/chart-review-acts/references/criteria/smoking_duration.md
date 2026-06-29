@@ -1,6 +1,6 @@
 ---
 field_id: smoking_duration
-prompt: For how many years has/did the patient smoke?
+prompt: For how many years has/did the patient smoke? Report YEARS SMOKED only — never a start age, current age, or quit age; if the note gives only ages and no stated years-smoked figure, leave null.
 answer_schema:
   type: integer
   minimum: 0
