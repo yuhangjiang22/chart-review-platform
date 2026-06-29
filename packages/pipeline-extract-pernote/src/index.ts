@@ -229,6 +229,18 @@ export function resolveEvidence(patientId: string, noteId: string, noteText: str
   return ev;
 }
 
+/** PURE: does a numeric answer's value appear as a standalone number in any of
+ *  its cited note spans? The per-note twin of domain-review's
+ *  assertNumericAnswerCited. Used to DROP a numeric the model computed/inferred
+ *  rather than read (e.g. smoking_duration = quit_age − start_age, which the
+ *  rubric forbids): the derived value won't appear verbatim in the cited span.
+ *  Lookarounds keep `5` from matching inside `50`/`25`/`0.5`. */
+export function numericAnswerGrounded(answer: number, evidence: NoteEvidence[] | undefined): boolean {
+  const token = String(answer).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`(?<![\\d.])${token}(?![\\d.])`);
+  return (evidence ?? []).some((e) => e?.source === "note" && re.test(e?.verbatim_quote ?? ""));
+}
+
 function describeField(f: PerNoteField): string {
   if (f.type === "array" && f.entity) {
     const attrs = Object.entries(f.entity.attributes)
@@ -254,6 +266,10 @@ function buildUserPrompt(noteId: string, noteText: string, fields: PerNoteField[
     "value for categorical fields, the numeric score (a number) for numeric",
     "fields, or the free-text value for free-text fields. OMIT a field (or use",
     "null) when THIS note does not document it.",
+    "For NUMERIC fields, record a number ONLY if it is written verbatim in THIS",
+    "note; never compute or infer one — e.g. do NOT subtract a start age from a",
+    "quit/current age to get a duration, and do NOT multiply packs/day by years.",
+    "If no number is written, omit the field.",
     fieldLines,
     "",
     "Return ONLY a JSON object keyed by field_id, each value an object",
@@ -342,7 +358,17 @@ export async function extractLabelsForNote(opts: ExtractLabelsOpts): Promise<Ext
       return { ...p, answer: kept, evidence: evidence.length ? evidence : undefined };
     }
     const ev = p.evidence_quote ? resolveEvidence(opts.patientId, opts.noteId, noteText, p.evidence_quote) : null;
-    return { ...p, evidence: ev ? [ev] : undefined };
+    const evidence = ev ? [ev] : undefined;
+    // Numeric grounding: a numeric answer must have its value present in the
+    // cited note span. Drop (to "not documented" — the safe direction) a value
+    // the model computed/inferred against rubric guidance, e.g. smoking_duration
+    // derived from start/quit ages. We drop rather than throw so one bad field
+    // never aborts the whole note.
+    if (f && (f.type === "integer" || f.type === "number") && typeof p.answer === "number"
+        && !numericAnswerGrounded(p.answer, evidence)) {
+      return { ...p, answer: undefined, evidence: undefined };
+    }
+    return { ...p, evidence };
   });
   return { fields: out, usage: res.usage };
 }

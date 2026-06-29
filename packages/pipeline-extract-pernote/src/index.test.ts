@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   parseLabelResponse, fieldsFromTask, tryParseLabelJson, callWithTruncationRetry,
+  numericAnswerGrounded,
   type PerNoteField,
 } from "./index.js";
 import type { LlmEndpoint, LlmResult } from "@chart-review/pipeline-extract-ner";
@@ -224,5 +225,30 @@ describe("callWithTruncationRetry — truncated/unparseable notes never silently
     const out = await callWithTruncationRetry(call, EP, "sys", "usr");
     expect(out.attempts).toBe(1);
     expect(out.error).toMatch(/LLM call failed.*429/);
+  });
+});
+
+describe("numericAnswerGrounded — numeric value must be cited (no computed/inferred numbers)", () => {
+  const noteEv = (q: string) => [{ source: "note" as const, note_id: "n", span_offsets: [0, q.length] as [number, number], verbatim_quote: q }];
+
+  it("keeps a value written verbatim in the cited span", () => {
+    expect(numericAnswerGrounded(24, noteEv("MMSE 24/30 today"))).toBe(true);
+    expect(numericAnswerGrounded(40, noteEv("smoked for 40 years"))).toBe(true);
+    expect(numericAnswerGrounded(0.5, noteEv("0.5 ppd"))).toBe(true);
+  });
+
+  it("DROPS a value computed from ages (smoking_duration = quit − start)", () => {
+    // note cites the two ages; the derived duration 30 is NOT written → ungrounded
+    expect(numericAnswerGrounded(30, noteEv("started smoking at 20, quit at 50"))).toBe(false);
+  });
+
+  it("does not match a value as a substring of another number", () => {
+    expect(numericAnswerGrounded(5, noteEv("quit at 50"))).toBe(false);
+    expect(numericAnswerGrounded(2, noteEv("25 pack-year history"))).toBe(false);
+  });
+
+  it("ungrounded when there is no evidence at all", () => {
+    expect(numericAnswerGrounded(30, undefined)).toBe(false);
+    expect(numericAnswerGrounded(30, [])).toBe(false);
   });
 });
