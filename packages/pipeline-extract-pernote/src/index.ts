@@ -9,6 +9,8 @@
  * fabricated.
  */
 import { callLlm, type LlmEndpoint, type LlmResult, type LlmUsage } from "@chart-review/pipeline-extract-ner";
+import { classifyVaccine, type VaccineCatalog } from "./vaccine-classify.js";
+export { parseVaccineTables, classifyVaccine, normVax, type VaccineCatalog, type VaccineCategory } from "./vaccine-classify.js";
 import { verifyEvidence, type NoteEvidence } from "@chart-review/faithfulness";
 import { readNote } from "@chart-review/patients";
 import type { CompiledTask } from "@chart-review/tasks";
@@ -62,6 +64,10 @@ export interface ExtractLabelsOpts {
   promptPreamble: string;
   /** Injectable for tests; defaults to the real callLlm. */
   call?: typeof callLlm;
+  /** CDC + amyloid/tau lookup tables. When provided, each extracted vaccine's
+   *  `Category` is (re)assigned deterministically from the tables (Step 2 of the
+   *  Vaccine guideline) instead of trusting the model's inline guess. */
+  vaccineCatalog?: VaccineCatalog;
 }
 
 /** Pull EXTRACTED leaf fields + their enums off the compiled task. Fields with
@@ -364,7 +370,16 @@ export async function extractLabelsForNote(opts: ExtractLabelsOpts): Promise<Ext
             ev = resolveEvidence(opts.patientId, opts.noteId, noteText, val.trim());
           }
         }
-        if (ev) { evidence.push(ev); kept.push(ent); }
+        if (ev) {
+          // Step 2: deterministic vaccine category from the CDC / amyloid tables
+          // (do NOT classify from memory). The model's Step-1 "Not a vaccine"
+          // call is preserved; everything else is re-assigned from the table.
+          if (opts.vaccineCatalog && f.field_id === "vaccine_name" && ent.Category !== "Not a vaccine") {
+            const nm = vk && typeof ent[vk] === "string" ? (ent[vk] as string) : "";
+            ent.Category = classifyVaccine(nm, opts.vaccineCatalog);
+          }
+          evidence.push(ev); kept.push(ent);
+        }
       }
       return { ...p, answer: kept, evidence: evidence.length ? evidence : undefined };
     }
