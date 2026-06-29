@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   parseLabelResponse, fieldsFromTask, tryParseLabelJson, callWithTruncationRetry,
-  numericAnswerGrounded,
+  numericValueInNote,
   type PerNoteField,
 } from "./index.js";
 import type { LlmEndpoint, LlmResult } from "@chart-review/pipeline-extract-ner";
@@ -228,27 +228,26 @@ describe("callWithTruncationRetry — truncated/unparseable notes never silently
   });
 });
 
-describe("numericAnswerGrounded — numeric value must be cited (no computed/inferred numbers)", () => {
-  const noteEv = (q: string) => [{ source: "note" as const, note_id: "n", span_offsets: [0, q.length] as [number, number], verbatim_quote: q }];
-
-  it("keeps a value written verbatim in the cited span", () => {
-    expect(numericAnswerGrounded(24, noteEv("MMSE 24/30 today"))).toBe(true);
-    expect(numericAnswerGrounded(40, noteEv("smoked for 40 years"))).toBe(true);
-    expect(numericAnswerGrounded(0.5, noteEv("0.5 ppd"))).toBe(true);
+describe("numericValueInNote — numeric value must appear in the NOTE (no computed/inferred numbers)", () => {
+  it("keeps a value written anywhere in the note (even if the model's quote was imperfect)", () => {
+    expect(numericValueInNote(24, "...MMSE 24/30 today...")).toBe(true);
+    expect(numericValueInNote(40, "long social hx; smoked for 40 years; ...")).toBe(true);
+    expect(numericValueInNote(0.5, "tobacco: 0.5 ppd")).toBe(true);
+    // REAL documented value whose cited span happened to be elsewhere is still kept:
+    expect(numericValueInNote(30, "PMH ... 30 pack-year history ... assorted")).toBe(true);
   });
 
-  it("DROPS a value computed from ages (smoking_duration = quit − start)", () => {
-    // note cites the two ages; the derived duration 30 is NOT written → ungrounded
-    expect(numericAnswerGrounded(30, noteEv("started smoking at 20, quit at 50"))).toBe(false);
+  it("DROPS a value computed from ages — the derived number is not in the note", () => {
+    // note contains the two ages (20, 50) but NOT the derived duration 30
+    expect(numericValueInNote(30, "started smoking at 20, quit at 50")).toBe(false);
   });
 
   it("does not match a value as a substring of another number", () => {
-    expect(numericAnswerGrounded(5, noteEv("quit at 50"))).toBe(false);
-    expect(numericAnswerGrounded(2, noteEv("25 pack-year history"))).toBe(false);
+    expect(numericValueInNote(5, "quit at 50")).toBe(false);
+    expect(numericValueInNote(2, "25 pack-year history")).toBe(false);
   });
 
-  it("ungrounded when there is no evidence at all", () => {
-    expect(numericAnswerGrounded(30, undefined)).toBe(false);
-    expect(numericAnswerGrounded(30, [])).toBe(false);
+  it("not grounded against an empty note", () => {
+    expect(numericValueInNote(30, "")).toBe(false);
   });
 });

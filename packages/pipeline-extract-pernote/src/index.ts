@@ -229,16 +229,17 @@ export function resolveEvidence(patientId: string, noteId: string, noteText: str
   return ev;
 }
 
-/** PURE: does a numeric answer's value appear as a standalone number in any of
- *  its cited note spans? The per-note twin of domain-review's
- *  assertNumericAnswerCited. Used to DROP a numeric the model computed/inferred
- *  rather than read (e.g. smoking_duration = quit_age − start_age, which the
- *  rubric forbids): the derived value won't appear verbatim in the cited span.
+/** PURE: does a numeric answer's value appear as a standalone number ANYWHERE in
+ *  the note? Used to DROP a numeric the model computed/inferred rather than read
+ *  (e.g. smoking_duration = quit_age − start_age, which the rubric forbids): the
+ *  derived value won't appear in the note text. We check the whole note, not
+ *  just the model's cited quote, because a REAL documented value can be paired
+ *  with an imperfect/paraphrased Supporting_Evidence quote — dropping it on that
+ *  basis was a recall regression (pack_year/pack_per_day getting nulled out).
  *  Lookarounds keep `5` from matching inside `50`/`25`/`0.5`. */
-export function numericAnswerGrounded(answer: number, evidence: NoteEvidence[] | undefined): boolean {
+export function numericValueInNote(answer: number, noteText: string): boolean {
   const token = String(answer).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const re = new RegExp(`(?<![\\d.])${token}(?![\\d.])`);
-  return (evidence ?? []).some((e) => e?.source === "note" && re.test(e?.verbatim_quote ?? ""));
+  return new RegExp(`(?<![\\d.])${token}(?![\\d.])`).test(noteText ?? "");
 }
 
 function describeField(f: PerNoteField): string {
@@ -246,7 +247,7 @@ function describeField(f: PerNoteField): string {
     const attrs = Object.entries(f.entity.attributes)
       .map(([k, s]) => (s.enum ? `${k}(${s.enum.join("|")})` : k))
       .join(", ");
-    return `(JSON ARRAY of entity objects — one per item documented in THIS note, [] if none. Each object: {"${f.entity.value_key}": <verbatim>, "Supporting_Evidence": <smallest verbatim span from THIS note>${attrs ? `, optional: ${attrs}` : ""}})`;
+    return `(JSON ARRAY of entity objects — ONE record per DISTINCT item; list EVERY item documented in THIS note (do not stop at the first), [] if none. Each object: {"${f.entity.value_key}": <verbatim>, "Supporting_Evidence": <smallest verbatim span from THIS note that contains this item>${attrs ? `, optional: ${attrs}` : ""}})`;
   }
   if (f.enum.length > 0) return `(one of: ${f.enum.map((e) => JSON.stringify(e)).join(", ")})`;
   if (f.type === "integer" || f.type === "number") {
@@ -344,29 +345,46 @@ export async function extractLabelsForNote(opts: ExtractLabelsOpts): Promise<Ext
   const byId = new Map(fields.map((f) => [f.field_id, f]));
   const out: PerNoteFieldResult[] = parsed.map((p) => {
     const f = byId.get(p.field_id);
-    // Entity-list field: resolve EACH entity's Supporting_Evidence; drop any
-    // entity whose evidence is not faithful (anti-fabrication), and collect the
-    // verified spans as the assessment's evidence[].
+    // Entity-list field: resolve EACH entity's Supporting_Evidence (anti-fabrication).
+    // If the model's quote is imperfect but the substance/value itself is verbatim
+    // in the note, fall back to the value as the span — a REAL allergen/vaccine
+    // shouldn't be dropped just because its Supporting_Evidence quote was off
+    // (that was under-populating multi-item lists). Drop only when neither the
+    // quote NOR the value is in the note.
     if (f?.type === "array" && Array.isArray(p.answer)) {
+      const vk = f.entity?.value_key;
       const evidence: NoteEvidence[] = [];
       const kept: EntityRecord[] = [];
       for (const ent of p.answer as EntityRecord[]) {
         const q = typeof ent.Supporting_Evidence === "string" ? ent.Supporting_Evidence : "";
-        const ev = resolveEvidence(opts.patientId, opts.noteId, noteText, q);
+        let ev = resolveEvidence(opts.patientId, opts.noteId, noteText, q);
+        if (!ev && vk) {
+          const val = ent[vk];
+          if (typeof val === "string" && val.trim()) {
+            ev = resolveEvidence(opts.patientId, opts.noteId, noteText, val.trim());
+          }
+        }
         if (ev) { evidence.push(ev); kept.push(ent); }
       }
       return { ...p, answer: kept, evidence: evidence.length ? evidence : undefined };
     }
     const ev = p.evidence_quote ? resolveEvidence(opts.patientId, opts.noteId, noteText, p.evidence_quote) : null;
-    const evidence = ev ? [ev] : undefined;
-    // Numeric grounding: a numeric answer must have its value present in the
-    // cited note span. Drop (to "not documented" — the safe direction) a value
-    // the model computed/inferred against rubric guidance, e.g. smoking_duration
-    // derived from start/quit ages. We drop rather than throw so one bad field
-    // never aborts the whole note.
-    if (f && (f.type === "integer" || f.type === "number") && typeof p.answer === "number"
-        && !numericAnswerGrounded(p.answer, evidence)) {
-      return { ...p, answer: undefined, evidence: undefined };
+    let evidence = ev ? [ev] : undefined;
+    // Numeric grounding: a numeric value the model COMPUTED rather than read
+    // (e.g. smoking_duration = quit_age − start_age, forbidden by the rubric)
+    // won't appear in the note — drop it to "not documented" (the safe
+    // direction; we drop rather than throw so one bad field never aborts the
+    // note). A REAL documented value IS in the note even when the model's quote
+    // was imperfect, so we check the whole note (not just the cited span) and
+    // back the answer with a located span when its quote didn't resolve.
+    if (f && (f.type === "integer" || f.type === "number") && typeof p.answer === "number") {
+      if (!numericValueInNote(p.answer, noteText)) {
+        return { ...p, answer: undefined, evidence: undefined };
+      }
+      if (!evidence) {
+        const vev = resolveEvidence(opts.patientId, opts.noteId, noteText, String(p.answer));
+        evidence = vev ? [vev] : undefined;
+      }
     }
     return { ...p, evidence };
   });
