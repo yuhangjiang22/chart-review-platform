@@ -132,12 +132,51 @@ export function parseVaccineTables(cdcMd: string, amyloidMd: string): VaccineCat
   return { brands, abbrevs, diseases, amyloid };
 }
 
+/** Clinical-shorthand rewrites applied to the normalized name BEFORE table
+ *  matching, so common chart abbreviations resolve to the table's canonical
+ *  disease/brand terms. Each is a deterministic, auditable mapping of an
+ *  unambiguous shorthand — not a memory guess. */
+const CLINICAL_REWRITES: Array<[RegExp, string]> = [
+  [/\bhep\s+a\b/g, "hepatitis a"],
+  [/\bhep\s+b\b/g, "hepatitis b"],
+  [/\bhepa\b/g, "hepatitis a"],
+  [/\bhepb\b/g, "hepatitis b"],
+  [/\bdtp\b/g, "dtap"],                 // whole-cell DTP → DTaP family (all non-live)
+  [/\bpneumonia\b/g, "pneumococcal"],   // "pneumonia 23" → pneumococcal (PPSV23)
+  [/\bprevnar\b/g, "prevnar pneumococcal"], // Prevnar 13/20 → pneumococcal conjugate
+  [/\bflu\b/g, "influenza"],
+];
+
+function clinicalRewrite(q: string): string {
+  let out = q;
+  for (const [re, sub] of CLINICAL_REWRITES) out = out.replace(re, sub);
+  return out.replace(/\s+/g, " ").trim();
+}
+
+/** Deterministic fallbacks for shorthand the CDC table cannot resolve on its
+ *  own: an influenza mention WITH an explicit platform qualifier (intranasal/
+ *  live → Live; inactivated/recombinant/split/IM/high-dose → Non-Live), and the
+ *  unambiguous legacy oral polio vaccine. Bare "flu"/"influenza" with no
+ *  platform stays unresolved (genuinely ambiguous). */
+function clinicalFallback(q: string): VaccineCategory | null {
+  if (/\bopv\b|oral polio/.test(q)) return "Live Vaccine"; // OPV is live (legacy/ex-US)
+  if (/influenza|\bflu\b/.test(q)) {
+    if (/laiv|intranasal|live attenuated|\blive\b/.test(q)) return "Live Vaccine";
+    if (/inactivated|\biiv\d?\b|\btiv\b|cciiv|\briv\d?\b|recombinant|\bsplit\b|high.?dose|\bhd\b|adjuvanted|\bim\b|intramuscular|injectable/.test(q)) {
+      return "Non-Live Vaccine";
+    }
+  }
+  return null;
+}
+
 /** Classify one extracted vaccine name against the catalog (brand → abbrev →
- *  amyloid → disease → Ambiguous). Returns "Ambiguous" when no deterministic
- *  match exists — the guideline's safe default for human review. */
+ *  amyloid → disease), with a clinical-shorthand rewrite first and a deterministic
+ *  fallback when the table can't resolve it. Returns "Ambiguous" when no
+ *  deterministic match exists — the guideline's safe default for human review. */
 export function classifyVaccine(name: string, cat: VaccineCatalog): VaccineCategory {
-  const q = normVax(name);
-  if (!q) return "Ambiguous";
+  const q0 = normVax(name);
+  if (!q0) return "Ambiguous";
+  const q = clinicalRewrite(q0);
   const tokens = new Set(q.split(" "));
 
   // 1. Brand (longest-first): brand phrase appears within the extracted name.
@@ -159,6 +198,9 @@ export function classifyVaccine(name: string, cat: VaccineCatalog): VaccineCateg
     if (q.includes(key)) for (const c of categories) found.add(c);
   }
   if (found.size === 1) return [...found][0]!;
-  // size 0 (no match) or >1 (mixed-platform disease) → do not guess.
+  // 5. Shorthand the table can't resolve (flu-with-platform, OPV).
+  const fb = clinicalFallback(q0);
+  if (fb) return fb;
+  // size 0 (no match) or >1 (mixed-platform disease, no qualifier) → do not guess.
   return "Ambiguous";
 }
