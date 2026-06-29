@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { parseLabelResponse, fieldsFromTask, type PerNoteField } from "./index.js";
+import {
+  parseLabelResponse, fieldsFromTask, tryParseLabelJson, callWithTruncationRetry,
+  type PerNoteField,
+} from "./index.js";
+import type { LlmEndpoint, LlmResult } from "@chart-review/pipeline-extract-ner";
 
 const FIELDS: PerNoteField[] = [
   { field_id: "impaired_cognition", enum: ["1", "0"], prompt: "cog?" },
@@ -140,5 +144,85 @@ describe("fieldsFromTask", () => {
     expect(moca.type).toBe("integer");
     expect(moca.min).toBe(0);
     expect(moca.max).toBe(30);
+  });
+});
+
+describe("tryParseLabelJson", () => {
+  it("parses a JSON object / array / fenced block", () => {
+    expect(tryParseLabelJson('{"a":{"answer":1}}')).toEqual({ a: { answer: 1 } });
+    expect(tryParseLabelJson("[]")).toEqual([]);
+    expect(tryParseLabelJson('```json\n{"a":1}\n```')).toEqual({ a: 1 });
+    expect(tryParseLabelJson("{}")).toEqual({}); // legit "nothing documented" — NOT a failure
+  });
+  it("returns undefined for truncated / empty / non-JSON text", () => {
+    expect(tryParseLabelJson('{"a":{"answer": 1, "evidence_quote": "the patient wa')).toBeUndefined(); // cut off mid-stream
+    expect(tryParseLabelJson("")).toBeUndefined();
+    expect(tryParseLabelJson("   ")).toBeUndefined();
+    expect(tryParseLabelJson("I could not find anything.")).toBeUndefined();
+  });
+});
+
+const EP: LlmEndpoint = { baseUrl: "x", apiKey: "x", model: "m", mode: "openrouter" };
+/** A `call` stand-in returning a scripted sequence of results; records the
+ *  maxTokens passed on each invocation so we can assert the retry escalates. */
+function scriptedCall(results: Array<LlmResult | Error>) {
+  const budgets: number[] = [];
+  let i = 0;
+  const fn = async (_ep: LlmEndpoint, _s: string, _u: string, maxTokens?: number): Promise<LlmResult> => {
+    budgets.push(maxTokens ?? -1);
+    const r = results[Math.min(i++, results.length - 1)]!;
+    if (r instanceof Error) throw r;
+    return r;
+  };
+  return Object.assign(fn, { budgets });
+}
+
+describe("callWithTruncationRetry — truncated/unparseable notes never silently drop", () => {
+  it("good first response → 1 attempt, no retry, no error", async () => {
+    const call = scriptedCall([{ text: '{"impaired_cognition":{"answer":"1"}}' }]);
+    const out = await callWithTruncationRetry(call, EP, "sys", "usr");
+    expect(out.attempts).toBe(1);
+    expect(out.error).toBeUndefined();
+    expect(out.res?.text).toContain("impaired_cognition");
+    expect(call.budgets.length).toBe(1);
+  });
+
+  it("truncated first response → retries with a LARGER budget and recovers", async () => {
+    const call = scriptedCall([
+      { text: '{"a":{"answer":1', truncated: true }, // cut off
+      { text: '{"impaired_cognition":{"answer":"0"}}' }, // full on retry
+    ]);
+    const out = await callWithTruncationRetry(call, EP, "sys", "usr", 8192, 16384);
+    expect(out.attempts).toBe(2);
+    expect(out.error).toBeUndefined();
+    expect(call.budgets).toEqual([8192, 16384]); // retry escalated the budget
+  });
+
+  it("unparseable-but-not-flagged first response also triggers the retry", async () => {
+    const call = scriptedCall([
+      { text: "Sorry, here is the answer: impaired" }, // prose, no truncated flag
+      { text: "{}" }, // valid empty on retry
+    ]);
+    const out = await callWithTruncationRetry(call, EP, "sys", "usr");
+    expect(out.attempts).toBe(2);
+    expect(out.error).toBeUndefined();
+  });
+
+  it("REGRESSION: still truncated after retry → surfaces an ERROR, not an empty parse", async () => {
+    const call = scriptedCall([
+      { text: '{"a":{"answer":1', truncated: true, usage: { output_tokens: 8192 } },
+      { text: '{"a":{"answer":1, "evidence_quote":"the pat', truncated: true, usage: { output_tokens: 16384 } },
+    ]);
+    const out = await callWithTruncationRetry(call, EP, "sys", "usr");
+    expect(out.attempts).toBe(2);
+    expect(out.error).toBeDefined();
+    expect(out.error).toMatch(/truncated|unparseable/i);
+  });
+
+  it("call throws on the first pass → LLM-call error surfaced", async () => {
+    const call = scriptedCall([new Error("429 rate limited")]);
+    const out = await callWithTruncationRetry(call, EP, "sys", "usr");
+    expect(out.attempts).toBe(1);
+    expect(out.error).toMatch(/LLM call failed.*429/);
   });
 });

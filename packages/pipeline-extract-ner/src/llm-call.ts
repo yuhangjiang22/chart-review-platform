@@ -31,6 +31,10 @@ export interface LlmUsage {
 export interface LlmResult {
   text: string;
   usage?: LlmUsage;
+  /** True when the model stopped because it hit the output-token budget
+   *  rather than finishing. A truncated response is usually invalid JSON, so
+   *  callers must NOT treat it as "the model found nothing". */
+  truncated?: boolean;
 }
 
 /**
@@ -65,6 +69,8 @@ export async function callLlm(
     const body = (await r.json()) as {
       output?: Array<{ type?: string; content?: Array<{ type?: string; text?: string }> }>;
       usage?: { input_tokens?: number; cached_input_tokens?: number; output_tokens?: number };
+      status?: string;
+      incomplete_details?: { reason?: string };
       error?: { message?: string };
     };
     if (!r.ok) {
@@ -80,7 +86,13 @@ export async function callLlm(
         if (c.type === "output_text" && typeof c.text === "string") text += c.text;
       }
     }
-    return { text, usage: body.usage };
+    // Responses API reports a truncated generation via status/incomplete_details;
+    // fall back to "output hit the cap" for providers that omit those fields.
+    const truncated =
+      body.status === "incomplete" ||
+      body.incomplete_details?.reason === "max_output_tokens" ||
+      (typeof body.usage?.output_tokens === "number" && body.usage.output_tokens >= maxTokens);
+    return { text, usage: body.usage, truncated };
   }
 
   // openrouter / OpenAI-compatible chat-completions:
@@ -100,16 +112,20 @@ export async function callLlm(
     }),
   });
   const j = (await r.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
+    choices?: Array<{ message?: { content?: string }; finish_reason?: string }>;
     usage?: { prompt_tokens?: number; completion_tokens?: number };
   };
   if (!r.ok) {
     throw new Error(`LLM ${r.status}: ${JSON.stringify(j).slice(0, 200)}`);
   }
+  const truncated =
+    j.choices?.[0]?.finish_reason === "length" ||
+    (typeof j.usage?.completion_tokens === "number" && j.usage.completion_tokens >= maxTokens);
   return {
     text: j.choices?.[0]?.message?.content ?? "",
     usage: j.usage
       ? { input_tokens: j.usage.prompt_tokens, output_tokens: j.usage.completion_tokens }
       : undefined,
+    truncated,
   };
 }

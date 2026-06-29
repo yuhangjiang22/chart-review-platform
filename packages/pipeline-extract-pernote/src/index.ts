@@ -8,7 +8,7 @@
  * dropped (the answer is kept, flagged low-evidence) — offsets are never
  * fabricated.
  */
-import { callLlm, type LlmEndpoint, type LlmUsage } from "@chart-review/pipeline-extract-ner";
+import { callLlm, type LlmEndpoint, type LlmResult, type LlmUsage } from "@chart-review/pipeline-extract-ner";
 import { verifyEvidence, type NoteEvidence } from "@chart-review/faithfulness";
 import { readNote } from "@chart-review/patients";
 import type { CompiledTask } from "@chart-review/tasks";
@@ -106,25 +106,48 @@ export function fieldsFromTask(task: CompiledTask): PerNoteField[] {
     .filter((f) => f.enum.length > 0 || f.type === "integer" || f.type === "number" || f.type === "string" || f.type === "array");
 }
 
+/** Per-note output-token budget. Sized for the full leaf-field set where each
+ *  field emits answer + evidence_quote + rationale (plus entity arrays with
+ *  per-record Supporting_Evidence). 2048 — the old value — truncated verbose
+ *  notes mid-JSON, which parseLabelResponse then silently swallowed into an
+ *  all-empty result (a whole-note dropout). Observed real notes want up to
+ *  ~2.4k tokens; the retry doubles this when a response still comes back
+ *  truncated/unparseable. */
+export const MAX_OUTPUT_TOKENS = 8192;
+export const MAX_OUTPUT_TOKENS_RETRY = 16384;
+
+/** PURE: strip an optional markdown fence and parse the model's label JSON.
+ *  Returns the parsed object/array, or `undefined` when the text does not parse
+ *  (e.g. truncated mid-stream, empty, or prose). Exposed so the orchestrator
+ *  can distinguish a real "nothing documented" (`{}`) from a swallowed parse
+ *  failure that parseLabelResponse would otherwise render as all-empty. */
+export function tryParseLabelJson(text: string): unknown | undefined {
+  let s = (text ?? "").trim();
+  const fence = s.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/);
+  if (fence) s = fence[1]!.trim();
+  if (!s) return undefined;
+  try {
+    const parsed = JSON.parse(s);
+    return parsed && typeof parsed === "object" ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /** PURE: parse the model's JSON into one result per requested field, keeping
  *  only enum-valid answers. Tolerates markdown fences and object- or array-shaped
  *  responses. Always returns exactly one entry per field in `fields`. */
 export function parseLabelResponse(text: string, fields: PerNoteField[]): PerNoteFieldResult[] {
-  let s = (text ?? "").trim();
-  const fence = s.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/);
-  if (fence) s = fence[1]!.trim();
+  const parsed = tryParseLabelJson(text);
   let obj: Record<string, { answer?: unknown; confidence?: unknown; evidence_quote?: unknown; rationale?: unknown }> = {};
-  try {
-    const parsed = JSON.parse(s);
-    if (Array.isArray(parsed)) {
-      for (const row of parsed) {
-        const fid = (row as { field_id?: string })?.field_id;
-        if (fid) obj[fid] = row as never;
-      }
-    } else if (parsed && typeof parsed === "object") {
-      obj = parsed as never;
+  if (Array.isArray(parsed)) {
+    for (const row of parsed) {
+      const fid = (row as { field_id?: string })?.field_id;
+      if (fid) obj[fid] = row as never;
     }
-  } catch { /* leave obj empty → all answers undefined */ }
+  } else if (parsed && typeof parsed === "object") {
+    obj = parsed as never;
+  }
 
   return fields.map((f) => {
     const raw = obj[f.field_id];
@@ -246,7 +269,46 @@ function buildUserPrompt(noteId: string, noteText: string, fields: PerNoteField[
   ].join("\n");
 }
 
-/** Orchestrator: one LLM call for one note, returning verified per-field results. */
+export interface LabelCallOutcome {
+  res?: LlmResult;
+  attempts: number;
+  error?: string;
+}
+
+/** Call the model for one note, retrying once with a larger token budget when
+ *  the response is truncated or unparseable. Surfaces an `error` (rather than
+ *  letting parseLabelResponse render an all-empty result) when the response is
+ *  still unusable after the retry — so a whole-note dropout is COUNTED by the
+ *  run instead of masquerading as "nothing documented". */
+export async function callWithTruncationRetry(
+  call: typeof callLlm,
+  endpoint: LlmEndpoint,
+  system: string,
+  user: string,
+  primaryMaxTokens = MAX_OUTPUT_TOKENS,
+  retryMaxTokens = MAX_OUTPUT_TOKENS_RETRY,
+): Promise<LabelCallOutcome> {
+  const unusable = (r: LlmResult) => r.truncated === true || tryParseLabelJson(r.text) === undefined;
+  let res: LlmResult;
+  try {
+    res = await call(endpoint, system, user, primaryMaxTokens);
+  } catch (e) {
+    return { attempts: 1, error: `LLM call failed: ${(e as Error).message}` };
+  }
+  if (!unusable(res)) return { res, attempts: 1 };
+  // Truncated or unparseable on the first pass → retry once with a larger budget.
+  try {
+    res = await call(endpoint, system, user, retryMaxTokens);
+  } catch (e) {
+    return { attempts: 2, error: `LLM call failed (retry): ${(e as Error).message}` };
+  }
+  if (!unusable(res)) return { res, attempts: 2 };
+  const at = res.truncated && res.usage?.output_tokens ? ` (truncated at ${res.usage.output_tokens} output tokens)` : "";
+  return { res, attempts: 2, error: `unparseable LLM response after 2 attempts${at}` };
+}
+
+/** Orchestrator: one LLM call for one note (with a truncation retry), returning
+ *  verified per-field results. */
 export async function extractLabelsForNote(opts: ExtractLabelsOpts): Promise<ExtractLabelsResult> {
   const fields = fieldsFromTask(opts.task);
   let noteText: string;
@@ -256,12 +318,12 @@ export async function extractLabelsForNote(opts: ExtractLabelsOpts): Promise<Ext
     return { fields: [], error: `read_note failed for ${opts.noteId}: ${(e as Error).message}` };
   }
   const call = opts.call ?? callLlm;
-  let res;
-  try {
-    res = await call(opts.endpoint, opts.promptPreamble, buildUserPrompt(opts.noteId, noteText, fields), 2048);
-  } catch (e) {
-    return { fields: [], error: `LLM call failed: ${(e as Error).message}` };
+  const user = buildUserPrompt(opts.noteId, noteText, fields);
+  const outcome = await callWithTruncationRetry(call, opts.endpoint, opts.promptPreamble, user);
+  if (outcome.error || !outcome.res) {
+    return { fields: [], usage: outcome.res?.usage, error: outcome.error ?? "LLM call produced no response" };
   }
+  const res = outcome.res;
   const parsed = parseLabelResponse(res.text, fields);
   const byId = new Map(fields.map((f) => [f.field_id, f]));
   const out: PerNoteFieldResult[] = parsed.map((p) => {
