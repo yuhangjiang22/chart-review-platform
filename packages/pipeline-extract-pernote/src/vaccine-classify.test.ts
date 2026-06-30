@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseVaccineTables, classifyVaccine } from "./vaccine-classify.js";
+import { parseVaccineTables, classifyVaccine, classifyVaccineFull } from "./vaccine-classify.js";
 
 const CDC = `
 | Disease / Target | Vaccine name / abbreviation | Common US brand name(s) | Platform / type | Category |
@@ -86,5 +86,24 @@ describe("classifyVaccine — clinical-shorthand layer", () => {
   });
   it("maps the unambiguous legacy oral polio vaccine to Live", () => {
     expect(classifyVaccine("OPV", cat)).toBe("Live Vaccine");
+  });
+});
+
+describe("classifyVaccineFull — disease/target from the table", () => {
+  it("returns the matched row's disease for brand/abbrev hits", () => {
+    expect(classifyVaccineFull("Shingrix", cat).disease).toBe("Herpes Zoster (shingles), recombinant");
+    expect(classifyVaccineFull("MMR", cat)).toEqual({ category: "Live Vaccine", disease: "Measles-Mumps-Rubella" });
+  });
+  it("amyloid/tau vaccines are for Alzheimer's disease", () => {
+    expect(classifyVaccineFull("AADvac1", cat)).toEqual({ category: "Active Amyloid or Tau Immunization", disease: "Alzheimer's disease" });
+  });
+  it("reports the disease even when the category is Ambiguous (mixed-platform)", () => {
+    expect(classifyVaccineFull("flu vaccine", cat)).toEqual({ category: "Ambiguous", disease: "Influenza" });
+  });
+  it("fallback shorthand still reports a disease", () => {
+    expect(classifyVaccineFull("OPV", cat)).toEqual({ category: "Live Vaccine", disease: "Poliovirus" });
+  });
+  it("no match → no disease", () => {
+    expect(classifyVaccineFull("lecanemab", cat).disease).toBeNull();
   });
 });

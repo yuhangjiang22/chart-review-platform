@@ -9,8 +9,8 @@
  * fabricated.
  */
 import { callLlm, type LlmEndpoint, type LlmResult, type LlmUsage } from "@chart-review/pipeline-extract-ner";
-import { classifyVaccine, type VaccineCatalog } from "./vaccine-classify.js";
-export { parseVaccineTables, classifyVaccine, normVax, type VaccineCatalog, type VaccineCategory } from "./vaccine-classify.js";
+import { classifyVaccineFull, type VaccineCatalog } from "./vaccine-classify.js";
+export { parseVaccineTables, classifyVaccine, classifyVaccineFull, normVax, type VaccineCatalog, type VaccineCategory, type VaccineClassification } from "./vaccine-classify.js";
 import { verifyEvidence, type NoteEvidence } from "@chart-review/faithfulness";
 import { readNote } from "@chart-review/patients";
 import type { CompiledTask } from "@chart-review/tasks";
@@ -371,12 +371,16 @@ export async function extractLabelsForNote(opts: ExtractLabelsOpts): Promise<Ext
           }
         }
         if (ev) {
-          // Step 2: deterministic vaccine category from the CDC / amyloid tables
-          // (do NOT classify from memory). The model's Step-1 "Not a vaccine"
-          // call is preserved; everything else is re-assigned from the table.
+          // Step 2: deterministic vaccine category AND disease/target from the
+          // CDC / amyloid tables (do NOT classify from memory). The model's
+          // Step-1 "Not a vaccine" call is preserved; everything else — both the
+          // category and the disease the vaccine is for — is re-assigned from
+          // the table, overwriting any model guess.
           if (opts.vaccineCatalog && f.field_id === "vaccine_name" && ent.Category !== "Not a vaccine") {
             const nm = vk && typeof ent[vk] === "string" ? (ent[vk] as string) : "";
-            ent.Category = classifyVaccine(nm, opts.vaccineCatalog);
+            const cls = classifyVaccineFull(nm, opts.vaccineCatalog);
+            ent.Category = cls.category;
+            ent.Disease = cls.disease ?? "Not documented";
           }
           evidence.push(ev); kept.push(ent);
         }

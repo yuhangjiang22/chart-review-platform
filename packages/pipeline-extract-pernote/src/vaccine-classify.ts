@@ -1,13 +1,15 @@
 /**
  * Step 2 (Post-Processing Classification) of the ACTS Vaccine Extraction
- * Guideline: assign each extracted vaccine NAME a category using ONLY the CDC
- * reference table (+ the Alzforum amyloid/tau table) — never from model memory.
+ * Guideline: assign each extracted vaccine NAME a category AND its disease/target
+ * using ONLY the CDC reference table (+ the Alzforum amyloid/tau table) — never
+ * from model memory.
  *
  * Priority per the guideline: brand name → abbreviation → disease/target.
  * Brand wins (the same disease can have both live and non-live products, e.g.
  * Zostavax=Live vs Shingrix=Non-Live). A disease-only mention whose products
- * span more than one category resolves to "Ambiguous" (do not guess). BCG is its
- * own category. Amyloid/tau active immunizations match by name only.
+ * span more than one category resolves to "Ambiguous" (do not guess) — but the
+ * disease itself is still reported. BCG is its own category. Amyloid/tau active
+ * immunizations match by name only and are for Alzheimer's disease.
  */
 
 export type VaccineCategory =
@@ -17,14 +19,28 @@ export type VaccineCategory =
   | "Active Amyloid or Tau Immunization"
   | "Ambiguous";
 
+/** One CDC table row: its disease/target label (verbatim from the table) and category. */
+interface VaxRow {
+  disease: string;
+  category: VaccineCategory;
+}
+
+export interface VaccineClassification {
+  category: VaccineCategory;
+  /** The disease/target the vaccine is for, from the table (e.g. "Influenza",
+   *  "Herpes Zoster (shingles), recombinant", "Alzheimer's disease"); null when
+   *  no table row matched. */
+  disease: string | null;
+}
+
 export interface VaccineCatalog {
-  /** normalized brand phrase → category; matched longest-first */
-  brands: Array<{ key: string; category: VaccineCategory }>;
-  /** normalized abbreviation token → category */
-  abbrevs: Map<string, VaccineCategory>;
-  /** normalized disease keyword → set of categories across its products */
-  diseases: Array<{ key: string; categories: Set<VaccineCategory> }>;
-  /** normalized amyloid/tau therapy name or alias (category is fixed) */
+  /** normalized brand phrase → row; matched longest-first */
+  brands: Array<{ key: string; row: VaxRow }>;
+  /** normalized abbreviation token → row */
+  abbrevs: Map<string, VaxRow>;
+  /** normalized disease keyword → rows whose disease cell contains it (longest-first) */
+  diseaseKeys: Array<{ key: string; rows: VaxRow[] }>;
+  /** normalized amyloid/tau therapy name or alias (category/disease are fixed) */
   amyloid: Set<string>;
 }
 
@@ -37,7 +53,8 @@ const DISEASE_TOKEN_STOPLIST = new Set([
   "acellular", "conjugate", "polysaccharide", "recombinant", "inactivated",
   "attenuated", "subunit", "adjuvanted", "valent", "toxoid", "live",
   "vaccine", "vaccines", "combo", "based", "culture", "syncytial",
-  "virus", "human", "type", "types",
+  "virus", "human", "type", "types", "prefusion", "replicating",
+  "military", "intranasal",
 ]);
 
 /** lowercase, drop punctuation to spaces, collapse whitespace */
@@ -47,6 +64,10 @@ export function normVax(s: string): string {
 
 function stripParen(s: string): string {
   return s.replace(/\([^)]*\)/g, " ");
+}
+
+function titleCase(s: string): string {
+  return s.replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 function tableRows(md: string): string[][] {
@@ -68,47 +89,46 @@ function cleanCategory(cell: string): VaccineCategory | null {
 
 /** Parse the CDC vaccine table + the amyloid/tau table into a lookup catalog. */
 export function parseVaccineTables(cdcMd: string, amyloidMd: string): VaccineCatalog {
-  const brands: Array<{ key: string; category: VaccineCategory }> = [];
-  const abbrevs = new Map<string, VaccineCategory>();
-  const diseaseMap = new Map<string, Set<VaccineCategory>>();
+  const brands: Array<{ key: string; row: VaxRow }> = [];
+  const abbrevs = new Map<string, VaxRow>();
+  const diseaseMap = new Map<string, VaxRow[]>();
 
   for (const cells of tableRows(cdcMd)) {
     // CDC columns: [Disease/Target, Vaccine name/abbreviation, Brand(s), Platform, Category]
     if (cells.length < 5) continue;
     const category = cleanCategory(cells[4]!);
     if (!category) continue; // header / malformed
-    // brands: split on comma/semicolon, drop parentheticals
+    const row: VaxRow = { disease: cells[0]!.replace(/\s+/g, " ").trim(), category };
+    // brands: split on comma/semicolon/slash, drop parentheticals
     for (const b of stripParen(cells[2]!).split(/[,;/]/)) {
       const key = normVax(b);
-      if (key && key !== "—") brands.push({ key, category });
+      if (key && key !== "—") brands.push({ key, row });
     }
     // abbreviations: alnum tokens from the abbrev cell (handles "LAIV4 (LAIV3)", "9vHPV (HPV9)")
     for (const a of normVax(cells[1]!).split(" ")) {
-      if (a.length >= 2 && a !== "—") abbrevs.set(a, category);
+      if (a.length >= 2 && a !== "—") abbrevs.set(a, row);
     }
-    // disease keywords: main term (pre-comma) + parenthetical common names
+    // disease keywords: main term (pre-comma) + parenthetical names + disease-name tokens
     const diseaseCell = cells[0]!;
     const keys = new Set<string>();
     const main = normVax(stripParen(diseaseCell).split(",")[0]!);
     if (main) {
       keys.add(main);
-      // also key on each disease-NAME token (not platform/qualifier words) so a
-      // generic "<disease> vaccine" mention matches multi-word table diseases —
-      // e.g. "pneumococcal vaccine" / "pertussis vaccine" / "hepatitis b". Each
-      // token's category set is unioned across all rows, so a mixed-platform
-      // disease (e.g. influenza: LAIV live + IIV non-live) still resolves to
-      // Ambiguous, while a uniform one (all pertussis products non-live) resolves.
       for (const w of main.split(" ")) {
         if (w.length >= 5 && !DISEASE_TOKEN_STOPLIST.has(w)) keys.add(w);
       }
     }
     for (const m of diseaseCell.matchAll(/\(([^)]*)\)/g)) {
-      const k = normVax(m[1]!);
-      if (k) keys.add(k);
+      // tokenize parenthetical synonyms the same way (e.g. "(shingles)" →
+      // shingles), filtering platform/qualifier words so e.g. "(recombinant)"
+      // or "(15-valent)" never become disease keys.
+      for (const w of normVax(m[1]!).split(" ")) {
+        if (w.length >= 5 && !DISEASE_TOKEN_STOPLIST.has(w) && !/^\d+$/.test(w)) keys.add(w);
+      }
     }
     for (const k of keys) {
-      if (!diseaseMap.has(k)) diseaseMap.set(k, new Set());
-      diseaseMap.get(k)!.add(category);
+      if (!diseaseMap.has(k)) diseaseMap.set(k, []);
+      diseaseMap.get(k)!.push(row);
     }
   }
 
@@ -124,26 +144,21 @@ export function parseVaccineTables(cdcMd: string, amyloidMd: string): VaccineCat
     }
   }
 
-  // longest brand phrase first so "fluzone high dose" wins over "fluzone"
   brands.sort((a, b) => b.key.length - a.key.length);
-  const diseases = [...diseaseMap.entries()]
-    .map(([key, categories]) => ({ key, categories }))
+  const diseaseKeys = [...diseaseMap.entries()]
+    .map(([key, rows]) => ({ key, rows }))
     .sort((a, b) => b.key.length - a.key.length);
-  return { brands, abbrevs, diseases, amyloid };
+  return { brands, abbrevs, diseaseKeys, amyloid };
 }
 
-/** Clinical-shorthand rewrites applied to the normalized name BEFORE table
- *  matching, so common chart abbreviations resolve to the table's canonical
- *  disease/brand terms. Each is a deterministic, auditable mapping of an
- *  unambiguous shorthand — not a memory guess. */
 const CLINICAL_REWRITES: Array<[RegExp, string]> = [
   [/\bhep\s+a\b/g, "hepatitis a"],
   [/\bhep\s+b\b/g, "hepatitis b"],
   [/\bhepa\b/g, "hepatitis a"],
   [/\bhepb\b/g, "hepatitis b"],
-  [/\bdtp\b/g, "dtap"],                 // whole-cell DTP → DTaP family (all non-live)
-  [/\bpneumonia\b/g, "pneumococcal"],   // "pneumonia 23" → pneumococcal (PPSV23)
-  [/\bprevnar\b/g, "prevnar pneumococcal"], // Prevnar 13/20 → pneumococcal conjugate
+  [/\bdtp\b/g, "dtap"],
+  [/\bpneumonia\b/g, "pneumococcal"],
+  [/\bprevnar\b/g, "prevnar pneumococcal"],
   [/\bflu\b/g, "influenza"],
 ];
 
@@ -153,13 +168,11 @@ function clinicalRewrite(q: string): string {
   return out.replace(/\s+/g, " ").trim();
 }
 
-/** Deterministic fallbacks for shorthand the CDC table cannot resolve on its
- *  own: an influenza mention WITH an explicit platform qualifier (intranasal/
- *  live → Live; inactivated/recombinant/split/IM/high-dose → Non-Live), and the
- *  unambiguous legacy oral polio vaccine. Bare "flu"/"influenza" with no
- *  platform stays unresolved (genuinely ambiguous). */
-function clinicalFallback(q: string): VaccineCategory | null {
-  if (/\bopv\b|oral polio/.test(q)) return "Live Vaccine"; // OPV is live (legacy/ex-US)
+/** Deterministic category fallback for shorthand the CDC table can't resolve on
+ *  its own: influenza WITH an explicit platform qualifier, and the unambiguous
+ *  legacy oral polio vaccine. Bare flu with no platform stays unresolved. */
+function clinicalFallbackCategory(q: string): VaccineCategory | null {
+  if (/\bopv\b|oral polio/.test(q)) return "Live Vaccine";
   if (/influenza|\bflu\b/.test(q)) {
     if (/laiv|intranasal|live attenuated|\blive\b/.test(q)) return "Live Vaccine";
     if (/inactivated|\biiv\d?\b|\btiv\b|cciiv|\briv\d?\b|recombinant|\bsplit\b|high.?dose|\bhd\b|adjuvanted|\bim\b|intramuscular|injectable/.test(q)) {
@@ -169,38 +182,54 @@ function clinicalFallback(q: string): VaccineCategory | null {
   return null;
 }
 
-/** Classify one extracted vaccine name against the catalog (brand → abbrev →
- *  amyloid → disease), with a clinical-shorthand rewrite first and a deterministic
- *  fallback when the table can't resolve it. Returns "Ambiguous" when no
- *  deterministic match exists — the guideline's safe default for human review. */
-export function classifyVaccine(name: string, cat: VaccineCatalog): VaccineCategory {
+/** Classify one extracted vaccine name against the catalog, returning BOTH its
+ *  category and the disease/target it is for (from the table). Priority:
+ *  brand → abbreviation → amyloid-name → disease keyword, with a clinical
+ *  shorthand rewrite first and a platform/legacy fallback last. */
+export function classifyVaccineFull(name: string, cat: VaccineCatalog): VaccineClassification {
   const q0 = normVax(name);
-  if (!q0) return "Ambiguous";
+  if (!q0) return { category: "Ambiguous", disease: null };
   const q = clinicalRewrite(q0);
   const tokens = new Set(q.split(" "));
 
-  // 1. Brand (longest-first): brand phrase appears within the extracted name.
-  for (const { key, category } of cat.brands) {
-    if (key.length >= 3 && (q === key || q.includes(key))) return category;
+  // 1. Brand (longest-first) — row-specific disease + category.
+  for (const { key, row } of cat.brands) {
+    if (key.length >= 3 && q.includes(key)) return { category: row.category, disease: row.disease };
   }
-  // 2. Abbreviation: a whole token equals a table abbreviation.
+  // 2. Abbreviation — a whole token equals a table abbreviation.
   for (const tok of tokens) {
-    const c = cat.abbrevs.get(tok);
-    if (c) return c;
+    const row = cat.abbrevs.get(tok);
+    if (row) return { category: row.category, disease: row.disease };
   }
-  // 3. Amyloid/tau: therapy name or alias appears in the name.
+  // 3. Amyloid/tau active immunization — for Alzheimer's disease.
   for (const a of cat.amyloid) {
-    if (a.length >= 3 && (q === a || q.includes(a))) return "Active Amyloid or Tau Immunization";
+    if (a.length >= 3 && q.includes(a)) return { category: "Active Amyloid or Tau Immunization", disease: "Alzheimer's disease" };
   }
-  // 4. Disease/target: collect categories of all products for matched diseases.
-  const found = new Set<VaccineCategory>();
-  for (const { key, categories } of cat.diseases) {
-    if (q.includes(key)) for (const c of categories) found.add(c);
+  // 4. Disease/target keyword — collect every product for the matched disease(s).
+  const rows: VaxRow[] = [];
+  let longestKey = "";
+  for (const { key, rows: rs } of cat.diseaseKeys) {
+    if (q.includes(key)) { rows.push(...rs); if (key.length > longestKey.length) longestKey = key; }
   }
-  if (found.size === 1) return [...found][0]!;
-  // 5. Shorthand the table can't resolve (flu-with-platform, OPV).
-  const fb = clinicalFallback(q0);
-  if (fb) return fb;
-  // size 0 (no match) or >1 (mixed-platform disease, no qualifier) → do not guess.
-  return "Ambiguous";
+  if (rows.length) {
+    const cats = new Set(rows.map((r) => r.category));
+    const diseaseLabels = new Set(rows.map((r) => r.disease));
+    // one shared disease label → use it; otherwise the matched keyword, title-cased.
+    const disease = diseaseLabels.size === 1 ? [...diseaseLabels][0]! : titleCase(longestKey);
+    if (cats.size === 1) return { category: [...cats][0]!, disease };
+    // mixed-platform disease → category Ambiguous unless a platform qualifier resolves it.
+    return { category: clinicalFallbackCategory(q0) ?? "Ambiguous", disease };
+  }
+  // 5. Fallback for shorthand with no disease-keyword match (flu-platform, OPV).
+  const fb = clinicalFallbackCategory(q0);
+  if (fb) {
+    const disease = /\bopv\b|oral polio/.test(q0) ? "Poliovirus" : (/influenza|\bflu\b/.test(q0) ? "Influenza" : null);
+    return { category: fb, disease };
+  }
+  return { category: "Ambiguous", disease: null };
+}
+
+/** Category-only convenience wrapper. */
+export function classifyVaccine(name: string, cat: VaccineCatalog): VaccineCategory {
+  return classifyVaccineFull(name, cat).category;
 }
