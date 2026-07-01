@@ -8,6 +8,9 @@ import { cn } from "@/lib/utils";
 import { AgentConfigPanel, type AgentSpecForm } from "../PilotsTab/AgentConfigPanel";
 import { AgentLogPanel } from "./AgentLogPanel";
 import { RubricPanel } from "./RubricPanel";
+import { NerSdkRunPanel } from "./NerSdkRunPanel";
+import { SkillDocPanel } from "./SkillDocPanel";
+import { AgentTracePanel } from "./AgentTracePanel";
 import { useDeepagentsModels } from "../../useDeepagentsModels";
 
 interface Patient {
@@ -50,8 +53,10 @@ interface PhaseTryProps {
    *  no-session gate to give the user a one-click path to fix the issue. */
   onOpenNewSession?: () => void;
   /** Task kind — drives the runtime indicator in the agent readout.
-   *  phenotype runs via the deepagents Python sidecar (AGENT_PROVIDER). */
-  taskKind?: "phenotype";
+   *  phenotype runs via the deepagents Python sidecar (AGENT_PROVIDER); ner
+   *  (bso-ad-ner) runs via the benchmark Claude-Agent-SDK CLI, so it suppresses
+   *  the deepagents label and labels the panel "Reviewers" not "Agents". */
+  taskKind?: "phenotype" | "ner";
   /** Bumped by the sidebar "Open skill rubric" link to reveal the inline
    *  rubric editor. Forwarded to RubricPanel. */
   revealRubricNonce?: number;
@@ -89,11 +94,13 @@ export function PhaseTry({
     return () => { cancelled = true; };
   }, [taskKind]);
 
-  const runtimeLabel = agentProvider === "deepagents"
-    ? "deepagents (Python sidecar · tool-using agent loop)"
-    : agentProvider
-      ? `agent runtime: ${agentProvider}`
-      : "agent runtime: (loading…)";
+  const runtimeLabel = taskKind === "ner"
+    ? "Claude Agent SDK · benchmark CLI"
+    : agentProvider === "deepagents"
+      ? "deepagents (Python sidecar · tool-using agent loop)"
+      : agentProvider
+        ? `agent runtime: ${agentProvider}`
+        : "agent runtime: (loading…)";
   const [patients, setPatients] = useState<Patient[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [agentSpecs, setAgentSpecs] = useState<AgentSpecForm[]>([
@@ -360,6 +367,22 @@ export function PhaseTry({
     );
   }
 
+  // NER (bso-ad-ner-sdk): the vendored Claude-Agent-SDK flow has its own panel
+  // (run → status → VALIDATE / annotate UI) and does NOT use the deepagents
+  // RunStatusCard. Render it for the whole TRY phase regardless of any pilot
+  // iter (an iter exists after a run so VALIDATE opens, but the NER panel — not
+  // the RunStatusCard — is the right surface here, and it carries the
+  // "Open annotate UI" button).
+  if (taskKind === "ner") {
+    return (
+      <div className="space-y-4">
+        <NerSdkRunPanel sessionId={activeSessionId} onAdvanceToValidate={onAdvanceToValidate ?? (() => {})} />
+        <SkillDocPanel />
+        <AgentTracePanel sessionId={activeSessionId} />
+      </div>
+    );
+  }
+
   // Branch A: a run is in flight or just completed (within this session).
   // Run status is the focus here — it renders FIRST so clicking Run drops you
   // straight onto the progress. The rubric stays available (collapsed, below)
@@ -428,7 +451,9 @@ export function PhaseTry({
         </div>
         {sessionAgentSpecs.length === 0 ? (
           <div className="text-[12px] text-muted-foreground italic">
-            (loading session…)
+            {taskKind === "ner"
+              ? "Runs via the benchmark Claude-Agent-SDK CLI (scripts/run-bso-ad-claude-sdk.ts) — no platform agents to configure here."
+              : "(loading session…)"}
           </div>
         ) : (
           <div className="text-[12px] font-mono text-ink space-y-1">
@@ -459,17 +484,21 @@ export function PhaseTry({
         </div>
       )}
 
-      <div className="flex justify-end">
-        <Button
-          size="sm"
-          className="gap-1.5"
-          disabled={busy || sessionCohort.length === 0 || noModels}
-          onClick={() => startRun()}
-        >
-          <Play size={12} strokeWidth={1.75} />
-          {busy ? "Running…" : "Run"}
-        </Button>
-      </div>
+      {taskKind === "ner" ? (
+        <NerSdkRunPanel sessionId={activeSessionId} onAdvanceToValidate={onAdvanceToValidate ?? (() => {})} />
+      ) : (
+        <div className="flex justify-end">
+          <Button
+            size="sm"
+            className="gap-1.5"
+            disabled={busy || sessionCohort.length === 0 || noModels}
+            onClick={() => startRun()}
+          >
+            <Play size={12} strokeWidth={1.75} />
+            {busy ? "Running…" : "Run"}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
