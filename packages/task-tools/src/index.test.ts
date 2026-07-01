@@ -37,6 +37,16 @@ describe("toolProfileFor", () => {
     expect(p.baseTools).toContain("set_field_assessment");
   });
 
+  it("ner profile exposes the 4 BSO-AD ontology tools, not the phenotype writes", () => {
+    const p = toolProfileFor({ task_id: "bso-ad-ner", task_kind: "ner" } as any);
+    expect(p.baseTools).toEqual([
+      "list_entity_types", "get_concept_tree", "normalize_to_ontology", "locate_in_source",
+    ]);
+    const allow = mcpAllowlist(p).split(",");
+    expect(allow).not.toContain("set_field_assessment");
+    expect(allow).not.toContain("list_criteria");
+  });
+
   it("rucam enables read_structured_data even without uses_structured_data (profile sets it)", () => {
     // The profile materializes labs/meds/conditions into omop/, so the agent can
     // cite CITABLE structured rows — the allowlist must expose the structured tools

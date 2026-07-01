@@ -18,6 +18,13 @@ export const ADHERENCE_BASE_TOOLS = [
   "list_questions", "read_question", "set_question_answer", "get_adherence_state",
   "list_notes", "read_note", "read_notes", "search_notes", "get_note_section", "set_review_status",
 ];
+/** NER's MCP surface: the BSO-AD ontology browsers the Claude-Agent-SDK skill
+ *  uses (mirrors the benchmark `bso-ad` skill — the authoritative skill for the
+ *  bso-ad-ner task; span commits go through the benchmark's write step, not an
+ *  MCP write tool here). */
+export const NER_BASE_TOOLS = [
+  "list_entity_types", "get_concept_tree", "normalize_to_ontology", "locate_in_source",
+];
 /** EHR/OMOP read tools, added when a task opts into structured data. */
 export const STRUCTURED_DATA_TOOLS = ["list_structured_data", "read_structured_data"];
 
@@ -105,7 +112,9 @@ const NAMED_PROFILES: Record<string, Partial<ToolProfile>> = {
 export function toolProfileFor(task: CompiledTask & { tool_profile?: string }): ToolProfile {
   const kind = task.task_kind ?? "phenotype";
   const base: ToolProfile = {
-    baseTools: kind === "adherence" ? ADHERENCE_BASE_TOOLS : PHENOTYPE_BASE_TOOLS,
+    baseTools: kind === "ner" ? NER_BASE_TOOLS
+      : kind === "adherence" ? ADHERENCE_BASE_TOOLS
+      : PHENOTYPE_BASE_TOOLS,
     structuredData: task.uses_structured_data === true,
     mcpTools: [],
     pythonPlugins: [],

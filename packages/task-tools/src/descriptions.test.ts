@@ -25,6 +25,15 @@ describe("describeTaskTools — per-task tool surface", () => {
     expect(ids(v, "mcp")).not.toContain("set_field_assessment");
   });
 
+  it("ner: exactly the 4 BSO-AD ontology tools, each described, no phenotype writes", () => {
+    const v = describeTaskTools(task({ task_kind: "ner" }));
+    expect(ids(v, "mcp")).toEqual([
+      "list_entity_types", "get_concept_tree", "normalize_to_ontology", "locate_in_source",
+    ]);
+    expect(ids(v, "mcp")).not.toContain("set_field_assessment");
+    for (const g of v.groups) for (const t of g.tools) expect(t.description).not.toBe("(no description)");
+  });
+
   it("rucam profile: adds the rucam plugin tools + per-item count, structured on", () => {
     const v = describeTaskTools(task({ task_kind: "phenotype", tool_profile: "rucam" }));
     expect(ids(v, "plugin")).toContain("compute_r_ratio");

@@ -24,6 +24,11 @@ export const TOOL_DESCRIPTIONS: Record<string, string> = {
   set_review_status: "Mark the review's status (in_progress / complete…).",
   get_review_state: "Read back the current draft state.",
   recommend_keywords: "Suggest search keywords for the criteria.",
+  // NER (bso-ad-ner) — BSO-AD ontology browsers (mirror the benchmark skill)
+  list_entity_types: "List the BSO-AD entity-type subtrees (the valid entity_type roots).",
+  get_concept_tree: "Browse the concept tree under one entity_type (children + paths).",
+  normalize_to_ontology: "Normalize a surface form to a canonical ontology concept_name under an entity_type.",
+  locate_in_source: "Locate a span's authoritative character offsets in the note (for faithful citation).",
   // Questions (adherence) — replaces criteria + field-write
   list_questions: "List the adherence questions (by tier).",
   read_question: "Read one question's text, schema, and retrieval hints.",
@@ -78,6 +83,8 @@ export function describeTaskTools(task: CompiledTask & { tool_profile?: string }
       source: "mcp",
       label: task.task_kind === "adherence"
         ? "MCP tools — notes + questions + write"
+        : task.task_kind === "ner"
+        ? "NER tools — BSO-AD ontology lookup"
         : "MCP tools — notes + criteria + write",
       tools: mcp.map((id) => ({ id, description: describe(id) })),
     });
