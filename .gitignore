@@ -68,3 +68,8 @@ corpus/index.json
 # Python sidecar venv (rebuilt via uv)
 python/.venv/
 .venv/
+
+# Vendored bso-ad-sdk runner: ignore secrets + python caches (code is tracked)
+vendor/bso-ad-sdk/.env
+vendor/bso-ad-sdk/**/__pycache__/
+vendor/bso-ad-sdk/**/*.pyc
