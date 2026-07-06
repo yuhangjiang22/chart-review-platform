@@ -623,17 +623,25 @@ export async function listStructuredDataTool(
   session: McpSession,
   _args: ListStructuredDataArgs,
 ): Promise<CallToolResult> {
-  // readStructured returns one object whose keys ARE the table names
-  // (measurements, conditions, drug_exposures, …). Pull row counts per
-  // table so the agent can pick which to read in full.
+  // readStructured returns one object whose keys are mostly table names
+  // (measurements, conditions, drug_exposures, …) plus a few scalar fields
+  // (index_date). Pull row counts per table so the agent can pick which to
+  // read in full; surface scalar fields directly rather than folding them
+  // into the tables list as a fake 0-row table, which silently hid their
+  // value from the agent (index_date was unreadable via any tool).
   try {
     const s = readStructuredFn(session.patientId);
-    const tables = Object.entries(s).map(([name, rows]) => ({
-      name,
-      n_rows: Array.isArray(rows) ? rows.length : 0,
-    }));
+    const tables = Object.entries(s)
+      .filter(([, value]) => Array.isArray(value))
+      .map(([name, rows]) => ({
+        name,
+        n_rows: (rows as unknown[]).length,
+      }));
     return {
-      content: [{ type: "text", text: JSON.stringify({ ok: true, tables }) }],
+      content: [{
+        type: "text",
+        text: JSON.stringify({ ok: true, index_date: s.index_date ?? null, tables }),
+      }],
     };
   } catch (e) {
     return {
