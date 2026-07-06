@@ -375,11 +375,13 @@ if (want("list_structured_data")) {
     "list_structured_data",
     {
       description: [
-        "PREFER OVER SHELL. Return the patient's available OMOP structured-data",
-        "tables and their row counts (conditions, drugs, measurements,",
-        "observations, procedures, encounters). Call ONCE to see which tables",
-        "exist, then read_structured_data the ones the questions reference. An",
-        "empty list means this patient has no structured data — fall back to notes.",
+        "PREFER OVER SHELL. Return the patient's index_date (if the task uses",
+        "one) plus the available OMOP structured-data tables and their row",
+        "counts (conditions, drugs, measurements, observations, procedures,",
+        "encounters). Call ONCE per session — early, before reading notes, if",
+        "the task has a time-window rule — then read_structured_data the",
+        "tables the questions reference. An empty tables list means this",
+        "patient has no structured data — fall back to notes.",
       ].join(" "),
       inputSchema: {},
     },
