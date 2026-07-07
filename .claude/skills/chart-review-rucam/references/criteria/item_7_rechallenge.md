@@ -1,26 +1,28 @@
 ---
 field_id: item_7_rechallenge
-prompt: RUCAM Item 7 — response to readministration score
+prompt: RUCAM Item 7 — response to readministration score (computed)
 answer_schema:
   enum: [3, 1, 0, -2]
 cardinality: one
 group: rucam
+role: interpretive
+required_note: "COMPUTED from rechallenge_result — not answered directly."
+derivation: 'rechallenge_result == "positive_alone" ? 3 : rechallenge_result == "positive_with_codrug" ? 1 : rechallenge_result == "below_uln" ? -2 : 0'
 ---
 
-# Criterion: item_7_rechallenge
+# Criterion: item_7_rechallenge (computed)
 
 ## Definition
 
-RUCAM Item 7 score for the liver-enzyme response to re-exposure (rechallenge) of
-the suspect drug.
+RUCAM Item 7 (response to readministration), **computed** from `rechallenge_result` —
+do NOT answer directly:
+
+- **+3** if `positive_alone` (anchor lab doubled on re-exposure to the suspect drug alone).
+- **+1** if `positive_with_codrug` (doubled, but a co-medication was also present).
+- **−2** if `below_uln` (re-exposed, increase stayed below ULN → negative rechallenge).
+- **0** if `none_or_insufficient` (no valid rechallenge / not interpretable).
 
 ## Extraction guidance
 
-Follow `references/scoring/item-7-rechallenge.md`. Use `get_drug_episodes` (a
-re-exposure episode after the first) and `get_lft_series` around it, plus
-`get_patient_summary` (`rechallenge_flag`). Score (one of `3`, `1`, `0`, `-2`):
-- `3` — positive: ALT (hepatocellular) or ALP (chole/mixed) doubles on
-  re-administration of the drug alone.
-- `1` — doubling on re-administration of the drug + the same co-medication(s).
-- `-2` — negative rechallenge (re-exposed, no doubling).
-- `0` — no rechallenge / not interpretable.
+Answer `rechallenge_result` (per `references/scoring/item-7-rechallenge.md`); this
+score derives from it.
