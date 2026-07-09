@@ -605,7 +605,11 @@ export function Workspace({
             onAdvanceToValidate={() => setPhase("VALIDATE")}
             activeSessionId={activeSessionId}
             onOpenNewSession={() => setNewSessionOpen(true)}
-            taskKind={taskKind}
+            // The shared `taskKind` always resolves to "phenotype" in this fork
+            // (see note below); read task_type directly so NER tasks (bso-ad-ner)
+            // get the NER treatment — no deepagents runtime label, "Reviewers"
+            // not "Agents".
+            taskKind={task?.task_type === "ner" ? "ner" : "phenotype"}
             revealRubricNonce={revealRubricNonce}
           />
         )}
@@ -614,7 +618,8 @@ export function Workspace({
             taskId={taskId}
             iterId={validateIter.iter_id}
             onOpenPatient={(pid) => onOpenPatient?.(pid)}
-            taskKind={taskKind}
+            taskKind={task?.task_type === "ner" ? "ner" : "phenotype"}
+            sessionId={activeSessionId}
           />
         )}
         {activePhase === "VALIDATE" && activeSessionId && !validateIter && (

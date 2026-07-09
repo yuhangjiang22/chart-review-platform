@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 import { authFetch } from "../../auth";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
+import { AnnotateEmbedPanel } from "./AnnotateEmbedPanel";
 
 interface PatientStatus {
   patient_id: string;
@@ -43,7 +44,9 @@ interface PhaseValidateProps {
   /** Navigate to the patient chart for validation. */
   onOpenPatient: (patientId: string) => void;
   /** Kept for API compatibility with Workspace caller — phenotype only now. */
-  taskKind?: "phenotype";
+  taskKind?: "phenotype" | "ner";
+  /** Active session ID — forwarded to AnnotateEmbedPanel for NER tasks. */
+  sessionId?: string | null;
 }
 
 /**
@@ -58,7 +61,7 @@ interface PhaseValidateProps {
  *   press "Approve all agreements" once each).
  */
 export function PhaseValidate({
-  taskId, iterId, onOpenPatient,
+  taskId, iterId, onOpenPatient, taskKind, sessionId,
 }: PhaseValidateProps) {
   const [patients, setPatients] = useState<PatientStatus[]>([]);
   const [patientsWithDisagreements, setPatientsWithDisagreements] = useState<Set<string>>(
@@ -126,6 +129,14 @@ export function PhaseValidate({
     (p) => patientsWithDisagreements.has(p.patient_id),
   );
   const nextUnvalidated = nextWithDisagreement ?? unvalidated[0];
+
+  if (taskKind === "ner") {
+    return (
+      <div className="space-y-4">
+        <AnnotateEmbedPanel sessionId={sessionId} />
+      </div>
+    );
+  }
 
   return (
     <div className="pt-2">

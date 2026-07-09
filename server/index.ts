@@ -90,6 +90,9 @@ import { refineRoutes } from "./refine-routes.js";
 import { adherenceRubricRoutes } from "./adherence-rubric-routes.js";
 import { rubricVersionRoutes } from "./rubric-version-routes.js";
 import { maturityDerivedRoutes } from "./maturity-derived-routes.js";
+import { nerSdkRunRoutes } from "./ner-sdk-run-routes.js";
+import { nerSdkAnnotateRoutes } from "./ner-sdk-annotate-routes.js";
+import { nerSdkViewRoutes } from "./ner-sdk-view-routes.js";
 import { attachWebSocketServer, registerBroadcasters } from "./ws.js";
 import {
   isBuilderPath, delegateBuilder,
@@ -246,6 +249,9 @@ const paramRouter = makeRouter([
   ...adherenceRubricRoutes,
   ...rubricVersionRoutes,
   ...maturityDerivedRoutes,
+  ...nerSdkRunRoutes,
+  ...nerSdkAnnotateRoutes,
+  ...nerSdkViewRoutes,
 ]);
 
 // ── http plumbing ───────────────────────────────────────────────────
