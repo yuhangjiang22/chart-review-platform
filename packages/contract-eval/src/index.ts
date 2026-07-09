@@ -173,31 +173,53 @@ export function derivedInputs(task: MinimalTask, fieldId: string): string[] {
   return ids.filter((id) => id !== fieldId && new RegExp("\\b" + id + "\\b").test(f.derivation!));
 }
 
-export function evalDerivation(task: MinimalTask, answers: Env, fieldId: string, visited?: Set<string>): unknown {
+export function evalDerivation(
+  task: MinimalTask,
+  answers: Env,
+  fieldId: string,
+  visited?: Set<string>,
+  memo?: Map<string, unknown>,
+): unknown {
   visited = visited ?? new Set();
+  // Memoize each derived field's value for the duration of ONE top-level call.
+  // Without this, building a field's env recurses into EVERY other derived
+  // field, and since a field is re-evaluable once it leaves `visited`, a task
+  // with k chained derived fields costs O(k!) — RUCAM's 11 derived fields with
+  // a sparse env (only leaves committed) hung the write path at 100% CPU. The
+  // memo makes it linear; the visited set still guards true dependency cycles.
+  memo = memo ?? new Map();
+  if (memo.has(fieldId)) return memo.get(fieldId);
   const f = task.fields.find((x) => x.id === fieldId);
   if (!f?.derivation) return null;
   if (visited.has(fieldId)) return null;
   visited.add(fieldId);
+  // Resolve ONLY the fields this derivation actually references — recursively
+  // for derived inputs. (The old code eagerly evaluated every field in the task,
+  // which both cost O(k!) across a wide derived graph and cross-contaminated a
+  // dependent field with a mid-flight dependency's null.)
+  const inputs = derivedInputs(task, fieldId);
   const env: Env = {};
-  for (const x of task.fields) {
-    if (x.id === fieldId) { env[x.id] = undefined; continue; }
-    const a = answers[x.id];
+  for (const id of inputs) {
+    const a = answers[id];
     // A null / empty answer means "not documented" — treat it like an absent
     // input, NOT a value. Otherwise a null numeric (e.g. an unanswered MoCA)
     // flows into a comparison as 0-ish (`null >= 26` is false in JS) and
     // cascades the derivation to its lowest band ("severe"), fabricating a
     // severity for a patient who never had the test. With it excluded, the
     // missing-input guard below yields null (Pending) instead.
-    if (a !== undefined && a !== null && a !== "") env[x.id] = a;
-    else if (x.derivation) env[x.id] = evalDerivation(task, answers, x.id, visited);
-    else env[x.id] = undefined;
+    if (a !== undefined && a !== null && a !== "") env[id] = a;
+    else {
+      const xf = task.fields.find((x) => x.id === id);
+      env[id] = xf?.derivation ? evalDerivation(task, answers, id, visited, memo) : undefined;
+    }
   }
   visited.delete(fieldId);
   // Return null when any referenced input is missing (undefined/null in env).
-  const inputs = derivedInputs(task, fieldId);
-  if (inputs.some((id) => env[id] === undefined || env[id] === null)) return null;
-  return safeEval(f.derivation, env);
+  const result = inputs.some((id) => env[id] === undefined || env[id] === null)
+    ? null
+    : safeEval(f.derivation, env);
+  memo.set(fieldId, result);
+  return result;
 }
 
 export interface EvidenceLike {
