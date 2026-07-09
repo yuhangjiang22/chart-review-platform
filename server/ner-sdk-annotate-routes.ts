@@ -28,6 +28,13 @@ function vendorEnv(): Record<string, string> {
   } } catch { /* optional */ }
   return out;
 }
+// The workbench + batch_init need the vendored SDK's deps (fastapi/uvicorn/…),
+// which are installed in vendor/bso-ad-sdk/.venv — NOT in the system python3
+// (crashes with ModuleNotFoundError: uvicorn). Prefer the venv interpreter.
+function vendorPython(): string {
+  const venv = path.join(VENDOR, ".venv", "bin", "python");
+  return fs.existsSync(venv) ? venv : "python3";
+}
 function checkTcp(host: string, port: number, ms = 1200): Promise<boolean> {
   return new Promise((res) => { const s = net.connect({ host, port }); const d = (ok: boolean) => { s.destroy(); res(ok); };
     s.setTimeout(ms); s.on("connect", () => d(true)); s.on("timeout", () => d(false)); s.on("error", () => d(false)); });
@@ -53,7 +60,7 @@ function ensureBatch(sessionId: string): void {
     }
   }
   fs.writeFileSync(notesCsv, rows.join("\n") + "\n");
-  const r = spawnSync("python3", ["pipeline/batch_init.py",
+  const r = spawnSync(vendorPython(), ["pipeline/batch_init.py",
     "--results-root", path.join(PLATFORM_ROOT, "var", "benchmark-sdk", sessionId),
     "--review-root", REVIEW_ROOT, "--batch-id", sessionId,
     "--reviewers", "reviewer_1", "reviewer_2", "--notes-csv", notesCsv,
@@ -73,7 +80,7 @@ export const nerSdkAnnotateRoutes: RouteEntry[] = [
         const annotateDir = path.join(PLATFORM_ROOT, "var", "annotate");
         fs.mkdirSync(annotateDir, { recursive: true });
         const logFd = fs.openSync(path.join(annotateDir, "workbench.log"), "a");
-        const child = spawn("python3", ["pipeline/workbench.py", "--review-root", REVIEW_ROOT, "--ontology-root", path.join(VENDOR, "ontology")],
+        const child = spawn(vendorPython(), ["pipeline/workbench.py", "--review-root", REVIEW_ROOT, "--ontology-root", path.join(VENDOR, "ontology")],
           { cwd: VENDOR, env: { ...process.env, ...vendorEnv() }, detached: true, stdio: ["ignore", logFd, logFd] });
         child.unref();
         await new Promise((r) => setTimeout(r, 1800));
