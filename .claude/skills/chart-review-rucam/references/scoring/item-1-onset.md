@@ -28,27 +28,22 @@ Pick the episode containing T0 (`ongoing_at_t0`); if none, pick the most recent 
 
 **NOT CALCULABLE (scoreable=False):** All episodes are `started_after` (reaction before drug started)
 
-### Step 4 — Score by track
+### Step 4 — Commit the components (do NOT score)
+Map the path you chose in Step 3 to the two component fields; the platform's
+`item_1_time_to_onset` derivation applies the latency bands per track.
 
-**Hepatocellular (R > 5):**
-| Path | Latency | Score |
-|---|---|---|
-| A, initial treatment | 5–90 days | +2 |
-| A, initial treatment | <5 or >90 days | +1 |
-| A, re-exposure | 1–15 days | +2 |
-| A, re-exposure | >15 days | +1 |
-| B | ≤15 days | +1 |
-| B | >15 days | NOT CALCULABLE |
+→ **Commit `onset_path`** =
+- `initial_treatment` — Path A, initial treatment (episode `ongoing_at_t0`, single episode or `n_fills > 1`)
+- `re_exposure` — Path A, re-exposure (a second `ongoing_at_t0` episode after an earlier `stopped_before` episode, gap > 45 days)
+- `from_cessation` — Path B (relevant episode is `stopped_before`)
+- `not_calculable` — all episodes `started_after` T0, or no suspect drug
 
-**Cholestatic/Mixed (R ≤ 5):**
-| Path | Latency | Score |
-|---|---|---|
-| A, initial treatment | 5–90 days | +2 |
-| A, initial treatment | <5 or >90 days | +1 |
-| A, re-exposure | 1–90 days | +2 |
-| A, re-exposure | >90 days | +1 |
-| B | ≤30 days | +1 |
-| B | >30 days | NOT CALCULABLE |
+→ **Commit `onset_latency_days`** = the raw latency in days (integer):
+- Path A: `-start_day` (episode start → T0)
+- Path B: `-end_day` (drug stop → T0)
+- `not_calculable`: omit (leave latency unset)
+
+Report the raw number — do **not** bucket it or convert it to a score.
 
 ### Note review — Item 1
 - Search notes for drug start/stop dates that may differ from structured data

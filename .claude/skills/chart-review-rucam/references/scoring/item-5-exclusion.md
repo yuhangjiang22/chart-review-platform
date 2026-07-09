@@ -4,24 +4,27 @@
 
 ### Step 0 — MANDATORY: anchor on the structured floor (`score_item5_exclusion`)
 
-**Call `score_item5_exclusion(person_id)` FIRST, before scoring.** It returns,
-from structured data, each cause's status under the strict rule (a NEGATIVE test
-= ruled out; a POSITIVE test / present diagnosis = a competing cause, NOT
-excluded; no test / flag = 0 = NOT ruled out), plus a `recommended_floor`.
+**Call `score_item5_exclusion(person_id)` FIRST.** It returns, from structured
+data, each cause's status under the strict rule (a NEGATIVE test = ruled out; a
+POSITIVE test / present diagnosis = a competing cause, NOT excluded; no test /
+flag = 0 = NOT ruled out). Item 5 is **decomposed** — you do not score it. You set
+one yes/no flag per cause (6 Group I + 5 Group II) plus `alt_cause_explains`, and
+the platform derives item_5 (+2 / +1 / 0 / −2, or −3) from your flags.
 
-**Your item_5 score starts AT the floor. You may only move it with evidence:**
-- **RAISE above the floor** ONLY by citing, per cause, an explicit NOTE
-  exclusion for a cause the tool marked `not_assessed` (a negative test result
-  in a note, or an explicit "denies / no evidence of …"). Each such cause
-  upgrades the ruled-out count. A structured flag of 0 is NOT a justification —
-  you need a note quote. **Never return a score above the floor without naming
-  the notes that justify it.**
-- **LOWER toward −3** if a `competing_cause` clearly explains the injury.
-- If you cannot justify moving it, **use the floor.**
+**Each per-cause flag starts at the tool's status. You may only raise a flag to
+`yes` with evidence:**
+- **Set a flag to `yes`** only when the cause is ruled out — the tool marked it
+  ruled out (negative structured test), **or** you cite an explicit NOTE exclusion
+  (a negative test result in a note, or an explicit "denies / no evidence of …").
+  A structured flag of 0 is NOT enough — for a `not_assessed` cause you need a note
+  quote. **Never set a flag to `yes` without the evidence that justifies it.**
+- **Set `alt_cause_explains = yes`** if a `competing_cause` clearly explains the
+  injury (drives the −3 override).
+- If you cannot justify ruling a cause out, leave its flag `no`.
 
-This exists because asserting "all causes excluded" (→ +1) without the per-cause
-work is the most common error. The floor makes that impossible: most causes are
-`not_assessed` in structured data, so +1/+2 requires real note evidence.
+This matters because asserting "all causes excluded" without the per-cause work is
+the most common error. Most causes are `not_assessed` in structured data, so a `yes`
+flag requires real note evidence.
 
 ### Step 1 — Collect structured flags (`get_patient_summary`)
 
@@ -89,8 +92,29 @@ Raw values and dates for: HAV_IgM, HBsAg, HBc_IgM, HCV_Ab, HCV_RNA, ANA, SMA, Ig
 **What counts as ruled out:** Only (a) and (b). (c) = NOT ruled out.
 Structured flag = 0 does NOT override notes — if notes document an active diagnosis, it is not ruled out.
 
-### Step 6 — Check for −3 first (before counting)
-Score **−3 = non-drug cause highly probable** using this standard:
+**Map each label to its flag** — (a) or (b) → `yes`; (c) → `no`. Commit one flag
+per cause (the platform counts them; `n_group1_ruled_out` and `group2_all_ruled_out`
+are derived — do not commit those):
+
+| Cause | Field to commit |
+|---|---|
+| Group I · HAV | `g1_hav_ruled_out` |
+| Group I · HBV | `g1_hbv_ruled_out` |
+| Group I · HCV | `g1_hcv_ruled_out` |
+| Group I · biliary obstruction | `g1_biliary_obstruction_ruled_out` |
+| Group I · alcoholism | `g1_alcoholism_ruled_out` |
+| Group I · hypotension/shock/ischemia | `g1_ischemia_ruled_out` |
+| Group II · autoimmune hepatitis | `g2_autoimmune_ruled_out` |
+| Group II · sepsis/bacteremia | `g2_sepsis_ruled_out` |
+| Group II · chronic HBV/HCV complications | `g2_chronic_hbv_hcv_ruled_out` |
+| Group II · PBC/PSC | `g2_pbc_psc_ruled_out` |
+| Group II · acute CMV/EBV/HSV | `g2_cmv_ebv_hsv_ruled_out` |
+
+Commit **all 11** flags, even a `no` — a missing flag leaves item 5 Pending.
+
+### Step 6 — Decide `alt_cause_explains` (the −3 override)
+Set **`alt_cause_explains = yes`** when a non-drug cause is highly probable —
+i.e. it is *sufficient to account for the injury* — using this standard:
 
 > **Clear alternative diagnosis explains the liver injury pattern, or there is strong evidence of another severe non-drug cause that is sufficient to account for the injury.**
 
@@ -105,13 +129,17 @@ Apply the standard — do not require a specific keyword. The evidence must be *
 - Labs are inconclusive (e.g., viral serology "pending")
 - Only a risk factor is present (e.g., chronic HCV without evidence of flare/decompensation at T0)
 
-If −3 applies, stop — do not proceed to Group I counting.
+Set `alt_cause_explains = no` otherwise. (When it is `yes`, the platform derives
+item_5 = −3 regardless of the ruled-out counts — but still commit every flag.)
 
-### Step 7 — Count Group I (only if −3 does not apply)
-- All Group I + Group II ruled out → **+2**
-- All 6 Group I ruled out (Group II uncertain) → **+1**
-- 5 or 4 Group I ruled out → **0**
-- Fewer than 4 Group I ruled out → **-2**
+### Step 7 — Commit the components (do NOT score or count)
+→ **Commit all 11 per-cause flags** (`g1_*` ×6, `g2_*` ×5) as `yes`/`no` per the
+Step 5 mapping, plus **`alt_cause_explains`** (`yes`/`no`) from Step 6.
+
+The platform counts your Group I flags into `n_group1_ruled_out`, gates Group II
+into `group2_all_ruled_out`, and derives item_5 (all-I-and-II → +2, all-I → +1,
+4–5 of I → 0, <4 → −2; `alt_cause_explains=yes` → −3). **Do not** compute or commit
+`item_5_exclusion`, `n_group1_ruled_out`, or `group2_all_ruled_out` — they are derived.
 
 ### Common mistakes
 - Stopping note reads early once −3 evidence is found: read ALL notes in the window — a later note may change a (c) to (a) or (b).

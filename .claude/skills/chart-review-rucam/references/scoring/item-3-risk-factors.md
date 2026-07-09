@@ -14,20 +14,21 @@ Check:
 - Search notes for: "alcohol", "ETOH", "drinks", "beer", "wine", "liquor"
 - If notes document a DOB or age that contradicts the structured `AGE`, document it; use structured `AGE` as primary unless notes clearly contradict it.
 
-### Step 3 — Score (max +2)
+### Step 3 — Commit the components (do NOT score)
+Report each factor as a plain yes/no. The platform's `item_3_risk_factors`
+derivation handles the track logic (pregnancy only counts on cholestatic/mixed)
+and the stacking — you do not apply the track rule yourself.
 
-**Hepatocellular track (R > 5):**
-- Alcohol use disorder OR alcoholic liver disease present → **+1**
-- Age ≥ 55 years → **+1**
-- **Pregnancy does NOT count on this track**
-
-**Cholestatic/Mixed track (R ≤ 5):**
-- Alcohol use disorder OR alcoholic liver disease OR pregnancy present → **+1**
-- Age ≥ 55 years → **+1**
-
-Both factors can apply simultaneously (max +2 on either track).
+→ **Commit `rf_alcohol`** = `yes` if alcohol use disorder **or** alcoholic liver
+disease is present (structured flag = 1 **or** clinician-documented alcohol
+use/abuse in notes), else `no`.
+→ **Commit `rf_pregnancy`** = `yes` if pregnancy is present, else `no`. (Report it
+regardless of track — the derivation applies it only on cholestatic/mixed.)
+→ **Commit `rf_age_ge_55`** = `yes` if `AGE` ≥ 55 years at T0, else `no`.
 
 ### Common mistakes
-- Applying pregnancy to the hepatocellular track: pregnancy is a risk factor on cholestatic/mixed only.
-- Capping at +1: both age and alcohol can stack to +2.
-- Ignoring `alcoholic_liver_disease` as separate from `alcohol_use_disorder`: either flags the alcohol factor.
+- Withholding `rf_pregnancy` on a hepatocellular case: always report it; the
+  derivation decides whether it counts.
+- Ignoring `alcoholic_liver_disease` as separate from `alcohol_use_disorder`:
+  either one flags `rf_alcohol = yes`.
+- Trying to output a +1/+2 score: commit the yes/no flags only.

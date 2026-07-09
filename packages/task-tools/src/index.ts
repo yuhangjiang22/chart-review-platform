@@ -49,31 +49,16 @@ export interface ToolProfile {
   perItem?: PerItemSpec[];
 }
 
-const RUCAM_PER_ITEM: PerItemSpec[] = [
-  { field_id: "item_1_time_to_onset", item_number: 1,
-    skill_file: "/chart-review-rucam/references/scoring/item-1-onset.md",
-    keywords: ["started", "initiated", "first dose", "began", "started taking"] },
-  { field_id: "item_2_course", item_number: 2,
-    skill_file: "/chart-review-rucam/references/scoring/item-2-cessation.md",
-    keywords: ["discontinued", "stopped", "held", "dechallenge", "improved", "resolved"] },
-  { field_id: "item_3_risk_factors", item_number: 3,
-    skill_file: "/chart-review-rucam/references/scoring/item-3-risk-factors.md",
-    keywords: ["alcohol", "ethanol", "pregnan", "age"] },
-  { field_id: "item_4_concomitant", item_number: 4,
-    skill_file: "/chart-review-rucam/references/scoring/item-4-concomitant.md",
-    keywords: ["concomitant", "acetaminophen", "tylenol", "augmentin", "statin", "herbal", "supplement"] },
-  { field_id: "item_5_exclusion", item_number: 5,
-    skill_file: "/chart-review-rucam/references/scoring/item-5-exclusion.md",
-    keywords: ["sepsis", "ischemia", "shock", "biliary", "obstruction", "ERCP", "alcohol",
-               "hepatitis", "HAV", "HBV", "HCV", "CMV", "EBV", "cirrhosis", "PBC", "PSC",
-               "autoimmune", "ANA", "AMA"] },
-  { field_id: "item_6_hepatotoxicity", item_number: 6,
-    skill_file: "/chart-review-rucam/references/scoring/item-6-hepatotoxicity.md",
-    keywords: ["hepatotoxic", "drug-induced", "DILI", "liver injury", "prior reaction"] },
-  { field_id: "item_7_rechallenge", item_number: 7,
-    skill_file: "/chart-review-rucam/references/scoring/item-7-rechallenge.md",
-    keywords: ["rechallenge", "re-started", "resumed", "readministered", "re-exposure"] },
-];
+// NOTE: RUCAM no longer uses per-item scoring. The rubric was decomposed so the
+// agent extracts 24 component leaves (onset_path, dechallenge_outcome, the
+// g1_*/g2_* exclusion flags, …) and the platform DERIVES item_1…item_7, the
+// total, and the category from them. The old per-item loop (one conversation per
+// item, retrying until item_N's field is written) pointed the agent at the now-
+// DERIVED item fields — which are guard-rejected — and forced parallel tool calls,
+// which hung the deepagents stack on the resulting rejection storms. So RUCAM runs
+// as a single-pass extraction (the sidecar's non-per_item path), serial tool calls.
+// The `perItem` mechanism (PerItemSpec / ToolProfile.perItem / sidecar _score_items)
+// is retained but unused, in case a future task wants genuine per-item invocation.
 
 /** Named profiles for tasks that bring their own tools, keyed by meta.yaml's
  *  `tool_profile`. Add an entry when a task needs bespoke tools. */
@@ -84,7 +69,7 @@ const NAMED_PROFILES: Record<string, Partial<ToolProfile>> = {
     pythonPlugins: ["chart_review_plugins.rucam"],
     dataSource: "rucam-csv",
     skills: ["rucam-scoring"],
-    perItem: RUCAM_PER_ITEM,
+    // No perItem: RUCAM is decomposed — single-pass leaf extraction, items derived.
     // Also expose read_structured_data/list_structured_data: the patient's
     // labs/meds/conditions are materialized into omop/, so the agent can cite
     // CITABLE structured rows ({source:"structured", table, row_id}) that resolve

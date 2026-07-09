@@ -53,22 +53,21 @@ describe("toolProfileFor", () => {
   });
 });
 
-describe("rucam perItem", () => {
+describe("rucam perItem (retired — rubric is decomposed)", () => {
   const task = { task_id: "rucam", task_kind: "phenotype", tool_profile: "rucam" } as any;
-  it("declares 7 ordered items with field_id, item_number, skill_file, keywords", () => {
-    const p = toolProfileFor(task);
-    expect(p.perItem).toBeDefined();
-    expect(p.perItem!.map((e) => e.item_number)).toEqual([1, 2, 3, 4, 5, 6, 7]);
-    expect(p.perItem!.map((e) => e.field_id)).toEqual([
-      "item_1_time_to_onset", "item_2_course", "item_3_risk_factors",
-      "item_4_concomitant", "item_5_exclusion", "item_6_hepatotoxicity",
-      "item_7_rechallenge",
-    ]);
-    const i5 = p.perItem!.find((e) => e.item_number === 5)!;
-    expect(i5.skill_file).toContain("item-5-exclusion.md");
-    expect(i5.keywords).toContain("autoimmune");
+  it("no longer declares per-item scoring — RUCAM extracts leaves, items derive", () => {
+    // The old per-item loop pointed the agent at the now-DERIVED item_* fields
+    // (guard-rejected) and forced parallel tool calls that hung the run. RUCAM
+    // now runs single-pass leaf extraction (the sidecar's non-per_item path).
+    expect(toolProfileFor(task).perItem).toBeUndefined();
   });
-  it("leaves perItem undefined for non-per-item tasks", () => {
+  it("still carries RUCAM's plugins + structured data + write surface", () => {
+    const p = toolProfileFor(task);
+    expect(p.pythonPlugins).toContain("chart_review_plugins.rucam");
+    expect(p.structuredData).toBe(true);
+    expect(p.baseTools).toContain("set_field_assessment");
+  });
+  it("leaves perItem undefined for non-per-item tasks too", () => {
     const cancer = { task_id: "cancer-diagnosis", task_kind: "phenotype" } as any;
     expect(toolProfileFor(cancer).perItem).toBeUndefined();
   });

@@ -57,38 +57,34 @@ Using the merged episodes from Step 1b:
     - insufficient information to determine exposure timing or latency
 
 
-### Step 5 — Score (choose the single worst-case drug)
+### Step 5 — Commit the components (do NOT score)
+Pick the **single worst-case concomitant drug** — the one with the most
+implicating timing (`suggestive` beats `compatible` beats `incompatible`), and
+among ties, the one that is hepatotoxic. Describe that drug with three components;
+the platform's `item_4_concomitant` derivation applies the −1/−2/−3 logic.
 
-**Decide each drug's score using this two-step algorithm**:
+→ **Commit `concomitant_worst_timing`** = the worst drug's timing from Step 4:
+`suggestive` / `compatible` / `incompatible`, or `none` if there are no
+concomitant drugs at all.
+→ **Commit `concomitant_worst_hepatotoxic`** = `yes` if that worst-timing drug is
+LiverTox **Category A or B**, else `no`.
+→ **Commit `concomitant_attribution`** = `yes` only with clear evidence a
+concomitant drug is the actual cause (its own positive rechallenge, a distinctive
+signature, or a clinician explicitly naming it as the cause) — this drives the −3
+override; else `no`.
 
-1. **Start at 0**. If timing is **incompatible** → score **0** (drug doesn't matter).
-2. If timing is **suggestive OR compatible** → start at **-1**.
-3. **Upgrade to -2** ONLY IF: hepatotoxicity is **Category A or B** AND timing is **suggestive** (both conditions required).
-4. **Override to -3** only with clear evidence the drug is the actual cause (positive rechallenge, distinctive signature, or explicit clinician attribution).
-
-**Full scoring grid** (every combination is covered — no gaps):
-
-| Timing \ Category | A or B (known hepatotoxic) | C / D / E / not-listed |
-|---|---|---|
-| **Suggestive** (5–90d initial / 1–15d re-exposure for hep; 5–90d / 1–90d for chol-mixed) | **-2** | **-1** |
-| **Compatible** (ongoing-at-T0 outside suggestive window, or stopped within carry-over) | **-1** | **-1** |
-| **Incompatible** (stopped well before T0, started after, or insufficient info) | **0** | **0** |
-
-Then apply: **-3 override** if there's clear attribution (positive rechallenge, distinctive signature, or clinician explicitly names the drug as the cause).
-
-**Final rule**: Pick the drug with the worst (most-negative) score; that becomes Item 4's score.
-
-**Worked examples**:
-- Atorvastatin (Cat A), ongoing at T0, started 244d before T0 (chronic) → timing **compatible** (not suggestive, since outside 5–90d window) → score **-1**
-- Atorvastatin (Cat A), started 30d before T0 → timing **suggestive** (within 5–90d) → score **-2**
-- Sitagliptin (Cat C), started 30d before T0 → timing **suggestive** + non-hepatotoxic → score **-1** (not upgraded)
-- Furosemide (Cat E), stopped 60d before T0 → timing **incompatible** (>45d carry-over for compatible) → score **0**
-- Lisinopril (Cat B), stopped 10d before T0 (within 45d carry-over) → timing **compatible** → score **-1**
+**Worked examples** (observation → components):
+- Atorvastatin (Cat A), ongoing at T0, started 244d before T0 (chronic) → timing `compatible` → `concomitant_worst_timing=compatible`, `concomitant_worst_hepatotoxic=yes`, `concomitant_attribution=no`
+- Atorvastatin (Cat A), started 30d before T0 → timing `suggestive` → `suggestive` / `yes` / `no`
+- Sitagliptin (Cat C), started 30d before T0 → timing `suggestive`, non-hepatotoxic → `suggestive` / `no` / `no`
+- Furosemide (Cat E), stopped 60d before T0 → timing `incompatible` → `incompatible` / `no` / `no`
+- No concomitant drugs at all → `none` / `no` / `no`
 
 ### Common mistakes
 - Skipping `get_hepatotoxicity_category` and guessing categories from memory: the masterlist is authoritative; always call the tool.
 - Forgetting to search notes for OTC meds: home acetaminophen or ibuprofen is often only in the HPI/home-meds section, not structured data.
 - Including the suspect drug: Item 4 is about concomitant drugs only.
 - Not applying the 45-day gap rule: a drug that stopped 40 days before T0 may still have compatible timing.
-- Scoring -2 for Cat A/B with chronic exposure (start_day outside −5 to −90d): the -2 upgrade requires BOTH Cat A/B AND suggestive timing. Chronic Cat A/B drugs ongoing at T0 score **-1**, not -2.
-- Forgetting that Cat C/D/E/not-listed drugs with suggestive timing still score **-1** (they meet the baseline -1 rule but never qualify for the -2 upgrade).
+- Mislabeling chronic Cat A/B exposure as `suggestive`: a Cat A/B drug ongoing at T0 but started outside the −5 to −90d window is `compatible`, not `suggestive` (the derivation only reaches −2 when timing is `suggestive` AND hepatotoxic).
+- Setting `concomitant_worst_hepatotoxic=yes` for a Cat C/D/E/not-listed drug: only Category A or B counts as hepatotoxic here.
+- Trying to output a −1/−2/−3 score: commit the three component fields; the platform derives the score.

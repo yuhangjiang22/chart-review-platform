@@ -9,11 +9,11 @@
 - D_stop is the relevant episode's `end_day` (or earlier note-based stop if documented)
 
 **IMPORTANT — what "drug continued" means**:
-- "Drug continued" means the drug was **NEVER stopped** within the observation window — i.e., NO end date for the relevant episode at any point through the available follow-up. This is the only case that triggers `score = 0, stop`.
+- "Drug continued" means the drug was **NEVER stopped** within the observation window — i.e., NO end date for the relevant episode at any point through the available follow-up. This is the only case that maps to `dechallenge_outcome = not_stopped`.
 - `ACTIVE_AT_LIVER_INJURY=1` alone does **NOT** mean "drug continued" — it only flags active-at-T0. If the drug was stopped LATER (any time after T0), dechallenge IS assessable.
 - A drug `ongoing_at_t0` with a finite `end_day` (e.g., end_day=+46) = stopped after onset → proceed to scoring with D_stop = end_day.
 
-If drug truly continued (no end_day in any episode AND no note evidence of cessation): **score = 0, stop.**
+If drug truly continued (no end_day in any episode AND no note evidence of cessation): **commit `dechallenge_outcome = not_stopped` and stop** (no peak/nadir work needed).
 
 Otherwise — including drug stopped before OR after T0 — proceed to Step 2.
 
@@ -39,18 +39,22 @@ Window (in days from T0, i.e. DAYS_FROM_LIVER_INJURY) for each scoring tier:
 
 % decrease = (peak − nadir) / peak × 100. Compare to 50% threshold.
 
-### Step 4 — Score by track
+### Step 4 — Commit the component (do NOT score)
+From the peak → nadir % decrease and the day the nadir occurs (measured from the
+drug stop date), determine ONE outcome bucket. The platform's `item_2_course`
+derivation applies the track-specific score. For cholestatic/mixed, evaluate ALP
+and bilirubin separately and report the **best** (earliest/largest-decrease) bucket.
 
-**Hepatocellular (ALT, use nadir):**
-- ≥50% decrease, nadir occurs within 8 days of drug stop → **+3**
-- ≥50% decrease, nadir occurs within 30 days → **+2**
-- ≥50% decrease reached only after 30 days, OR no follow-up data → **0**
-- <50% decrease after 30 days, OR recurrent increase → **-2**
+→ **Commit `dechallenge_outcome`** =
+- `ge50_le8d` — ≥ 50% decrease, nadir within 8 days of drug stop
+- `ge50_le30d` — ≥ 50% decrease, nadir within 30 days (but not within 8)
+- `ge50_le180d` — ≥ 50% decrease reached only later, within 180 days
+- `lt50_with_data` — follow-up data exist but the decrease stays < 50%
+- `increase` — the anchor lab rises / recurs after the drug stop
+- `no_followup` — the drug was stopped but there are no follow-up labs to judge the course
+- (`not_stopped` was already handled in Step 1 if the drug never stopped)
 
-**Cholestatic/Mixed (compute for ALP AND bilirubin separately; assign the BEST score):**
-- ≥50% decrease in ALP OR bilirubin within 180 days → **+2**
-- <50% decrease in both ALP and bilirubin within 180 days → **+1**
-- Persistence/increase in both, or no follow-up data for either → **0**
+Report the bucket only — the +3/+2/0/−2/+1 mapping is the platform's job.
 
 ### Note review — Item 2
 - Keywords: drug name, "discontinued", "stopped", "held", "DC'd", "resumed", "restarted", "STOP taking"

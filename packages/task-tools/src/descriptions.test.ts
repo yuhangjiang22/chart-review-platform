@@ -25,12 +25,12 @@ describe("describeTaskTools — per-task tool surface", () => {
     expect(ids(v, "mcp")).not.toContain("set_field_assessment");
   });
 
-  it("rucam profile: adds the rucam plugin tools + per-item count, structured on", () => {
+  it("rucam profile: adds the rucam plugin tools, structured on, no per-item count", () => {
     const v = describeTaskTools(task({ task_kind: "phenotype", tool_profile: "rucam" }));
     expect(ids(v, "plugin")).toContain("compute_r_ratio");
     expect(ids(v, "plugin")).toContain("score_item5_exclusion");
     expect(ids(v, "structured").length).toBe(2);   // rucam profile forces structuredData
-    expect(v.per_item_count).toBe(7);
+    expect(v.per_item_count).toBeUndefined();       // per-item scoring retired (decomposed)
   });
 
   it("every base tool id has a description (no '(no description)')", () => {
