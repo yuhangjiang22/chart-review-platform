@@ -477,8 +477,9 @@ if (task.task_kind === "adherence") {
               z.object({
                 note_id: z.string(),
                 quote: z.string(),
-                start: z.number().int().nonnegative().optional(),
-                end: z.number().int().nonnegative().optional(),
+                // `.nullish()`: agents serialize uncomputed offsets as null.
+                start: z.number().int().nonnegative().nullish(),
+                end: z.number().int().nonnegative().nullish(),
               }),
             )
             .optional(),

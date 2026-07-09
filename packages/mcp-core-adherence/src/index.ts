@@ -143,8 +143,9 @@ export async function readQuestion(
 const evidenceSchema = z.object({
   note_id: z.string(),
   quote: z.string(),
-  start: z.number().int().nonnegative().optional(),
-  end: z.number().int().nonnegative().optional(),
+  // `.nullish()`: agents pass explicit null for offsets they didn't compute.
+  start: z.number().int().nonnegative().nullish(),
+  end: z.number().int().nonnegative().nullish(),
 });
 
 export const setQuestionAnswerArgsSchema = z.object({

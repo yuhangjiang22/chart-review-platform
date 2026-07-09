@@ -70,24 +70,32 @@ const noopHooks: ReviewToolHooks = { onStateUpdate: () => {} };
  *  ones are required. ensureEvidenceShape() does the runtime check. */
 export const evidenceSchema = z.object({
   source: z.enum(["note", "omop", "structured"]),
-  // note fields
-  note_id: z.string().optional(),
+  // Evidence is secondary metadata (a pointer to a note span or a structured
+  // row, for display + the faithfulness check). It must NEVER reject on a benign
+  // type mismatch, because a rejected set_field_assessment triggers a retry storm
+  // that hangs the deepagents/langchain stack. So every field is BOTH:
+  //   • `.nullish()` — agents serialize an absent field as explicit `null`
+  //     (`.optional()` alone rejects null → the `unit:null` empty-run bug), and
+  //   • `z.coerce.*` — agents send a numeric OMOP `row_id`/id where a string is
+  //     declared (→ the `row_id` -32602 hang). Coercion normalizes 12345→"12345".
+  // Source-specific requiredness is still enforced by ensureEvidenceShape below.
+  note_id: z.coerce.string().nullish(),
   span_offsets: z
-    .array(z.number().int().nonnegative())
+    .array(z.coerce.number().int().nonnegative())
     .length(2)
-    .optional(),
-  verbatim_quote: z.string().optional(),
-  doc_type: z.string().optional(),
-  author_role: z.string().optional(),
+    .nullish(),
+  verbatim_quote: z.coerce.string().nullish(),
+  doc_type: z.coerce.string().nullish(),
+  author_role: z.coerce.string().nullish(),
   // omop / structured fields
-  table: z.string().optional(),
-  row_id: z.string().optional(),
-  concept_id: z.number().int().optional(),
-  concept_name: z.string().optional(),
-  value: z.unknown().optional(),
-  unit: z.string().optional(),
+  table: z.coerce.string().nullish(),
+  row_id: z.coerce.string().nullish(),
+  concept_id: z.coerce.number().int().nullish(),
+  concept_name: z.coerce.string().nullish(),
+  value: z.unknown().nullish(),
+  unit: z.coerce.string().nullish(),
   // common
-  evidence_date: z.string().optional(),
+  evidence_date: z.coerce.string().nullish(),
 });
 
 // ── shared helpers ───────────────────────────────────────────────────
@@ -313,8 +321,34 @@ export async function setFieldAssessment(
   // The field's allowed answers (enum), used to normalize a raw boolean answer
   // to the right enum value for THIS field — generic across tasks/conventions.
   const field = (
-    session.task.fields as Array<{ field_id?: string; id?: string; answer_schema?: { enum?: unknown[] } }> | undefined
+    session.task.fields as
+      | Array<{ field_id?: string; id?: string; answer_schema?: { enum?: unknown[] }; derivation?: string }>
+      | undefined
   )?.find((f) => (f.field_id ?? f.id) === payload.field_id);
+  // Derived fields are COMPUTED by the platform from their component leaves. An
+  // agent must never set one directly — recompute would discard the value, and
+  // it signals the agent is scoring instead of extracting. Reject with guidance
+  // toward the components (defense-in-depth; list_criteria already hides these).
+  if (field?.derivation) {
+    // Return a NORMAL (non-isError) result — same convention as runAction's
+    // catch below. `isError:true` makes langchain-mcp-adapters raise a
+    // ToolException that deepagents re-raises, breaking the run; a plain
+    // {ok:false} result lets the model read the message and commit the
+    // components instead.
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({
+            ok: false,
+            action_type: "set_field_assessment",
+            error_code: "derived_field_not_settable",
+            message: `"${payload.field_id}" is a DERIVED field — the platform computes it from its component leaves, so you cannot set it directly. Do NOT score it. Commit the component fields it depends on instead (read its criterion, or the matching references/scoring/item-N file, for the exact components).`,
+          }),
+        },
+      ],
+    };
+  }
   const enumVals = field?.answer_schema?.enum;
   return runAction(
     session,
