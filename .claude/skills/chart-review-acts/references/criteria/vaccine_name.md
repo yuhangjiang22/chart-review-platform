@@ -8,6 +8,7 @@ answer_schema:
     required: [Vaccine_Name, Supporting_Evidence]
     attributes:
       Category: { enum: [Live Vaccine, Non-Live Vaccine, BCG, Active Amyloid or Tau Immunization, Not a vaccine, Ambiguous] }
+      Disease: {}
       Administration_Date: {}
 cardinality: one
 group: vaccine

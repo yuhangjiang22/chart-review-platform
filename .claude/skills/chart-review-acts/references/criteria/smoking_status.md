@@ -1,6 +1,6 @@
 ---
 field_id: smoking_status
-prompt: What is the patient's documented smoking status?
+prompt: What is the patient's documented smoking status? A problem-list/history entry such as "tobacco use" or "smoker" with no former/ex/quit qualifier means current, not unknown.
 answer_schema:
   enum: ["current", "former", "never", "unknown"]
 cardinality: one

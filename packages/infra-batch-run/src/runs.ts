@@ -382,7 +382,7 @@ import { getActiveVersion, snapshotVersion, draftDiffersFromActive } from "@char
 import { patientDir, listNotes, isPhiPatient, patientPersonId } from "@chart-review/patients";
 import { resolveRolePrompt, validateAgentSpec } from "@chart-review/agent-specs";
 import { extractSpansDirect } from "@chart-review/pipeline-extract-ner";
-import { extractLabelsForNote } from "@chart-review/pipeline-extract-pernote";
+import { extractLabelsForNote, parseVaccineTables, type VaccineCatalog } from "@chart-review/pipeline-extract-pernote";
 import { writePerNoteAssessments } from "@chart-review/domain-review";
 import { pathFor } from "@chart-review/storage";
 // server/lib is the deployment's app code; packages reach into it via a
@@ -399,6 +399,23 @@ function loadPerNotePrompt(taskId: string): string {
   const fp = path.join(guidelineDir(taskId), "references", "pernote_prompt.md");
   try { return fs.readFileSync(fp, "utf8"); }
   catch { return "You label one clinical note at a time. Answer each field only from THIS note, using only the allowed values."; }
+}
+
+/** Load the CDC + amyloid/tau reference tables from the task's skill bundle and
+ *  parse them into a vaccine-category lookup. Returns undefined when the task
+ *  ships no CDC table (non-vaccine tasks), so per-note extraction stays
+ *  table-driven only where the tables exist. */
+function loadVaccineCatalog(taskId: string): VaccineCatalog | undefined {
+  const dir = path.join(guidelineDir(taskId), "references");
+  try {
+    const cdc = fs.readFileSync(path.join(dir, "CDC_Vaccine_Reference_Table.md"), "utf8");
+    let amyloid = "";
+    try { amyloid = fs.readFileSync(path.join(dir, "Active_Amyloid_Tau_Immunization_Reference_Table.md"), "utf8"); }
+    catch { /* amyloid table optional */ }
+    return parseVaccineTables(cdc, amyloid);
+  } catch {
+    return undefined; // no CDC table → leave the model's category untouched
+  }
 }
 
 /** Fold one AgentEvent into the running tally for an agent run. Counts
@@ -1343,6 +1360,7 @@ async function runOneAgent(
         return;
       }
       const promptPreamble = loadPerNotePrompt(taskId);
+      const vaccineCatalog = loadVaccineCatalog(taskId);
       const notes = listNotes(patientId);
       const transcriptFp = agentTranscriptPath(runId, patientId, spec.id);
       try {
@@ -1359,7 +1377,7 @@ async function runOneAgent(
         try {
           r = await extractLabelsForNote({
             patientId, task, noteId,
-            endpoint, promptPreamble,
+            endpoint, promptPreamble, vaccineCatalog,
           });
         } catch (e) {
           agentError = (e as Error).message ?? String(e);

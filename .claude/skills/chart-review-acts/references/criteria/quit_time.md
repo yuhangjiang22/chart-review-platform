@@ -1,6 +1,6 @@
 ---
 field_id: quit_time
-prompt: When did the patient quit smoking (year, age at quit, or relative time)?
+prompt: When did the patient quit smoking (year, age at quit, or relative time)? Use the cessation time itself — never a note/encounter/entry or last-updated timestamp.
 answer_schema:
   type: string
 cardinality: one

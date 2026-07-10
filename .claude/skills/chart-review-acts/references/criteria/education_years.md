@@ -4,7 +4,7 @@ prompt: How many years of formal education has the patient completed?
 answer_schema:
   type: integer
   minimum: 0
-  maximum: 30
+  maximum: 40
 cardinality: one
 group: demographics
 ---

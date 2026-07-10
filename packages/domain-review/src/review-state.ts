@@ -608,6 +608,40 @@ function applySetAssessmentMutation(
  * rollups (e.g. lung_cancer_status) stay in sync without an agent run. Cheap:
  * O(fields × derived) per write on small rubrics.
  */
+/** Categories that are entity-handling sentinels, not real guideline vaccine
+ *  categories — excluded from the projected vaccine_category summary. */
+const NON_GUIDELINE_VACCINE_CATEGORIES = new Set(["Not a vaccine", "Ambiguous"]);
+
+/** Parse a `derivation` of the form `entity_attr(<field>, <attribute>)`, used to
+ *  project an entity-list field's attribute into a standalone derived array.
+ *  Returns null for ordinary scalar-DSL derivations. */
+export function parseEntityProjection(
+  derivation: string | undefined,
+): { field: string; attribute: string } | null {
+  const m = (derivation ?? "").match(
+    /^\s*entity_attr\(\s*([A-Za-z_]\w*)\s*,\s*([A-Za-z_]\w*)\s*\)\s*$/,
+  );
+  return m ? { field: m[1]!, attribute: m[2]! } : null;
+}
+
+/** Project an entity-list answer to the distinct, sorted, real values of one
+ *  attribute (e.g. each vaccine's Category). Returns null when the source field
+ *  has no entities in scope so recompute leaves the slot empty. */
+export function projectEntityAttribute(entityAnswer: unknown, attribute: string): string[] | null {
+  if (!Array.isArray(entityAnswer)) return null;
+  const vals: string[] = [];
+  for (const rec of entityAnswer) {
+    if (rec && typeof rec === "object" && !Array.isArray(rec)) {
+      const v = (rec as Record<string, unknown>)[attribute];
+      if (typeof v === "string" && v.trim() && !NON_GUIDELINE_VACCINE_CATEGORIES.has(v.trim())) {
+        vals.push(v.trim());
+      }
+    }
+  }
+  const distinct = [...new Set(vals)].sort();
+  return distinct.length ? distinct : null;
+}
+
 function recomputeDerivedAssessments(s: ReviewState, task: CompiledTask): void {
   const derivedFields = task.fields.filter((f) => f.derivation);
   if (derivedFields.length === 0) return;
@@ -644,7 +678,15 @@ function recomputeDerivedAssessments(s: ReviewState, task: CompiledTask): void {
       // Preserve manual reviewer-authored answers on derived fields.
       if (existing && existing.source === "reviewer") continue;
 
-      const value = evalDerivation(task, answers, f.id);
+      // Entity-attribute projection: a derived field can summarize an
+      // entity-list field's attribute into a standalone array (e.g.
+      // vaccine_category = the distinct vaccine categories projected from each
+      // vaccine_name entity's Category attribute). The scalar derivation DSL
+      // can't express "map over an entity list", so handle it here.
+      const proj = parseEntityProjection(f.derivation);
+      const value = proj
+        ? projectEntityAttribute(answers[proj.field], proj.attribute)
+        : evalDerivation(task, answers, f.id);
       if (value === null || value === undefined) {
         // Inputs not yet complete — leave the slot empty so the dropdown still
         // shows "Pending" rather than a stale or fabricated value.
