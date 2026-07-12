@@ -2,9 +2,16 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 let capturedPrompt = "";
 let fakeResultText = "";
-const runAgent = vi.fn(async function* (input: { prompt: string }) {
+// The agent stream yields result OR error events; annotate the union so tests
+// can inject an error-only generator via mockImplementationOnce.
+type MockAgentEvent =
+  | { type: "result"; result: string; cost_usd: number }
+  | { type: "error"; error: string };
+const runAgent = vi.fn(async function* (
+  input: { prompt: string },
+): AsyncGenerator<MockAgentEvent> {
   capturedPrompt = input.prompt;
-  yield { type: "result", result: fakeResultText, cost_usd: 0.002 } as const;
+  yield { type: "result", result: fakeResultText, cost_usd: 0.002 };
 });
 
 vi.mock("../agent-provider.js", () => ({ runAgent: (i: { prompt: string }) => runAgent(i) }));
