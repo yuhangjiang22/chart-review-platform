@@ -9,8 +9,12 @@
 // no patient data.
 //
 // Usage (from concur root):
-//   CHART_REVIEW_RUCAM_DATA_DIR=$(cd ../RUCAM/data_v5 && pwd) \
+//   CHART_REVIEW_RUCAM_DATA_DIR=$(cd ../RUCAM/data_v3 && pwd) \
 //     node_modules/.bin/tsx scripts/rucam-realtest/run.ts [patient_id]
+// NOTE: the corpus patient_real_rucam_* patients live in ../RUCAM/data_v3 (their
+// person_ids are in data_v3's derived_rucam.csv/serology/etc.). data_v5 does NOT
+// contain them — pointing there makes every RUCAM plugin tool return "No data
+// found" and the agent extracts from notes only (or bails). Default is data_v3.
 //
 // Env must be set BEFORE importing the batch-run module (it reads model /
 // platform-root config at load), so the package is imported dynamically.
@@ -28,7 +32,7 @@ process.env.CHART_REVIEW_PLATFORM_ROOT ??= CONCUR_ROOT;
 
 const DATA_DIR =
   process.env.CHART_REVIEW_RUCAM_DATA_DIR ??
-  path.resolve(CONCUR_ROOT, "..", "RUCAM", "data_v5");
+  path.resolve(CONCUR_ROOT, "..", "RUCAM", "data_v3");
 process.env.CHART_REVIEW_RUCAM_DATA_DIR = DATA_DIR;
 
 // Patients: explicit args, else every gitignored real fixture.
