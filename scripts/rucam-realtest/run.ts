@@ -67,8 +67,14 @@ const { run_id } = startBatchRun({
   started_by: "rucam-realtest",
   max_concurrency: Number(process.env.RUN_CONCURRENCY ?? 3),
   // Serial tool calls (parallel_tool_calls=False, see models.py) need more
-  // turns to read the same number of notes, so give generous headroom.
-  max_turns_per_patient: Number(process.env.RUN_MAX_TURNS ?? 120),
+  // turns to read the same number of notes, so give generous headroom. RUCAM
+  // is tool-intensive: 24 leaf components, each needing search_notes +
+  // structured tools + offset-finding, so a thorough review legitimately makes
+  // 80-100+ tool calls. recursion_limit = max_turns*2+10 (see __main__.py); at
+  // the old 120 (=250) a thorough patient completes set_review_status but tips
+  // over during the finalize tail and errors WITHOUT persisting the draft. 200
+  // (=410) leaves ample margin for ~135 tool calls.
+  max_turns_per_patient: Number(process.env.RUN_MAX_TURNS ?? 200),
 });
 console.log(`[run] run_id=${run_id}`);
 
