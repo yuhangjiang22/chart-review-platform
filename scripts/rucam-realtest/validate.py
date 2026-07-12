@@ -111,9 +111,13 @@ def main():
     over = sum(1 for d in tdiffs if d > args.tolerance)
     print("\n=== totals ===")
     print(f"patients run:            {len(done)}/{len(rows)}")
-    print(f"total mean bias:         {sum(tdiffs)/len(tdiffs):+.2f}")
-    print(f"total MAE:               {sum(abs(d) for d in tdiffs)/len(tdiffs):.2f}")
-    print(f"over-scored by > {args.tolerance}:      {over}/{len(tdiffs)}")
+    if tdiffs:
+        print(f"total mean bias:         {sum(tdiffs)/len(tdiffs):+.2f}")
+        print(f"total MAE:               {sum(abs(d) for d in tdiffs)/len(tdiffs):.2f}")
+        print(f"over-scored by > {args.tolerance}:      {over}/{len(tdiffs)}")
+    else:
+        print("total mean bias:         n/a (no patient has a computable total — "
+              "an item is Pending, e.g. onset_latency_days unset)")
     print(f"category exact match:    {cat_hits}/{len(done)}")
     print("\n(positive item bias = agent scores HIGHER than human = under-penalizing)")
 
