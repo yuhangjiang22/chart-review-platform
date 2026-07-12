@@ -864,9 +864,17 @@ export function canonicalizeStringAnswer(
  * a number. Only pure numeric scales are gated; binary/categorical enum flags
  * (impaired_cognition=0, CDR staging) are skipped — there a 0 / negation answer
  * is legitimate and its evidence carries no digit. Run AFTER assertAnswerInRange.
+ *
+ * Opt-out: a field whose frontmatter declares `numeric_grounding: "structured"`
+ * is exempt — its value is COMPUTED from structured (OMOP) data, not read as a
+ * documented scale, so the number legitimately never appears verbatim in a note
+ * (e.g. RUCAM onset_latency_days = −start_day from get_drug_episodes). Gating it
+ * would force null and Pend every downstream derivation. Its provenance is the
+ * deterministic tool output, auditable in the transcript, and adjudicable by the
+ * reviewer. The default (absent flag) stays note-grounded.
  */
 export function assertNumericAnswerCited(
-  field: { id: string; answer_schema?: unknown },
+  field: { id: string; answer_schema?: unknown; numeric_grounding?: string },
   answer: unknown,
   evidence: Array<{ source?: string; verbatim_quote?: string }> | undefined,
 ): void {
@@ -874,6 +882,7 @@ export function assertNumericAnswerCited(
   const t = schema?.type;
   if (t !== "integer" && t !== "number") return; // not a numeric field
   if (Array.isArray(schema?.enum) && schema!.enum!.length > 0) return; // numeric-coded enum (staging) → categorical
+  if (field.numeric_grounding === "structured") return; // value computed from structured data → no note digit exists
   if (answer == null || answer === "") return; // null/absent IS the "not documented" path
   const n = typeof answer === "number" ? answer : Number(String(answer).trim());
   if (!Number.isFinite(n)) return; // non-numbers are assertAnswerInRange's job

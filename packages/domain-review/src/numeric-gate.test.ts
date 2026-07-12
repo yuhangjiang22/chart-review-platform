@@ -58,6 +58,17 @@ describe("assertNumericAnswerCited", () => {
   it("ignores omop evidence — only note quotes can ground a numeric scale", () => {
     expect(() => assertNumericAnswerCited(moca, 22, [{ source: "omop", verbatim_quote: "22" } as never])).toThrow();
   });
+  it("exempts numeric_grounding:structured fields (value computed from structured data)", () => {
+    // onset_latency_days = -start_day, computed from get_drug_episodes; the
+    // number legitimately never appears verbatim in a note quote, so the
+    // note-grounding requirement must NOT apply to it.
+    const latency = { id: "onset_latency_days", answer_schema: { type: "integer", minimum: 0, maximum: 3650 }, numeric_grounding: "structured" };
+    expect(() => assertNumericAnswerCited(latency, 126, note("started lisinopril; developed jaundice"))).not.toThrow();
+    expect(() => assertNumericAnswerCited(latency, 126, [])).not.toThrow();
+    expect(() => assertNumericAnswerCited(latency, 0, undefined)).not.toThrow();
+    // the exemption is opt-in: a plain documented scale still requires the digit.
+    expect(() => assertNumericAnswerCited(moca, 126, note("no MoCA this visit"))).toThrow();
+  });
 });
 
 describe("canonicalizeNumericAnswer", () => {

@@ -8,6 +8,10 @@ answer_schema:
 cardinality: one
 group: rucam
 role: intermediate
+# Value is COMPUTED from structured drug-episode data (get_drug_episodes),
+# not read as a documented scale — so it never appears verbatim in a note.
+# This exempts it from the numeric note-grounding gate (assertNumericAnswerCited).
+numeric_grounding: structured
 ---
 
 # Criterion: onset_latency_days
