@@ -38,10 +38,13 @@ Map the path you chose in Step 3 to the two component fields; the platform's
 - `from_cessation` — Path B (relevant episode is `stopped_before`)
 - `not_calculable` — all episodes `started_after` T0, or no suspect drug
 
-→ **Commit `onset_latency_days`** = the raw latency in days (integer):
+→ **Commit `onset_latency_days`** = the raw latency in days — **ALWAYS a concrete
+integer, NEVER null**:
 - Path A: `-start_day` (episode start → T0)
 - Path B: `-end_day` (drug stop → T0)
-- `not_calculable`: omit (leave latency unset)
+- `not_calculable`: commit **`0`**. (Item 1 scores 0 regardless of the number, but a
+  **null** here leaves Item 1 — and therefore `rucam_total_score` and
+  `rucam_causality_category` — stuck at *Pending*. Always commit `0`, not null.)
 
 Report the raw number — do **not** bucket it or convert it to a score.
 
