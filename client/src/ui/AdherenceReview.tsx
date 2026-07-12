@@ -208,6 +208,10 @@ export function AdherenceReview(props: AdherenceReviewProps) {
 
   const refreshState = useCallback(async (token: number = refreshTokenRef.current) => {
     const live = () => refreshTokenRef.current === token;
+    // Adherence reviews are session-scoped — the server 400s without session_id.
+    // Skip the fetch until the active session is known; this callback depends on
+    // activeSessionId, so the driving effect re-fires once it arrives.
+    if (!activeSessionId) return;
     try {
       const r = await authFetch(
         `/api/reviews/${encodeURIComponent(patientId)}/${encodeURIComponent(taskId)}${sessionQs}`,

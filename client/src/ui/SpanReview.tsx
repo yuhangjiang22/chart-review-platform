@@ -117,6 +117,10 @@ export function SpanReview({ patientId, patientDisplay, taskId, onBack, activeSe
 
   const refresh = useCallback(async (token: number = refreshTokenRef.current) => {
     const live = () => refreshTokenRef.current === token;
+    // NER reviews are session-scoped — the server 400s without session_id. Skip
+    // until the active session is known (this callback depends on activeSessionId,
+    // so the driving effect re-fires once it arrives).
+    if (!activeSessionId) { setLoading(false); return; }
     setLoading(true);
     try {
       const r = await authFetch(
