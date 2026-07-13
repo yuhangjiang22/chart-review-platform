@@ -83,9 +83,13 @@ export interface CriterionFromSkill {
  * `.claude/skills/chart-review-cancer-diagnosis/`.
  */
 export function phenotypeSkillDir(taskId: string): string {
-  // Re-read CHART_REVIEW_PLATFORM_ROOT each call so tests can override it via
-  // the env without restarting the module. Falls back to the import-time
-  // PLATFORM_ROOT for production paths.
+  // Mirrors guidelinesRoot() in skill-bundle.ts: CHART_REVIEW_GUIDELINES_ROOT
+  // wins when set (this repo's .env points it at .agents/skills), else fall
+  // back to <platform root>/.claude/skills. Re-read the env each call so
+  // tests can override it without restarting the module.
+  if (process.env.CHART_REVIEW_GUIDELINES_ROOT) {
+    return path.join(process.env.CHART_REVIEW_GUIDELINES_ROOT, `chart-review-${taskId}`);
+  }
   const root = process.env.CHART_REVIEW_PLATFORM_ROOT ?? PLATFORM_ROOT;
   // All chart-review skills (drafts and locked) live at this canonical path;
   // draft maturity is signaled by `status: draft` in meta.yaml. The legacy
