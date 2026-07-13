@@ -70,3 +70,83 @@ def build_item_task_prompt(entry: Dict[str, Any], prior: List[Dict[str, Any]]) -
 Prior item scores (context; do not re-score them):
 {prior_lines}
 """
+
+
+def format_case_facts(facts: Dict[str, Any]) -> str:
+    """Render the once-computed shared foundations as a compact block for every
+    group prompt, so groups don't each re-fetch the suspect drug / T0 / R-ratio."""
+    if not facts:
+        return "  (not available from structured data — establish these yourself with the tools)"
+    L: List[str] = []
+    if facts.get("suspect_drug"):
+        s = f"  - Suspect drug: {facts['suspect_drug']}"
+        if facts.get("suspect_first_date"):
+            s += f" (first structured exposure {facts['suspect_first_date']})"
+        if facts.get("stratum"):
+            s += f" [stratum: {facts['stratum']}]"
+        L.append(s)
+    else:
+        L.append("  - Suspect drug: none in structured data — check the notes")
+    if facts.get("liver_injury_date"):
+        L.append(f"  - Liver injury date (T0): {facts['liver_injury_date']}")
+    if facts.get("r_ratio") is not None:
+        L.append(f"  - R ratio: {facts['r_ratio']} → injury pattern: {facts.get('injury_pattern', '?')}")
+    if facts.get("age") is not None:
+        L.append(f"  - Age at injury: {facts['age']}")
+    if facts.get("n_concomitant_drugs_90d") is not None:
+        L.append(f"  - Concomitant drugs in 90-day window (structured count): {facts['n_concomitant_drugs_90d']}")
+    return "\n".join(L)
+
+
+def build_group_task_prompt(group: Dict[str, Any], case_facts_block: str,
+                            prior: List[Dict[str, Any]], pending: List[str]) -> str:
+    """One short, fresh conversation for a GROUP of leaves that share evidence.
+    Injects the shared case facts + compact summaries of already-committed groups,
+    and asks the agent to commit exactly this group's leaves. Context stays small
+    because nothing from prior groups' raw exploration is carried forward."""
+    title = group.get("title", group.get("group_id", "group"))
+    fields = ", ".join(f"`{f}`" for f in pending)
+    kws = ", ".join(group.get("keywords", []))
+    skill_reads = "\n".join(f'   - read_file("{sf}")' for sf in group.get("skill_files", [])) \
+        or "   (this group has no dedicated scoring file)"
+
+    def _prior_line(p: Dict[str, Any]) -> str:
+        committed = p.get("committed") or {}
+        vals = ", ".join(f"{k}={v}" for k, v in committed.items()) or "(none)"
+        return f"  - {p.get('title', p.get('group_id'))}: {vals}"
+    prior_lines = "\n".join(_prior_line(p) for p in prior) or "  (none yet)"
+
+    item5 = ""
+    if group.get("group_id") == "exclusion":
+        item5 = ("\n   MANDATORY for this group: call `score_item5_exclusion` (already bound to this "
+                 "patient — pass no arguments) and start from its per-cause statuses. Raise a cause to "
+                 "`ruled_out`/`yes` ONLY by citing a negative test or explicit note exclusion; a "
+                 "documented-negative result counts even if it was drawn for another cause. Set "
+                 "`alt_cause_explains=yes` (drives the -3 override) only if a NON-drug cause clearly "
+                 "explains the injury — a competing drug belongs in item 4, not here.")
+
+    return f"""Commit ONLY the RUCAM leaf fields in the "{title}" group: {fields}.
+Do NOT touch any other field, and do NOT set the derived item_/total/category fields — the platform computes those from your leaves.
+
+CASE FACTS (already established — reuse them, do not re-derive):
+{case_facts_block}
+
+1. Read this group's scoring method(s) first and follow them exactly:
+{skill_reads}
+2. Gather THIS group's evidence: rucam tools for COMPUTED logic (compute_r_ratio,
+   get_drug_episodes, get_lab_extremum, get_hepatotoxicity_category, get_patient_summary)
+   + `read_structured_data` (tables: measurements / drugs / conditions) for the raw
+   rows you will CITE (each row has a row_id).{item5}
+3. Sweep the notes — call `search_notes(keyword)` for: {kws}
+   then `get_note_section(filename)` on the notes that matched (cheaper than full read_note).
+4. Commit EACH of these fields with
+   `set_field_assessment(field_id=..., answer=..., rationale="…", evidence=[...])`:
+   {fields}
+   Evidence source or the write is REJECTED — a specific lab/med/condition →
+   `source:"structured"` with table + row_id; a note statement → `source:"note"` with
+   note_id, span_offsets [start,end], verbatim_quote; a purely derived quantity →
+   `source:"computed"`. Do not cite an unrelated note just to satisfy the requirement.
+
+Already-committed groups (context; do not re-score):
+{prior_lines}
+"""

@@ -92,6 +92,10 @@ export interface PatientReviewProps {
    *  is responsible for ensuring a session is active before opening a
    *  patient review. */
   activeSessionId?: string | null;
+  /** Human-facing name of the active session — shown on the header so the
+   *  reviewer always knows WHICH session they're validating (a stale pointer
+   *  then reads as "wrong session", not "no draft"). Display-only. */
+  activeSessionName?: string | null;
   /** Per-note labeling: when set, scopes the review to ONE note/encounter —
    *  only assessments with this encounter_id are shown, and writes carry it.
    *  Undefined = patient-level (the standard review, unchanged). */
@@ -553,6 +557,14 @@ export function PatientReview(p: PatientReviewProps) {
           <Badge variant="validated" className="!text-[10px]">
             <ShieldCheck size={9} strokeWidth={2.5} className="mr-0.5" /> Validated
           </Badge>
+        )}
+        {p.activeSessionId && (
+          <span
+            className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground"
+            title="Review session this screen is scoped to. Agent drafts from a run in a DIFFERENT session won't appear here — switch sessions if this looks empty unexpectedly."
+          >
+            session: {p.activeSessionName || p.activeSessionId}
+          </span>
         )}
         <span className="ml-auto flex items-center gap-3 text-[12px] tabular-nums">
           <span className="text-muted-foreground">Progress</span>

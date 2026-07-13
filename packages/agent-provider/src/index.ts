@@ -95,6 +95,13 @@ export type AgentRunInput = ComposeAgentInput & {
   perItem?: Array<{ field_id: string; item_number: number; skill_file: string; keywords: string[] }>;
   /** Retries per item before the field is left unscored. Default 2. */
   perItemMaxAttempts?: number;
+  /** Grouped/compacted scoring config (RUCAM). When set, the sidecar computes
+   *  shared foundations once, then runs ONE short fresh conversation per group
+   *  of leaves (context compacted between groups) instead of one giant growing
+   *  conversation. Shape = task-tools PerGroupSpec[]. */
+  perGroup?: Array<{ group_id: string; title: string; field_ids: string[]; skill_files: string[]; keywords: string[] }>;
+  /** Retries per group before its remaining leaves are left unscored. Default 2. */
+  perGroupMaxAttempts?: number;
 };
 
 /** Provider contract: one method that yields events. Implementations

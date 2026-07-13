@@ -121,15 +121,48 @@ export function App() {
   // session id (string), not the manifest, so fetch the session to read
   // `per_note` and gate the per-note review grid on it.
   const [activePerNote, setActivePerNote] = useState(false);
+  // Human-facing name of the active session, shown on the reviewer header so
+  // "empty" reads as "wrong session" rather than "no draft" (the silent-wrong-
+  // session footgun). Null when no session is active.
+  const [activeSessionName, setActiveSessionName] = useState<string | null>(null);
   useEffect(() => {
-    if (!task || !activeSessionId) { setActivePerNote(false); return; }
+    if (!task || !activeSessionId) { setActivePerNote(false); setActiveSessionName(null); return; }
     let cancelled = false;
     authFetch(`/api/sessions/${encodeURIComponent(task.task_id)}/${encodeURIComponent(activeSessionId)}`)
       .then((r) => (r.ok ? r.json() : null))
-      .then((d: { session?: { per_note?: boolean } } | null) => { if (!cancelled) setActivePerNote(!!d?.session?.per_note); })
-      .catch(() => { if (!cancelled) setActivePerNote(false); });
+      .then((d: { session?: { per_note?: boolean; name?: string } } | null) => {
+        if (cancelled) return;
+        setActivePerNote(!!d?.session?.per_note);
+        setActiveSessionName(d?.session?.name ?? null);
+      })
+      .catch(() => { if (!cancelled) { setActivePerNote(false); setActiveSessionName(null); } });
     return () => { cancelled = true; };
   }, [task, activeSessionId]);
+
+  // Auto-point: when NO session is active for this task, default the pointer to
+  // the most-recent session (highest session_num) instead of leaving the
+  // reviewer scoped to nothing. Only fills a null pointer — never overrides a
+  // session the user (or Workspace) deliberately selected.
+  useEffect(() => {
+    if (!task?.task_id || activeSessionId) return;
+    let cancelled = false;
+    authFetch(`/api/sessions/${encodeURIComponent(task.task_id)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { sessions?: { session: { session_id: string; session_num?: number } }[] } | null) => {
+        // Listing items are nested: { session: {session_id, session_num, …}, iter_ids, … }.
+        const items = (d?.sessions ?? []).map((x) => x.session).filter(Boolean);
+        if (cancelled || items.length === 0) return;
+        const newest = items.slice().sort((a, b) => (b.session_num ?? 0) - (a.session_num ?? 0))[0];
+        if (!newest?.session_id) return;
+        try {
+          localStorage.setItem(`chart-review:active-session:${task.task_id}`, newest.session_id);
+          window.dispatchEvent(new Event("chart-review:session-changed"));
+        } catch { /* localStorage unavailable — leave unset */ }
+        setActiveSessionId(newest.session_id);
+      })
+      .catch(() => { /* no sessions endpoint / none yet — leave unset */ });
+    return () => { cancelled = true; };
+  }, [task?.task_id, activeSessionId]);
 
   // Subscribe a single agent socket to whichever patient×task is active.
   // Mirrors how the legacy App lifts useAgentSocket. Until the user picks
@@ -429,6 +462,7 @@ export function App() {
             onJumpToSource={setNoteFocus}
             criterionId={route.criterionId ?? null}
             activeSessionId={activeSessionId}
+            activeSessionName={activeSessionName}
             onCriterionChange={(id, opts) =>
               navigate(patientHash(task.task_id, route.patientId!, id ?? undefined), opts)
             }
@@ -483,6 +517,7 @@ export function App() {
             onJumpToSource={setNoteFocus}
             criterionId={route.criterionId ?? null}
             activeSessionId={activeSessionId}
+            activeSessionName={activeSessionName}
             onCriterionChange={(id, opts) =>
               navigate(
                 patientHash(task.task_id, route.patientId!, id ?? undefined),

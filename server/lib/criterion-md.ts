@@ -107,7 +107,12 @@ export function buildCriterionMd(params: {
 }): string {
   const yamlLines = [
     `field_id: ${params.field_id}`,
-    `prompt: ${stringifyYaml(params.prompt).trimEnd()}`,
+    // lineWidth:0 disables the yaml serializer's default 80-col wrapping. Without
+    // it, a prompt >~80 chars folds onto an UNINDENTED second line, producing
+    // frontmatter that no longer parses — the criterion then silently drops out
+    // of the compiled task, and the agent's write for it is rejected as
+    // "unknown_field" (observed on alt_cause_explains after a UI edit).
+    `prompt: ${stringifyYaml(params.prompt, { lineWidth: 0 }).trimEnd()}`,
     `answer_schema:`,
     `  enum:`,
     ...params.enumValues.map((v) => `    - ${v}`),

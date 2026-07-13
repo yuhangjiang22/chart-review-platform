@@ -23,3 +23,10 @@ is a plausible non-drug cause).
 Use `get_conditions` filtered to [-365, +30] for chronic HBV/HCV and search notes for
 "cirrhosis", "decompensated", "HBV flare", "HCV cirrhosis", "variceal bleed", "ascites"
 (per `references/scoring/item-5-exclusion.md`, Group II). Cite the evidence.
+
+**No known chronic HBV/HCV + a negative acute panel rules this out — don't require an
+explicit exclusion.** If there is no documented chronic HBV/HCV history AND HBsAg /
+anti-HCV (or HBV DNA / HCV RNA) are negative in the window, commit `yes` (reuse the same
+HBV/HCV serologies you cited for Group I). Reserve `no` only when the patient HAS known
+chronic HBV/HCV with a recent flare/decompensation in the window (a plausible non-drug
+cause), or the status is genuinely unassessed.

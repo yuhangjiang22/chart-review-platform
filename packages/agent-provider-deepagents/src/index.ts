@@ -43,6 +43,11 @@ export interface RunSpec {
   per_item?: Array<{ field_id: string; item_number: number; skill_file: string; keywords: string[] }>;
   /** Retries per item (default 2). */
   per_item_max_attempts?: number;
+  /** Grouped/compacted scoring config; sidecar computes foundations once then
+   *  runs one short fresh conversation per group when present. */
+  per_group?: Array<{ group_id: string; title: string; field_ids: string[]; skill_files: string[]; keywords: string[] }>;
+  /** Retries per group (default 2). */
+  per_group_max_attempts?: number;
 }
 
 const KNOWN_EVENT_TYPES = new Set(["tool_use", "tool_result", "text", "result", "error"]);
@@ -81,6 +86,8 @@ export function buildRunSpec(input: AgentRunInput): RunSpec | null {
   if (input.skills?.length) spec.skills = input.skills;
   if (input.perItem?.length) spec.per_item = input.perItem;
   if (input.perItemMaxAttempts !== undefined) spec.per_item_max_attempts = input.perItemMaxAttempts;
+  if (input.perGroup?.length) spec.per_group = input.perGroup;
+  if (input.perGroupMaxAttempts !== undefined) spec.per_group_max_attempts = input.perGroupMaxAttempts;
   return spec;
 }
 

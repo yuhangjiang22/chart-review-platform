@@ -27,3 +27,13 @@ hepatocellular; ALP/bilirubin for cholestatic/mixed):
 Use `get_lab_extremum` for peak (to drug stop) and nadir (in the window).
 % decrease = (peak − nadir)/peak × 100. Record the tier reached. For
 cholestatic/mixed, evaluate ALP and bilirubin and record the best (fastest/largest).
+
+**Anchor to the suspect drug's STOP date — never the injury peak (T0).** The
+dechallenge measures how the anchor lab moved *after the suspect drug was stopped*.
+If the suspect drug has no exposure episode in a relevant window — i.e.
+`onset_path = not_calculable`, or `get_drug_episodes` is empty / returns no episode
+near T0 — then there is **no dechallenge to measure: commit `no_followup`**. Do NOT
+score the injury's own post-T0 decline (the natural resolution of whatever caused it)
+as a dechallenge: a drug taken/stopped long before onset cannot produce one, and doing
+so fabricates a positive course score. A well-timed anchor drop is only a dechallenge
+if the drug was actually on board and then stopped.

@@ -1468,6 +1468,8 @@ async function runOneAgent(
       skills,
       perItem: profile.perItem,
       perItemMaxAttempts: 3,
+      perGroup: profile.perGroup,
+      perGroupMaxAttempts: 3,
     })) {
       if (event.type === "result" && typeof event.cost_usd === "number") {
         cost = (cost ?? 0) + event.cost_usd;
@@ -1495,7 +1497,33 @@ async function runOneAgent(
           : { status: "error", error: "NER produced no completion signal this run" })
     : classifyAgentOutcome({ agentError, writeCount });
   if (outcome.status === "error") {
-    // Do NOT promote: a seeded/carried scratch is not this run's output.
+    // SALVAGE-ON-ERROR: an agent that committed real leaves before erroring
+    // (e.g. hit the turn/recursion limit on the finalize tail — leaves are in
+    // the scratch review_state) shouldn't lose the whole patient. Promote the
+    // committed scratch as a PARTIAL draft, tagged with the error, so the
+    // reviewer keeps every leaf that committed; derived fields whose inputs are
+    // missing stay Pending on their own. `writeCount > 0` guards against
+    // promoting a merely seeded/carried scratch (no writes this run = nothing to
+    // salvage). Adherence writes its draft inline (no scratch promote), so
+    // salvage only applies to the scratch-promoted paths (phenotype / NER). The
+    // run is STILL reported as errored — the salvaged draft is recovery, not
+    // success.
+    if (!isAdherenceTask && writeCount > 0) {
+      try {
+        const scratchReviewState = path.join(scratchRoot, patientId, taskId, "review_state.json");
+        const draftFp = agentDraftPath(runId, patientId, spec.id);
+        if (fs.existsSync(scratchReviewState) && !fs.existsSync(draftFp)) {
+          const salvaged = JSON.parse(fs.readFileSync(scratchReviewState, "utf8"));
+          salvaged.partial = true;
+          salvaged.salvaged_from_error = outcome.error;
+          atomicWriteJson(draftFp, salvaged);
+          try { fs.unlinkSync(scratchReviewState); } catch { /* scratch cleanup best-effort */ }
+          console.warn(`[salvage] ${spec.id}: run errored after ${writeCount} write(s) — promoted a PARTIAL draft from the committed scratch state`);
+        }
+      } catch (e) {
+        console.warn(`[salvage] ${spec.id}: could not salvage partial draft: ${(e as Error).message}`);
+      }
+    }
     const markerPath = path.join(ppDir, "agents", `${spec.id}.error.json`);
     try {
       fs.writeFileSync(markerPath, JSON.stringify(

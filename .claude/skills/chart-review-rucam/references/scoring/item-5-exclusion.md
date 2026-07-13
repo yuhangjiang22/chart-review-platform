@@ -69,6 +69,21 @@ Raw values and dates for: HAV_IgM, HBsAg, HBc_IgM, HCV_Ab, HCV_RNA, ANA, SMA, Ig
 - **(b) explicitly absent by history/exam** — notes explicitly exclude it (e.g., "denies alcohol use × 3 years"); flag = 0 alone is NOT sufficient for (b)
 - **(c) not assessed / unknown** — no test, no explicit note exclusion; cannot be counted as ruled out
 
+**Reuse a negative result across causes — a documented negative is (a) even if it was
+ordered for another cause or is not labeled with this cause's name.** A negative result
+in the chart rules out its cause regardless of *why* it was drawn — do NOT downgrade a
+*present* negative to (c) just because no test or note names that specific cause:
+- negative **AMA** (usually from the autoimmune panel) → PBC = (a); a clean biliary tree on US/MRCP → PSC = (a)
+- negative **ANA / SMA / IgG** (or biopsy/hepatology assessment not AIH) → autoimmune = (a)
+- a hepatology/acute-hepatitis panel with negative **CMV/EBV/HSV** PCR or serology → acute viral = (a)
+- a documented negative **sepsis workup** (negative cultures, low/normal procalcitonin, or clinician documents no septic source / low suspicion) → sepsis = (a)
+- **no known chronic HBV/HCV history + negative HBsAg/anti-HCV** (or HBV DNA/HCV RNA) → chronic HBV/HCV = (a)
+
+This does NOT loosen the anti-fabrication rule above: you still need a **real, cited
+negative result** — genuinely absent data (no relevant test/note in the window) stays
+(c)/`no`. The fix is only that a negative already in the chart must be *credited*, not
+re-labeled "not assessed."
+
 **Record in structured_evidence for every Group I cause and Group II category** (even if −3 applies):
 ```
 [cause]: (a)/(b)/(c) — [one-line evidence summary]

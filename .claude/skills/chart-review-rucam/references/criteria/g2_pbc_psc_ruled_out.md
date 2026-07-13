@@ -23,3 +23,15 @@ mention in the window is "not assessed" → `no`.
 Use `get_conditions` filtered to [-365, +30] and search notes for "primary biliary",
 "PBC", "sclerosing cholangitis", "PSC", "AMA", "MRCP" (per
 `references/scoring/item-5-exclusion.md`, Group II). Cite the evidence.
+
+**Reuse evidence you already have — AMA is the PBC test; biliary imaging is the PSC
+test.** Do NOT require a workup literally labeled "PBC/PSC":
+- A **negative AMA** (anti-mitochondrial antibody) rules out PBC — this is usually the
+  *same* AMA result you cite for autoimmune hepatitis; reuse it here.
+- **Normal biliary imaging** (RUQ ultrasound / MRCP / ERCP showing no ductal dilatation,
+  beading, or strictures) rules out PSC.
+
+Commit `yes` when AMA is negative AND biliary imaging is unremarkable (or a note
+explicitly excludes PBC/PSC). Reserve `no` for cases where **neither** AMA **nor** biliary
+imaging is available in the window (genuinely not assessed) — a tested-negative AMA and a
+clean biliary tree are positive rule-out evidence, not "absence of mention."

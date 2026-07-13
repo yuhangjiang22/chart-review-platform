@@ -122,8 +122,25 @@ async def run(spec: dict) -> None:
         agent = create_deep_agent(**agent_kwargs)
         config = {"recursion_limit": int(spec.get("max_turns", 90)) * 2 + 10}
 
+        per_group = spec.get("per_group")
         per_item = spec.get("per_item")
-        if per_item:
+        if per_group:
+            # Grouped/compacted scoring: compute shared foundations ONCE
+            # (deterministic, no LLM), then run one short FRESH conversation per
+            # group of leaves — context is compacted between groups instead of
+            # one giant growing all-24-leaves conversation. Targets leaves + stays
+            # serial (per_item is falsy here), so it avoids the derived-field and
+            # parallel-tool-call pitfalls that retired the per-item loop.
+            case_facts = build_case_facts(plugin_bind)
+            if case_facts:
+                print("[foundations] " + "; ".join(
+                    f"{k}={v}" for k, v in case_facts.items() if v is not None), file=sys.stderr)
+            max_attempts = int(spec.get("per_group_max_attempts", 2))
+            emit({"type": "text",
+                  "text": "Agent started — foundations computed; scoring leaves group by group…"})
+            prior, final_msgs = await _score_groups(agent, per_group, case_facts, max_attempts, config)
+            last_text = "grouped scoring complete"
+        elif per_item:
             # RUCAM-style per-item scoring: drive ONE conversation per rubric
             # item, retrying an item until its field is written (or max attempts
             # exhausted). `prior` carries the real scores of already-scored items
@@ -242,6 +259,88 @@ async def _score_items(agent, per_item, max_attempts: int, config: dict, recommi
             emit({"type": "text", "text": f"WARNING: {fid} not written after {max_attempts} attempts"})
         prior.append({"item_number": entry["item_number"], "field_id": fid,
                       "answer": answer, "reasoning": reasoning})
+    return prior, final_msgs
+
+
+def build_case_facts(plugin_bind: dict) -> dict:
+    """Compute RUCAM's shared foundations ONCE, deterministically (no LLM) — the
+    facts every group needs (suspect drug, T0, R-ratio/injury pattern, age). Each
+    group prompt injects these so groups don't each re-fetch them. Calls the raw
+    plugin functions directly with the run's bound person_id + data_dir. Degrades
+    gracefully: any missing fact just falls back to the agent gathering it."""
+    plugin_bind = plugin_bind or {}
+    person_id = plugin_bind.get("person_id")
+    data_dir = plugin_bind.get("data_dir", "data")
+    facts: dict = {}
+    if person_id is None:
+        return facts
+    try:
+        from chart_review_plugins.rucam_tools import get_suspect_drug, get_patient_summary
+        from chart_review_plugins.rucam_r_ratio import compute_r_ratio
+    except Exception as e:  # plugin module unavailable → agent gathers facts itself
+        print(f"[foundations] import failed: {e}", file=sys.stderr)
+        return facts
+
+    def _safe(label, fn):
+        try:
+            return fn()
+        except Exception as e:
+            print(f"[foundations] {label} failed: {e}", file=sys.stderr)
+            return None
+
+    sd = _safe("get_suspect_drug", lambda: get_suspect_drug(person_id, data_dir))
+    if isinstance(sd, dict):
+        facts["suspect_drug"] = sd.get("SELECTED_DRUG")
+        facts["suspect_first_date"] = sd.get("FIRST_DATE")
+        facts["stratum"] = sd.get("STRATUM")
+    ps = _safe("get_patient_summary", lambda: get_patient_summary(person_id, data_dir))
+    if isinstance(ps, dict):
+        facts["liver_injury_date"] = ps.get("liver_injury_date")
+        facts["age"] = ps.get("AGE")
+        facts["n_concomitant_drugs_90d"] = ps.get("n_concomitant_drugs_90d")
+    rr = _safe("compute_r_ratio", lambda: compute_r_ratio(person_id, data_dir))
+    if isinstance(rr, tuple) and len(rr) >= 2:  # compute_r_ratio returns (r_ratio, injury_enum)
+        r, inj = rr[0], rr[1]
+        facts["r_ratio"] = round(r, 2) if isinstance(r, (int, float)) else r
+        facts["injury_pattern"] = getattr(inj, "value", None) or str(inj)
+    return facts
+
+
+async def _score_groups(agent, per_group, case_facts: dict, max_attempts: int, config: dict):
+    """Drive ONE short, fresh conversation per GROUP of leaves. Injects the shared
+    case facts + compact summaries of already-committed groups; retries a group
+    (with only its still-pending leaves) until all its fields commit or attempts
+    exhaust. Each group's context is fresh, so nothing from prior groups' raw
+    exploration accumulates. Returns (prior, final_msgs) — final_msgs feeds _log_usage."""
+    from .rucam_prompts import build_group_task_prompt, format_case_facts
+    from .messages_util import field_answers
+
+    facts_block = format_case_facts(case_facts)
+    prior = []
+    final_msgs = []
+    for group in per_group:
+        gid = group.get("group_id", "group")
+        title = group.get("title", gid)
+        want = list(group["field_ids"])
+        committed: dict = {}
+        pending = list(want)
+        for attempt in range(1, max_attempts + 1):
+            if not pending:
+                break
+            emit({"type": "text",
+                  "text": f"Group '{title}': {len(want) - len(pending)}/{len(want)} committed, attempt {attempt}…"})
+            msgs, _last = await _stream_once(
+                agent, build_group_task_prompt(group, facts_block, prior, pending), config)
+            final_msgs += msgs
+            answers = field_answers(msgs)
+            for fid in list(pending):
+                if fid in answers:  # membership (not truthiness) so a 0 / "no" counts
+                    committed[fid] = answers[fid]
+                    pending.remove(fid)
+        if pending:
+            emit({"type": "text",
+                  "text": f"WARNING: group '{title}' left {len(pending)} field(s) uncommitted: {', '.join(pending)}"})
+        prior.append({"group_id": gid, "title": title, "committed": committed})
     return prior, final_msgs
 
 

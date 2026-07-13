@@ -23,3 +23,10 @@ Check `get_conditions` for `sepsis_dx` / `bacteremia_dx` / `septicemia_dx` and
 admission notes in the window, plus explicit note exclusions (per
 `references/scoring/item-5-exclusion.md`, Group II). A structured flag of 0 alone is
 NOT a rule-out. Cite the evidence.
+
+**A documented-negative sepsis workup rules it out — don't require a literal "sepsis
+excluded" note.** Negative blood cultures, low/normal procalcitonin, or a clinician
+documenting no septic source / low suspicion in the window = ruled out → `yes` (this is
+note-documented evidence, distinct from the structured flag=0 that alone is insufficient).
+Reserve `no` for a documented septic episode, an indeterminate workup, or no assessment
+at all.

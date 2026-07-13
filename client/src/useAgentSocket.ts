@@ -41,10 +41,17 @@ export function useAgentSocket(
       setReviewState(null);
       return;
     }
+    // Cancellation guard: activeSessionId flips null→<sid> on mount, so this
+    // effect fires twice. The first (no session) 400s → null; without this
+    // guard that superseded response can resolve LAST and clobber the good
+    // session-scoped result → an empty reviewer even though the draft exists.
+    // Only the latest (non-superseded) request may set state.
+    let cancelled = false;
     const qs = sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : "";
     authFetch(`/api/reviews/${patientId}/${taskId}${qs}`)
       .then((r) => (r.ok ? r.json() : null))
-      .then((s) => setReviewState(s));
+      .then((s) => { if (!cancelled) setReviewState(s); });
+    return () => { cancelled = true; };
   }, [patientId, taskId, sessionId]);
 
   useEffect(() => {

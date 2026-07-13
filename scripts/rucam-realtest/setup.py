@@ -182,7 +182,7 @@ def materialize_omop(fixture, pid, data_dir):
     return {"measurements": len(meas), "drugs": len(meds), "conditions": len(cond)}
 
 
-def build_fixture(fid, pid, gold, data_dir, corpus, note_window):
+def build_fixture(fid, pid, gold, data_dir, corpus, note_window, source_label):
     derived = pd.read_csv(data_dir / "derived_rucam.csv")
     liver_date = str(derived.loc[derived["PERSON_ID"] == pid, "liver_injury_date"].iloc[0])
     fixture = corpus / fid
@@ -214,7 +214,7 @@ def build_fixture(fid, pid, gold, data_dir, corpus, note_window):
         "person_id": int(pid), "gold_total": gold["total"],
         "gold_category": gold["category"], "gold_items": gold["items"],
         "gold_complete": gold["complete"],
-        "source": "Validation_Adjudication_v3.xlsx (human annotator)",
+        "source": source_label,
     }, indent=2) + "\n")
     omop_counts = materialize_omop(fixture, pid, data_dir)
     return copied, omop_counts
@@ -259,10 +259,11 @@ def main():
     for d in corpus.glob("patient_real_rucam_*"):
         shutil.rmtree(d)
 
-    print(f"[setup] building {len(cands)} fixture(s) from {data_dir.name}")
+    source_label = f"{Path(args.adj).name} (human annotator gold)"
+    print(f"[setup] building {len(cands)} fixture(s) from {data_dir.name}  gold={Path(args.adj).name}")
     for k, g in enumerate(cands, 1):
         fid = f"patient_real_rucam_{k:02d}"
-        n, omop = build_fixture(fid, g["pid"], g, data_dir, corpus, args.note_window)
+        n, omop = build_fixture(fid, g["pid"], g, data_dir, corpus, args.note_window, source_label)
         flag = "" if g["complete"] else "  (gold per-item incomplete — total reliable)"
         print(f"[setup]   {fid}: notes={n:>3}  omop(meas/drug/cond)="
               f"{omop['measurements']}/{omop['drugs']}/{omop['conditions']}  gold_total={g['total']:>3}  "

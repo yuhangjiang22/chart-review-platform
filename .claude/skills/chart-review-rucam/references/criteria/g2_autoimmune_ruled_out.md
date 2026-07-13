@@ -22,3 +22,9 @@ not assessed, indeterminate, or present.
 Check `get_serology` for ANA / SMA / IgG (most informative near T0), any liver-biopsy
 or hepatology-consult notes, plus explicit note exclusions (per
 `references/scoring/item-5-exclusion.md`, Group II). Cite the evidence.
+
+**A documented-negative result rules AIH out — don't require an "AIH excluded" note.**
+Negative **ANA / SMA / IgG** (or a hepatology assessment / biopsy not consistent with
+AIH) = ruled out → `yes`, even when drawn as part of a broad panel. Reserve `no` only
+when none of ANA/SMA/IgG/biopsy is available in the window (genuinely not assessed) —
+not for the mere absence of a cause-labeled exclusion.

@@ -22,3 +22,8 @@ indeterminate, or present.
 Check `CMV_acute_dx` / `EBV_acute_dx` / `HSV_hepatitis_dx` and the serologies
 (`CMV_IgM`, `CMV_PCR`, `EBV_VCA_IgM`, `EBV_PCR`, `HSV_PCR`) with dates in [-30, +30]
 (per `references/scoring/item-5-exclusion.md`, Group II). Cite the negatives or span.
+
+**Reuse the viral panel — these are often resulted together in a hepatology / acute-
+hepatitis workup.** A documented negative for CMV/EBV/HSV (PCR or serology) = ruled out
+→ `yes`, even if not labeled "acute viral hepatitis excluded." Reserve `no` for a
+positive/indeterminate result or when none of the trio was tested in [-30, +30].
