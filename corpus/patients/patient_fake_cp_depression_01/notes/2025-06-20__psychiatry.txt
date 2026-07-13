@@ -1,0 +1,19 @@
+PSYCHIATRY — INITIAL CONSULTATION
+Provider: A. Bianchi, MD — Psychiatry
+Encounter date: 2025-06-20
+
+REASON FOR REFERRAL
+Referred by primary care for management of major depressive disorder.
+
+HPI
+Patient describes persistent depressed mood, anhedonia (loss of interest in
+activities she previously enjoyed), and feelings of hopelessness over the past
+two months. Denies suicidal ideation. Denies prior psychiatric hospitalization.
+
+SCREENING
+PHQ-9 total 19 today.
+
+ASSESSMENT / PLAN
+1. Major depressive disorder, moderately severe. Increase sertraline to
+   100 mg daily.
+2. Continue psychiatric follow-up in 4 weeks.

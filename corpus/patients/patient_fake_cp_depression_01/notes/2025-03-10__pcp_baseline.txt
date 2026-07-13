@@ -1,0 +1,17 @@
+PRIMARY CARE — NEW PATIENT / BASELINE (INDEX) VISIT
+Provider: R. Osei, MD — Family Medicine
+Encounter date: 2025-03-10
+
+HPI
+58-year-old woman with obesity (BMI 38) and Type 2 Diabetes. Today is her
+program index visit; enrolled in the GLP-1 initiation cohort and starting
+semaglutide.
+
+ASSESSMENT / PLAN
+1. Type 2 Diabetes — start semaglutide 0.25 mg weekly, titrate.
+2. Obesity — lifestyle counseling.
+3. Remote history of major depressive disorder years ago, currently off
+   treatment and stable. No active depressive complaints today.
+
+MEDICATIONS
+- Semaglutide 0.25 mg weekly (new)
