@@ -49,15 +49,18 @@ async function result(iter, patient = PID) {
   const tok = await login(); const h = H(tok);
   const j = await (await fetch(`${B}/api/pilots/${T}/${iter}`, { headers: h })).json();
   const runId = j.manifest?.run_id;
-  const dr = await fetch(`${B}/api/runs/${runId}/per_patient/${patient}/drafts`, { headers: h });
-  const drafts = await dr.json().catch(() => null);
-  const list = drafts?.drafts || drafts?.agents || (Array.isArray(drafts) ? drafts : []);
-  const d = list?.[0] || {};
+  // Adherence drafts carry question_answers + rule_verdicts. The multi-agent
+  // list endpoint (/per_patient/:pid/drafts) projects to field_assessments
+  // ONLY (phenotype shape), so it returns empty for adherence. Read the full
+  // single-agent draft (/patients/:pid/draft → readRunDraft) which preserves
+  // question_answers and rule_verdicts.
+  const dr = await fetch(`${B}/api/runs/${runId}/patients/${patient}/draft`, { headers: h });
+  const d = await dr.json().catch(() => ({}));
   console.log("=== agent question answers ===");
   for (const a of (d.question_answers || [])) console.log(`  ${a.question_id} = ${JSON.stringify(a.answer)}  (${(a.evidence || []).length} ev)`);
   console.log("=== agent rule verdicts ===");
   for (const v of (d.rule_verdicts || [])) console.log(`  ${v.rule_id}: ${v.verdict}${v.attribution ? " / " + v.attribution : ""}`);
-  if (!(d.question_answers || []).length) console.log("  (draft shape:", JSON.stringify(drafts).slice(0, 300), ")");
+  if (!(d.question_answers || []).length) console.log("  (draft shape:", JSON.stringify(d).slice(0, 300), ")");
 }
 
 const [cmd, a, b] = process.argv.slice(2);
