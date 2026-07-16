@@ -7,29 +7,40 @@
 
 questions:
   - question_id: T1-ACTScore
-    text: What is the most recent Asthma Control Test (ACT) score documented in the
-      lookback window? (5-25 integer. Null when ACT was not recorded.)
+    text: What is the most recent AGE-APPROPRIATE asthma-control test total score
+      in the lookback window — ACT (ages 12-17) or Childhood ACT / C-ACT (ages
+      5-11)? Record the total score. Null when no control test is documented, or
+      for ages 2-4 (no validated questionnaire — control is assessed via
+      symptoms and exacerbations; see T1-ExacerbationsCount). Both ACT and C-ACT
+      use total >= 20 = well controlled, so the same threshold applies to both.
     tier: 1
     answer_schema:
       type: number
-      description: Integer 5..25, or null when no ACT is documented.
+      description: ACT total 5..25 (ages 12-17) or C-ACT total 0..27 (ages
+        5-11); null when no control test is documented or for ages 2-4. In both
+        instruments a total >= 20 = well controlled.
+    depends_on:
+      - T0-AgeBand
     naepp_source: "EPR-3 Section 3, Component 1, p.38 — control instruments:
-      ACT (Nathan et al. 2004), Childhood ACT (Liu et al. 2007), Asthma
-      Control Questionnaire (Juniper et al. 1999), Asthma Therapy Assessment
-      Questionnaire (Vollmer et al. 1999)"
+      ACT (Nathan et al. 2004, ages 12+), Childhood ACT (Liu et al. 2007, ages
+      4-11), Asthma Control Questionnaire (Juniper et al. 1999). EPR-3 Figures
+      4-2a / 4-2b assess control by age band."
     evidence_grade: B
     clinical_rationale: >-
       EPR-3 endorses standardized control instruments as the operational
-      definition of 'level of control'. ACT (5-item, ages 12+) is the most
-      common in U.S. EHR templates. Score interpretation: 20-25 well
-      controlled, 16-19 not well controlled, <16 very poorly controlled.
+      definition of 'level of control', and specifies AGE-APPROPRIATE tools:
+      ACT (5-item) for ages 12+, Childhood ACT (7-item, 0-27) for ages 5-11.
+      Ages 2-4 have no validated questionnaire — control is symptom/exacerbation
+      based. The well-controlled cutoff is total >= 20 for BOTH ACT and C-ACT,
+      so downstream thresholds ('< 20 = not well controlled') hold across bands.
     retrieval_hints: "STRUCTURED FIRST →
-      read_structured_data(table=\"measurements\"). Look for rows with
-      loinc=\"75827-3\" (Asthma Control Test total score). Pick the row with the
-      most recent date. The integer 5..25 is in the `value` field. Fallback to
-      notes only when measurements has no ACT rows: visit assessment sections,
-      \"ACT: 18/25\" style notations. Don't infer from \"well controlled\"
-      prose."
+      read_structured_data(table=\"measurements\"). For ages 12-17 look for the
+      ACT total (loinc=\"75827-3\"); for ages 5-11 look for the Childhood ACT
+      (C-ACT) total. Pick the most recent row; the score is in the `value`
+      field. For ages 2-4 return null (no validated score — control is
+      symptom/exacerbation based). Fallback to notes: \"ACT: 18/25\" or
+      \"C-ACT: 22/27\" style notations. Don't infer a number from \"well
+      controlled\" prose."
 
   - question_id: T1-ExacerbationsCount
     text: How many asthma exacerbations are documented in the past 12 months?
@@ -219,7 +230,7 @@ questions:
       indication for comorbidity workup. Skipping this step before
       escalating therapy is a documented concordance gap. Mark
       'not_applicable' when the patient is well-controlled
-      (ACT >= 20 AND exacerbations = 0).
+      (age-appropriate control score >= 20 AND exacerbations = 0).
     retrieval_hints: >-
       STRUCTURED FIRST. (1) read_structured_data(table="conditions") for
           ICD-10 codes: J30.x (allergic rhinitis), J33.x (nasal polyps),

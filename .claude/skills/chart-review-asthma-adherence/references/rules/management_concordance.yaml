@@ -5,16 +5,18 @@
 rules:
   - rule_id: R-T2-StepTherapyMatches
     description: >-
-      The patient's controller regimen matches guideline step therapy
-      for their control level (per EPR-3 Figure 4-5 and 2020 Focused
-      Update SMART/LAMA updates for ages 12+).
+      The patient's controller regimen matches guideline step therapy for
+      their control level, using the stepwise table for their AGE BAND
+      (T0-AgeBand): EPR-3 Figures 4-1a/4-2a (ages 2-4), 4-1b/4-2b (ages 5-11),
+      and Figure 4-5 + 2020 SMART/LAMA (ages 12-17).
     naepp_source: >-
-      EPR-3 Section 4 Figure 4-5 (Stepwise Approach Youths ≥12 and
-      Adults, p.343); 2020 Focused Update Rec 12 (strong) and Rec 13
+      EPR-3 Section 4 age-band stepwise tables: Figures 4-1a/4-2a (ages 0-4),
+      Figures 4-1b/4-2b (ages 5-11), Figure 4-5 (Youths ≥12 and Adults,
+      p.343). For ages 12+: 2020 Focused Update Rec 12 (strong) and Rec 13
       (conditional) p.80-86 — ICS-formoterol SMART for moderate-severe
-      persistent asthma 12+; Recs 14-16 p.90-95 — LAMA add-on as Step 4
-      alternative when LABA is contraindicated or unavailable
-      (conditional, moderate certainty).
+      persistent asthma; Recs 14-16 p.90-95 — LAMA add-on as Step 4
+      alternative when LABA is contraindicated or unavailable. SMART/LAMA are
+      NOT first-line for ages 2-11 (use the pediatric figures).
     evidence_grade: A_with_SMART_strong_LAMA_conditional
     verdict_if: "T2-StepTherapyMatch == \"matches\""
     attribution_when:
@@ -30,7 +32,7 @@ rules:
     nuanced: true
     judge_can_override: false
     supporting_questions:
-      [T2-StepTherapyMatch, T2-ContraindicationDocumented, T1-ControllerPrescribed]
+      [T0-AgeBand, T2-StepTherapyMatch, T2-ContraindicationDocumented, T1-ControllerPrescribed]
 
   - rule_id: R-T2-WrittenActionPlan
     description: >-

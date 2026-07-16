@@ -7,10 +7,16 @@
 
 questions:
   - question_id: T2-StepTherapyMatch
-    text: Does the current controller regimen match guideline step therapy for the
-      patient's control level? (Patients 12+ with moderate-severe persistent
-      asthma should be on ICS-formoterol SMART or ICS-LABA combination;
-      mild persistent should be on low-dose ICS as preferred therapy.)
+    text: >-
+      Does the current controller regimen match the guideline stepwise-therapy
+      table FOR THE PATIENT'S AGE BAND (T0-AgeBand) and control level? EPR-3 has
+      distinct stepwise tables for ages 0-4, 5-11, and 12+; apply the one for
+      this patient's band. (Ages 12-17: per the 2020 Update, moderate-severe
+      persistent favors ICS-formoterol SMART or ICS-LABA; mild persistent =
+      low-dose ICS. Ages 5-11: EPR-3 Figures 4-1b/4-2b — low-dose ICS preferred
+      at Step 2, medium-dose ICS or ICS-LABA at Steps 3-4. Ages 2-4: EPR-3
+      Figure 4-1a — low-dose ICS preferred at Step 2, LTRA/cromolyn alternative;
+      SMART and LABA are NOT first-line in this band.)
     tier: 2
     answer_schema:
       type: string
@@ -20,11 +26,13 @@ questions:
         - over_treated
         - unknown
     depends_on:
+      - T0-AgeBand
       - T1-ControllerPrescribed
       - T1-ACTScore
       - T1-ExacerbationsCount
-    naepp_source: "EPR-3 Section 4 'Managing Asthma Long Term', Figure 4-5
-      (Stepwise Approach Youths ≥12 and Adults, p.343); UPDATED by 2020
+    naepp_source: "EPR-3 Section 4 'Managing Asthma Long Term' — AGE-BAND
+      stepwise tables: Figures 4-1a/4-2a (ages 0-4), Figures 4-1b/4-2b (ages
+      5-11), Figure 4-5 (Youths ≥12 and Adults, p.343); UPDATED by 2020
       Focused Update Rec 13 (p.84) — 'In individuals ages 12 years and
       older with moderate to severe persistent asthma, the Expert Panel
       conditionally recommends ICS-formoterol in a single inhaler used as
@@ -42,9 +50,15 @@ questions:
       concordance gap. SMART is the 2020 Update's preferred regimen for
       moderate-severe persistent in patients 12+.
     retrieval_hints: >-
+      FIRST select the stepwise table for T0-AgeBand (2-4 -> EPR-3 Fig 4-1a;
+      5-11 -> Fig 4-1b; 12-17 -> Fig 4-5 + 2020 SMART/LAMA). SMART and biologics
+      referenced below apply to ages 12+ (and, for some biologics, 6+); for ages
+      2-11 the preferred step-up is medium-dose ICS or ICS-LABA per the pediatric
+      figures, NOT SMART. The control cutoffs (>= 20 well controlled) use the
+      band-appropriate score (ACT 12-17 / C-ACT 5-11). Then:
       Compare T1 control signals to the regimen captured in
       T1-ControllerPrescribed:
-      (a) Well-controlled (ACT >= 20, no exacerbations) on ICS or
+      (a) Well-controlled (control score >= 20, no exacerbations) on ICS or
           ICS-LABA → 'matches'.
       (b) Not well-controlled (ACT 16-19, OR exacerbations >= 1, OR
           SABAOveruse=true) on low-dose ICS only → 'under_treated'

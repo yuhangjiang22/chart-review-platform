@@ -27,21 +27,54 @@ questions:
       from inhaler use alone."
 
   - question_id: T0-AgeOk
-    text: Is the patient age at the index date >= 12 years? (The 2020 Focused
-      Update's SMART and LAMA recommendations are scoped to ages 12+; pediatric
-      <12y uses a different evidence base.)
+    text: Is the patient age at the index date between 2 and 17 years inclusive
+      (the study's pediatric cohort scope)?
     tier: 0
     answer_schema:
       type: boolean
-    naepp_source: "2020 Focused Update Recommendations 13-16 (p.84-95) —
-      explicit population scope: 'individuals ages 12 years and older'"
+    naepp_source: "Study cohort definition — 'Agentic Chart Review for Pediatric
+      Asthma Guideline Adherence', Inclusion Criteria: pediatric patients ages
+      2-17 years (Cohort_Definition_Asthma_Adherence.docx; Design doc Study
+      Population). NAEPP guideline HANDLING is age-band-stratified (0-4, 5-11,
+      12+) and is selected downstream by T0-AgeBand."
     evidence_grade: population_scope
     clinical_rationale: >-
-      The 2020 Focused Update's strong SMART recommendation (Rec 13) and
-      LAMA add-on guidance (Recs 14-16) apply to individuals ages 12 and
-      older. Patients <12 are assessable for ICS adherence (EPR-3 stepwise)
-      but the T2-StepTherapyMatch logic in this skill assumes 12+ evidence.
+      The study population is pediatric asthma patients ages 2-17. Eligibility
+      admits that full range; the age-appropriate guideline logic (control
+      instrument, stepwise-therapy table) is then selected by T0-AgeBand,
+      because NAEPP EPR-3 applies different criteria to ages 0-4, 5-11, and 12+.
     retrieval_hints: Demographic header or notes. If age is unclear, return null.
+
+  - question_id: T0-AgeBand
+    text: Which NAEPP guideline age band does the patient fall into at the index
+      date? NAEPP applies different control instruments and stepwise-therapy
+      tables by band. Within the 2-17 cohort the bands are 2-4 (NAEPP 0-4
+      handling), 5-11, and 12-17 (NAEPP 12+ handling).
+    tier: 0
+    answer_schema:
+      type: string
+      enum:
+        - age_2_4
+        - age_5_11
+        - age_12_17
+    depends_on:
+      - T0-AgeOk
+    naepp_source: "EPR-3 stratifies diagnosis, control assessment, and the
+      stepwise approach by age: 0-4 years (Figures 4-1a / 4-2a), 5-11 years
+      (Figures 4-1b / 4-2b), and 12+ years (Figure 4-5). Design doc:
+      'Age-stratified guideline handling: NAEPP guidelines differ by age group
+      (0-4, 5-11, 12+).'"
+    evidence_grade: population_scope
+    clinical_rationale: >-
+      The correct control instrument (Childhood ACT for 5-11 vs ACT for 12+;
+      symptom-based for 2-4) and the correct stepwise-therapy table both depend
+      on this band; downstream T1/T2 questions and rules interpret their
+      thresholds relative to it. NOTE for analysis: the study's REPORTING strata
+      are 2-5 / 6-11 / 12-17, while guideline HANDLING uses the NAEPP boundaries
+      above — they differ at age 5 (NAEPP places a 5-year-old in 5-11 / C-ACT).
+      PI to confirm the 5-year-old handling before lock.
+    retrieval_hints: Compute from age at the index date — 2-4 -> age_2_4;
+      5-11 -> age_5_11; 12-17 -> age_12_17. If age is unknown, return null.
 
   - question_id: T0-LookbackHasNotes
     text: Are there at least 2 outpatient or specialty notes in the lookback window

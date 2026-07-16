@@ -5,8 +5,9 @@
 rules:
   - rule_id: R-T1-ControllerForPersistent
     description: >-
-      Persistent asthma (recent ACT < 20 OR >= 2 exacerbations) must
-      have an active controller prescribed.
+      Persistent asthma (recent age-appropriate control score < 20 — ACT for
+      ages 12-17, C-ACT for 5-11; or symptom/exacerbation-based for 2-4 — OR
+      >= 2 exacerbations) must have an active controller prescribed.
     naepp_source: >-
       EPR-3 Component 4 p.213 (Key Points: Medications) — 'long-term
       control medications [are] used to achieve and maintain control of
