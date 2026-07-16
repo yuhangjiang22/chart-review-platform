@@ -17,6 +17,7 @@ import type { RouteEntry } from "./router.js";
 import { PLATFORM_ROOT } from "@chart-review/patients";
 import { loadCompiledTask } from "@chart-review/tasks";
 import { listPilotIterations } from "./lib/domain/iter/index.js";
+import { getSessionManifest } from "@chart-review/domain-iter";
 
 interface FieldAssessment {
   field_id: string;
@@ -81,6 +82,14 @@ export function computePerformance(
   const agentIds = new Set<string>();
   const validatedPatients = new Set<string>();
 
+  // Scope to the session's declared cohort. The reviews dir is keyed by
+  // session_id alone and shared across tasks, so without this a foreign patient
+  // with a validated review_state under a colliding session_id leaks into the
+  // leaderboard (observed: a session whose cohort is patient_test_* still scored
+  // leftover patient_fake_* validations). Empty cohort → nothing to score.
+  const cohortSession = getSessionManifest(taskId, sessionId);
+  const cohort = cohortSession ? new Set(cohortSession.cohort?.patient_ids ?? []) : null;
+
   const ensure = (agentId: string, fid: string): Cell => {
     (agentCounts[agentId] ??= {});
     return (agentCounts[agentId][fid] ??= { n_evaluable: 0, n_correct: 0 });
@@ -89,6 +98,7 @@ export function computePerformance(
   if (fs.existsSync(sessionDir)) {
     for (const pid of fs.readdirSync(sessionDir)) {
       if (pid.startsWith(".")) continue;
+      if (cohort && !cohort.has(pid)) continue; // ← cohort scoping (null = no session manifest → don't filter)
       const state = readJson<ReviewState>(path.join(sessionDir, pid, taskId, "review_state.json"));
       if (!state) continue;
       if (state.review_status !== "reviewer_validated") continue;

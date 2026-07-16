@@ -12,8 +12,12 @@ interface SdkStatus {
 
 export function NerSdkRunPanel({
   sessionId,
+  taskId,
 }: {
   sessionId?: string | null;
+  /** Active task id — scopes the run + status so a session_id that also exists
+   *  under another NER task doesn't resolve the wrong cohort / status. */
+  taskId?: string | null;
   /** Accepted for call-site compatibility; the vendored NER flow reviews in the
    *  annotate UI (workbench), not the platform VALIDATE, so it's unused. */
   onAdvanceToValidate?: () => void;
@@ -26,10 +30,11 @@ export function NerSdkRunPanel({
   const poll = useCallback(async () => {
     if (!sessionId) return;
     try {
-      const r = await authFetch(`/api/ner-sdk/run-status?session_id=${encodeURIComponent(sessionId)}`);
+      const tq = taskId ? `&task_id=${encodeURIComponent(taskId)}` : "";
+      const r = await authFetch(`/api/ner-sdk/run-status?session_id=${encodeURIComponent(sessionId)}${tq}`);
       if (r.ok) setStatus((await r.json()) as SdkStatus);
     } catch { /* keep polling */ }
-  }, [sessionId]);
+  }, [sessionId, taskId]);
 
   useEffect(() => {
     const active = status.state === "starting" || status.state === "running";
@@ -51,7 +56,7 @@ export function NerSdkRunPanel({
       const r = await authFetch(`/api/ner-sdk/run`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_id: sessionId }),
+        body: JSON.stringify({ session_id: sessionId, ...(taskId ? { task_id: taskId } : {}) }),
       });
       if (!r.ok) { setError(`Start failed: ${(await r.json().catch(() => ({}))).message ?? r.status}`); return; }
       setStatus({ state: "starting" });

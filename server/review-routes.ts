@@ -786,8 +786,14 @@ export const reviewRoutes: RouteEntry[] = [
       const sid = sessionIdOf(query);
       const task = loadCompiledTask(p.taskId);
       if (!task) throw httpErr(404, { error: "task not found" });
-      if (task.task_kind !== "ner") {
-        throw httpErr(400, { error: `task ${p.taskId} is not an NER task` });
+      // Note validation backs BOTH NER (span review) and per-note phenotype
+      // tasks (supports_per_note) — the latter reuse `validated_notes` as the
+      // per-(note,field) scoring gate for the per-note performance view. Only a
+      // task with no note-level review notion at all is rejected. (Without this,
+      // PerNoteReview's "mark note validated" 400s for ACTS and the per-note
+      // DECIDE metrics can never populate.)
+      if (task.task_kind !== "ner" && !task.supports_per_note) {
+        throw httpErr(400, { error: `task ${p.taskId} does not support note-level validation` });
       }
       const { validated } = (body ?? {}) as { validated?: boolean };
       if (typeof validated !== "boolean") {

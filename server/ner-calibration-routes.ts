@@ -25,6 +25,7 @@ import { pathFor } from "@chart-review/storage";
 import { listRuns, runDir } from "@chart-review/infra-batch-run";
 import { computeSpanIaa } from "@chart-review/eval-span-iaa";
 import { sessionReviewsRoot } from "./lib/session-reviews.js";
+import { getSessionManifest } from "@chart-review/domain-iter";
 import { transitionMaturity, getMaturity } from "./lib/maturity.js";
 import type { SpanLabel } from "@chart-review/platform-types";
 
@@ -73,13 +74,24 @@ export const nerCalibrationRoutes: RouteEntry[] = [
       }
       const sid = sessionIdOf(query);
 
-      // Enumerate patients with a review_state.json for this task,
-      // scoped to the active session.
+      // Scope to THIS session's declared cohort — NOT every patient that happens
+      // to have a review_state under the (task-agnostic) session reviews dir.
+      // Without this, a patient annotated for this task under a colliding
+      // session_id from OTHER work (e.g. a real ACTS patient with a leftover
+      // bso-ad-ner review_state) leaks in and inflates/replaces the score with a
+      // patient that isn't even in the cohort the UI shows. Empty/missing cohort
+      // → nothing to score (correct: the session has no gold).
+      const cohortSession = getSessionManifest(p.taskId, sid);
+      const cohort = cohortSession ? new Set(cohortSession.cohort?.patient_ids ?? []) : null;
+
+      // Enumerate patients that are BOTH in the cohort AND have a review_state
+      // for this task under the active session.
       const rRoot = sessionReviewsRoot(sid);
       const patientIds: string[] = [];
       if (fs.existsSync(rRoot)) {
         for (const pid of fs.readdirSync(rRoot)) {
           if (!/^[a-zA-Z0-9_-]+$/.test(pid)) continue;
+          if (cohort && !cohort.has(pid)) continue; // ← cohort scoping (null = no session manifest → don't filter)
           const rsp = pathFor.reviewState(sid, pid, p.taskId);
           if (fs.existsSync(rsp)) patientIds.push(pid);
         }

@@ -376,7 +376,7 @@ export function PhaseTry({
   if (taskKind === "ner") {
     return (
       <div className="space-y-4">
-        <NerSdkRunPanel sessionId={activeSessionId} onAdvanceToValidate={onAdvanceToValidate ?? (() => {})} />
+        <NerSdkRunPanel sessionId={activeSessionId} taskId={taskId} onAdvanceToValidate={onAdvanceToValidate ?? (() => {})} />
         <SkillDocPanel />
         <AgentTracePanel sessionId={activeSessionId} />
       </div>
@@ -485,7 +485,7 @@ export function PhaseTry({
       )}
 
       {taskKind === "ner" ? (
-        <NerSdkRunPanel sessionId={activeSessionId} onAdvanceToValidate={onAdvanceToValidate ?? (() => {})} />
+        <NerSdkRunPanel sessionId={activeSessionId} taskId={taskId} onAdvanceToValidate={onAdvanceToValidate ?? (() => {})} />
       ) : (
         <div className="flex justify-end">
           <Button

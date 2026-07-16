@@ -11,7 +11,7 @@ import { getSessionManifest, importPilotIteration } from "@chart-review/domain-i
 import { runDir, manifestPath as runManifestPath, statusPath as runStatusPath } from "@chart-review/infra-batch-run";
 import { parseEnvFile, runBenchmarkCohort } from "./lib/run-benchmark-cohort.js";
 
-const TASK_ID = "bso-ad-ner-sdk";
+const DEFAULT_NER_SDK_TASK = "bso-ad-ner-sdk";
 
 function arg(name: string, fallback?: string): string {
   const i = process.argv.indexOf(`--${name}`);
@@ -33,6 +33,10 @@ function checkTcp(host: string, port: number, ms = 1500): Promise<boolean> {
 
 async function main() {
   const sessionId = arg("session-id");
+  // Task the run belongs to. Defaults to bso-ad-ner-sdk for back-compat, but the
+  // server passes the ACTIVE task so a session_id that also exists under a
+  // different NER task no longer resolves the wrong cohort.
+  const taskId = arg("task-id", DEFAULT_NER_SDK_TASK);
   const model = arg("model", "gpt-5.2");
   // Optional status file: when set, write coarse run progress as JSON so a UI
   // (server /api/ner-sdk/run-status) can poll it. Absent → behave as before.
@@ -84,8 +88,8 @@ async function main() {
   }
 
   // Preflight 3: session + cohort
-  const session = getSessionManifest(TASK_ID, sessionId);
-  if (!session) throw new Error(`session ${sessionId} not found for task ${TASK_ID}`);
+  const session = getSessionManifest(taskId, sessionId);
+  if (!session) throw new Error(`session ${sessionId} not found for task ${taskId}`);
   const patientIds = session.cohort?.patient_ids ?? [];
   if (!patientIds.length) throw new Error(`session ${sessionId} has an empty cohort`);
 
@@ -97,9 +101,9 @@ async function main() {
   writeStatus({ state: "running", session_id: sessionId, total, done, started_at: nowIso() });
 
   const summary = await runBenchmarkCohort({
-    sessionId, taskId: TASK_ID, model, patientIds, benchmarkRoot, env,
+    sessionId, taskId, model, patientIds, benchmarkRoot, env,
     reviewsRootOverride: reviewsRoot,
-    outRoot: path.join(PLATFORM_ROOT, "var", "benchmark-sdk", sessionId),
+    outRoot: path.join(PLATFORM_ROOT, "var", "benchmark-sdk", taskId, sessionId),
     onProgress: (m) => {
       console.log(m);
       if (/^\[done\] /.test(m)) {
@@ -125,7 +129,7 @@ async function main() {
   const isError = (p: { n_spans: number; failures: unknown[] }) => p.n_spans === 0 && p.failures.length > 0;
   fs.mkdirSync(runDir(runId), { recursive: true });
   fs.writeFileSync(runManifestPath(runId), JSON.stringify({
-    run_id: runId, label: `vendored-sdk ${sessionId}`, task_id: TASK_ID,
+    run_id: runId, label: `vendored-sdk ${sessionId}`, task_id: taskId,
     guideline_sha: "sdk-vendored", started_at: runStartedAt, started_by: "vendored-sdk",
     patient_ids: patientIds, max_concurrency: 1, max_turns_per_patient: 200,
     model, cost_cap_usd: 50, kind: "agent_batch_run", session_id: sessionId,
@@ -140,10 +144,10 @@ async function main() {
     n_complete: summary.patients.filter((p) => !isError(p)).length,
     n_error: summary.patients.filter(isError).length, n_running: 0, per_patient: perPatient,
   }, null, 2));
-  const iter = importPilotIteration({ task_id: TASK_ID, run_id: runId, session_id: sessionId, started_by: "vendored-sdk" });
+  const iter = importPilotIteration({ task_id: taskId, run_id: runId, session_id: sessionId, started_by: "vendored-sdk" });
   console.log(`[sdk-run] created iter ${iter.pilot.iter_id} (${iter.pilot.state}) for VALIDATE.`);
 
-  console.log(`[sdk-run] open NER tab → task ${TASK_ID} + session ${sessionId} to VALIDATE.`);
+  console.log(`[sdk-run] open NER tab → task ${taskId} + session ${sessionId} to VALIDATE.`);
   writeStatus({
     state: "complete", session_id: sessionId, total,
     done: summary.patients.length,

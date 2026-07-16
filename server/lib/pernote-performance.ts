@@ -3,6 +3,7 @@ import path from "node:path";
 import { cohensKappa } from "@chart-review/eval-adherence-iaa";
 import { PLATFORM_ROOT, readGroundTruth } from "@chart-review/patients";
 import { loadCompiledTask } from "@chart-review/tasks";
+import { getSessionManifest } from "@chart-review/domain-iter";
 
 /** One scored cell: rater `a` (agent) vs rater `b` (reviewer or ground truth). */
 export interface CellPair {
@@ -145,6 +146,11 @@ export function computePerNotePerformance(
 ): PerNotePerformance {
   const reviewsRoot = process.env.CHART_REVIEW_REVIEWS_ROOT ?? path.join(PLATFORM_ROOT, "var", "reviews");
   const sessionDir = path.join(reviewsRoot, sessionId);
+  // Scope to the session's declared cohort — the reviews dir is keyed by
+  // session_id alone (shared across tasks), so a foreign patient's leftover
+  // review_state under a colliding session_id would otherwise be scored.
+  const cohortSession = getSessionManifest(taskId, sessionId);
+  const cohort = cohortSession ? new Set(cohortSession.cohort?.patient_ids ?? []) : null;
   const arPairs: CellPair[] = [];
   const agPairs: CellPair[] = [];
   const rgPairs: CellPair[] = [];
@@ -155,6 +161,7 @@ export function computePerNotePerformance(
   if (fs.existsSync(sessionDir)) {
     for (const pid of fs.readdirSync(sessionDir)) {
       if (pid.startsWith(".")) continue;
+      if (cohort && !cohort.has(pid)) continue; // ← cohort scoping (null = no session manifest → don't filter)
       const state = readJson<RState>(path.join(sessionDir, pid, taskId, "review_state.json"));
       if (!state) continue;
       const validated = new Set(state.validated_notes ?? []);

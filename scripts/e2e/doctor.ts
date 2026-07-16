@@ -136,6 +136,7 @@ for (const task of tasks) {
 // Detailed checks focus on RECENT sessions (the ones a human might open);
 // older/historical sessions (mostly e2e test cruft) are summarized, not listed.
 const RECENT_N = Number(process.env.DOCTOR_RECENT_SESSIONS ?? 8);
+const reviewsRoot = process.env.CHART_REVIEW_REVIEWS_ROOT ?? path.join(ROOT, "var", "reviews");
 const recentSessionIds = new Set<string>(); // (task:sid) — used to scope ALIGN too
 for (const task of tasks) {
   const all = listSessions(task.task_id).slice().sort((a, b) => ((b as any).session_num ?? 0) - ((a as any).session_num ?? 0));
@@ -166,6 +167,19 @@ for (const task of tasks) {
         }
       }
       if (dangling.size) add("FAIL", "CITATION", `${task.task_id}/${s.session_id} ${pid}: review_state cites ${dangling.size} note(s) NOT in the current fixture (stale after a repoint) → save fails: ${[...dangling].slice(0, 3).join(", ")}${dangling.size > 3 ? " …" : ""}`);
+    }
+    // SCOPING: performance + calibrate-ner score every patient that has a
+    // review_state under the (session-id-keyed, task-agnostic) reviews dir. A
+    // review_state for a patient NOT in this session's cohort is cross-cohort
+    // leakage — it inflated/replaced the DECIDE leaderboard before cohort
+    // scoping (and is a data-hygiene smell even now the routes exclude it).
+    const cohortSet = new Set(cohort);
+    const sdir = path.join(reviewsRoot, s.session_id);
+    if (fs.existsSync(sdir)) {
+      const foreign = fs.readdirSync(sdir).filter((pid) =>
+        pid.startsWith("patient_") && !cohortSet.has(pid) &&
+        fs.existsSync(path.join(sdir, pid, task.task_id, "review_state.json")));
+      if (foreign.length) add("WARN", "SCOPING", `${task.task_id}/${s.session_id} ('${(s as any).name ?? ""}'): ${foreign.length} review_state(s) for patient(s) NOT in the session cohort (cross-cohort leak — performance/calibrate-ner scored these before cohort scoping): ${foreign.slice(0, 3).join(", ")}${foreign.length > 3 ? " …" : ""}`);
     }
   }
   const olderBroken = older.filter((s) => ((s as any).cohort?.patient_ids ?? []).some((pid: string) => !fixtureSet.has(pid)));

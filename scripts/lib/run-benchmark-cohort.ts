@@ -130,7 +130,13 @@ export async function runBenchmarkCohort(input: RunCohortInput): Promise<CohortR
     ?? path.join(input.benchmarkRoot, "..", "chart-review-platform", "var", "reviews");
   const dataRoot = input.dataRoot ?? path.join(input.benchmarkRoot, "ontology");
   const outRoot = input.outRoot ?? path.join(reviewsRoot, "..", "benchmark-sdk", input.sessionId);
-  const pythonBin = input.pythonBin ?? "python3";
+  // Default to the benchmark's OWN venv python — the vendored Claude-Agent-SDK
+  // deps (claude_agent_sdk, fastmcp, …) live only in vendor/bso-ad-sdk/.venv
+  // (Python 3.11). System python3 (often 3.9) can't import them and the child
+  // dies with `ModuleNotFoundError: claude_agent_sdk` → 0 spans, all notes
+  // "failed". Callers may still override via input.pythonBin.
+  const venvPy = path.join(input.benchmarkRoot, ".venv", "bin", "python");
+  const pythonBin = input.pythonBin ?? (fs.existsSync(venvPy) ? venvPy : "python3");
   const runNote = input.runNote ?? runOneNote;
   const nowIso = input.nowIso ?? new Date().toISOString();
   const ontologyPin = input.ontologyPin ?? "bso-ad@2026.05.28-0";
