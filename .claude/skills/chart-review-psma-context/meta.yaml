@@ -1,0 +1,36 @@
+task_type: adherence
+task_kind: adherence
+uses_structured_data: true
+manual_version: 0.1.0-draft
+source_document_sha: sha256:psma-context-draft-2026-07
+status: draft
+review_unit: patient
+overview_prose: >-
+  PSMA PET/CT clinical-context task. The agent answers factual chart-review
+  questions in tiers — (T0) eligibility: this is a PSMA PET/CT, confirmed
+  prostate adenocarcinoma; (T1) disease/staging: Grade Group, most-recent PSA,
+  PSA trend, prior metastatic sites; (T2) treatment history:
+  prostatectomy, radiation, ADT, ARPI, chemotherapy, radioligand therapy; (T3)
+  exam context: the indication for this scan, prior PET/CT disease status, and
+  any prior-imaging follow-up recommendation. Facts are read from pathology,
+  oncology, urology, radiation-oncology, and prior imaging notes plus structured
+  EHR data (PSA, medications, procedures). This is a CONTEXT-EXTRACTION task —
+  it provides context for interpretation, it does not judge the scan or make
+  recommendations, so no concordance rules are defined. DRAFT — question topics
+  are from the project scope doc; enums and clinical specifics are unvalidated
+  and pending clinician review (see RUBRIC_DRAFT.md).
+final_output: question_answers
+phases:
+  - author
+  - try
+  - validate
+  - decide
+clinical_sources:
+  - id: NCCN-PROSTATE
+    title: "NCCN Clinical Practice Guidelines in Oncology — Prostate Cancer"
+    publisher: National Comprehensive Cancer Network
+    citation: "NCCN Guidelines: Prostate Cancer."
+  - id: AUA-SUO-2023
+    title: "AUA/SUO Advanced Prostate Cancer Guideline"
+    publisher: American Urological Association / Society of Urologic Oncology
+    citation: "AUA/SUO Advanced Prostate Cancer Guideline."

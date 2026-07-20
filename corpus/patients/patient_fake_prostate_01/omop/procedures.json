@@ -1,0 +1,11 @@
+[
+  {
+    "row_id": 20301,
+    "concept_id": 4030665,
+    "concept_name": "Laparoscopic radical prostatectomy",
+    "cpt": "55866",
+    "procedure_date": "2023-04-15",
+    "provider_specialty": "Urology",
+    "encounter_id": "enc_p2003"
+  }
+]

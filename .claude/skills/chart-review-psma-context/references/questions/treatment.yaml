@@ -1,0 +1,51 @@
+# T2 — Treatment history. Report STATE, not mere presence.
+
+questions:
+  - question_id: PC2a
+    text: "Has the patient had a radical prostatectomy?"
+    tier: 2
+    answer_schema:
+      type: string
+      enum: [yes, no, unclear]
+    depends_on: [PC0b]
+    retrieval_hints: "Operative/surgical notes, urology notes ('s/p RALP 2023-04'); procedures table. TURP does NOT count."
+
+  - question_id: PC2b
+    text: "Has the patient received radiation therapy, and to what target?"
+    tier: 2
+    answer_schema:
+      type: string
+      enum: [none, prostate_or_bed, nodal, metastasis_directed, unclear]
+    retrieval_hints: "Radiation-oncology notes / treatment summaries."
+
+  - question_id: PC2c
+    text: "What is the patient's androgen-deprivation therapy (ADT) status?"
+    tier: 2
+    answer_schema:
+      type: string
+      enum: [none, active, completed, unclear]
+    retrieval_hints: "Structured first: drugs table (leuprolide, goserelin, degarelix, relugolix). Orchiectomy = permanent active. Notes fallback."
+
+  - question_id: PC2d
+    text: "What is the patient's androgen-receptor pathway inhibitor (ARPI) status?"
+    tier: 2
+    answer_schema:
+      type: string
+      enum: [none, active, completed, unclear]
+    retrieval_hints: "Drugs table: abiraterone, enzalutamide, apalutamide, darolutamide."
+
+  - question_id: PC2e
+    text: "What is the patient's chemotherapy status for prostate cancer?"
+    tier: 2
+    answer_schema:
+      type: string
+      enum: [none, active, completed, unclear]
+    retrieval_hints: "Drugs table: docetaxel, cabazitaxel. Oncology treatment summaries."
+
+  - question_id: PC2f
+    text: "Has the patient received PSMA-targeted radioligand therapy (e.g. Lu-177 PSMA-617 / Pluvicto)?"
+    tier: 2
+    answer_schema:
+      type: string
+      enum: [yes, no, unclear]
+    retrieval_hints: "Nuclear-medicine / oncology therapy notes; drugs table ('Lu-177', 'lutetium vipivotide', 'Pluvicto')."

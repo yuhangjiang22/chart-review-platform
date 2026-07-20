@@ -1,0 +1,37 @@
+# T1 — Disease & staging.
+
+questions:
+  - question_id: PC1a
+    text: "What is the patient's ISUP Grade Group (or Gleason score) at diagnosis?"
+    tier: 1
+    answer_schema:
+      type: string
+      enum: [GG1, GG2, GG3, GG4, GG5, unclear]
+      description: "GG1=Gleason 6, GG2=3+4, GG3=4+3, GG4=8, GG5=9-10."
+    depends_on: [PC0b]
+    retrieval_hints: "Prostate biopsy / prostatectomy pathology ('Gleason 4+3=7, Grade Group 3'). Do not infer from PSA."
+
+  - question_id: PC1c
+    text: "What is the most recent PSA value (ng/mL) documented?"
+    tier: 1
+    answer_schema:
+      type: number
+      description: "ng/mL; null when no PSA is documented."
+    retrieval_hints: "Structured first: measurements table, PSA (LOINC 2857-1), most recent value. Notes fallback ('PSA 0.4')."
+
+  - question_id: PC1d
+    text: "What is the PSA trend across the available values?"
+    tier: 1
+    answer_schema:
+      type: string
+      enum: [rising, falling, stable, unclear]
+    retrieval_hints: "Compare the two or more most recent PSA values. unclear if only one value."
+
+  - question_id: PC1e
+    text: "What are the known prior sites of metastatic disease?"
+    tier: 1
+    answer_schema:
+      type: string
+      enum: [none, nodal, osseous, visceral, multiple, unclear]
+      description: "Single best category. multiple = more than one of nodal/osseous/visceral."
+    retrieval_hints: "Prior imaging reports (PET/CT, CT, bone scan) and oncology notes."

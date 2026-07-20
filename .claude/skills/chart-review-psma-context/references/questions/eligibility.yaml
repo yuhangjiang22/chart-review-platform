@@ -1,0 +1,10 @@
+# T0 — Eligibility. Answer FIRST.
+
+questions:
+  - question_id: PC0b
+    text: "Does the patient have a confirmed prostate adenocarcinoma diagnosis (pathologically confirmed)?"
+    tier: 0
+    answer_schema:
+      type: string
+      enum: [yes, no, unclear]
+    retrieval_hints: "Prostate biopsy or prostatectomy pathology report; urology/oncology notes."

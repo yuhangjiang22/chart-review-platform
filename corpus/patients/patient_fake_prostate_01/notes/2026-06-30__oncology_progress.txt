@@ -1,0 +1,16 @@
+MEDICAL ONCOLOGY PROGRESS NOTE  (SYNTHETIC — NOT A REAL PATIENT)
+Date: 2026-06-30
+
+History: High-risk prostate adenocarcinoma (Grade Group 4), NCCN high risk,
+diagnosed 2023. Status post radical prostatectomy 2023-04 (pT3a pN0).
+
+Interval: Post-operative PSA was undetectable (<0.1). PSA is now rising:
+0.2 ng/mL (2025-08), 0.4 ng/mL (2025-12), and 0.6 ng/mL (2026-06). This meets
+criteria for biochemical recurrence.
+
+Treatment history: No history of radiation therapy. No androgen receptor
+pathway inhibitor (no abiraterone/enzalutamide). No chemotherapy. No prior
+PSMA radioligand therapy.
+
+Plan: Started leuprolide (androgen-deprivation therapy) this visit for rising
+PSA. Order Ga-68 PSMA-11 PET/CT to localize site of biochemical recurrence.

@@ -9,7 +9,7 @@ import type { RouteEntry } from "./router.js";
 import { PLATFORM_ROOT } from "@chart-review/patients";
 import { getSessionManifest } from "@chart-review/domain-iter";
 
-const TASK_ID = "bso-ad-ner-sdk";
+const DEFAULT_TASK_ID = "bso-ad-ner-sdk";
 const WORKBENCH_PORT = 18090;
 const REVIEWER = "reviewer_1";
 const VENDOR = path.join(PLATFORM_ROOT, "vendor", "bso-ad-sdk");
@@ -18,7 +18,12 @@ const REVIEW_ROOT = path.join(PLATFORM_ROOT, "var", "annotate", "review");
 function httpErr(s: number, m: string): Error & { status: number } { const e = new Error(m) as Error & { status: number }; e.status = s; return e; }
 function safeId(v: unknown): string { if (typeof v !== "string" || !/^[A-Za-z0-9_-]+$/.test(v)) throw httpErr(400, "invalid id"); return v; }
 function csvField(s: string): string { return `"${s.replace(/"/g, '""')}"`; }
-function batchDir(s: string): string { return path.join(REVIEW_ROOT, "batches", s); }
+// Batch id/dir are namespaced by task AND session: two NER tasks share session
+// ids, so a session-only key made one task's review batch surface under the
+// other (bso-ad-ner showing bso-ad-ner-sdk's mentions).
+function batchIdFor(taskId: string, sessionId: string): string { return `${taskId}__${sessionId}`; }
+function batchDir(taskId: string, sessionId: string): string { return path.join(REVIEW_ROOT, "batches", batchIdFor(taskId, sessionId)); }
+function legacyBatchDir(sessionId: string): string { return path.join(REVIEW_ROOT, "batches", sessionId); }
 function vendorEnv(): Record<string, string> {
   const out: Record<string, string> = {};
   try { for (const raw of fs.readFileSync(path.join(VENDOR, ".env"), "utf-8").split("\n")) {
@@ -39,15 +44,29 @@ function checkTcp(host: string, port: number, ms = 1200): Promise<boolean> {
   return new Promise((res) => { const s = net.connect({ host, port }); const d = (ok: boolean) => { s.destroy(); res(ok); };
     s.setTimeout(ms); s.on("connect", () => d(true)); s.on("timeout", () => d(false)); s.on("error", () => d(false)); });
 }
-function ensureBatch(sessionId: string): void {
-  const manifest = path.join(batchDir(sessionId), "manifest.json");
-  if (fs.existsSync(manifest)) return;
-  const session = getSessionManifest(TASK_ID, sessionId);
-  if (!session) throw httpErr(404, `session ${sessionId} not found`);
+function ensureBatch(taskId: string, sessionId: string): string {
+  const batchId = batchIdFor(taskId, sessionId);
+  const dir = batchDir(taskId, sessionId);
+  if (fs.existsSync(path.join(dir, "manifest.json"))) return batchId;
+  // A dir without a manifest is a partial/failed batch_init — clear it so a retry
+  // (or the migration below) starts clean instead of hitting the vendored
+  // "batch directory exists" error forever.
+  if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true });
+  // One-time migration: legacy batches (created when this route hardcoded
+  // bso-ad-ner-sdk) live at batches/<session> with no task in the key and belong
+  // to bso-ad-ner-sdk. Adopt them into the namespaced path so their reviewer
+  // verdicts aren't orphaned. Other tasks never owned a legacy batch.
+  const legacy = legacyBatchDir(sessionId);
+  if (taskId === DEFAULT_TASK_ID && fs.existsSync(path.join(legacy, "manifest.json"))) {
+    fs.renameSync(legacy, dir);
+    return batchId;
+  }
+  const session = getSessionManifest(taskId, sessionId);
+  if (!session) throw httpErr(404, `session ${sessionId} not found for task ${taskId}`);
   const patientIds = session.cohort?.patient_ids ?? [];
   if (!patientIds.length) throw httpErr(400, `session ${sessionId} has an empty cohort`);
   fs.mkdirSync(path.join(PLATFORM_ROOT, "var", "annotate"), { recursive: true });
-  const notesCsv = path.join(PLATFORM_ROOT, "var", "annotate", `${sessionId}-notes.csv`);
+  const notesCsv = path.join(PLATFORM_ROOT, "var", "annotate", `${batchId}-notes.csv`);
   const rows = ["note_id,person_id,note_text"]; const noteIds: string[] = [];
   for (const pid of patientIds) {
     const personId = pid.replace(/^patient_real_/, "");
@@ -59,14 +78,18 @@ function ensureBatch(sessionId: string): void {
       noteIds.push(noteId);
     }
   }
+  if (noteIds.length === 0) {
+    throw httpErr(400, `no notes to annotate for session ${sessionId} — its cohort (${patientIds.join(", ")}) has no notes materialized here`);
+  }
   fs.writeFileSync(notesCsv, rows.join("\n") + "\n");
   const r = spawnSync(vendorPython(), ["pipeline/batch_init.py",
-    "--results-root", path.join(PLATFORM_ROOT, "var", "benchmark-sdk", sessionId),
-    "--review-root", REVIEW_ROOT, "--batch-id", sessionId,
+    "--results-root", path.join(PLATFORM_ROOT, "var", "benchmark-sdk", taskId, sessionId),
+    "--review-root", REVIEW_ROOT, "--batch-id", batchId,
     "--reviewers", "reviewer_1", "reviewer_2", "--notes-csv", notesCsv,
     "--include-note-id", ...noteIds,
   ], { cwd: VENDOR, env: { ...process.env, ...vendorEnv() }, encoding: "utf-8" });
-  if (r.status !== 0 && !fs.existsSync(manifest)) throw httpErr(500, `batch_init failed: ${(r.stderr || r.stdout || "").slice(-800)}`);
+  if (r.status !== 0 && !fs.existsSync(path.join(dir, "manifest.json"))) throw httpErr(500, `batch_init failed: ${(r.stderr || r.stdout || "").slice(-800)}`);
+  return batchId;
 }
 
 export const nerSdkAnnotateRoutes: RouteEntry[] = [
@@ -74,8 +97,10 @@ export const nerSdkAnnotateRoutes: RouteEntry[] = [
     method: "POST",
     pattern: "/api/ner-sdk/annotate",
     handler: async (body) => {
-      const sessionId = safeId((body as { session_id?: unknown } | null)?.session_id);
-      ensureBatch(sessionId);
+      const b = (body ?? {}) as { session_id?: unknown; task_id?: unknown };
+      const sessionId = safeId(b.session_id);
+      const taskId = b.task_id == null ? DEFAULT_TASK_ID : safeId(b.task_id);
+      const batchId = ensureBatch(taskId, sessionId);
       if (!(await checkTcp("127.0.0.1", WORKBENCH_PORT))) {
         const annotateDir = path.join(PLATFORM_ROOT, "var", "annotate");
         fs.mkdirSync(annotateDir, { recursive: true });
@@ -85,8 +110,8 @@ export const nerSdkAnnotateRoutes: RouteEntry[] = [
         child.unref();
         await new Promise((r) => setTimeout(r, 1800));
       }
-      const url = `http://127.0.0.1:${WORKBENCH_PORT}/?embed=1&reviewer=${REVIEWER}&batch=${encodeURIComponent(sessionId)}`;
-      return { url, batch_id: sessionId };
+      const url = `http://127.0.0.1:${WORKBENCH_PORT}/?embed=1&reviewer=${REVIEWER}&batch=${encodeURIComponent(batchId)}`;
+      return { url, batch_id: batchId };
     },
   },
 ];

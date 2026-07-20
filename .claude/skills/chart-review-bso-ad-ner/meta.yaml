@@ -13,8 +13,8 @@ final_output: span_labels
 phases:
   - author
   - try
-  - judge
   - validate
   - decide
+  - refine
   - lock
 ontology_pin: bso-ad@0.1

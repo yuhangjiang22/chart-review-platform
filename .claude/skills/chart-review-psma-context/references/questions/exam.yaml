@@ -1,0 +1,26 @@
+# T3 — Exam context & prior imaging.
+
+questions:
+  - question_id: PC3a
+    text: "What is the clinical indication for THIS PSMA PET/CT?"
+    tier: 3
+    answer_schema:
+      type: string
+      enum: [initial_staging, biochemical_recurrence, restaging, treatment_response, unclear]
+    retrieval_hints: "Imaging order / referring note. 'Rising PSA after prostatectomy/RT' -> biochemical_recurrence."
+
+  - question_id: PC3b
+    text: "On the most recent prior PET/CT or CT, what was the disease status?"
+    tier: 3
+    answer_schema:
+      type: string
+      enum: [progressing, responding, stable, no_prior, unclear]
+    retrieval_hints: "Prior radiology report Impression. no_prior = no comparison study."
+
+  - question_id: PC3c
+    text: "Did the most recent prior imaging report make a specific follow-up recommendation? If so, quote it."
+    tier: 3
+    answer_schema:
+      type: string
+      description: "Short: site + recommendation verbatim, or 'none', or 'no_prior'."
+    retrieval_hints: "Prior radiology report Recommendation/Impression section. Quote verbatim."

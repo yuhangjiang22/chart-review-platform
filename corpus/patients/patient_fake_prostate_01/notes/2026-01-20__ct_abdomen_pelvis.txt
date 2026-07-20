@@ -1,0 +1,12 @@
+CT ABDOMEN AND PELVIS WITH CONTRAST  (SYNTHETIC — NOT A REAL PATIENT)
+Date: 2026-01-20
+History: Prostate cancer, s/p radical prostatectomy, rising PSA.
+
+IMPRESSION:
+1. No definite metastatic disease. No pathologically enlarged pelvic or
+   retroperitoneal lymph nodes; a subcentimeter (8 mm) retroperitoneal node is
+   unchanged from prior and likely reactive.
+2. No suspicious osseous lesion.
+
+RECOMMENDATION: Recommend PSMA PET/CT if PSA continues to rise, as CT is
+insensitive for low-volume recurrent disease.
