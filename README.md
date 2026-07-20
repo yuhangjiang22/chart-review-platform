@@ -1,273 +1,207 @@
-# chart-review-platform-concur
+<div align="center">
 
-A trimmed fork of chart-review-platform-v2. It began as the minimum viable
-stack for a single phenotype chart-review task driven by an open-weights or
-Azure OpenAI model via the [deepagents](https://github.com/langchain-ai/deepagents)
-agent framework, and has since been extended back up toward v2: **three task
-kinds** (phenotype, NER, adherence) and an **automatic rubric self-refinement
-loop** that improves the rubric from the reviewer's own annotations.
+# 📋 Chart Review
 
----
+### Agent-assisted clinical chart review — from rubric draft to locked, citable results, in one workspace.
 
-## What it is
+An LLM agent reads every patient's chart and drafts each answer **with the exact quote it used**; a human adjudicates; the rubric **improves itself** from those decisions — until agreement stabilizes and the rubric locks at a git SHA you can cite.
 
-- **Three task kinds.** Clinical notes only (OMOP structured-data access
-  stays removed):
-  - **phenotype** — per-criterion categorical answers (e.g. `cancer-diagnosis`).
-  - **NER** — entity-span extraction against an ontology (e.g. `bso-ad-ner`).
-  - **adherence** — guideline-concordance: per-question answers plus
-    deterministic rule verdicts (e.g. `asthma-adherence`). See
-    [Adherence](#adherence-task) below.
-- **One pre-authored phenotype task: `cancer-diagnosis`.** Two categorical
-  fields per patient:
-  - `cancer_type`: `squamous_cell_carcinoma | adenocarcinoma | lymphoma |
-    sarcoma | melanoma | neuroendocrine_tumor | no_info`
-  - `disease_extent`: `local_recurrent | local_recurrent_and_metastatic |
-    metastatic | no_info`
-- **One agent provider: `deepagents`.** A TypeScript `DeepAgentsProvider`
-  (`packages/agent-provider-deepagents`) spawns a Python sidecar
-  (`python/chart_review_deepagents`) which loads the MCP tools from the
-  stdio MCP server via `langchain-mcp-adapters` — one persistent session
-  per patient run — and drives the agent with Azure OpenAI or vLLM.
-- **Phases: AUTHOR · TRY · JUDGE (optional) · VALIDATE · PERFORMANCE.**
-  AUTHOR (rubric editor) and JUDGE (disagreement triage) were added back;
-  LOCK and DEPLOY remain deferred.
-- **PERFORMANCE** scores the agents against the reviewer's validated
-  answers, per task kind: phenotype = per-field accuracy
-  (`GET /api/performance/:taskId`), NER = per-entity-type precision/recall/F1
-  (`/api/calibrate-ner`), adherence = per-question / per-rule Cohen's κ
-  (`/api/pilots/:taskId/:iterId/adherence-iaa`).
-- **Rubric self-refinement** (phenotype + adherence; NER attribution+propose
-  only so far). From the reviewer's validated annotations the platform does
-  an LLM **error analysis** on each model-vs-human mismatch (rubric gap /
-  genuine ambiguity / model slip), proposes a **generalizable rule** to add to
-  the rubric, validates it on a **held-out** split (Δ agreement, n_fixed /
-  n_regressed), and surfaces a transparent card the reviewer **applies** — a
-  versioned, **revertable** edit with the wrong-cases + proof recorded as
-  provenance. Never auto-applies; never refines for a model slip. See
-  `docs/superpowers/plans/2026-06-13-refine-from-human-annotations.md`.
-- **Faithfulness gate** is retained. Every `set_field_assessment` call
-  requires verbatim note text at verifiable byte offsets; the MCP write
-  path rejects writes whose evidence quotes don't match note bytes.
+![status](https://img.shields.io/badge/status-research%20preview-3b82f6)
+![stack](https://img.shields.io/badge/stack-TypeScript%20·%20Python%20·%20React-64748b)
+![tasks](https://img.shields.io/badge/tasks-phenotype%20·%20NER%20·%20adherence-16a34a)
+![models](https://img.shields.io/badge/models-Azure%20OpenAI%20·%20vLLM%20·%20OpenRouter-6E56CF)
+![license](https://img.shields.io/badge/license-see%20LICENSE-lightgrey)
+
+</div>
 
 ---
 
-## Adherence task
+Clinical chart review — reading a record to answer a fixed set of structured questions — is a bottleneck in observational research: slow, expensive, and hard to reproduce. This platform puts an LLM **agent** in front of the human reviewer as a *first-drafter*. Three properties make it more than "an LLM with a form":
 
-The **adherence** task kind reviews **guideline concordance** — did the care
-documented in the chart follow a clinical guideline? Example task:
-`asthma-adherence` (16 questions across 3 tiers).
+- ✅ **Every answer carries a machine-verified quote.** A write is rejected if the cited text isn't actually in the note. The agent cannot invent evidence.
+- 🔁 **Every run is reproducible.** The rubric is versioned; a validated task exports as a package and re-runs headlessly on a new cohort with the same prompt and model.
+- ♻️ **The rubric improves itself.** From the reviewer's own decisions, the platform proposes concrete, held-out-validated rubric edits — surfaced transparently for a human to apply, never automatically.
 
-**Two kinds of unit, and only one is LLM-driven:**
+<div align="center">
 
-- **Questions** (`references/questions/T<tier>_*.yaml`) — the agent answers each
-  (`question_id`, `answer`, evidence, confidence). A question carries its
-  `text`, an `answer_schema`, and free-form `retrieval_hints` (where/how to find
-  the answer). These are what the reviewer adjudicates and what refinement edits.
-- **Rule verdicts** (`references/rules/*.yaml`) — `CONCORDANT` /
-  `NON_CONCORDANT` / `EXCLUDED`, computed **deterministically** by the rule
-  engine from the question answers (a boolean DSL over `question_id`s). They are
-  *not* LLM output and are *not* refinable — to change a verdict you change the
-  questions feeding it.
+![Performance — per-agent F1 against the reviewer's validated gold](docs/assets/studio-decide.png)
 
-**Review state** (per patient): `question_answers[]` + `rule_verdicts[]`
-(union of agent + reviewer; reviewer entries are `source: "reviewer"`),
-`validated_questions[]`, `validated_rules[]`. A patient flips to
-`reviewer_validated` when every question/rule unit is reviewer-decided
-(`deriveAdherenceReviewStatus`).
+<sub><b>PERFORMANCE</b> — per-entity precision / recall / F1 of each agent against the reviewer's validated gold.</sub>
 
-**Across the phases:**
+</div>
 
-- **AUTHOR** — an *editable* question rubric: the methodologist edits each
-  question's `text` and `retrieval_hints` directly
-  (`AdherenceRubricPanel` → `PUT /api/tasks/:taskId/adherence-questions/:questionId`).
-- **PERFORMANCE** — per-agent leaderboard: per-question / per-rule match rate +
-  Cohen's κ vs the reviewer (`computeAdherenceIaa`).
-- **Self-refinement** (PERFORMANCE → "Refine question guidance") — for each
-  question where the agent disagreed with the reviewer's validated answer, an
-  LLM error-analysis attributes it (rubric gap / ambiguity / model slip), then
-  proposes a generalizable addition to that question's `retrieval_hints`,
-  validates it on a held-out split, and the reviewer applies it (logged +
-  revertable). The human-edit path (AUTHOR) and the agent-proposed path
-  (PERFORMANCE) write the **same** tier-YAML questions.
+## 🔬 Three kinds of review
 
-Implementation: `packages/pipeline-extract-adherence` (skill loader),
-`packages/rule-engine` (deterministic verdicts), `server/adherence-routes.ts`
-(reviewer validation), `server/adherence-iaa-routes.ts` (performance),
-`server/adherence-rubric-routes.ts` (AUTHOR edits), and
-`server/lib/refine/adherence-*.ts` (the self-refinement loop).
+Every task is one of three kinds. They share the same loop, the same evidence-citation discipline, and the same screens — what differs is the *shape of the question*, and therefore the evidence the agent gathers and how the result is scored.
 
----
+| Kind | The question it answers | Example tasks | Scored by |
+|---|---|---|---|
+| **Phenotype** | *What is / does the patient have X?* | `cancer-diagnosis`, `RUCAM` (drug-induced liver injury), `ACTS` (dementia work-up) | per-field accuracy |
+| **Adherence** | *Did the documented care follow the guideline?* | `asthma-adherence`, `crc-nccn-adherence`, `lung-cancer-adherence` | Cohen's κ |
+| **NER** | *Where in the text is each entity, and what concept is it?* | `bso-ad-ner` (SDOH + dementia ontology) | precision / recall / F1 |
 
-## Quick start
+```mermaid
+flowchart TB
+    Q(["A patient chart"]) --> K1["PHENOTYPE"] & K2["ADHERENCE"] & K3["NER"]
+    K1 --> A1["structured variables — value,<br/>category, or score; some derived"]
+    K2 --> A2["tiered concordance questions<br/>→ a deterministic verdict"]
+    K3 --> A3["marked spans, each normalized<br/>to an ontology concept"]
+```
 
-### 1. Install Node dependencies
+## 🔁 One workspace for the whole loop
+
+A review is a loop, not a one-shot. The methodologist tightens the rubric until the agent and the human agree reliably; then the rubric is frozen and cited.
+
+```mermaid
+flowchart LR
+    A["AUTHOR<br/>draft the rubric"] --> B["TRY<br/>agent drafts<br/>evidence-cited answers"]
+    B --> C{"JUDGE<br/>(optional)<br/>triage disagreements"}
+    C --> D["VALIDATE<br/>human accepts<br/>or overrides"]
+    D --> E["PERFORMANCE<br/>score agent vs human"]
+    E --> F{"agreement<br/>stable?"}
+    F -- "not yet" --> G["REFINE<br/>propose a rule,<br/>prove it on held-out data,<br/>human applies"]
+    G --> A
+    F -- "yes" --> H["LOCK + DEPLOY<br/>freeze the rubric,<br/>run headless on the cohort"]
+```
+
+<div align="center">
+
+![TRY — the agent runs and drafts spans](docs/assets/studio-try.png)
+<sub><b>TRY</b> — the agent reads each note and drafts answers; the rubric it's following is shown read-only alongside.</sub>
+
+![VALIDATE — the human reviews every drafted answer](docs/assets/studio-validate.png)
+<sub><b>VALIDATE</b> — the reviewer confirms, corrects, or rejects each drafted answer; their decisions become the gold standard.</sub>
+
+</div>
+
+## ✅ Every answer is backed by a verified quote
+
+The single most important guardrail: **the agent cannot cite evidence that isn't there.** Every answer must include a verbatim quote from the note, and the platform checks that quote against the note's actual bytes before the write is accepted.
+
+```mermaid
+sequenceDiagram
+    participant Ag as Agent
+    participant Gate as Faithfulness gate
+    participant Note as Note text
+    Ag->>Gate: answer + cited quote + offsets
+    Gate->>Note: is the quote present, verbatim?
+    alt quote present, offsets off
+        Gate->>Gate: auto-correct the offsets
+        Gate-->>Ag: accepted
+    else quote present at offsets
+        Gate-->>Ag: accepted
+    else quote absent
+        Gate-->>Ag: rejected — no fabricated evidence
+    end
+```
+
+The reviewer never has to wonder whether a quote is real. If it displays, it was found in the chart.
+
+## ♻️ The rubric improves itself — transparently
+
+When the agent and reviewer disagree, that's a signal. For each mismatch the platform runs an **error analysis** — *rubric gap*, *genuine ambiguity*, or *model slip*? — and for real gaps it proposes a **generalizable rule**, then **validates it on a held-out split** (how many cases it fixes vs. regresses) and surfaces a card showing the wrong example, the proposed edit, and the proof.
+
+The reviewer decides. Nothing is applied automatically; a model slip is never turned into a rule; every applied edit is versioned and revertable. The rubric gets tighter *because* a human and an agent disagreed — and you can see exactly why it changed.
+
+## 🚀 Quick start
+
+### Prerequisites
+
+| Requirement | Notes |
+|---|---|
+| **Node.js** ≥ 20 | runs the server + client |
+| **Python** ≥ 3.11 | the agent sidecar (use [`uv`](https://github.com/astral-sh/uv)) |
+| **A model backend** | Azure OpenAI, a vLLM endpoint, or an OpenRouter key |
+
+### Run it
 
 ```sh
-cd chart-review-platform-concur
+# 1. install
 npm install
+cd python && uv venv .venv --python 3.11 && uv pip install -e . && cd ..
+
+# 2. configure
+cp .env.example .env        # then edit — set AGENT_PROVIDER, the model backend, and CHART_REVIEW_PLATFORM_ROOT
+
+# 3. start the dev server (Express on :3002, Vite on :5174)
+npm run dev
 ```
 
-### 2. Set up the Python sidecar
+Open **http://localhost:5174**, sign in with any reviewer ID, and select the `cancer-diagnosis` task to walk the full loop end to end.
 
-Requires Python 3.11+. Using [uv](https://github.com/astral-sh/uv):
+## 🔌 Configuring the API + LLM
+
+The agent needs a model backend. Set **one** in your `.env` (copied from `.env.example`):
+
+| Backend | Set `DEEPAGENTS_LLM_BACKEND` to | Then provide |
+|---|---|---|
+| **Azure OpenAI** *(tested — `gpt-4o`)* | `azure` | `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_VERSION`, `AZURE_OPENAI_DEPLOYMENT` |
+| **vLLM** *(self-hosted, e.g. Qwen3-32B)* | `vllm` | `VLLM_BASE_URL`, `VLLM_MODEL`, `VLLM_API_KEY` (any non-empty string) |
+
+A minimal Azure `.env`:
 
 ```sh
-cd python
-uv venv .venv --python 3.11
-uv pip install -e .
-cd ..
-```
-
-### 3. Configure environment
-
-```sh
-cp .env.example .env
-# Then edit .env
-```
-
-Minimum required variables for Azure OpenAI:
-
-```
+CHART_REVIEW_PLATFORM_ROOT=/abs/path/to/chart-review-platform-concur
 AGENT_PROVIDER=deepagents
 MCP_TRANSPORT=subprocess
 DEEPAGENTS_PYTHON=/abs/path/to/python/.venv/bin/python
+
 DEEPAGENTS_LLM_BACKEND=azure
 AZURE_OPENAI_API_KEY=<your key>
 AZURE_OPENAI_ENDPOINT=https://<resource>.openai.azure.com/
 AZURE_OPENAI_API_VERSION=2024-06-01
 AZURE_OPENAI_DEPLOYMENT=gpt-4o
-CHART_REVIEW_PLATFORM_ROOT=/abs/path/to/chart-review-platform-concur
 ```
 
-### 4. Start the dev server
+> **🔒 PHI safety.** Set `CHART_REVIEW_PHI_MODEL` to an in-BAA model (e.g. `gpt-4o` on Azure, or a truly local vLLM). PHI-flagged patients route there regardless of the default; if it's unset and a PHI patient appears, the run **fails loudly** rather than leaking data outside the BAA boundary.
+
+**NER tasks** (`bso-ad-ner`) run a vendored Claude-Agent-SDK through a small local proxy on `:18080` that picks the provider from the API-key *prefix*. Put the key in `vendor/bso-ad-sdk/.env` as `ANTHROPIC_API_KEY`, and use a **provider-namespaced** model id in the session:
+
+| Provider | `ANTHROPIC_API_KEY` format | Example model id |
+|---|---|---|
+| Azure OpenAI | `azure:<endpoint>:<key>` *(auto-built from `AZURE_OPENAI_*`)* | `gpt-4o` |
+| OpenRouter | `sk-or-v1-…` | `anthropic/claude-sonnet-4.6`, `openai/gpt-4o` |
+| OpenAI | `sk-…` | `gpt-4o` |
+
+Start the proxy once, in its own terminal:
 
 ```sh
-npm run dev    # Express on :3002, Vite on :5174
+cd vendor/bso-ad-sdk
+env -u ANTHROPIC_API_KEY .venv/bin/uvicorn claude_proxy.proxy:app --port 18080
 ```
 
-Open `http://localhost:5174`, sign in with any reviewer ID, and select
-the `cancer-diagnosis` task.
+## 📦 Deploy on a whole cohort
 
----
-
-## Workflow
-
-```
-TRY  →  VALIDATE  →  DECIDE
-```
-
-| Phase | What happens |
-|---|---|
-| **TRY** | Start a session, pick patients, launch an agent run. The deepagents Python sidecar reads the patient's notes via MCP tools and commits the leaf field assessments (`cancer_type`, `has_distant_metastasis`, `has_local_recurrence`) with evidence; `disease_extent` is then computed from the two `has_*` fields. Watch the agent log in real time. |
-| **VALIDATE** | Human reviewer accepts or overrides each agent answer per patient. Validation saves to `var/reviews/<pid>/<task>/review_state.json`. |
-| **DECIDE** | Per-field accuracy report comparing agent answers to reviewer-validated answers (`GET /api/performance/:taskId`). |
-
----
-
-## Architecture
-
-```
-┌────────────┬───────────────────────────────────────────────────┐
-│ React UI   │ Express + WebSocket server (TypeScript)           │
-│ Studio +   │ ├─ TRY / VALIDATE / DECIDE routes                 │
-│ Workspace  │ ├─ packages/mcp-server-stdio  ← MCP over stdio    │
-│ panes      │ └─ packages/agent-provider-deepagents             │
-└────────────┴──────────────┬────────────────────────────────────┘
-                             │ spawns subprocess
-                    python/chart_review_deepagents
-                      ├─ langchain-mcp-adapters (1 session / run)
-                      ├─ Azure OpenAI or vLLM model
-                      └─ emits AgentEvents on stdout (JSONL)
-```
-
-Key seams:
-
-- **Filesystem-as-state**: `var/reviews/`, `var/runs/`. All reads/writes go
-  through `packages/storage` (`atomicWriteJson`, `readJsonOrNull`).
-- **Faithfulness gate**: enforced in `packages/mcp-server-stdio`. Every
-  `set_field_assessment` call verifies that the `evidence` text appears
-  verbatim in the note file at the stated byte offset before writing.
-- **Phase config**: `phases.ts` + `phases.ts` on the client. The three
-  enabled phases are `try | validate | decide`; the task's `meta.yaml`
-  also lists them explicitly.
-
----
-
-## Repo layout
-
-```
-chart-review-platform-concur/
-├── .agents/skills/chart-review-cancer-diagnosis/
-│   ├── SKILL.md          ← agent procedure
-│   ├── meta.yaml         ← task_kind, phases, field definitions
-│   └── references/criteria/{cancer_type,has_distant_metastasis,has_local_recurrence,disease_extent}.md
-│       (disease_extent is derived: computed from the two has_* leaves)
-├── client/               ← React + Tailwind + Radix Studio UI
-├── server/               ← Express + WebSocket server
-├── packages/
-│   ├── agent-provider-deepagents/  ← TS DeepAgentsProvider
-│   ├── mcp-server-stdio/           ← stdio MCP server (faithfulness gate)
-│   ├── storage/                    ← atomic filesystem I/O
-│   ├── domain-review/              ← review_state business logic
-│   └── …
-├── python/
-│   ├── chart_review_deepagents/    ← Python sidecar
-│   └── pyproject.toml              ← requires Python ≥3.11
-├── corpus/               ← patient notes (patients/<pid>/notes/)
-├── var/                  ← runtime state (gitignored)
-│   └── reviews/, runs/
-└── .env.example          ← all env vars documented
-```
-
----
-
-## Adding patients
-
-Drop a directory under `corpus/patients/<pid>/notes/` with plain-text or
-PDF note files. Add an entry to `corpus/index.json`. The patient will
-appear in the session cohort picker automatically.
-
----
-
-## Deploy on a larger cohort
-
-After validating a session and exporting its package (PERFORMANCE →
-"Export task package"), run the validated agent on a new cohort headlessly —
-no UI:
+Once a task agrees reliably with the reviewer, export it as a package and run the validated agent **headlessly** on a new cohort — no UI, one command:
 
 ```sh
 npm run deploy -- \
   --package var/exports/<task>/<exportId> \
-  --data-dir /path/to/cohort \   # laid out as <patient_id>/notes/*.txt
-  --out /path/to/results \
-  [--agent agent_2]              # default: best agent by avg_accuracy
+  --data-dir /path/to/cohort \      # <patient_id>/notes/*.txt
+  --out /path/to/results
 ```
 
-It runs a single agent (the best-performing one from the package's
-`performance.json`, or `--agent`) on every patient in `--data-dir`, reusing the
-same prompt, deepagents sidecar, and faithfulness gate as the UI. Outputs:
+Each patient gets a JSON answer file with cited evidence; the run emits a per-patient CSV and a manifest recording the model and pass/fail counts, and warns if the configured model differs from the one the package was validated on.
 
-- `<out>/<patient_id>.json` — the agent's answers + cited evidence (offsets),
-- `<out>/results.csv` — one row per patient, one column per field,
-- `<out>/run_manifest.json` — chosen agent + reason, model, and ok/failed counts.
+## 🗂️ Repository layout
 
-v1 runs on this platform (the task/skill must be installed) and uses the
-`.env`-configured model — it warns if that differs from the model the package
-was validated on.
+```
+chart-review-platform-concur/
+├── .claude/skills/          rubric trees (one per task) + promoted versions
+├── client/                  React 18 + Tailwind + Radix Studio UI
+├── server/                  Express + WebSocket (routes, MCP, agent provider)
+├── packages/                storage · domain-review · mcp-server · agent-provider · …
+├── python/                  the agent sidecar (deepagents + langchain)
+├── corpus/                  patient notes (synthetic; real/PHI are gitignored)
+└── docs/                    design narrative + technical report
+```
 
----
+## 🤝 Conventions
 
-## Workflow conventions
+- **Feature branches** (`feat/…`, `fix/…`, `docs/…`), **conventional commits**, **`--no-ff`** merges.
+- **No secrets in commits** — `.env` is gitignored; real/PHI patient data (`patient_real_*`, `patient_private_*`) never leaves the team.
+- **Faithfulness first** — any new write tool must route its note evidence through the same quote-verification gate.
 
-- Feature branches (`feat/...`, `fix/...`, `refactor/...`)
-- Conventional commits (`<type>(<scope>): <summary>`)
-- No `--no-verify`, no secrets in commits (`.env` is gitignored)
-- No push — this repo is local-only
+## 📄 License
 
----
-
-## License
-
-Private / unlicensed pending decision. Do not redistribute patient notes
-or reviewer-validated `review_state.json` files outside the team.
+Private / unlicensed pending decision. Do not redistribute patient notes or reviewer-validated `review_state.json` files outside the team.
