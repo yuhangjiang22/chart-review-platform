@@ -8,11 +8,11 @@ overview_prose: ACTS Alzheimer's/dementia cohort phenotyping. From a patient's
   clinical notes, extract five evidence-cited entities — whether impaired
   cognition (MCI or dementia) is documented (impaired_cognition), the documented
   APOE genotype broken into ε2/ε3/ε4 allele presence (apoe2, apoe3, apoe4), and
-  whether the patient is postmenopausal (postmenopause). Notes-only; every answer
-  cites the smallest supporting span and follows each criterion's allowed values
-  and NA/0 rules exactly. (Ported from the xuguang-ai/acts extraction guidelines;
-  the numeric cognitive scales and entity/span fields — Allergen, Vaccine, last
-  menstrual period — are a later increment.)
+  whether the patient is postmenopausal (postmenopause). Notes-only; every
+  answer cites the smallest supporting span and follows each criterion's allowed
+  values and NA/0 rules exactly. (Ported from the xuguang-ai/acts extraction
+  guidelines; the numeric cognitive scales and entity/span fields — Allergen,
+  Vaccine, last menstrual period — are a later increment.)
 phases:
   - author
   - try

@@ -1,0 +1,19 @@
+{
+  "patient_id": "patient_fake_prostate_01",
+  "category": "prostate_demo",
+  "demographics": {
+    "age": 68,
+    "sex": "M",
+    "region": "Midwest"
+  },
+  "index_date": "2026-07-10",
+  "doc_types": [
+    "surgical_pathology",
+    "urology_consult",
+    "ct_abdomen_pelvis",
+    "oncology_progress",
+    "psma_petct_order"
+  ],
+  "generated_by": "claude_synthetic_psma_context_demo",
+  "generation_run_id": "psma-context-wire-in-2026-07-16"
+}

@@ -58,7 +58,10 @@ export const nerSdkRunRoutes: RouteEntry[] = [
       const spec = getSessionManifest(taskId, sessionId)?.agent_specs?.[0] as { model?: string } | undefined;
       const model = spec?.model;
       const args = ["tsx", "scripts/run-bso-ad-claude-sdk.ts", "--task-id", taskId, "--session-id", sessionId, "--status-file", sf];
-      if (typeof model === "string" && /^[A-Za-z0-9._-]+$/.test(model)) args.push("--model", model);
+      // Allow "/" so provider-namespaced ids (e.g. OpenRouter "anthropic/claude-sonnet-4.6",
+      // "openai/gpt-4o") pass through. Without it the flag is dropped and the run
+      // silently falls back to the harness default model.
+      if (typeof model === "string" && /^[A-Za-z0-9._/-]+$/.test(model)) args.push("--model", model);
       const child = spawn(
         "npx",
         args,

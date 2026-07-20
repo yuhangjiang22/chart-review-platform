@@ -1,0 +1,17 @@
+[
+  {
+    "row_id": 20501,
+    "concept_id": 1163443,
+    "concept_name": "Leuprolide acetate 22.5 MG injection (3-month depot)",
+    "rxnorm": "1163443",
+    "drug_class": "GnRH agonist (ADT)",
+    "is_controller": false,
+    "instructions": "22.5 mg IM every 3 months",
+    "start_date": "2026-06-30",
+    "end_date": null,
+    "active": true,
+    "fills": [
+      { "fill_date": "2026-06-30", "days_supply": 90, "quantity": 1 }
+    ]
+  }
+]

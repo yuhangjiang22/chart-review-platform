@@ -26,6 +26,7 @@ import { listRuns, runDir } from "@chart-review/infra-batch-run";
 import { computeSpanIaa } from "@chart-review/eval-span-iaa";
 import { sessionReviewsRoot } from "./lib/session-reviews.js";
 import { getSessionManifest } from "@chart-review/domain-iter";
+import { materializeAnnotateReview } from "./lib/annotate-materialize.js";
 import { transitionMaturity, getMaturity } from "./lib/maturity.js";
 import type { SpanLabel } from "@chart-review/platform-types";
 
@@ -73,6 +74,13 @@ export const nerCalibrationRoutes: RouteEntry[] = [
         throw httpErr(400, `task ${p.taskId} is not an NER task`);
       }
       const sid = sessionIdOf(query);
+
+      // Bridge the annotate workbench's reviewer verdicts into review_state +
+      // an agent draft so this F1 reflects the annotate review. Idempotent and
+      // best-effort: a no-op when there's no batch / no verdicts / the batch
+      // doesn't map to this cohort, in which case we fall back to whatever the
+      // platform review_state already holds.
+      try { await materializeAnnotateReview(p.taskId, sid); } catch { /* fall back to existing review_state */ }
 
       // Scope to THIS session's declared cohort — NOT every patient that happens
       // to have a review_state under the (task-agnostic) session reviews dir.

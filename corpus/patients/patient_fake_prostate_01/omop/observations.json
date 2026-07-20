@@ -1,0 +1,16 @@
+[
+  {
+    "row_id": 20601,
+    "concept_id": 4275495,
+    "concept_name": "Tobacco smoking status",
+    "value_as_string": "Former smoker",
+    "date": "2023-02-10"
+  },
+  {
+    "row_id": 20602,
+    "concept_id": 4133421,
+    "concept_name": "ECOG performance status",
+    "value_as_string": "0",
+    "date": "2026-06-30"
+  }
+]

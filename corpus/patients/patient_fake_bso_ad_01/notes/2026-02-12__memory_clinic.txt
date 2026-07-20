@@ -1,0 +1,32 @@
+MEMORY CLINIC CONSULTATION NOTE
+Date: 2026-02-12
+Patient: Arthur Pennington (SYNTHETIC RECORD — not a real patient)
+
+HISTORY OF PRESENT ILLNESS:
+Mr. Pennington is a 72-year-old African American man referred by his primary
+care provider for evaluation of progressive memory loss over the past 18
+months. He is a widowed, retired postal worker. His daughter, who accompanies
+him today, reports increasing disorientation to date and place, along with
+notable executive dysfunction — he has had difficulty managing his own
+medications and finances, tasks he previously handled independently.
+
+There is a family history of dementia; his mother was diagnosed with
+Alzheimer's disease in her 80s. The patient himself denies any prior formal
+cognitive diagnosis and had no memory complaints until recently.
+
+PAST SOCIAL HISTORY:
+Former smoker (quit approximately 15 years ago, 20 pack-year history). Reports
+only occasional alcohol use. Describes a largely sedentary lifestyle since
+retirement.
+
+ASSESSMENT:
+MoCA administered today scored 21/30, consistent with mild cognitive
+impairment (MCI). There were no signs of acute delirium, and reversible causes
+were excluded on today's laboratory work-up. The clinical picture is most
+consistent with amnestic MCI, with concern for early conversion to Alzheimer's
+disease given the 18-month trajectory.
+
+PLAN:
+- Repeat neurocognitive testing in 6 months.
+- Patient is covered by Medicare; no barrier to follow-up imaging.
+- Diagnosis and prognosis discussed with the patient and his daughter.

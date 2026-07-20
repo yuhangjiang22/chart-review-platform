@@ -133,7 +133,7 @@ export function PhaseValidate({
   if (taskKind === "ner") {
     return (
       <div className="space-y-4">
-        <AnnotateEmbedPanel sessionId={sessionId} />
+        <AnnotateEmbedPanel sessionId={sessionId} taskId={taskId} />
       </div>
     );
   }

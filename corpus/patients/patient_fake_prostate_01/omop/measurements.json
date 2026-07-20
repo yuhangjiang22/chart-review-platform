@@ -1,0 +1,32 @@
+[
+  {
+    "row_id": 20401,
+    "concept_id": 2857001,
+    "concept_name": "Prostate specific Ag [Mass/volume] in Serum or Plasma",
+    "loinc": "2857-1",
+    "value": 0.2,
+    "unit": "ng/mL",
+    "date": "2025-08-14",
+    "encounter_id": "enc_p2005"
+  },
+  {
+    "row_id": 20402,
+    "concept_id": 2857001,
+    "concept_name": "Prostate specific Ag [Mass/volume] in Serum or Plasma",
+    "loinc": "2857-1",
+    "value": 0.4,
+    "unit": "ng/mL",
+    "date": "2025-12-03",
+    "encounter_id": "enc_p2006"
+  },
+  {
+    "row_id": 20403,
+    "concept_id": 2857001,
+    "concept_name": "Prostate specific Ag [Mass/volume] in Serum or Plasma",
+    "loinc": "2857-1",
+    "value": 0.6,
+    "unit": "ng/mL",
+    "date": "2026-06-30",
+    "encounter_id": "enc_p2007"
+  }
+]
