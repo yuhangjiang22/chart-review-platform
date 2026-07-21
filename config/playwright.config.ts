@@ -13,7 +13,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
-  testDir: "./e2e",
+  testDir: "../e2e", // config now lives in config/; specs are at the repo root's e2e/
   timeout: 30_000,
   expect: { timeout: 5_000 },
   fullyParallel: false, // share one dev server; avoid filesystem races on var/
