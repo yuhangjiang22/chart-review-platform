@@ -170,14 +170,28 @@ Each patient gets a JSON answer file with cited evidence; the run emits a per-pa
 
 ```
 chart-review-platform/
-├── .claude/skills/          rubric trees (one per task) + promoted versions
-├── client/                  React 18 + Tailwind + Radix Studio UI
-├── server/                  Express + WebSocket (routes, MCP, agent provider)
-├── packages/                storage · domain-review · mcp-server · agent-provider · …
-├── python/                  the agent sidecar (deepagents + langchain)
-├── corpus/                  patient notes (synthetic; real/PHI are gitignored)
-└── docs/                    design narrative + technical report
+├── client/            React 18 + Tailwind + Radix Studio UI          (workspace)
+├── server/            Express + WebSocket entrypoint + phase routes
+├── packages/          all platform logic — 70+ workspace packages, grouped by name:
+│    ├─ agent-*        agent-core · -compose · -provider(-deepagents) · -specs
+│    ├─ domain-*       domain-review · -iter · -cohort · -issue · -proposal · -bundle
+│    ├─ pipeline-*     pipeline-extract(-ner/-pernote/-adherence) · -clarify · -form-gen · …
+│    │                   (the extract stages; also the /api/v2 pipeline the server wires)
+│    ├─ workflow-*     workflow-chart-review · -lit-extract · -phase-* · -phases
+│    ├─ mcp-*          mcp-core(-ner/-adherence) · mcp-server-(stdio/anthropic)
+│    ├─ eval-*         eval-span-iaa · -adherence-iaa · kappa · contract-eval
+│    └─ (infra/core)   storage · faithfulness · model-config · tasks · rubric · ontology · …
+├── python/            deepagents agent sidecar (Python ≥3.11)
+├── vendor/bso-ad-sdk/ vendored Claude-Agent-SDK NER runner
+├── corpus/            patient fixtures (synthetic tracked; real/PHI gitignored)
+├── .claude/skills/    rubric packages — one per task (cancer-diagnosis, rucam, acts, …)
+├── e2e/               Playwright UI tests   · scripts/  dev + QA tooling
+├── config/            build config (vite, tailwind)  · prompts/  agent role prompts
+└── docs/assets/       README images  (other docs are kept local, not published)
 ```
+
+The platform lives in **`packages/`** (an npm-workspace monorepo); `server/` and
+`client/` wire it together. Import a package as `@chart-review/<name>`.
 
 ## 🤝 Conventions
 
