@@ -141,7 +141,7 @@ The agent needs a model backend. Set **one** in your `.env` (copied from `.env.e
 A minimal Azure `.env`:
 
 ```sh
-CHART_REVIEW_PLATFORM_ROOT=/abs/path/to/chart-review-platform-concur
+CHART_REVIEW_PLATFORM_ROOT=/abs/path/to/chart-review-platform
 AGENT_PROVIDER=deepagents
 MCP_TRANSPORT=subprocess
 DEEPAGENTS_PYTHON=/abs/path/to/python/.venv/bin/python
@@ -186,7 +186,7 @@ Each patient gets a JSON answer file with cited evidence; the run emits a per-pa
 ## 🗂️ Repository layout
 
 ```
-chart-review-platform-concur/
+chart-review-platform/
 ├── .claude/skills/          rubric trees (one per task) + promoted versions
 ├── client/                  React 18 + Tailwind + Radix Studio UI
 ├── server/                  Express + WebSocket (routes, MCP, agent provider)
