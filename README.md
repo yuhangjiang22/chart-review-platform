@@ -76,24 +76,7 @@ flowchart LR
 
 ## ✅ Every answer is backed by a verified quote
 
-The single most important guardrail: **the agent cannot cite evidence that isn't there.** Every answer must include a verbatim quote from the note, and the platform checks that quote against the note's actual bytes before the write is accepted.
-
-```mermaid
-sequenceDiagram
-    participant Ag as Agent
-    participant Gate as Faithfulness gate
-    participant Nt as Note text
-    Ag->>Gate: answer + cited quote + offsets
-    Gate->>Nt: is the quote present, verbatim?
-    alt quote present, offsets off
-        Gate->>Gate: auto-correct the offsets
-        Gate-->>Ag: accepted
-    else quote present at offsets
-        Gate-->>Ag: accepted
-    else quote absent
-        Gate-->>Ag: rejected (no fabricated evidence)
-    end
-```
+The single most important guardrail: **the agent cannot cite evidence that isn't there.** Every answer must include a verbatim quote from the note, and the platform checks that quote against the note's actual bytes before the write is accepted. If the quote is present but the offsets are slightly off, the gate auto-corrects them; if the quote is absent from the note, the write is rejected — no fabricated evidence.
 
 The reviewer never has to wonder whether a quote is real. If it displays, it was found in the chart.
 
