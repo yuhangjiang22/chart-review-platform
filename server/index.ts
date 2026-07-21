@@ -45,20 +45,20 @@ dotenv.config({ path: path.resolve(__dirname, "..", ".env") });
 // As of M7.5 every UI-consumed surface lives in v2 natively (HTTP +
 // WebSocket + builder). No proxy fallback to v1 remains; unmatched
 // /api/* paths get a 404.
-import { makeChartReviewClarify, makeLitExtractClarify } from "../modules/1-clarify/index.js";
-import { makeChartReviewFormGen, makeLitExtractFormGen } from "../modules/2-form-gen/index.js";
-import { makeChartReviewDiscover, makeLitExtractDiscover } from "../modules/3-discover/index.js";
+import { makeChartReviewClarify, makeLitExtractClarify } from "@chart-review/pipeline-clarify";
+import { makeChartReviewFormGen, makeLitExtractFormGen } from "@chart-review/pipeline-form-gen";
+import { makeChartReviewDiscover, makeLitExtractDiscover } from "@chart-review/pipeline-discover";
 import {
   makeV1AgentExtract, verifyEvidenceFaithfulness,
-} from "../modules/4-extract/index.js";
-import { makeReconciler, makeV1Judge } from "../modules/5-validate/index.js";
-import { makeCorrectLog } from "../modules/6-correct-log/index.js";
-import { makeChartReviewPipeline } from "../workflows/chart-review.js";
-import { makeLitExtractPipeline } from "../workflows/lit-extract.js";
+} from "@chart-review/pipeline-extract";
+import { makeReconciler, makeV1Judge } from "@chart-review/pipeline-validate";
+import { makeCorrectLog } from "@chart-review/pipeline-correct-log";
+import { makeChartReviewPipeline } from "@chart-review/workflow-chart-review";
+import { makeLitExtractPipeline } from "@chart-review/workflow-lit-extract";
 import type {
   TaskSpec, FormSpec, SubjectRef, EvidenceUnit, ExtractorOutput,
   HumanDecision, Domain, ProviderName,
-} from "../shared/types.js";
+} from "@chart-review/v2-shared";
 import {
   login, logout, readTokenFromRequest, requireMethodologist, whoami,
 } from "./auth.js";
