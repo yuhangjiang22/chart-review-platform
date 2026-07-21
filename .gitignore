@@ -69,3 +69,12 @@ corpus/index.json
 # Python sidecar venv (rebuilt via uv)
 python/.venv/
 .venv/
+
+# Local-only rendered artifacts — the .md/.html source is tracked; the big
+# rendered "*.local.html" is a per-machine preview, not source.
+*.local.html
+
+# Stray chat/session transcripts sometimes captured under skill bundles or
+# scratch dirs — never source.
+**/conversation_history/
+scratch/

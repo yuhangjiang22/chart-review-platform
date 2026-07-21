@@ -1,5 +1,5 @@
 // QA smoke for the JUDGE + VALIDATE/review-commit phenotype functions.
-// Usage: node scripts/qa-phenotype-review.mjs <session_id> <iter_id> <patient_id>
+// Usage: node scripts/qa/qa-phenotype-review.mjs <session_id> <iter_id> <patient_id>
 const B = "http://localhost:3002";
 const T = "cancer-diagnosis";
 const [SID, ITER, PID] = process.argv.slice(2);
