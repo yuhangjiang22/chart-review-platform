@@ -1,6 +1,6 @@
 ---
 field_id: gds_depression_score
-prompt: What is the documented Geriatric Depression Scale (GDS) score?
+prompt: What is the documented Geriatric Depression Scale score? Use ONLY a score explicitly labeled Geriatric Depression Scale / GDS / GDS-15 / GDS-30. Do NOT use PHQ-9, PHQ-2, or any other depression screen; if only a non-GDS screen is documented, omit this field.
 answer_schema:
   type: integer
   minimum: 0

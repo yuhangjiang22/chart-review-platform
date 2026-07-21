@@ -2,10 +2,10 @@
 field_id: cdr_severity
 prompt: CDR severity label (computed).
 answer_schema:
-  enum: ["normal", "very_mild", "mild", "moderate", "severe"]
+  enum: ["normal", "very_mild", "mild", "moderate", "severe", "no_info"]
 cardinality: one
 group: staging
-derivation: 'cdr_global == "0" ? "normal" : cdr_global == "0.5" ? "very_mild" : cdr_global == "1" ? "mild" : cdr_global == "2" ? "moderate" : "severe"'
+derivation: 'cdr_global == "0" ? "normal" : cdr_global == "0.5" ? "very_mild" : cdr_global == "1" ? "mild" : cdr_global == "2" ? "moderate" : cdr_global == "3" ? "severe" : "no_info"'
 required: false
 role: interpretive
 required_note: "NOT REQUIRED — interpretation band auto-derived from cdr_global; guideline lists severity as context only."

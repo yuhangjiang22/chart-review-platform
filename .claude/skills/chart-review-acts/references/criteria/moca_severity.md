@@ -2,10 +2,10 @@
 field_id: moca_severity
 prompt: MoCA severity band (computed).
 answer_schema:
-  enum: ["normal", "mild", "moderate", "severe"]
+  enum: ["normal", "mild", "moderate", "severe", "no_info"]
 cardinality: one
 group: cognitive_scales
-derivation: 'moca_score >= 26 ? "normal" : moca_score >= 18 ? "mild" : moca_score >= 10 ? "moderate" : "severe"'
+derivation: 'moca_score >= 26 ? "normal" : moca_score >= 18 ? "mild" : moca_score >= 10 ? "moderate" : moca_score >= 0 ? "severe" : "no_info"'
 required: false
 role: interpretive
 required_note: "NOT REQUIRED — interpretation band auto-derived from moca_score; guideline lists severity as context only."
