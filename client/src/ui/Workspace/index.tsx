@@ -112,6 +112,19 @@ export function Workspace({
     return () => { cancelled = true; };
   }, [taskId]);
 
+  // NER tasks have no AUTHOR phase — there's no rubric editor for entity-type
+  // guidance yet (edited via the Builder), so AUTHOR is dropped from the pill
+  // bar and isn't reachable. Filtering here (rather than per-task meta.yaml)
+  // makes this apply to every NER task kind, present and future.
+  // Derive from the `tasks` prop (available here) — NOT the `task` const below,
+  // which is declared later and would be a temporal-dead-zone error at runtime.
+  const isNer = tasks.find((t) => t.id === taskId)?.task_type === "ner";
+  const effectivePhases: Phase[] | null = useMemo(() => {
+    if (!isNer) return enabledPhases;
+    const base = enabledPhases ?? PHASE_ORDER;
+    return base.filter((p) => p !== "AUTHOR");
+  }, [isNer, enabledPhases]);
+
   // Phase override is now URL-driven via the `tab` prop. When the URL has
   // /studio/<task>/<phase> (where phase is a key in PHASE_TABS), that phase
   // is the active one; otherwise we fall back to the auto-derived phase.
@@ -126,19 +139,19 @@ export function Workspace({
     ? PHASE_TABS[tab.toLowerCase()] ?? null
     : null;
   const manualPhaseOverride: Phase | null =
-    rawOverride && enabledPhases && !enabledPhases.includes(rawOverride)
+    rawOverride && effectivePhases && !effectivePhases.includes(rawOverride)
       ? null
       : rawOverride;
   // Sync the URL back to a valid phase when the current one is disabled,
   // so refreshing or sharing the link doesn't keep landing on a hidden
-  // phase. Runs once per task on first load of enabledPhases.
+  // phase. Runs once per task on first load of effectivePhases.
   useEffect(() => {
-    if (!enabledPhases) return;
-    if (rawOverride && !enabledPhases.includes(rawOverride)) {
+    if (!effectivePhases) return;
+    if (rawOverride && !effectivePhases.includes(rawOverride)) {
       onTabChange?.("");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabledPhases, rawOverride]);
+  }, [effectivePhases, rawOverride]);
 
   const setPhase = (phase: Phase | null) => {
     onTabChange?.(phase ? phase.toLowerCase() : "");
@@ -376,8 +389,12 @@ export function Workspace({
   // (performance) just because the session is complete: entering a task should
   // start on TRY (the run-first entry phase), and the reviewer can click into
   // DECIDE/VALIDATE deliberately. VALIDATE is still auto-resumed mid-review.
-  const activePhase: Phase =
-    manualPhaseOverride ?? (phaseInfo.phase === "DECIDE" ? "TRY" : phaseInfo.phase);
+  const activePhase: Phase = (() => {
+    const p = manualPhaseOverride ?? (phaseInfo.phase === "DECIDE" ? "TRY" : phaseInfo.phase);
+    // NER has no AUTHOR phase — if the derived/default phase lands on AUTHOR
+    // (e.g. a fresh NER task), fall through to TRY instead.
+    return isNer && p === "AUTHOR" ? "TRY" : p;
+  })();
 
   // RubricPanel "reveal" nonce, still threaded into PhaseTry's Branch-B
   // RubricPanel as `revealNonce`. The sidebar's "author" jump now targets the
@@ -464,7 +481,7 @@ export function Workspace({
             donePhases={donePhases}
             maturity={maturity}
             onPhaseClick={(phase) => setPhase(phase)}
-            enabledPhases={enabledPhases ?? undefined}
+            enabledPhases={effectivePhases ?? undefined}
           />
         </div>
         <div className="flex shrink-0 items-center gap-3">
@@ -531,22 +548,6 @@ export function Workspace({
                   Try on patients →
                 </Button>
               </div>
-            </div>
-          ) : task?.task_type === "ner" ? (
-            <div className="mx-auto max-w-[560px] py-12 space-y-3 text-center">
-              <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-                Author
-              </div>
-              <h3
-                className="font-display text-[20px] tracking-tight"
-                style={{ fontVariationSettings: '"opsz" 20, "SOFT" 50' }}
-              >
-                Author for NER isn't available yet
-              </h3>
-              <p className="text-[13px] text-muted-foreground">
-                Edit entity-type guidance via the Builder for now. A dedicated NER
-                authoring pane is a later increment.
-              </p>
             </div>
           ) : (
             <div className="mx-auto max-w-[760px] space-y-5 py-2">
