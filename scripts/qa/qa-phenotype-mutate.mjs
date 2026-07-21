@@ -1,7 +1,7 @@
 // QA mutating-endpoint smoke for phenotype. Exercises the write paths with
 // idempotent round-trips (read → write-same → verify) so it never corrupts the
 // live rubric, plus session-scoped fork edit, version switch, and export.
-// Usage: node scripts/qa-phenotype-mutate.mjs <session_id> <iter_id>
+// Usage: node scripts/qa/qa-phenotype-mutate.mjs <session_id> <iter_id>
 const B = "http://localhost:3002";
 const T = "cancer-diagnosis";
 const [SID, ITER] = process.argv.slice(2);

@@ -6,7 +6,7 @@
 // derived fields (study1_tier, phq9_threshold_met, final_decision) with the real
 // contract-eval evaluator.
 //
-// Run:  set -a; source .env; set +a; npx tsx scripts/smoke-cp-depression-run.ts [patientId]
+// Run:  set -a; source .env; set +a; npx tsx scripts/smoke/smoke-cp-depression-run.ts [patientId]
 import fs from "node:fs";
 import path from "node:path";
 import { runAgent } from "@chart-review/agent-provider";

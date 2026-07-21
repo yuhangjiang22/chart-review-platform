@@ -4,7 +4,7 @@
 // DeepAgentsProvider -> Python sidecar -> stdio MCP server -> gpt-4o ->
 // set_field_assessment (faithfulness gate) -> review_state.json.
 //
-// Run:  set -a; source .env; set +a; npx tsx scripts/smoke-deepagents-run.ts [patientId]
+// Run:  set -a; source .env; set +a; npx tsx scripts/smoke/smoke-deepagents-run.ts [patientId]
 import fs from "node:fs";
 import path from "node:path";
 import { runAgent } from "@chart-review/agent-provider";
