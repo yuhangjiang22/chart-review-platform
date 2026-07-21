@@ -16,11 +16,16 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+// This config now lives in config/, so paths resolve one level up to the repo
+// root (V2_ROOT) — mirrors config/vite.config.ts.
+const V2_ROOT = path.resolve(__dirname, "..");
+
 export default defineConfig({
+  root: V2_ROOT, // test discovery + the e2e exclude resolve from the repo root, not config/
   plugins: [react()],
   resolve: {
     alias: {
-      "@": path.join(__dirname, "client/src"),
+      "@": path.join(V2_ROOT, "client/src"),
     },
   },
   test: {
