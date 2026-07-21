@@ -1,6 +1,6 @@
 ---
 field_id: cdr_global
-prompt: What is the documented global Clinical Dementia Rating (CDR)?
+prompt: What is the documented global Clinical Dementia Rating (CDR)? Extract a value ONLY if the note literally contains "CDR" or "Clinical Dementia Rating" together with a score. The evidence_quote MUST contain the token "CDR". Phrases like "no cognitive impairment", "cognition intact", "alert and oriented", or a normal exam are NOT a CDR score — for those, OMIT this field (do not answer "0").
 answer_schema:
   enum: ["0", "0.5", "1", "2", "3"]
 cardinality: one

@@ -2,10 +2,10 @@
 field_id: mmse_severity
 prompt: MMSE severity band (computed).
 answer_schema:
-  enum: ["normal", "mild", "moderate", "severe"]
+  enum: ["normal", "mild", "moderate", "severe", "no_info"]
 cardinality: one
 group: cognitive_scales
-derivation: 'mmse_score >= 24 ? "normal" : mmse_score >= 19 ? "mild" : mmse_score >= 10 ? "moderate" : "severe"'
+derivation: 'mmse_score >= 24 ? "normal" : mmse_score >= 19 ? "mild" : mmse_score >= 10 ? "moderate" : mmse_score >= 0 ? "severe" : "no_info"'
 required: false
 role: interpretive
 required_note: "NOT REQUIRED — interpretation band auto-derived from mmse_score; guideline lists severity as context only."

@@ -4,7 +4,7 @@ import {
   numericValueInNote,
   type PerNoteField,
 } from "./index.js";
-import type { LlmEndpoint, LlmResult } from "@chart-review/pipeline-extract-ner";
+import type { LlmEndpoint, LlmResult } from "./llm-call.js";
 
 const FIELDS: PerNoteField[] = [
   { field_id: "impaired_cognition", enum: ["1", "0"], prompt: "cog?" },

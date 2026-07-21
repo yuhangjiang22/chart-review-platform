@@ -8,7 +8,7 @@
  * dropped (the answer is kept, flagged low-evidence) — offsets are never
  * fabricated.
  */
-import { callLlm, type LlmEndpoint, type LlmResult, type LlmUsage } from "@chart-review/pipeline-extract-ner";
+import { callLlm, type LlmEndpoint, type LlmResult, type LlmUsage } from "./llm-call.js";
 import { classifyVaccineFull, type VaccineCatalog } from "./vaccine-classify.js";
 export { parseVaccineTables, classifyVaccine, classifyVaccineFull, normVax, type VaccineCatalog, type VaccineCategory, type VaccineClassification } from "./vaccine-classify.js";
 import { verifyEvidence, type NoteEvidence } from "@chart-review/faithfulness";

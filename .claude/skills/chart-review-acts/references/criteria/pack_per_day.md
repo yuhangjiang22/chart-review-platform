@@ -1,6 +1,6 @@
 ---
 field_id: pack_per_day
-prompt: How many PACKS of cigarettes per day (1 pack = 20 cigarettes)? Record only a documented packs/day figure; do NOT report a cigarettes-per-day count as if it were packs/day.
+prompt: How many PACKS of cigarettes per day (1 pack = 20 cigarettes)? Use a stated pack fraction verbatim (e.g. "1/2 pack or more" -> 0.5) or convert an explicit cigarettes/day count (10/day -> 0.5). Do NOT report a cigarettes-per-day count as if it were packs/day, and do NOT invent a number the note does not support.
 answer_schema:
   type: number
   minimum: 0
