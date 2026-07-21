@@ -82,16 +82,16 @@ The single most important guardrail: **the agent cannot cite evidence that isn't
 sequenceDiagram
     participant Ag as Agent
     participant Gate as Faithfulness gate
-    participant Note as Note text
+    participant Nt as Note text
     Ag->>Gate: answer + cited quote + offsets
-    Gate->>Note: is the quote present, verbatim?
+    Gate->>Nt: is the quote present, verbatim?
     alt quote present, offsets off
         Gate->>Gate: auto-correct the offsets
         Gate-->>Ag: accepted
     else quote present at offsets
         Gate-->>Ag: accepted
     else quote absent
-        Gate-->>Ag: rejected — no fabricated evidence
+        Gate-->>Ag: rejected (no fabricated evidence)
     end
 ```
 
