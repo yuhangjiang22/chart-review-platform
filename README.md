@@ -1,6 +1,6 @@
 <div align="center">
 
-# 📋 Chart Review
+# 📋 Agentic Chart Review
 
 ### Agent-assisted clinical chart review — from rubric draft to locked, citable results, in one workspace.
 
