@@ -78,3 +78,9 @@ python/.venv/
 # scratch dirs — never source.
 **/conversation_history/
 scratch/
+
+# Only the README's image assets are published under docs/; all other docs
+# (design plans/specs, source PDFs, status snapshots, reference notes) stay
+# local — they're internal working material, not for the published repo.
+docs/*
+!docs/assets
