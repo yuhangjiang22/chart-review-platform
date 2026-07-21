@@ -20,12 +20,21 @@ import { type LlmEndpoint, type LlmResult } from "./llm-call.js";
  *  absent quote, which prompt instructions alone don't reliably stop:
  *   - cdr_global: infers a formal score from a general statement
  *     (cdr_global='0' from "no cognitive impairment") absent an actual CDR.
+ *     The negative lookahead ALSO rejects a quote whose only CDR reference is
+ *     the Sum-of-Boxes (CDR-SB / "sum of boxes"), which the rubric forbids
+ *     converting to CDR-Global — a bare "CDR" elsewhere in the quote still
+ *     passes (that IS a global reference).
  *   - smoking_status: defaults to "never" when the note has no tobacco line at
  *     all (real cohort: 2/10 false "never"; gold: spurious on fake_acts_01),
- *     often citing an unrelated (e.g. cognition) quote. Require a tobacco token. */
+ *     often citing an unrelated (e.g. cognition) quote. Require a tobacco token.
+ *     Includes the abbreviations "ppd" (packs/day) and "tob" (Tob:) so a
+ *     shorthand-only social-history line isn't wrongly dropped.
+ *   - quit_time: dates only — the evidence must contain a 4-digit calendar year
+ *     so an age-at-quit ("age 55") or relative time ("10 years ago") is dropped. */
 const ANCHOR_TOKENS: Record<string, RegExp> = {
-  cdr_global: /\bcdr\b|clinical dementia rating/i,
-  smoking_status: /tobacco|smok|cigar|cigarette|nicotine|\bvap|\bpack/i,
+  cdr_global: /\bcdr\b(?![\s-]*(sb\b|sob\b|sum))|clinical dementia rating(?![\s-]*(sum|sob|sb\b))/i,
+  smoking_status: /tobacco|\btob\b|smok|cigar|nicotine|\bvap|\bpack|\bppd\b/i,
+  quit_time: /\b(19|20)\d{2}\b/,
 };
 
 // ── irAE entity resolution (Safety) ──────────────────────────────────
