@@ -24,6 +24,7 @@ import { AuthoringModeDialog } from "./builder/AuthoringModeDialog";
 import { AuthoringWizard } from "./builder/AuthoringWizard";
 import { TaskKindPickerDialog } from "./builder/TaskKindPickerDialog";
 import { TasksIndex } from "./TasksIndex";
+import { ServiceHealthBanner } from "./ServiceHealthBanner";
 import {
   builderHash,
   patientHash,
@@ -687,6 +688,9 @@ export function App() {
           }}
         />
       )}
+
+      {/* Global service-health pill (fixed, bottom-right) — layout-safe. */}
+      <ServiceHealthBanner />
 
     </AppShell>
   );
