@@ -25,6 +25,7 @@ import { AuthoringWizard } from "./builder/AuthoringWizard";
 import { TaskKindPickerDialog } from "./builder/TaskKindPickerDialog";
 import { TasksIndex } from "./TasksIndex";
 import { ServiceHealthBanner } from "./ServiceHealthBanner";
+import { SettingsPage } from "./SettingsPage";
 import {
   builderHash,
   patientHash,
@@ -587,6 +588,8 @@ export function App() {
         />
       )}
       {route.page === "help" && <HelpPage />}
+
+      {route.page === "settings" && <SettingsPage />}
 
       {route.page === "builder" && (
         <BuilderRoute

@@ -14,8 +14,10 @@ import fs from "node:fs";
 import path from "node:path";
 import net from "node:net";
 import { spawn } from "node:child_process";
+import type { IncomingMessage } from "node:http";
 import type { RouteEntry } from "./router.js";
 import { PLATFORM_ROOT } from "@chart-review/patients";
+import { isMethodologist, readReviewerFromRequest } from "./auth.js";
 
 const PROXY_PORT = 18080;
 const WORKBENCH_PORT = 18090;
@@ -53,6 +55,75 @@ function readEnvFile(): Record<string, string> {
     }
   } catch { /* .env is optional */ }
   return out;
+}
+
+// ── Config (Settings page) ──────────────────────────────────────────────────
+// The ONLY .env keys the Settings UI may read/write. An allowlist so a config
+// PUT can never write arbitrary env keys.
+const MANAGED_KEYS = [
+  "DEEPAGENTS_LLM_BACKEND",
+  "AZURE_OPENAI_ENDPOINT", "AZURE_OPENAI_API_VERSION", "AZURE_OPENAI_DEPLOYMENT", "AZURE_OPENAI_API_KEY",
+  "VLLM_BASE_URL", "VLLM_MODEL", "VLLM_API_KEY",
+  "CHART_REVIEW_MODEL", "CHART_REVIEW_JUDGE_MODEL", "CHART_REVIEW_PHI_MODEL",
+] as const;
+const isSecretKey = (k: string) => /KEY|SECRET|TOKEN|PASSWORD/i.test(k);
+
+/** Never return a secret's value — only whether it's set + a short tail hint. */
+function maskSecret(v: string | undefined): { set: boolean; hint: string | null } {
+  if (!v) return { set: false, hint: null };
+  return { set: true, hint: v.length > 4 ? "…" + v.slice(-4) : "…" };
+}
+
+/** Update KEY=value pairs in .env atomically, preserving comments/order.
+ *  Existing keys are replaced in place; new keys appended. */
+function writeEnvKeys(updates: Record<string, string>): void {
+  const envPath = path.join(PLATFORM_ROOT, ".env");
+  let lines: string[] = [];
+  try { lines = fs.readFileSync(envPath, "utf-8").split("\n"); } catch { /* new file */ }
+  const remaining = new Set(Object.keys(updates));
+  const out = lines.map((line) => {
+    const m = line.match(/^([A-Z0-9_]+)=/);
+    if (m && remaining.has(m[1])) {
+      remaining.delete(m[1]);
+      return `${m[1]}=${updates[m[1]]}`;
+    }
+    return line;
+  });
+  for (const k of remaining) out.push(`${k}=${updates[k]}`);
+  const tmp = envPath + ".tmp";
+  fs.writeFileSync(tmp, out.join("\n"));
+  fs.renameSync(tmp, envPath); // atomic replace
+}
+
+async function testChatOnce(env: Record<string, string>): Promise<{ ok: boolean; status: number; detail: string }> {
+  const backend = (env.DEEPAGENTS_LLM_BACKEND || "azure").toLowerCase();
+  try {
+    if (backend === "vllm") {
+      // OpenAI-compatible: a models-list GET validates key + reachability, zero token cost.
+      const base = (env.VLLM_BASE_URL || "").replace(/\/$/, "");
+      if (!base) return { ok: false, status: 0, detail: "VLLM_BASE_URL not set" };
+      const r = await fetch(`${base}/models`, { headers: { Authorization: `Bearer ${env.VLLM_API_KEY || ""}` } });
+      return { ok: r.ok, status: r.status, detail: r.ok ? "reachable + key accepted" : (await r.text()).slice(0, 160) };
+    }
+    // azure: a max_tokens:1 chat completion against the deployment.
+    const ep = (env.AZURE_OPENAI_ENDPOINT || "").replace(/\/$/, "");
+    const dep = env.AZURE_OPENAI_DEPLOYMENT, ver = env.AZURE_OPENAI_API_VERSION || "2024-06-01";
+    if (!ep || !dep) return { ok: false, status: 0, detail: "AZURE_OPENAI_ENDPOINT / _DEPLOYMENT not set" };
+    const r = await fetch(`${ep}/openai/deployments/${dep}/chat/completions?api-version=${ver}`, {
+      method: "POST",
+      headers: { "api-key": env.AZURE_OPENAI_API_KEY || "", "Content-Type": "application/json" },
+      body: JSON.stringify({ messages: [{ role: "user", content: "ping" }], max_tokens: 1 }),
+    });
+    return { ok: r.ok, status: r.status, detail: r.ok ? "deployment responded" : (await r.text()).slice(0, 160) };
+  } catch (e) {
+    return { ok: false, status: 0, detail: String((e as Error).message).slice(0, 160) };
+  }
+}
+
+function gateMethodologist(req: IncomingMessage, action: string): void {
+  if (!isMethodologist(readReviewerFromRequest(req))) {
+    throw httpErr(403, `not authorized to ${action}`);
+  }
 }
 
 export const systemRoutes: RouteEntry[] = [
@@ -123,6 +194,71 @@ export const systemRoutes: RouteEntry[] = [
         await new Promise((r) => setTimeout(r, 500));
       }
       return { ok: up, started: true, up, port: PROXY_PORT };
+    },
+  },
+  {
+    method: "GET",
+    pattern: "/api/system/config",
+    handler: async () => {
+      const env = { ...readEnvFile(), ...process.env } as Record<string, string>;
+      const backend = (env.DEEPAGENTS_LLM_BACKEND || "azure").toLowerCase();
+      return {
+        backend,
+        azure: {
+          endpoint: env.AZURE_OPENAI_ENDPOINT || "",
+          api_version: env.AZURE_OPENAI_API_VERSION || "",
+          deployment: env.AZURE_OPENAI_DEPLOYMENT || "",
+          key: maskSecret(env.AZURE_OPENAI_API_KEY),
+        },
+        vllm: {
+          base_url: env.VLLM_BASE_URL || "",
+          model: env.VLLM_MODEL || "",
+          key: maskSecret(env.VLLM_API_KEY),
+        },
+        models: {
+          default: env.CHART_REVIEW_MODEL || "",
+          judge: env.CHART_REVIEW_JUDGE_MODEL || "",
+          phi: env.CHART_REVIEW_PHI_MODEL || "",
+        },
+      };
+    },
+  },
+  {
+    method: "PUT",
+    pattern: "/api/system/config",
+    handler: async (body, req) => {
+      gateMethodologist(req as IncomingMessage, "change platform configuration");
+      const b = (body ?? {}) as Record<string, unknown>;
+      const updates: Record<string, string> = {};
+      for (const [k, v] of Object.entries(b)) {
+        if (!MANAGED_KEYS.includes(k as (typeof MANAGED_KEYS)[number])) {
+          throw httpErr(400, `key not allowed: ${k}`);
+        }
+        if (typeof v !== "string") continue;
+        const val = v.trim();
+        // Skip empties (so a blank field never clobbers an existing value —
+        // in particular a masked secret the user didn't retype).
+        if (!val) continue;
+        if (k === "DEEPAGENTS_LLM_BACKEND" && val !== "azure" && val !== "vllm") {
+          throw httpErr(400, "DEEPAGENTS_LLM_BACKEND must be 'azure' or 'vllm'");
+        }
+        updates[k] = val;
+      }
+      if (Object.keys(updates).length === 0) return { ok: true, changed: [] };
+      writeEnvKeys(updates);
+      // Apply live so the next run/model-config read picks it up without a
+      // server restart (spawned children inherit process.env).
+      for (const [k, v] of Object.entries(updates)) process.env[k] = v;
+      // Return the changed KEY NAMES only — never the values (secrets).
+      return { ok: true, changed: Object.keys(updates).sort() };
+    },
+  },
+  {
+    method: "POST",
+    pattern: "/api/system/config/test",
+    handler: async () => {
+      const env = { ...readEnvFile(), ...process.env } as Record<string, string>;
+      return await testChatOnce(env);
     },
   },
 ];

@@ -3,6 +3,7 @@ import {
   Layers,
   LogOut,
   Search,
+  Settings as SettingsIcon,
   ShieldCheck,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -129,6 +130,19 @@ export function AppShell({
               </Button>
             </TooltipTrigger>
             <TooltipContent>Jump to a patient, criterion, or run</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <a
+                href="#/settings"
+                aria-label="Settings"
+                className="flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-card"
+              >
+                <SettingsIcon size={14} strokeWidth={1.75} />
+              </a>
+            </TooltipTrigger>
+            <TooltipContent>Model backend &amp; keys</TooltipContent>
           </Tooltip>
 
           {reviewer ? (
