@@ -26,29 +26,30 @@ ULN defaults: ALT = 52, ALP = 125 (the tool returns per-row `uln` from the data 
 
 **Peak call (let `D_stop` = drug stop day from T0; negative if stopped before onset):**
 - Drug stopped **after** onset (D_stop ≥ 0): `get_lab_extremum(lab_name=<anchor>, stat="max", day_min=0, day_max=D_stop)`
-- Drug stopped **before** onset (D_stop < 0): `get_lab_extremum(lab_name=<anchor>, stat="max", day_min=D_stop+1)` — scan the entire post-stop series; peak may be T0 or later
+- Drug stopped **before** onset (D_stop < 0): `get_lab_extremum(lab_name=<anchor>, stat="max", day_min=D_stop+1, day_max=0)`
 
 ### Step 3 — Find the nadir in the dechallenge window — use `get_lab_extremum`
-**Nadir = the minimum anchor-lab value inside the dechallenge window, measured from the drug stop date.** Use the tool directly — do not scan the series manually.
+**Use the minimum anchor-lab value inside each applicable dechallenge window.** The window starts at the later of the drug stop date or T0. If the drug was stopped before liver injury onset, start at T0 so that pre-onset laboratory values are not included. Use the tool directly — do not scan the series manually.
 
+Define:
+- `W_start=max(D_stop+1, 0)`
 Window (in days from T0, i.e. DAYS_FROM_LIVER_INJURY) for each scoring tier:
-- Hepatocellular +3: `day_min=D_stop+1, day_max=D_stop+8` → `get_lab_extremum("ALT","min",...)`
-- Hepatocellular +2: `day_min=D_stop+1, day_max=D_stop+30`
-- Hepatocellular >30: `day_min=D_stop+1` (no upper bound)
-- Cholestatic/Mixed: `day_min=D_stop+1, day_max=D_stop+180` (run once for ALP, once for bilirubin_total)
+- Hepatocellular +3: `day_min=W_start, day_max=D_stop+8` → `get_lab_extremum("ALT","min",...)`
+- Hepatocellular +2: `day_min=W_start, day_max=D_stop+30`
+- Hepatocellular >30: `day_min=max(W_start, D_stop+1)` (no upper bound)
+- Cholestatic/Mixed: `day_min=W_start, day_max=D_stop+180` (run once for ALP, once for bilirubin_total)
 
 % decrease = (peak − nadir) / peak × 100. Compare to 50% threshold.
 
+**Important:** The overall nadir may occur much later than the first value that reaches a ≥ 50% decrease. Use the minimum value to determine whether the threshold was reached within each window, but use the **earliest laboratory date within that window that meets the ≥ 50% threshold** to determine the outcome bucket.
+
 ### Step 4 — Commit the component (do NOT score)
-From the peak → nadir % decrease and the day the nadir occurs (measured from the
-drug stop date), determine ONE outcome bucket. The platform's `item_2_course`
-derivation applies the track-specific score. For cholestatic/mixed, evaluate ALP
-and bilirubin separately and report the **best** (earliest/largest-decrease) bucket.
+From the peak → follow-up % decrease and the **earliest date on which a ≥ 50% decrease is reached** (measured from the drug stop date), determine ONE outcome bucket. If the drug was stopped before T0, begin evaluating the course at T0, but retain the drug stop date for determining the elapsed dechallenge interval. The platform's `item_2_course` derivation applies the track-specific score. For cholestatic/mixed, evaluate ALP and bilirubin separately and report the **best** qualifying bucket based on the earliest ≥ 50% decrease; if neither reaches 50%, use the larger observed decrease.
 
 → **Commit `dechallenge_outcome`** =
-- `ge50_le8d` — ≥ 50% decrease, nadir within 8 days of drug stop
-- `ge50_le30d` — ≥ 50% decrease, nadir within 30 days (but not within 8)
-- `ge50_le180d` — ≥ 50% decrease reached only later, within 180 days
+- `ge50_le8d` — ≥ 50% decrease first reached within 8 days of drug stop
+- `ge50_le30d` — ≥ 50% decrease first reached within 30 days of drug stop, but not within 8 days
+- `ge50_le180d` — ≥ 50% decrease first reached after 30 days but within 180 days of drug stop
 - `lt50_with_data` — follow-up data exist but the decrease stays < 50%
 - `increase` — the anchor lab rises / recurs after the drug stop
 - `no_followup` — the drug was stopped but there are no follow-up labs to judge the course
