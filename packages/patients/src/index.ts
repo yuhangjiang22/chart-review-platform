@@ -201,6 +201,10 @@ const OMOP_TABLES = [
   "drugs",
   "observations",
   "encounters",
+  // Deterministic computed-foundations surface (age_at_index, age_band, sex, and
+  // pre-derived eligibility/control counts). Absent for most patients → empty
+  // table; present for real fixtures so tier-0/tier-1 lookups are reproducible.
+  "demographics",
 ] as const;
 
 export type OmopTable = (typeof OMOP_TABLES)[number];

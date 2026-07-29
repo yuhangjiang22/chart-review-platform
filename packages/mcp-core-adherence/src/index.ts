@@ -32,6 +32,7 @@ import type { CompiledTask } from "@chart-review/tasks";
 import type { QuestionAnswer } from "@chart-review/platform-types";
 import { loadOrCreate, writeReviewState } from "@chart-review/domain-review";
 import { verifyEvidence } from "@chart-review/faithfulness";
+import { readStructured } from "@chart-review/patients";
 import {
   loadAdherenceSkill,
   type AdherenceSkill,
@@ -140,13 +141,26 @@ export async function readQuestion(
 
 // ── set_question_answer ───────────────────────────────────────────────
 
-const evidenceSchema = z.object({
+// Evidence is EITHER a NOTE quote (faithfulness-checked) OR an OMOP structured
+// row (source:"omop", table [+ row_id]). Answers determined from a structured
+// lookup must cite the row, not a note (enforced below for foundation-backed
+// questions). Try the omop shape first so a source:"omop" item isn't misread.
+const noteEvidenceSchema = z.object({
+  source: z.literal("note").optional(),
   note_id: z.string(),
   quote: z.string(),
   // `.nullish()`: agents pass explicit null for offsets they didn't compute.
   start: z.number().int().nonnegative().nullish(),
   end: z.number().int().nonnegative().nullish(),
 });
+const omopEvidenceSchema = z.object({
+  source: z.literal("omop"),
+  table: z.string(),
+  row_id: z.union([z.string(), z.number()]).nullish().transform((v) => (v == null ? undefined : String(v))),
+  concept_id: z.number().optional(),
+  concept_name: z.string().optional(),
+});
+const evidenceSchema = z.union([omopEvidenceSchema, noteEvidenceSchema]);
 
 export const setQuestionAnswerArgsSchema = z.object({
   question_id: z.string(),
@@ -196,24 +210,59 @@ export async function setQuestionAnswer(
   // Coerce-to-null is OK (means "I couldn't determine") — agents are
   // explicitly told to prefer null over guessing.
 
+  // OMOP-PROVENANCE (UPGRADE, non-blocking): answers determined from a
+  // structured lookup should carry OMOP provenance. A HARD reject was tried and
+  // backfired — it triggered retry storms and drove the agent to null the answer
+  // to escape the gate (breaking eligibility). Instead we UPGRADE: if the agent
+  // committed a structured-sourced non-null answer WITHOUT citing the row, and
+  // the source table has data for this patient, we attach a table-level omop
+  // provenance pointer ourselves (below). The agent may still cite a specific
+  // row (schema accepts it) — then no upgrade is needed.
+  const STRUCTURED_SOURCED: Record<string, string> = {
+    "T0-AgeOk": "demographics",
+    "T0-AgeBand": "demographics",
+    "T0-LookbackHasNotes": "encounters",
+    "T1-ControllerPrescribed": "drugs",
+    "T1-SABAOveruse": "drugs",
+    "T1-ExacerbationsCount": "encounters",
+  };
+  const srcTable = STRUCTURED_SOURCED[args.question_id];
+  let upgradeOmopTable: string | null = null;
+  if (srcTable && coerced !== null) {
+    const hasOmop = (args.evidence ?? []).some((e) => (e as { source?: string }).source === "omop");
+    if (!hasOmop) {
+      try {
+        const s = readStructured(session.patientId) as unknown as Record<string, unknown[]>;
+        if (Array.isArray(s[srcTable]) && s[srcTable].length > 0) upgradeOmopTable = srcTable;
+      } catch { /* table unreadable → no upgrade, leave the agent's evidence as-is */ }
+    }
+  }
+
   // Faithfulness gate on every NOTE evidence quote — same contract the
   // phenotype set_field_assessment uses (CLAUDE.md gotcha #3). A genuinely
   // absent quote rejects the write; a real quote at wrong offsets is
-  // accepted with corrected offsets written back.
+  // accepted with corrected offsets written back. OMOP evidence is recorded
+  // as-is (verifyEvidence skips it — only note quotes are byte-checked).
   const evidence = args.evidence ?? [];
   const verifiedEvidence: NonNullable<QuestionAnswer["evidence"]> = [];
   for (const ev of evidence) {
-    const start = ev.start ?? 0;
-    const end = ev.end ?? (start + (ev.quote?.length ?? 0));
+    if ((ev as { source?: string }).source === "omop") {
+      const o = ev as { table: string; row_id?: string; concept_id?: number; concept_name?: string };
+      verifiedEvidence.push({ source: "omop", table: o.table, row_id: o.row_id, concept_id: o.concept_id, concept_name: o.concept_name });
+      continue;
+    }
+    const n = ev as { note_id: string; quote: string; start?: number | null; end?: number | null };
+    const start = n.start ?? 0;
+    const end = n.end ?? (start + (n.quote?.length ?? 0));
     const result = verifyEvidence(session.patientId, {
       source: "note",
-      note_id: ev.note_id,
+      note_id: n.note_id,
       span_offsets: [start, end],
-      verbatim_quote: ev.quote,
+      verbatim_quote: n.quote,
     });
     if (result.status === "fail") {
       return err(
-        `faithfulness check failed for evidence in note '${ev.note_id}': ${result.detail ?? "quote not found"}`,
+        `faithfulness check failed for evidence in note '${n.note_id}': ${result.detail ?? "quote not found"}`,
         {
           error_code: "faithfulness_failed",
           hint: "Evidence quote was not found in the note. Call find_quote_offsets (or read_note) to confirm the exact text, then retry set_question_answer with the verbatim quote.",
@@ -221,7 +270,14 @@ export async function setQuestionAnswer(
       );
     }
     const [cs, ce] = result.corrected_offsets ?? [start, end];
-    verifiedEvidence.push({ note_id: ev.note_id, quote: ev.quote, start: cs, end: ce });
+    verifiedEvidence.push({ source: "note", note_id: n.note_id, quote: n.quote, start: cs, end: ce });
+  }
+
+  // Upgrade: attach OMOP provenance for a structured-sourced answer the agent
+  // didn't already cite from a row. Table-level (the row the agent used isn't
+  // known here, but the source table is deterministic per question).
+  if (upgradeOmopTable && !verifiedEvidence.some((e) => (e as { source?: string }).source === "omop")) {
+    verifiedEvidence.push({ source: "omop", table: upgradeOmopTable });
   }
 
   const state = loadOrCreate(session.patientId, session.task);

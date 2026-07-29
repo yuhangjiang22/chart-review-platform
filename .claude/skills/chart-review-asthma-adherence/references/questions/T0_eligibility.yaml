@@ -43,7 +43,12 @@ questions:
       admits that full range; the age-appropriate guideline logic (control
       instrument, stepwise-therapy table) is then selected by T0-AgeBand,
       because NAEPP EPR-3 applies different criteria to ages 0-4, 5-11, and 12+.
-    retrieval_hints: Demographic header or notes. If age is unclear, return null.
+    retrieval_hints: >-
+      STRUCTURED FIRST → read_structured_data(table="demographics"). Use
+      `age_at_index` directly: true if 2-17 inclusive. Cite that row
+      (source: omop, table: demographics, row_id). Fall back to a note
+      demographic header only if the demographics table is empty. Return null
+      only when neither source states the age.
 
   - question_id: T0-AgeBand
     text: Which NAEPP guideline age band does the patient fall into at the index
@@ -73,35 +78,41 @@ questions:
       are 2-5 / 6-11 / 12-17, while guideline HANDLING uses the NAEPP boundaries
       above — they differ at age 5 (NAEPP places a 5-year-old in 5-11 / C-ACT).
       PI to confirm the 5-year-old handling before lock.
-    retrieval_hints: Compute from age at the index date — 2-4 -> age_2_4;
-      5-11 -> age_5_11; 12-17 -> age_12_17. If age is unknown, return null.
+    retrieval_hints: >-
+      STRUCTURED FIRST → read_structured_data(table="demographics"). Use the
+      precomputed `age_band` value directly (age_2_4 / age_5_11 / age_12_17) and
+      cite that row (source: omop, table: demographics, row_id). Only if the
+      demographics table is empty, compute from age at the index date
+      (2-4 -> age_2_4; 5-11 -> age_5_11; 12-17 -> age_12_17). Return null only
+      when age is unavailable from every source.
 
   - question_id: T0-LookbackHasNotes
-    text: Are there at least 2 outpatient or specialty notes in the lookback window
-      (so adherence has chart evidence to measure against)?
+    text: Are there at least 2 outpatient/specialty (non-ED, non-inpatient)
+      encounters in the lookback window? This is the deterministic proxy for the
+      longitudinal outpatient documentation adherence is measured against.
     tier: 0
     answer_schema:
       type: boolean
     naepp_source: "Methodological — not a NAEPP recommendation. Derived from
       EPR-3 p.94 (Component 2 KP) requirement for 'regular review by an
-      informed clinician' (Evidence B), which presupposes longitudinal notes."
+      informed clinician' (Evidence B), which presupposes longitudinal
+      outpatient care."
     evidence_grade: methodological
     clinical_rationale: >-
       Adherence cannot be assessed from a single encounter. EPR-3 grounds the
-      assessment of asthma control in 'regular review by an informed
-      clinician' — at least 2 longitudinal notes are the minimum chart
-      evidence to evaluate that review.
+      assessment of asthma control in 'regular review by an informed clinician'.
+      COUNTED FROM THE STRUCTURED encounters table (not a note-title judgment) so
+      the eligibility gate is reproducible run-to-run — note-title counting was
+      an unreliable, nondeterministic signal.
     retrieval_hints: >-
-      Use the encounter list + note titles to COUNT qualifying notes in the
-      lookback window. Qualifying notes are outpatient clinic progress notes and
-      specialty consult/follow-up notes (in-person, video, or telehealth visits
-      that generate a clinician note).
-
-      Do NOT count ED/hospitalization documentation (ED provider notes, H&P,
-      discharge summaries), procedures-only reports (PFT/spirometry reports
-      without a clinic note), imaging/lab result documents, telephone
-      encounters, refill requests, portal messages, administrative
-      documentation, or scheduling communications.
-
-      If fewer than 2 qualifying outpatient/specialty notes are present, answer
-      false.
+      STRUCTURED, deterministic → read_structured_data(table="encounters").
+      Count encounter rows in the lookback window that are OUTPATIENT / office /
+      clinic / specialty-consult visits: `is_ed` = false AND the visit `type` is
+      an outpatient/office visit (e.g. "Outpatient Visit", "Office Visit", a
+      specialty consult). EXCLUDE Emergency (`is_ed` = true), Inpatient /
+      hospitalization visits, and administrative/telephone contacts. If there are
+      >= 2 such encounters, answer true; otherwise false. Do NOT judge from note
+      titles — that count varies between runs; count the structured encounter
+      rows. Cite the qualifying encounter rows as evidence (source: omop, table:
+      encounters, row_id). Fall back to list_notes only if the encounters table
+      is empty.

@@ -16,17 +16,35 @@ The anchor lab's course after the suspect drug was stopped (anchor = ALT for
 hepatocellular; ALP/bilirubin for cholestatic/mixed):
 - `not_stopped` — drug never stopped in the observation window.
 - `no_followup` — stopped, but no post-stop lab data.
-- `ge50_le8d` — anchor fell ≥50% with nadir within 8 days of stop.
-- `ge50_le30d` — anchor fell ≥50% with nadir within 30 days.
-- `ge50_le180d` — anchor fell ≥50% with nadir within 180 days (after 30d).
+- `ge50_le8d` — anchor showed a ≥50% decrease within 8 days of stop.
+- `ge50_le30d` — anchor showed a ≥50% decrease after day 8 but within 30 days.
+- `ge50_le180d` — anchor showed a ≥50% decrease after day 30 but within 180 days.
 - `lt50_with_data` — post-stop data present but decrease <50%.
 - `increase` — anchor persisted or rose after stopping.
 
 ## Extraction guidance
 
-Use `get_lab_extremum` for peak (to drug stop) and nadir (in the window).
-% decrease = (peak − nadir)/peak × 100. Record the tier reached. For
-cholestatic/mixed, evaluate ALP and bilirubin and record the best (fastest/largest).
+Identify the injury peak and use `get_lab_extremum` to assess the minimum
+anchor-lab value within each applicable post-cessation window. Do not restrict the
+injury peak to laboratory results occurring before drug cessation; the injury peak
+may occur after the drug was stopped.
+
+If the drug was stopped before T0, exclude pre-onset laboratory
+values, but continue to measure the 8-, 30-, and 180-day scoring windows from the
+drug stop date.
+
+Calculate:
+
+`% decrease = (peak − follow-up value) / peak × 100`
+
+Record the earliest scoring tier in which any eligible laboratory result reaches the
+≥50% threshold. Do not use the date of the overall nadir if an earlier value already
+crossed the threshold.
+
+Use ALT for hepatocellular injury and ALP for
+cholestatic/mixed injury. If bilirubin is used because ALP is not interpretable or as
+part of a modified platform rule, document this explicitly as an implementation
+adaptation.
 
 **Anchor to the suspect drug's STOP date — never the injury peak (T0).** The
 dechallenge measures how the anchor lab moved *after the suspect drug was stopped*.
