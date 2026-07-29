@@ -2,7 +2,7 @@
 // synthetic demo patient's note via real OpenRouter, writes the extracted
 // leaves (which DERIVES apoe2/3/4 per note from apoe_genotype), then compares
 // the full stored field set (leaves + derived) to per-note ground truth.
-// Run: node node_modules/tsx/dist/cli.mjs scripts/pernote-live-e2e.ts
+// Run: npx tsx scripts/pernote-live-e2e.ts
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";

@@ -15,7 +15,7 @@
 //   ALIGN      the latest run per (task,patient) is reflected in its
 //              owning session's review_state                            (draft exists but reviewer shows empty)
 //
-// Read-only. Run: `node node_modules/tsx/dist/cli.mjs scripts/e2e/doctor.ts`
+// Read-only. Run: `npx tsx scripts/e2e/doctor.ts`
 // (the repo's .bin shims are broken; invoke tsx's cli directly). Exit code = #FAILs.
 
 import dotenv from "dotenv";

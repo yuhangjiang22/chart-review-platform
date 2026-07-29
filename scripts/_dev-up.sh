@@ -6,6 +6,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
+export PATH="$ROOT/node_modules/.bin:$PATH"   # use the .bin tool shims directly
 LOG="$ROOT/var/dev-logs"; mkdir -p "$LOG"
 
 start() { # name  logfile  cmd...
@@ -15,8 +16,8 @@ start() { # name  logfile  cmd...
 }
 
 echo "Starting concur dev stack (detached)…"
-start "API :3002"   api.log   node node_modules/tsx/dist/cli.mjs watch server/index.ts
-start "Vite :5174"  vite.log  node node_modules/vite/dist/node/cli.js --config config/vite.config.ts
+start "API :3002"   api.log   tsx watch server/index.ts
+start "Vite :5174"  vite.log  vite --config config/vite.config.ts
 ( cd "$ROOT/vendor/bso-ad-sdk" && \
   nohup env -u ANTHROPIC_API_KEY .venv/bin/uvicorn claude_proxy.proxy:app --host 127.0.0.1 --port 18080 \
     >"$LOG/proxy.log" 2>&1 & echo "  started proxy :18080 (pid $!) → $LOG/proxy.log" )
