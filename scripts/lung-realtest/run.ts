@@ -3,7 +3,7 @@
 // so we capture exact token usage → cost. Prints only run status (no PHI).
 //
 // Usage (from concur root):
-//   node node_modules/tsx/dist/cli.mjs scripts/lung-realtest/run.ts [patient_id]
+//   npx tsx scripts/lung-realtest/run.ts [patient_id]
 import dotenv from "dotenv";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
