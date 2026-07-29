@@ -17,7 +17,8 @@ export type RoutePage =
   | "patient"
   | "builder"
   | "audit"
-  | "help";
+  | "help"
+  | "settings";
 
 export interface ParsedRoute {
   page: RoutePage;
@@ -37,6 +38,7 @@ const VALID_PAGES: ReadonlyArray<RoutePage> = [
   "builder",
   "audit",
   "help",
+  "settings",
 ];
 
 function parseHash(hash: string): ParsedRoute | null {
@@ -59,6 +61,7 @@ function parseHash(hash: string): ParsedRoute | null {
     case "tasks":
     case "audit":
     case "help":
+    case "settings":
       return { page };
   }
 }
@@ -124,4 +127,8 @@ export function queueHash(taskId: string): string {
 
 export function builderHash(taskId: string): string {
   return `#/builder/${encodeURIComponent(taskId)}`;
+}
+
+export function settingsHash(): string {
+  return "#/settings";
 }

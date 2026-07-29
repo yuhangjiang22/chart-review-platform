@@ -188,12 +188,22 @@ export interface QuestionAnswer {
   answer: string | number | boolean | null;
   /** Extractor's calibrated confidence, 0..1. */
   confidence?: number;
-  /** Evidence passages cited in support. */
+  /** Evidence passages cited in support. Either a NOTE quote (faithfulness-
+   *  checked) or an OMOP structured-data row (source:"omop", table + row_id) —
+   *  answers determined from a structured lookup must cite the row, not a note. */
   evidence?: Array<{
-    note_id: string;
-    quote: string;
+    /** Provenance: "note" (default) or "omop" for a structured-data row. */
+    source?: "note" | "omop";
+    // note evidence
+    note_id?: string;
+    quote?: string;
     start?: number;
     end?: number;
+    // omop (structured) evidence
+    table?: string;
+    row_id?: string;
+    concept_id?: number;
+    concept_name?: string;
   }>;
   /** Short prose explaining the extraction. */
   reasoning?: string;

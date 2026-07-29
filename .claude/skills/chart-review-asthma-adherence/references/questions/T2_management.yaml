@@ -27,6 +27,7 @@ questions:
         - unknown
     depends_on:
       - T0-AgeBand
+      - T1-ControlLevel
       - T1-ControllerPrescribed
       - T1-ACTScore
       - T1-ExacerbationsCount
@@ -157,6 +158,43 @@ questions:
       technique reviewed, no issues. 'assessed_corrected' = errors found,
       coaching given. 'not_assessed' = no documentation of technique
       review in any visit during the lookback.
+
+  - question_id: T2-SpecialtyReferral
+    text: >-
+      For a patient who is NOT well-controlled (T1-ControlLevel in
+      not_well_controlled / very_poorly_controlled) OR who requires Step 4+
+      therapy, is a referral to asthma specialty care (allergy/immunology or
+      pulmonology) documented in the window? Answer `not_indicated` when the
+      patient is well-controlled and below Step 4 (referral not expected).
+    tier: 2
+    answer_schema:
+      type: string
+      enum:
+        - referred
+        - not_referred
+        - not_indicated
+    depends_on:
+      - T1-ControlLevel
+      - T2-StepTherapyMatch
+    naepp_source: "EPR-3 Section 4, p.373 (Referral to an Asthma Specialist)
+      — 'Referral for consultation or care to a specialist is recommended when
+      [...] the patient has had a life-threatening exacerbation; is not meeting
+      the goals of therapy after 3-6 months; signs/symptoms are atypical;
+      additional testing is indicated; the patient requires step 4 care or
+      higher (step 3 for children 0-4).' Design domain E ('referral to
+      specialist if indicated')."
+    evidence_grade: D
+    clinical_rationale: >-
+      EPR-3 treats specialist referral as a concordance action for patients who
+      remain uncontrolled despite guideline-appropriate primary care or who need
+      Step-4+ therapy. Failure to refer such a patient is a documented management
+      gap; a well-controlled, low-step patient needs no referral (not_indicated).
+    retrieval_hints: >-
+      Predicate on T1-ControlLevel and step level. Scan notes for referral
+      orders / consult notes to allergy-immunology or pulmonology, and the
+      encounters table for specialty visits. If well-controlled and below Step 4,
+      return 'not_indicated'. If uncontrolled / Step 4+ and a referral or
+      specialty visit is documented -> 'referred'; if none -> 'not_referred'.
 
   - question_id: T2-ComorbidityAddressed
     text: For patients with documented asthma-relevant comorbidities (from

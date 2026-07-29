@@ -19,6 +19,7 @@ rules:
       NOT first-line for ages 2-11 (use the pediatric figures).
     evidence_grade: A_with_SMART_strong_LAMA_conditional
     verdict_if: "T2-StepTherapyMatch == \"matches\""
+    excluded_if: "T2-StepTherapyMatch == \"unknown\""
     attribution_when:
       - when: "T2-ContraindicationDocumented == \"contraindication\""
         category: CONTRAINDICATION
@@ -55,7 +56,7 @@ rules:
   - rule_id: R-T2-FollowupScheduled
     description: >-
       Follow-up scheduled within 3 months for non-controlled patients.
-      Well-controlled patients (ACT >= 20 AND zero exacerbations) are
+      Well-controlled patients (T1-ControlLevel == well_controlled) are
       excluded — they can be reviewed at routine 6-month intervals.
     naepp_source: >-
       EPR-3 Component 2 p.94 (Key Points) — 'Regular review, by an
@@ -66,9 +67,9 @@ rules:
       when controlled. 3 months is the cap for non-controlled patients.
     evidence_grade: B
     verdict_if: "T2-FollowupScheduled == true"
-    excluded_if: "T1-ACTScore >= 20 and T1-ExacerbationsCount == 0"
+    excluded_if: "T1-ControlLevel == \"well_controlled\""
     attribution: DOCUMENTATION_GAP
-    supporting_questions: [T2-FollowupScheduled, T1-ACTScore, T1-ExacerbationsCount]
+    supporting_questions: [T2-FollowupScheduled, T1-ControlLevel]
 
   - rule_id: R-T2-InhalerTechniqueChecked
     description: >-
@@ -108,3 +109,24 @@ rules:
     nuanced: true
     judge_can_override: false
     supporting_questions: [T1-ComorbidityAssessed, T2-ComorbidityAddressed]
+
+  - rule_id: R-T2-SpecialtyReferralWhenIndicated
+    description: >-
+      A patient who is not well-controlled (T1-ControlLevel in
+      not_well_controlled / very_poorly_controlled) or who requires Step 4+
+      therapy has a documented referral to asthma specialty care
+      (allergy/immunology or pulmonology). Well-controlled, sub-Step-4 patients
+      are excluded (referral not indicated).
+    naepp_source: >-
+      EPR-3 Section 4 p.373 (Referral to an Asthma Specialist) — referral is
+      recommended for a life-threatening exacerbation, failure to meet therapy
+      goals after 3-6 months, atypical signs/symptoms, need for additional
+      testing, or when the patient requires Step 4 care or higher (Step 3 for
+      children 0-4). Design domain E ('referral to specialist if indicated').
+    evidence_grade: D
+    verdict_if: "T2-SpecialtyReferral in [\"referred\", \"not_indicated\"]"
+    excluded_if: "T2-SpecialtyReferral == \"not_indicated\""
+    attribution: DOCUMENTATION_GAP
+    nuanced: true
+    judge_can_override: false
+    supporting_questions: [T1-ControlLevel, T2-StepTherapyMatch, T2-SpecialtyReferral]

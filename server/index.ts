@@ -91,6 +91,7 @@ import { adherenceRubricRoutes } from "./adherence-rubric-routes.js";
 import { rubricVersionRoutes } from "./rubric-version-routes.js";
 import { maturityDerivedRoutes } from "./maturity-derived-routes.js";
 import { psmaContextRoutes } from "./psma-context-routes.js";
+import { systemRoutes } from "./system-routes.js";
 import { nerSdkRunRoutes } from "./ner-sdk-run-routes.js";
 import { nerSdkAnnotateRoutes } from "./ner-sdk-annotate-routes.js";
 import { nerSdkViewRoutes } from "./ner-sdk-view-routes.js";
@@ -254,6 +255,7 @@ const paramRouter = makeRouter([
   ...nerSdkAnnotateRoutes,
   ...nerSdkViewRoutes,
   ...psmaContextRoutes,
+  ...systemRoutes,
 ]);
 
 // ── http plumbing ───────────────────────────────────────────────────
