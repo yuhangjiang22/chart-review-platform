@@ -50,6 +50,10 @@ DRUG_KW = {"albuterol":("SABA",False),"levalbuterol":("SABA",False),"fluticasone
  "mepolizumab":("biologic",True),"benralizumab":("biologic",True),"dupilumab":("biologic",True),
  "prednisone":("OCS",False),"prednisolone":("OCS",False),"methylprednisolone":("OCS",False),"dexamethasone":("OCS",False)}
 
+# Study window on index_date (post-2020 default → 2020 NAEPP edition applies to all).
+STUDY_START = "2021-01-01"
+STUDY_END   = "2100-01-01"
+
 def render_duckdb(sql, schema_prefix=""):
     """Stand-in for OHDSI SqlRender: substitute @params + translate the OHDSI
        functions we use to DuckDB. A real site uses SqlRender.translate() instead."""
@@ -57,6 +61,7 @@ def render_duckdb(sql, schema_prefix=""):
     s = s.replace("@cdm_database_schema.", schema_prefix)
     s = s.replace("@cohort_table", "cohort").replace("@drug_class_table", "drug_class_map")
     s = s.replace("@min_age", "2").replace("@max_age", "17").replace("@min_lookback_visits", "2")
+    s = s.replace("@study_start", STUDY_START).replace("@study_end", STUDY_END)
     s = re.sub(r"DATEADD\(MONTH,\s*-12,\s*([^)]+)\)", r"(\1 - INTERVAL 12 MONTH)", s)
     return s
 
@@ -106,7 +111,11 @@ def main():
     ap.add_argument("--patients"); ap.add_argument("--salt", default=os.environ.get("ETL_SALT","rdrp6745"))
     ap.add_argument("--prefix", default="patient_real_asthma_"); ap.add_argument("--check", action="store_true")
     ap.add_argument("--adapter", default=os.path.join(HERE,"adapter_rdrp.sql"))
+    ap.add_argument("--study-start", default="2021-01-01", help="index_date >= this (post-2020 = 2020 NAEPP edition)")
+    ap.add_argument("--study-end", default="2100-01-01", help="index_date <= this")
     a = ap.parse_args()
+    global STUDY_START, STUDY_END
+    STUDY_START, STUDY_END = a.study_start, a.study_end
     con = duckdb.connect(); setup_adapter(con, a.adapter, a.rdrp, a.notes)
     if a.check: conformance(con); return
 

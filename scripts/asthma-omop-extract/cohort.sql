@@ -66,4 +66,10 @@ FROM idx_age ia
 INNER JOIN lookback lb ON lb.person_id = ia.person_id
 WHERE ia.age_at_index BETWEEN @min_age AND @max_age
   AND lb.n_lookback_outpatient >= @min_lookback_visits
+  -- Study window on the index date. Default is post-2020 (>= 2021-01-01) so EVERY
+  -- patient falls under ONE guideline edition — the 2020 NAEPP Focused Update —
+  -- and no one is scored against SMART/LAMA before it existed. Widen (e.g.
+  -- @study_start=1900-01-01) only if you add index-date-driven edition logic.
+  AND ia.index_date >= '@study_start'
+  AND ia.index_date <= '@study_end'
 ORDER BY ia.person_id;
