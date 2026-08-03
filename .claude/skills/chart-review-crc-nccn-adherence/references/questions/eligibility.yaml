@@ -1,0 +1,52 @@
+# T0 — Eligibility + context. Establishes that the patient is an in-scope CRC
+# case and captures the two facts (subsite, stage group) that the concordance
+# rules in concordance.yaml use to set their N/A conditions. Answer these FIRST.
+
+questions:
+  - question_id: T0-CRCConfirmed
+    text: >-
+      Is this a confirmed colorectal cancer case — primary site colon (C18.x),
+      rectosigmoid (C19), or rectum (C20), with a histologically confirmed
+      adenocarcinoma or recognized CRC variant?
+    tier: 0
+    answer_schema:
+      type: string
+      enum: [eligible, not_eligible, unknown]
+    nccn_source: "STORE 2025 site codes C18.x / C19 / C20; diagnostic confirmation by biopsy/path report."
+    clinical_rationale: >-
+      Gates the concordance questions to in-scope CRC patients. A non-CRC or
+      unconfirmed case makes every downstream concordance answer not_applicable.
+    retrieval_hints: >-
+      Pathology report — primary site + histology (adenocarcinoma, mucinous,
+      signet-ring); ICD-O-3 site code if coded.
+
+  - question_id: T0-Subsite
+    text: Is the primary tumor colon (C18.x) or rectal (rectum C20 / rectosigmoid C19)?
+    tier: 0
+    answer_schema:
+      type: string
+      enum: [colon, rectal, unknown]
+    depends_on: [T0-CRCConfirmed]
+    nccn_source: "Primary site (STORE 2025). Subsite drives the rectal-only neoadjuvant rule (C5)."
+    clinical_rationale: >-
+      The neoadjuvant-chemoradiation rule applies to rectal cancer only;
+      colon cases are N/A for it.
+    retrieval_hints: "Path/operative/radiology: 'colon', 'cecum'..'sigmoid' vs 'rectum'/'rectal'/'rectosigmoid'."
+
+  - question_id: T0-StageGroup
+    text: >-
+      What is the AJCC stage group (I–IV) for this patient? (Derived from the
+      abstracted cT/cN/cM or pT/pN/pM; if not derivable, answer unknown.)
+    tier: 0
+    answer_schema:
+      type: string
+      enum: ["I", "II", "III", "IV", "unknown"]
+    depends_on: [T0-CRCConfirmed]
+    nccn_source: "AJCC TNM → Stage Group lookup. Stage drives the adjuvant-chemo (C4) and rectal-neoadjuvant (C5) rules."
+    clinical_rationale: >-
+      Stage III gates the adjuvant-chemotherapy rule; stage II–III gates the
+      locally-advanced rectal neoadjuvant rule. Without a stage group those
+      rules cannot be judged.
+    retrieval_hints: >-
+      Surgical pathology (pT/pN), pre-treatment imaging (cT/cN/cM), oncology
+      staging notes; node-positive (N1/N2) = at least Stage III; M1 = Stage IV.

@@ -1,0 +1,19 @@
+{
+  "patient_id": "patient_fake_cancer_08",
+  "category": "confirmed_nsclc",
+  "demographics": {
+    "age": 68,
+    "sex": "F",
+    "region": "Midwest"
+  },
+  "smoking": "30 pack-years, quit 2018",
+  "index_date": "2024-12-09",
+  "doc_types": [
+    "ct_chest",
+    "surgical_pathology",
+    "oncology_progress",
+    "pcp_followup"
+  ],
+  "generated_by": "claude_api",
+  "generation_run_id": "claude-subagent-2026-04-29"
+}

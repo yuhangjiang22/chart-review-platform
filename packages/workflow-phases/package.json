@@ -1,0 +1,12 @@
+{
+  "name": "@chart-review/workflow-phases",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Workflow phase contract + registry. Each phase is its own @chart-review/workflow-phase-<id> package; this package defines the PhaseModule type and resolvePhasesForTask() that consults each task's meta.yaml `phases:` list.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": { "types": "./src/index.ts", "default": "./src/index.ts" }
+  }
+}

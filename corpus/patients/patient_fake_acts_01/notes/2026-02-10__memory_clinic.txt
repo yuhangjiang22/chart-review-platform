@@ -1,0 +1,31 @@
+DATE: 2026-02-10
+PATIENT: Female, 74 yo | PROVIDER: Dr. A. Reyes, MD — Memory & Aging Clinic (Neurology)
+VISIT: Cognitive evaluation follow-up
+
+CC: Progressive memory complaints over the past 18 months, brought in by daughter.
+
+HPI: Mrs. [L.] is a 74-year-old right-handed woman seen for follow-up of progressive
+memory difficulty. Her daughter reports worsening short-term memory, repeating
+questions, and misplacing items. Bedside and formal testing were completed.
+
+COGNITIVE TESTING: MoCA 21/30 (deficits in delayed recall and visuospatial/executive
+domains), consistent with mild cognitive impairment. Neuropsychological evaluation
+documented amnestic-predominant cognitive deficits exceeding age-expected norms.
+
+GENETICS: APOE genotype: ε3/ε4 (heterozygous ε4 carrier), obtained 2025-11 as part of
+the AD risk evaluation.
+
+GYN HISTORY: Postmenopausal female; natural menopause at age 51. No postmenopausal
+bleeding. Not on hormone therapy.
+
+PMH: Hypertension; hyperlipidemia.
+MEDS: Amlodipine 5 mg daily; atorvastatin 20 mg daily.
+ALLERGIES: NKDA.
+FAMILY HISTORY: Mother with Alzheimer's disease in her 80s.
+
+ASSESSMENT: Mild cognitive impairment, amnestic type, likely due to early Alzheimer's
+disease. APOE ε4 heterozygosity confers increased risk. Discussed prognosis and
+monitoring with patient and daughter.
+
+PLAN: Start cognitive monitoring; repeat MoCA in 6 months; counsel on safety. Consider
+biomarker evaluation if decline accelerates.

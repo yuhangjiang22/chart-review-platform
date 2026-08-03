@@ -1,0 +1,42 @@
+[
+  {
+    "row_id": 7001,
+    "concept_id": 201826,
+    "concept_name": "Type 2 diabetes mellitus",
+    "icd10cm": "E11.9",
+    "status": "active",
+    "date": "2019-03-20"
+  },
+  {
+    "row_id": 7002,
+    "concept_id": 443727,
+    "concept_name": "Type 1 diabetes mellitus with ketoacidosis",
+    "icd10cm": "E10.10",
+    "status": "active",
+    "date": "2019-04-02"
+  },
+  {
+    "row_id": 7003,
+    "concept_id": 201254,
+    "concept_name": "Type 1 diabetes mellitus",
+    "icd10cm": "E10.9",
+    "status": "active",
+    "date": "2021-07-15"
+  },
+  {
+    "row_id": 7004,
+    "concept_id": 201254,
+    "concept_name": "Type 1 diabetes mellitus",
+    "icd10cm": "E10.9",
+    "status": "active",
+    "date": "2024-02-10"
+  },
+  {
+    "row_id": 7005,
+    "concept_id": 37016349,
+    "concept_name": "Type 1 diabetes mellitus with hyperglycemia",
+    "icd10cm": "E10.65",
+    "status": "active",
+    "date": "2025-06-15"
+  }
+]

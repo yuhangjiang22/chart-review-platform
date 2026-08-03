@@ -1,0 +1,8 @@
+{
+  "patient_id": "patient_fake_rucam_01",
+  "category": "rucam_synth",
+  "person_id": 9001,
+  "phi": false,
+  "index_date": "2024-03-01",
+  "generated_by": "synthetic RUCAM DILI fixture (hepatocellular, amox-clav); NOT real patient data"
+}

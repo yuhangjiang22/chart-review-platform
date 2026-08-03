@@ -1,0 +1,14 @@
+UROLOGY CONSULT NOTE  (SYNTHETIC — NOT A REAL PATIENT)
+Date: 2023-02-10
+
+68-year-old man referred for newly diagnosed prostate cancer.
+
+Assessment: Prostatic adenocarcinoma, Gleason 4+4=8 (Grade Group 4).
+Clinical stage cT3a N0 M0. Presenting PSA 18 ng/mL. This is NCCN high-risk
+prostate cancer.
+
+Staging bone scan and CT performed at diagnosis showed no evidence of
+metastatic disease.
+
+Plan: Robotic-assisted radical prostatectomy with pelvic lymph node dissection.
+Options including radiation therapy were discussed; patient elects surgery.

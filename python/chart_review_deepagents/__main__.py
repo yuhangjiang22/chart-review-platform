@@ -1,0 +1,430 @@
+# chart_review_deepagents/__main__.py
+# Usage: python -m chart_review_deepagents <runspec.json>
+#
+# Run spec shape (written by DeepAgentsProvider):
+#   { "prompt": str, "system_prompt": str, "max_turns": int, "model": str|None,
+#     "mcp": { "command": str, "args": [str], "env": {str:str}, "type": "stdio" } }
+#
+# Emits AgentEvent JSONL on stdout (one event per line). All diagnostics
+# go to stderr — stdout is reserved for the event stream.
+import asyncio
+import json
+import os
+import sys
+import traceback
+
+from langchain_mcp_adapters.client import MultiServerMCPClient
+from langchain_mcp_adapters.tools import load_mcp_tools
+from langchain_core.tools import ToolException
+from deepagents import create_deep_agent
+
+from .models import make_model
+from .events import messages_to_events, emit
+from .plugins import load_python_plugins
+
+
+def _recoverable(tools):
+    """Wrap each MCP tool so a tool-side failure (faithfulness-gate rejection,
+    `incomplete_review`, etc.) is returned to the model as a normal observation
+    instead of raising out of the agent loop and crashing the whole run.
+
+    langchain-mcp-adapters raises `ToolException` whenever the MCP server marks
+    a result `isError`. The default agent loop lets that propagate, so a single
+    bad quote or a stray `set_review_status` aborts the patient. Returning the
+    error text instead lets the model self-correct (re-quote, commit the missing
+    field) — exactly what the faithfulness gate is designed to drive."""
+    for tool in tools:
+        orig = tool.coroutine
+
+        async def safe(*args, _orig=orig, _tool=tool, **kwargs):
+            try:
+                return await _orig(*args, **kwargs)
+            except ToolException as e:
+                msg = (
+                    f"TOOL_ERROR: {e}\n"
+                    "This is a recoverable error, not a stop signal. Read the "
+                    "message, fix the cause (copy the quote verbatim from the "
+                    "note, or commit the missing field), and call the tool "
+                    "again. Do not call `set_review_status`."
+                )
+                # langchain-mcp-adapters loads MCP tools with
+                # response_format='content_and_artifact', so the coroutine MUST
+                # return a (content, artifact) two-tuple — returning a bare str
+                # raises ValueError and crashes the run. Match the tool's format.
+                if getattr(_tool, "response_format", None) == "content_and_artifact":
+                    return msg, {"error": str(e)}
+                return msg
+
+        tool.coroutine = safe
+    return tools
+
+
+async def run(spec: dict) -> None:
+    mcp = spec["mcp"]
+    mcp_env = mcp.get("env", {})
+    conn = {
+        "command": mcp["command"],
+        "args": mcp["args"],
+        "env": mcp_env,
+        "transport": "stdio",
+    }
+    # Run the stdio MCP server from the platform root so `npx tsx` resolves
+    # the repo-local tsx binary (the sidecar's own cwd is python/, which has
+    # no node_modules). CHART_REVIEW_PLATFORM_ROOT is carried in the env the
+    # TS provider passes through.
+    platform_root = mcp_env.get("CHART_REVIEW_PLATFORM_ROOT")
+    if platform_root:
+        conn["cwd"] = platform_root
+    client = MultiServerMCPClient({"chart_review_state": conn})
+    # Hold ONE MCP session open for the entire agent run. get_tools() runs
+    # each tool call in a fresh server process (stateless), which breaks the
+    # stateful review_state.json accumulation the chart_review_state server
+    # relies on — set_field_assessment writes wouldn't accumulate. A single
+    # persistent session keeps one server process alive across all tool calls.
+    async with client.session("chart_review_state") as session:
+        tools = _recoverable(await load_mcp_tools(session))
+        # Append task-specific read/compute plugin tools (e.g. RUCAM's) selected
+        # by the task's tool profile. The MCP tools (writes + note faithfulness)
+        # remain the primary surface; plugins are read/compute only.
+        plugin_bind = {"data_dir": spec.get("data_dir", "data"), **(spec.get("plugin_bind") or {})}
+        plugin_tools = load_python_plugins(spec.get("python_plugins", []), plugin_bind)
+        if plugin_tools:
+            print(
+                f"[plugins] loaded {len(plugin_tools)} plugin tool(s): "
+                f"{', '.join(t.__name__ for t in plugin_tools)}",
+                file=sys.stderr,
+            )
+        tools = tools + plugin_tools
+        # Per-item mode uses short, single-item conversations that stay well under
+        # Azure's 128 tool_calls cap, so allow parallel tool-call batching (far
+        # fewer turns -> fewer context re-sends -> much cheaper). The note-heavy
+        # single-call path keeps serial to avoid the 128 overflow.
+        agent_kwargs = dict(
+            model=make_model(spec.get("model"),
+                             serial_tool_calls=not bool(spec.get("per_item"))),
+            tools=tools,
+            system_prompt=spec.get("system_prompt", ""),
+        )
+        # Load task skills when the run requests them (e.g. RUCAM's per-item
+        # scoring methodology). deepagents skills need a FilesystemBackend; we
+        # root it at .claude/skills (NOT the platform root) so the skill read_file
+        # can reach skill files only — patient notes stay behind the MCP
+        # faithfulness gate, never readable through this backend.
+        skills = spec.get("skills") or []
+        if skills:
+            from deepagents.backends.filesystem import FilesystemBackend
+            skills_root = os.path.join(
+                os.environ.get("CHART_REVIEW_PLATFORM_ROOT", "."), ".claude", "skills"
+            )
+            agent_kwargs["backend"] = FilesystemBackend(root_dir=skills_root, virtual_mode=True)
+            agent_kwargs["skills"] = skills
+            print(f"[skills] loaded: {', '.join(skills)} (root {skills_root})", file=sys.stderr)
+        agent = create_deep_agent(**agent_kwargs)
+        config = {"recursion_limit": int(spec.get("max_turns", 90)) * 2 + 10}
+
+        per_group = spec.get("per_group")
+        per_item = spec.get("per_item")
+        if per_group:
+            # Grouped/compacted scoring: compute shared foundations ONCE
+            # (deterministic, no LLM), then run one short FRESH conversation per
+            # group of leaves — context is compacted between groups instead of
+            # one giant growing all-24-leaves conversation. Targets leaves + stays
+            # serial (per_item is falsy here), so it avoids the derived-field and
+            # parallel-tool-call pitfalls that retired the per-item loop.
+            case_facts = build_case_facts(plugin_bind)
+            if case_facts:
+                print("[foundations] " + "; ".join(
+                    f"{k}={v}" for k, v in case_facts.items() if v is not None), file=sys.stderr)
+            max_attempts = int(spec.get("per_group_max_attempts", 2))
+            emit({"type": "text",
+                  "text": "Agent started — foundations computed; scoring leaves group by group…"})
+            prior, final_msgs = await _score_groups(agent, per_group, case_facts, max_attempts, config)
+            last_text = "grouped scoring complete"
+        elif per_item:
+            # RUCAM-style per-item scoring: drive ONE conversation per rubric
+            # item, retrying an item until its field is written (or max attempts
+            # exhausted). `prior` carries the real scores of already-scored items
+            # into each subsequent item's task prompt.
+            max_attempts = int(spec.get("per_item_max_attempts", 2))
+            # Re-commit path for score reconciliation: when the agent's rationale
+            # ("Score: X") drifts from the committed answer field, the loop trusts
+            # the prose (matching agent_v2) and re-writes the corrected score
+            # through the SAME set_field_assessment tool, so the faithfulness gate
+            # + answer-enum enforcement still apply (an off-enum stated score is
+            # rejected and the original answer is kept).
+            set_field_tool = next(
+                (t for t in tools if getattr(t, "name", None) == "set_field_assessment"), None)
+            prior, final_msgs = await _score_items(agent, per_item, max_attempts, config,
+                                                   recommit=make_recommit(set_field_tool))
+            last_text = "per-item scoring complete"
+        else:
+            # Immediate activity marker. astream(stream_mode="values") yields
+            # nothing until the first super-step (model call) completes — ~5-15s
+            # of apparent silence during which the live agent-log shows "waiting
+            # for agent activity". Emit a start line up front so the reviewer sees
+            # the agent is alive the instant it launches. Display-only: this flows
+            # to the transcript/audit log, not to the draft (which comes from the
+            # MCP review_state) or the run's success/error tally.
+            emit({"type": "text", "text": "Agent started — reading the chart and rubric…"})
+            final_msgs, last_text = await _stream_once(agent, spec["prompt"], config)
+    _log_usage(spec, final_msgs)
+    emit({"type": "result", "result": last_text})
+
+
+def make_recommit(set_field_tool):
+    """Build the score-reconciliation re-commit callable for `_score_items`.
+
+    Re-invokes set_field_assessment with the corrected answer and reports whether
+    the write was ACCEPTED — the faithfulness gate + answer-enum enforcement still
+    apply, so an off-enum stated score comes back rejected and the loop keeps the
+    original answer. Returns an async `recommit(args)->bool`, or None when the tool
+    is unavailable (reconciliation is then detected-but-skipped)."""
+    if set_field_tool is None:
+        return None
+
+    async def recommit(args: dict) -> bool:
+        try:
+            result = await set_field_tool.ainvoke(args)
+        except Exception as e:  # tool/transport error → keep the original answer
+            print(f"[reconcile] re-commit failed: {e}", file=sys.stderr)
+            return False
+        # MCP tools load with response_format='content_and_artifact' → the result
+        # may be a (content, artifact) tuple; a successful write's content carries
+        # {"ok":true}. Tolerate either shape.
+        content = result[0] if isinstance(result, tuple) else result
+        return '"ok":true' in str(content).replace(" ", "").lower()
+
+    return recommit
+
+
+async def _score_items(agent, per_item, max_attempts: int, config: dict, recommit=None):
+    """Drive ONE conversation per rubric item, retrying an item until its field
+    is written (or max_attempts exhausted). Threads the REAL score AND reasoning
+    the agent wrote for each item into the `prior` context passed to later items.
+
+    Score reconciliation (port of agent_v2's sync_score_from_reasoning): the
+    per-item prompt asks the agent to end its rationale with `Score: X`. If that
+    prose conclusion disagrees with the committed `answer` field (the structured
+    field is the more error-prone of the two), trust the prose and re-commit the
+    corrected score via `recommit` so review_state — the scorecard's source of
+    truth — matches. `recommit(args)->bool` re-invokes set_field_assessment;
+    when None (unit tests / non-RUCAM), reconciliation is detected but skipped.
+
+    Returns (prior, final_msgs):
+      - prior: list of {item_number, field_id, answer, reasoning} — answer is the
+        actual (possibly reconciled) score, or None if never written; reasoning
+        is the committed rationale ("" if none), threaded into later items.
+      - final_msgs: concatenation of every attempt's message list (for usage log).
+    """
+    from .rucam_prompts import build_item_task_prompt
+    from .messages_util import (
+        field_answers, set_field_committed, last_field_call_args, parse_stated_score,
+    )
+
+    prior = []
+    final_msgs = []
+    for entry in per_item:
+        fid = entry["field_id"]
+        wrote = False
+        answer = None
+        reasoning = ""
+        for attempt in range(1, max_attempts + 1):
+            emit({"type": "text",
+                  "text": f"Scoring item {entry['item_number']} ({fid}), attempt {attempt}…"})
+            msgs, _last_text = await _stream_once(agent, build_item_task_prompt(entry, prior),
+                                                  config, stop_on_set_field=True)
+            final_msgs += msgs
+            answers = field_answers(msgs)
+            # Require a SUCCESSFUL commit (not just the tool call). A rejected
+            # write (e.g. malformed evidence) must trigger a retry, not be
+            # silently treated as done. Membership (not truthiness) so a 0 counts.
+            if set_field_committed(msgs) and fid in answers:
+                wrote = True
+                answer = answers.get(fid)
+                call_args = last_field_call_args(msgs, fid)
+                reasoning = call_args.get("rationale") or ""
+                stated = parse_stated_score(reasoning)
+                if stated is not None and stated != answer:
+                    if recommit is not None and await recommit({**call_args, "answer": stated}):
+                        emit({"type": "text",
+                              "text": f"Reconciled {fid}: committed {answer} → {stated} "
+                                      f"(rationale 'Score:' overrides the answer field)"})
+                        answer = stated
+                    else:
+                        emit({"type": "text",
+                              "text": f"NOTE: {fid} rationale states Score {stated} but answer "
+                                      f"field is {answer}; re-commit unavailable/rejected, keeping {answer}"})
+                break
+        if not wrote:
+            emit({"type": "text", "text": f"WARNING: {fid} not written after {max_attempts} attempts"})
+        prior.append({"item_number": entry["item_number"], "field_id": fid,
+                      "answer": answer, "reasoning": reasoning})
+    return prior, final_msgs
+
+
+def build_case_facts(plugin_bind: dict) -> dict:
+    """Compute RUCAM's shared foundations ONCE, deterministically (no LLM) — the
+    facts every group needs (suspect drug, T0, R-ratio/injury pattern, age). Each
+    group prompt injects these so groups don't each re-fetch them. Calls the raw
+    plugin functions directly with the run's bound person_id + data_dir. Degrades
+    gracefully: any missing fact just falls back to the agent gathering it."""
+    plugin_bind = plugin_bind or {}
+    person_id = plugin_bind.get("person_id")
+    data_dir = plugin_bind.get("data_dir", "data")
+    facts: dict = {}
+    if person_id is None:
+        return facts
+    try:
+        from chart_review_plugins.rucam_tools import get_suspect_drug, get_patient_summary
+        from chart_review_plugins.rucam_r_ratio import compute_r_ratio
+    except Exception as e:  # plugin module unavailable → agent gathers facts itself
+        print(f"[foundations] import failed: {e}", file=sys.stderr)
+        return facts
+
+    def _safe(label, fn):
+        try:
+            return fn()
+        except Exception as e:
+            print(f"[foundations] {label} failed: {e}", file=sys.stderr)
+            return None
+
+    sd = _safe("get_suspect_drug", lambda: get_suspect_drug(person_id, data_dir))
+    if isinstance(sd, dict):
+        facts["suspect_drug"] = sd.get("SELECTED_DRUG")
+        facts["suspect_first_date"] = sd.get("FIRST_DATE")
+        facts["stratum"] = sd.get("STRATUM")
+    ps = _safe("get_patient_summary", lambda: get_patient_summary(person_id, data_dir))
+    if isinstance(ps, dict):
+        facts["liver_injury_date"] = ps.get("liver_injury_date")
+        facts["age"] = ps.get("AGE")
+        facts["n_concomitant_drugs_90d"] = ps.get("n_concomitant_drugs_90d")
+    rr = _safe("compute_r_ratio", lambda: compute_r_ratio(person_id, data_dir))
+    if isinstance(rr, tuple) and len(rr) >= 2:  # compute_r_ratio returns (r_ratio, injury_enum)
+        r, inj = rr[0], rr[1]
+        facts["r_ratio"] = round(r, 2) if isinstance(r, (int, float)) else r
+        facts["injury_pattern"] = getattr(inj, "value", None) or str(inj)
+    return facts
+
+
+async def _score_groups(agent, per_group, case_facts: dict, max_attempts: int, config: dict):
+    """Drive ONE short, fresh conversation per GROUP of leaves. Injects the shared
+    case facts + compact summaries of already-committed groups; retries a group
+    (with only its still-pending leaves) until all its fields commit or attempts
+    exhaust. Each group's context is fresh, so nothing from prior groups' raw
+    exploration accumulates. Returns (prior, final_msgs) — final_msgs feeds _log_usage."""
+    from .rucam_prompts import build_group_task_prompt, format_case_facts
+    from .messages_util import field_answers
+
+    facts_block = format_case_facts(case_facts)
+    prior = []
+    final_msgs = []
+    for group in per_group:
+        gid = group.get("group_id", "group")
+        title = group.get("title", gid)
+        want = list(group["field_ids"])
+        committed: dict = {}
+        pending = list(want)
+        for attempt in range(1, max_attempts + 1):
+            if not pending:
+                break
+            emit({"type": "text",
+                  "text": f"Group '{title}': {len(want) - len(pending)}/{len(want)} committed, attempt {attempt}…"})
+            msgs, _last = await _stream_once(
+                agent, build_group_task_prompt(group, facts_block, prior, pending), config)
+            final_msgs += msgs
+            answers = field_answers(msgs)
+            for fid in list(pending):
+                if fid in answers:  # membership (not truthiness) so a 0 / "no" counts
+                    committed[fid] = answers[fid]
+                    pending.remove(fid)
+        if pending:
+            emit({"type": "text",
+                  "text": f"WARNING: group '{title}' left {len(pending)} field(s) uncommitted: {', '.join(pending)}"})
+        prior.append({"group_id": gid, "title": title, "committed": committed})
+    return prior, final_msgs
+
+
+async def _stream_once(agent, user_content: str, config: dict, stop_on_set_field: bool = False):
+    """Run one agent conversation; emit new events as they arrive; return (final_msgs, last_text).
+
+    stop_on_set_field: when True, stop as soon as a set_field_assessment write has
+    COMMITTED (its tool result appears) — convergence for per-item mode, mirroring
+    agent_v2's structured-output stop so the agent can't keep searching/re-scoring
+    after it has answered. We break on the RESULT (not the tool_call) so the MCP
+    write executes first."""
+    from .messages_util import set_field_committed
+
+    seen = 0
+    final_msgs = []
+    last_text = ""
+    async for chunk in agent.astream(
+        {"messages": [{"role": "user", "content": user_content}]},
+        stream_mode="values", config=config,
+    ):
+        msgs = chunk.get("messages", [])
+        final_msgs = msgs
+        for ev in messages_to_events(msgs[seen:]):
+            if ev["type"] == "text":
+                last_text = ev["text"]
+            emit(ev)
+        seen = len(msgs)
+        if stop_on_set_field and set_field_committed(msgs):
+            break
+    return final_msgs, last_text
+
+
+def _log_usage(spec: dict, msgs) -> None:
+    """Append this run's token usage to DEEPAGENTS_USAGE_LOG (one JSON line per
+    patient). Lets a batch tally real input/output tokens for cost accounting —
+    the transcript only logs tool calls, and vLLM reports $0. No-op when the
+    env var is unset."""
+    log_path = os.environ.get("DEEPAGENTS_USAGE_LOG")
+    if not log_path:
+        return
+    inp = out = tot = cached = reasoning = 0
+    from langchain_core.messages import AIMessage
+    for m in msgs:
+        if isinstance(m, AIMessage):
+            u = getattr(m, "usage_metadata", None) or {}
+            inp += int(u.get("input_tokens", 0) or 0)
+            out += int(u.get("output_tokens", 0) or 0)
+            tot += int(u.get("total_tokens", 0) or 0)
+            # cost-relevant splits: cached input bills far cheaper; reasoning
+            # tokens (gpt-5.x) bill as output. Present in usage_metadata details.
+            cached += int((u.get("input_token_details") or {}).get("cache_read", 0) or 0)
+            reasoning += int((u.get("output_token_details") or {}).get("reasoning", 0) or 0)
+    rec = {"model": spec.get("model"), "input_tokens": inp,
+           "cached_input_tokens": cached, "output_tokens": out,
+           "reasoning_tokens": reasoning, "total_tokens": tot or (inp + out)}
+    try:
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(rec) + "\n")
+    except OSError as e:
+        print(f"[usage] could not write {log_path}: {e}", file=sys.stderr)
+
+
+def main() -> None:
+    if len(sys.argv) < 2:
+        print("usage: python -m chart_review_deepagents <runspec.json>", file=sys.stderr)
+        raise SystemExit(2)
+    with open(sys.argv[1], "r", encoding="utf-8") as f:
+        spec = json.load(f)
+    try:
+        asyncio.run(run(spec))
+    except BaseException as e:  # includes (Base)ExceptionGroup from TaskGroups
+        traceback.print_exc()
+        emit({"type": "error", "error": _format_exc(e)})
+        raise SystemExit(1)
+
+
+def _format_exc(e: BaseException) -> str:
+    """Flatten ExceptionGroups so the emitted error names the real cause
+    instead of the opaque 'unhandled errors in a TaskGroup (1 sub-exception)'."""
+    excs = getattr(e, "exceptions", None)
+    if excs:
+        return " | ".join(_format_exc(sub) for sub in excs)
+    return f"{type(e).__name__}: {e}"
+
+
+if __name__ == "__main__":
+    main()

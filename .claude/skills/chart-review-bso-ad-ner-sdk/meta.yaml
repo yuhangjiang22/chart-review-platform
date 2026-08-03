@@ -1,0 +1,21 @@
+task_type: ner
+task_kind: ner
+manual_version: 0.1
+source_document_sha: sha256:bso-ad-sdk-vendored-2026-06-30
+status: draft
+review_unit: patient
+overview_prose: BSO-AD ontology NER task — vendored Claude-Agent-SDK variant.
+  Same 9 entity-type subtrees + ~660-concept ontology as chart-review-bso-ad-ner,
+  but runs the benchmark's Claude-Agent-SDK pipeline from a self-contained copy
+  under vendor/bso-ad-sdk/ (no dependency on the external benchmark repo). The
+  authoritative annotation skill is this bundle's SKILL.md (copied verbatim from
+  the benchmark bso-ad skill). Output is per-(patient, task, note) span lists.
+final_output: span_labels
+phases:
+  - author
+  - try
+  - judge
+  - validate
+  - decide
+  - lock
+ontology_pin: bso-ad@2026.05.28-0

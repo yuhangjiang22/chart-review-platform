@@ -1,0 +1,20 @@
+task_type: phenotype_validation
+tool_profile: rucam
+review_unit: patient
+manual_version: 0.1.0-concur
+status: draft
+final_output: rucam_causality_category
+overview_prose: >-
+  RUCAM (Roussel Uclaf Causality Assessment Method) causality scoring for
+  drug-induced liver injury (DILI). Seven items are scored from EHR structured
+  data (LFT time series, medications, serology, conditions) and clinical notes;
+  the per-item scores sum to a total that maps to a causality category. Several
+  items depend on the injury type (hepatocellular / cholestatic / mixed) from
+  the R ratio (ALT/ULN divided by ALP/ULN). Ported from the standalone RUCAM
+  agent (RUCAM/agent_v2) — the read/compute tools run as a Python plugin
+  (tool_profile: rucam), notes go through the MCP tools.
+phases:
+  - author
+  - try
+  - validate
+  - decide

@@ -1,0 +1,5 @@
+[
+  { "row_id": 8101, "concept_id": 317009,  "concept_name": "Moderate persistent asthma, uncomplicated", "icd10cm": "J45.40", "status": "active", "date": "2023-09-12" },
+  { "row_id": 8102, "concept_id": 4099572, "concept_name": "Allergic rhinitis due to other allergen",     "icd10cm": "J30.89", "status": "active", "date": "2023-09-12" },
+  { "row_id": 8103, "concept_id": 4279553, "concept_name": "Gastro-esophageal reflux disease",            "icd10cm": "K21.9",  "status": "active", "date": "2024-01-08" }
+]

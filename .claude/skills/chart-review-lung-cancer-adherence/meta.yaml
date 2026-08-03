@@ -1,0 +1,48 @@
+task_type: adherence
+task_kind: adherence
+uses_structured_data: true
+manual_version: 0.1.0-concur
+source_document_sha: sha256:lung-cancer-molecular-testing-checklist
+status: draft
+review_unit: patient
+overview_prose: >-
+  Lung cancer (NSCLC) molecular-testing guideline-concordance task. The agent
+  answers FACTUAL chart-review questions in tiers — (T0) eligibility: confirmed
+  lung cancer, histologic subtype, stage, smoking history; (T1–T3) the molecular
+  workup: whether genomic testing and PD-L1 IHC were performed, comprehensive
+  genomic profiling vs single-gene/panel, specimen (tissue/liquid), test-vs-
+  therapy sequencing, results availability, PD-L1 result, actionable findings;
+  (T4) treatment alignment: targeted therapy for actionable mutations, time to
+  treatment, turnaround, minimum-biomarker completeness. The seven NCCN
+  molecular-testing concordance verdicts (C1–C6) are then computed
+  DETERMINISTICALLY by the rule-engine from those facts
+  (references/rules/concordance.yaml) — testing performed, panel completeness,
+  testing-before-therapy (order + results), PD-L1 testing, time-to-treatment,
+  and targeted-therapy alignment — each Concordant / Non-concordant / Excluded,
+  with a lung-specific attribution category for non-concordant verdicts. Facts
+  are read from pathology, molecular/genomics, radiology, and oncology notes plus
+  structured EHR data.
+
+  Derived from the lung cancer molecular-testing checklist + the Concordance
+  Rules for Expert Review (lung-cancer-experiment). This is the TASK ONLY — the
+  question + rule rubric — not the experiment's benchmark harness, annotation
+  tooling, or scoring scripts.
+final_output: rule_verdicts
+phases:
+  - author
+  - try
+  - validate
+  - decide
+clinical_sources:
+  - id: NCCN-NSCLC-Molecular
+    title: "NCCN Clinical Practice Guidelines in Oncology — Non-Small Cell Lung Cancer (Molecular/Biomarker Testing)"
+    publisher: National Comprehensive Cancer Network
+    citation: "NCCN Guidelines: Non-Small Cell Lung Cancer — Molecular Testing."
+  - id: Lung-Cancer-Registry
+    title: "Lung Cancer Registry Project Overview"
+    publisher: Internal (lung-cancer-experiment)
+    citation: "Lung Cancer Registry Project Overview."
+  - id: Concordance-Rules-Expert-Review
+    title: "Concordance Rules for Expert Review"
+    publisher: Internal (lung-cancer-experiment)
+    local_path: Concordance_Rules_for_Expert_Review.docx

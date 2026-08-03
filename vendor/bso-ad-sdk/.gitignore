@@ -1,0 +1,8 @@
+# Local runtime — never commit
+.venv/
+.env
+results/
+*.egg-info/
+__pycache__/
+*.pyc
+.budget_state.json

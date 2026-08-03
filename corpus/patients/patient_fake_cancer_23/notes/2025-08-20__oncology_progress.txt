@@ -1,0 +1,21 @@
+THORACIC ONCOLOGY PROGRESS NOTE
+Provider: L. Tanaka, MD — Hematology/Oncology
+Encounter date: 2025-08-20
+
+DIAGNOSIS
+Stage IIB (pT2bN0M0) adenosquamous carcinoma of the left upper lobe,
+status post lobectomy 2025-08-08.
+
+INTERVAL HISTORY
+Patient recovering well from lobectomy. Final pathology confirms a
+biphasic adenosquamous carcinoma with a predominant (~60%) adenocarcinoma
+component. Staging work-up (PET-CT, brain MRI) showed no nodal or distant
+disease. No evidence of metastatic spread. This is an initial diagnosis;
+there is no prior lung cancer history and no recurrence.
+
+ASSESSMENT AND PLAN
+1. Resected stage IIB adenosquamous NSCLC — margins negative, N0.
+2. Adjuvant cisplatin-based chemotherapy to be discussed at tumor board.
+3. Surveillance imaging per NCCN.
+
+L. Tanaka, MD — electronically signed 2025-08-20

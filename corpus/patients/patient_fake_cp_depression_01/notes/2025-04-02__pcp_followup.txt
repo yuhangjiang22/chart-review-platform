@@ -1,0 +1,23 @@
+PRIMARY CARE — FOLLOW-UP
+Provider: R. Osei, MD — Family Medicine
+Encounter date: 2025-04-02
+
+HPI
+Patient reports low mood and trouble sleeping over the past month. Depression
+screening performed today.
+
+SCREENING
+PHQ-9 total score 14 today.
+
+ASSESSMENT / PLAN
+1. Major depressive disorder, moderate — new diagnosis this visit. Start
+   sertraline 50 mg daily for depression. Discussed referral to psychiatry
+   and the patient agreed.
+2. Type 2 Diabetes — continue semaglutide, now 0.5 mg weekly.
+
+SCREENING EKG
+Normal sinus rhythm. No ST depression or elevation. No acute changes.
+
+MEDICATIONS
+- Sertraline 50 mg daily (new, for depression)
+- Semaglutide 0.5 mg weekly

@@ -1,0 +1,9 @@
+{
+  "patient_id": "patient_fake_cp_depression_01",
+  "category": "depression_present",
+  "demographics": { "age": 58, "sex": "F", "region": "Midwest" },
+  "index_date": "2025-03-10",
+  "doc_types": ["pcp_baseline", "pcp_followup", "endocrinology", "psychiatry"],
+  "generated_by": "hand-crafted",
+  "fixture_notes": "Synthetic cp-depression TRY fixture. GLP-1 / obesity-T2D cohort. Clear DEPRESSION case (explicit MDD dx across multiple post-index visits + PHQ-9 peaking at 19). Deliberate traps: (a) a note dated ON the index_date must be OUT of scope; (b) 'no ST depression or elevation' is non-psychiatric + negated; (c) weight loss / reduced appetite / fatigue on semaglutide is a GLP-1 confound, not depressive symptoms; (d) 'denies suicidal ideation' is a negation; (e) a carried-forward PHQ-9 19 must attribute to its original date, not double-count; (f) duloxetine started for diabetic neuropathy is an alt-indication distractor (sertraline-for-depression is the real antidepressant signal). Expected leaves: high_confidence_diagnosis=yes, depressive_symptoms=yes, antidepressants=yes, psychiatry_referral=yes, phq9_severity_band=moderately_severe -> derived final_decision=depression."
+}

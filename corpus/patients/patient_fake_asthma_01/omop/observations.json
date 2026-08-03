@@ -1,0 +1,6 @@
+[
+  { "row_id": 14101, "concept_id": 4275495, "concept_name": "Tobacco smoking status",          "value_as_string": "Never smoker",                           "date": "2024-01-08" },
+  { "row_id": 14102, "concept_id": 4221869, "concept_name": "Asthma severity classification",  "value_as_string": "moderate persistent",                    "date": "2025-12-16" },
+  { "row_id": 14103, "concept_id": 4262947, "concept_name": "Asthma written action plan given","value_as_string": "no",                                     "date": "2026-04-12" },
+  { "row_id": 14104, "concept_id": 4115361, "concept_name": "Inhaler technique reviewed",      "value_as_string": "yes",                                    "date": "2025-12-16" }
+]

@@ -1,0 +1,19 @@
+{
+  "name": "@chart-review/pipeline-extract",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": { ".": { "types": "./src/index.ts", "default": "./src/index.ts" } },
+  "dependencies": {
+    "@chart-review/v2-shared": "*",
+    "@chart-review/agent-provider": "*",
+    "@chart-review/patients": "*",
+    "@chart-review/rubric": "*",
+    "@chart-review/tasks": "*",
+    "@chart-review/mcp-server-anthropic": "*",
+    "@chart-review/audit-trail": "*",
+    "@chart-review/domain-review": "*"
+  }
+}

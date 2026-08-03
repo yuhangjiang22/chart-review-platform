@@ -1,0 +1,15 @@
+{
+  "patient_id": "patient_fake_cp_depression_01",
+  "leaf_answers": {
+    "high_confidence_diagnosis": "yes",
+    "depressive_symptoms": "yes",
+    "antidepressants": "yes",
+    "psychiatry_referral": "yes",
+    "phq9_severity_band": "moderately_severe"
+  },
+  "derived_expected": {
+    "study1_tier": "high_confidence",
+    "phq9_threshold_met": "yes",
+    "final_decision": "depression"
+  }
+}

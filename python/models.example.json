@@ -1,0 +1,23 @@
+{
+  "qwen3-32b": {
+    "comment": "Local vLLM (DEFAULT) — PHI never leaves your hardware. base_url_env reads the live /v1 URL from $VLLM_BASE_URL at run time (endpoint changes per job); use a literal base_url instead for a fixed server. Falls back to the next available model when VLLM_BASE_URL is unset.",
+    "backend": "vllm",
+    "base_url_env": "VLLM_BASE_URL",
+    "model": "qwen3-32b",
+    "api_key_env": "VLLM_API_KEY",
+    "default": true
+  },
+  "gpt-4o": {
+    "comment": "Hosted Azure (ALTERNATIVE) — only use with a signed BAA, since clinical notes are PHI.",
+    "backend": "azure",
+    "deployment": "gpt-4o",
+    "endpoint_env": "AZURE_OPENAI_ENDPOINT",
+    "api_key_env": "AZURE_OPENAI_API_KEY",
+    "api_version_env": "AZURE_OPENAI_API_VERSION"
+  },
+  "llama-3.3-70b": {
+    "backend": "vllm",
+    "base_url": "http://localhost:8000/v1",
+    "model": "meta-llama/Llama-3.3-70B-Instruct"
+  }
+}

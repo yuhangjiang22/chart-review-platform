@@ -1,0 +1,2 @@
+PERSON_ID,STRATUM,Hy_1_date,AGE,n_concomitant_drugs_90d,n_drugs_active_at_Hy,rechallenge_flag,alcohol_use_disorder,pregnancy,biliary_obstruction_dx,hypotension_14d,shock_14d,ischemic_hepatitis_14d,autoimmune_hepatitis_hx,chronic_hep_B_hx,chronic_hep_C_hx,HAV_IgM_result,HBsAg_result,HCV_Ab_result,CMV_IgM_result,EBV_VCA_IgM_result
+9001,DILI_in_window,2024-03-01,62,1,2,0,0,0,0,0,0,0,0,0,0,Negative,Negative,Negative,Negative,Negative

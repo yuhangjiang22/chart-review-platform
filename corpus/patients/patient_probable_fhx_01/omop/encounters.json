@@ -1,5 +1,0 @@
-[
-  { "row_id": 10101, "encounter_id": "enc_5101", "type": "Outpatient", "department": "Primary Care", "primary_provider": "L. Brennan, MD", "start_date": "2024-11-08", "end_date": "2024-11-08" },
-  { "row_id": 10102, "encounter_id": "enc_5102", "type": "Outpatient", "department": "Hematology/Oncology", "primary_provider": "K. Chen, MD", "start_date": "2024-12-04", "end_date": "2024-12-04" },
-  { "row_id": 10103, "encounter_id": "enc_5103", "type": "Outpatient", "department": "Hematology/Oncology", "primary_provider": "K. Chen, MD", "start_date": "2024-12-19", "end_date": "2024-12-19" }
-]

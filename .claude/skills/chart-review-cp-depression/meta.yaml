@@ -1,0 +1,26 @@
+task_type: phenotype_validation
+status: draft
+review_unit: patient
+manual_version: 2026-07-05
+final_output: final_decision
+overview_prose: >-
+  Identify evidence of depression in post-index clinical notes for patients
+  with obesity and/or Type 2 Diabetes (subset are GLP-1 receptor agonist
+  users). Only notes strictly after the patient's index date are in scope.
+
+  Two studies run per patient. Study 1 answers four leaf fields directly from
+  narrative evidence: high_confidence_diagnosis, depressive_symptoms,
+  antidepressants, and psychiatry_referral. Study 2 answers one leaf field,
+  phq9_severity_band, based on the highest post-index PHQ-9 total documented.
+
+  study1_tier, phq9_threshold_met, and final_decision are all COMPUTED from
+  the five leaves above — do not answer them directly.
+
+  Notes are the sole evidence source. Cite verbatim note text for every
+  answer. Exclude negated findings, non-psychiatric uses of "depression"
+  (e.g. ST depression on EKG, anatomical depression), and antidepressants
+  clearly prescribed for a documented non-depression indication.
+phases:
+  - try
+  - validate
+  - decide

@@ -1,0 +1,18 @@
+[project]
+name = "chart-review-deepagents"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+  "deepagents",
+  "langchain-openai",
+  "langchain-mcp-adapters",
+  "pandas",  # RUCAM plugin tools (chart_review_plugins.rucam) read CSV cohorts
+  "openpyxl",  # RUCAM get_hepatotoxicity_category reads the LiverTox masterlist .xlsx
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["chart_review_deepagents", "chart_review_plugins"]

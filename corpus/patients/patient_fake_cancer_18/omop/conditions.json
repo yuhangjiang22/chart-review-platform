@@ -1,0 +1,4 @@
+[
+  { "row_id": 9101, "concept_id": 4115276, "concept_name": "Malignant neoplasm of right lower lobe, bronchus or lung (adenocarcinoma)", "icd10cm": "C34.91", "status": "active", "date": "2024-03-05" },
+  { "row_id": 9102, "concept_id": 4311499, "concept_name": "Secondary malignant neoplasm of bone", "icd10cm": "C79.51", "status": "active", "date": "2024-03-05" }
+]

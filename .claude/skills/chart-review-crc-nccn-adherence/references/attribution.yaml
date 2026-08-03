@@ -1,0 +1,50 @@
+# Attribution taxonomy for CRC NCCN concordance verdicts. When a rule resolves
+# NON_CONCORDANT, exactly one category explains WHY — picking the one that
+# changes the intervention (documentation training vs audit/feedback vs
+# access fix vs patient-centered decision). Same canonical set as the asthma
+# adherence task; descriptions are CRC-contextualized.
+
+categories:
+  - DOCUMENTATION_GAP
+  - GUIDELINE_DEVIATION
+  - PATIENT_FACTOR
+  - PATIENT_REFUSAL
+  - CONTRAINDICATION
+  - SYSTEM_FACTOR
+  - PENDING_FOLLOWUP
+  - INSUFFICIENT_DATA
+  - OTHER
+
+descriptions:
+  DOCUMENTATION_GAP: >-
+    The guideline step may have occurred but isn't recorded — e.g. MSI/MMR was
+    likely run but no result is filed, or staging imaging was done elsewhere and
+    not scanned in. Prompts documentation improvement, not a care change.
+  GUIDELINE_DEVIATION: >-
+    The chart shows care that diverges from NCCN with no countervailing reason —
+    e.g. <12 nodes harvested on a standard resection, or no adjuvant chemo for a
+    fit Stage III patient. Prompts audit + feedback.
+  PATIENT_FACTOR: >-
+    A documented clinical/patient reason that isn't a clear refusal or
+    contraindication — e.g. frailty, competing comorbidity, or shared-decision
+    de-escalation of adjuvant therapy.
+  PATIENT_REFUSAL: >-
+    The chart explicitly records the patient declined the recommended step
+    (e.g. declined adjuvant chemotherapy or neoadjuvant chemoradiation).
+  CONTRAINDICATION: >-
+    A documented contraindication justifies the deviation — e.g. oxaliplatin
+    held for significant neuropathy, or radiation deferred for prior pelvic RT.
+  SYSTEM_FACTOR: >-
+    An access/institutional barrier prevented concordant care — e.g. molecular
+    testing send-out unavailable, insurance denial, or radiation-oncology
+    referral delay.
+  PENDING_FOLLOWUP: >-
+    The step is scheduled/in-flight at the index date — e.g. MSI pending,
+    adjuvant chemo planned but not yet started. Use sparingly.
+  INSUFFICIENT_DATA: >-
+    The available chart genuinely can't determine concordance (e.g. records
+    predate diagnosis or the resection report is absent) — distinct from
+    DOCUMENTATION_GAP, which implies the step likely happened.
+  OTHER: >-
+    Doesn't fit the above; MUST carry an explanatory rationale. If OTHER becomes
+    common, expand the taxonomy instead.

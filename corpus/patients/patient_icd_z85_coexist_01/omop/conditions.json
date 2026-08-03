@@ -1,6 +1,0 @@
-[
-  { "row_id": 5401, "concept_id": 320128, "concept_name": "Essential hypertension", "icd10cm": "I10", "status": "active", "date": "2014-08-04" },
-  { "row_id": 5402, "concept_id": 4193869, "concept_name": "Personal history of malignant neoplasm of bronchus and lung", "icd10cm": "Z85.118", "status": "active", "date": "2017-11-03" },
-  { "row_id": 5403, "concept_id": 4115276, "concept_name": "Malignant neoplasm of unspecified part of bronchus or lung", "icd10cm": "C34.10", "status": "active", "date": "2025-07-09" },
-  { "row_id": 5404, "concept_id": 4119911, "concept_name": "Chest wall pain", "icd10cm": "M79.81", "status": "resolved", "date": "2025-07-09" }
-]

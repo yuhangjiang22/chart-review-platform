@@ -1,0 +1,15 @@
+{
+  "name": "@chart-review/reviews-context",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AsyncLocalStorage wrapper for the per-run reviews root. Lets parallel agent invocations write to isolated reviewsRoot dirs without thread-local plumbing.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  }
+}

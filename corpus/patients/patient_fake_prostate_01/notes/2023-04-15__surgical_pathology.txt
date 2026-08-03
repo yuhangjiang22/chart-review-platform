@@ -1,0 +1,10 @@
+SURGICAL PATHOLOGY REPORT  (SYNTHETIC — NOT A REAL PATIENT)
+Date of service: 2023-04-15
+Specimen: Prostate + bilateral pelvic lymph nodes, radical prostatectomy.
+
+FINAL DIAGNOSIS:
+Prostatic adenocarcinoma, Gleason score 4+4=8 (Grade Group 4).
+Extraprostatic extension present (pT3a). Surgical margins focally positive.
+0 of 14 pelvic lymph nodes involved (pN0).
+
+Pathologic stage: pT3a pN0. Grade Group 4.

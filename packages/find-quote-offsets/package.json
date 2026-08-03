@@ -1,0 +1,18 @@
+{
+  "name": "@chart-review/find-quote-offsets",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Faithfulness primitive: locate a verbatim quote inside a note and return its byte offsets. Two-path matcher (exact substring + whitespace-tolerant). The platform's only legitimate way to compute citation offsets.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "dependencies": {
+    "@chart-review/patients": "*"
+  }
+}

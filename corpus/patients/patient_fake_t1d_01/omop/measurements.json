@@ -1,0 +1,35 @@
+[
+  {
+    "row_id": 7201,
+    "concept_id": 3009536,
+    "concept_name": "C peptide [Mass/volume] in Serum or Plasma",
+    "loinc": "1986-9",
+    "value": 0.3,
+    "unit": "ng/mL",
+    "reference_range": "0.8-3.1",
+    "date": "2019-04-03",
+    "encounter_id": "enc_t1d_0402"
+  },
+  {
+    "row_id": 7202,
+    "concept_id": 3007864,
+    "concept_name": "Glutamate decarboxylase 65 (GAD65) Ab [Units/volume] in Serum",
+    "loinc": "13926-8",
+    "value": 250,
+    "unit": "U/mL",
+    "reference_range": "<5",
+    "date": "2019-04-03",
+    "encounter_id": "enc_t1d_0402"
+  },
+  {
+    "row_id": 7203,
+    "concept_id": 3004410,
+    "concept_name": "Hemoglobin A1c/Hemoglobin.total in Blood",
+    "loinc": "4548-4",
+    "value": 9.8,
+    "unit": "%",
+    "reference_range": "<5.7",
+    "date": "2025-06-15",
+    "encounter_id": "enc_t1d_idx"
+  }
+]

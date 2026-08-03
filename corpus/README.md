@@ -29,4 +29,4 @@ jq '.[] | select(.icd10cm | startswith("C34"))' corpus/patients/*/omop/condition
 
 ## Regeneration
 
-The 5 hand-crafted patients (`patient_*_hard_*` / `patient_confirmed_reread_01` / `patient_probable_cytology_01` / `patient_icd_z85_coexist_01`) have committed `.txt` files; the generation script copies their seeds + writes `meta.json` / `ground_truth.json` / OMOP. The 15 API-generated patients are produced by `scripts/generate_corpus.py`.
+The 5 hand-crafted patients (`patient_*_hard_*` / `patient_fake_cancer_01` / `patient_fake_cancer_21` / `patient_fake_cancer_17`) have committed `.txt` files; the generation script copies their seeds + writes `meta.json` / `ground_truth.json` / OMOP. The 15 API-generated patients are produced by `scripts/generate_corpus.py`.

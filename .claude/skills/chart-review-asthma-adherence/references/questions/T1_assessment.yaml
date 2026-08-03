@@ -1,0 +1,296 @@
+# T1 — Assessment tier. Per EPR-3 Component 1 (Assessment & Monitoring,
+# p.36-91), asthma control is assessed via standardized instruments
+# (ACT/Childhood ACT/ACQ/ATAQ — p.38), exacerbation history (p.39),
+# spirometry (p.43), and proxies for current controller use/adherence.
+# 2020 Focused Update adds FeNO (Rec 2) and comorbidity screening as
+# part of control assessment.
+
+questions:
+  - question_id: T1-ACTScore
+    text: What is the most recent AGE-APPROPRIATE asthma-control test total score
+      in the lookback window — ACT (ages 12-17) or Childhood ACT / C-ACT (ages
+      5-11)? Record the total score. Null when no control test is documented, or
+      for ages 2-4 (no validated questionnaire — control is assessed via
+      symptoms and exacerbations; see T1-ExacerbationsCount). Both ACT and C-ACT
+      use total >= 20 = well controlled, so the same threshold applies to both.
+    tier: 1
+    answer_schema:
+      type: number
+      description: ACT total 5..25 (ages 12-17) or C-ACT total 0..27 (ages
+        5-11); null when no control test is documented or for ages 2-4. In both
+        instruments a total >= 20 = well controlled.
+    depends_on:
+      - T0-AgeBand
+    naepp_source: "EPR-3 Section 3, Component 1, p.38 — control instruments:
+      ACT (Nathan et al. 2004, ages 12+), Childhood ACT (Liu et al. 2007, ages
+      4-11), Asthma Control Questionnaire (Juniper et al. 1999). EPR-3 Figures
+      4-2a / 4-2b assess control by age band."
+    evidence_grade: B
+    clinical_rationale: >-
+      EPR-3 endorses standardized control instruments as the operational
+      definition of 'level of control', and specifies AGE-APPROPRIATE tools:
+      ACT (5-item) for ages 12+, Childhood ACT (7-item, 0-27) for ages 5-11.
+      Ages 2-4 have no validated questionnaire — control is symptom/exacerbation
+      based. The well-controlled cutoff is total >= 20 for BOTH ACT and C-ACT,
+      so downstream thresholds ('< 20 = not well controlled') hold across bands.
+    retrieval_hints: "STRUCTURED FIRST →
+      read_structured_data(table=\"measurements\"). For ages 12-17 look for the
+      ACT total (loinc=\"75827-3\"); for ages 5-11 look for the Childhood ACT
+      (C-ACT) total. Pick the most recent row; the score is in the `value`
+      field. For ages 2-4 return null (no validated score — control is
+      symptom/exacerbation based). Fallback to notes: \"ACT: 18/25\" or
+      \"C-ACT: 22/27\" style notations. Don't infer a number from \"well
+      controlled\" prose."
+
+  - question_id: T1-ExacerbationsCount
+    text: How many asthma exacerbations are documented in the past 12 months?
+      (Exacerbation = oral steroid burst, ED visit, or hospitalization for
+      asthma.) Return 0 if you can review ANY meaningful clinical documentation
+      covering the past 12 months and you do not find a qualifying exacerbation
+      (you do not need an explicit "no exacerbations" statement). Use null only
+      when the chart has essentially no clinical documentation in the lookback
+      window to assess exacerbations.
+    tier: 1
+    answer_schema:
+      type: number
+    depends_on:
+      - T0-AsthmaDx
+    naepp_source: "EPR-3 Section 3, Component 1, p.39 — exacerbation history
+      (ED visits, hospitalizations, ICU admissions, oral systemic
+      corticosteroid courses) as the 'risk' domain of control assessment;
+      Figure 3-5 'Classifying Severity and Initiating Treatment in Youths
+      ≥12 and Adults' uses these counts as severity/risk inputs."
+    evidence_grade: A
+    clinical_rationale: >-
+      EPR-3 splits control into 'impairment' (symptoms, ACT, lung function)
+      and 'risk' (exacerbations, lung function decline, treatment side
+      effects). Exacerbation count over 12 months is the primary risk
+      indicator and drives step-up decisions independent of current ACT.
+    retrieval_hints: >-
+      PREFER THE PRECOMPUTED COUNT: read_structured_data(table="observations") and
+      look for a row whose concept_name contains "exacerbations, past 12 months" —
+      use its value_as_number directly as the answer and cite that row
+      (source: omop, table: observations, row_id). Only if that row is ABSENT,
+      count DISTINCT DATES with an exacerbation in the 12-month lookback (a single
+      ED episode split across rows counts ONCE): (1)
+      read_structured_data(table="encounters") — dates where is_ed=true (or type
+      contains "Emergency"/"Inpatient") AND asthma_related=true; (2)
+      read_structured_data(table="drugs") — dates of OCS burst courses
+      (drug_class="OCS"). Union the date sets; cite the OMOP rows (source: omop).
+      Fallback to notes only when the tables are empty. Routine controller refills
+      do NOT count.
+
+  - question_id: T1-ControllerPrescribed
+    text: Is at least one daily controller (ICS, ICS-LABA, LTRA, or biologic)
+      prescribed and active in the lookback window?
+    tier: 1
+    answer_schema:
+      type: boolean
+    depends_on:
+      - T0-AsthmaDx
+    naepp_source: "EPR-3 Section 3, Component 4, p.213-216 (Key Points:
+      Medications) — ICS is 'the most potent and effective anti-inflammatory
+      medication currently available' (Evidence A); LABA used in combination
+      with ICS for long-term control (Evidence A, NOT monotherapy);
+      leukotriene modifiers as alternative (Evidence A). Updated by 2020
+      Focused Update Section IV (SMART therapy, Recs 12-13)."
+    evidence_grade: A
+    clinical_rationale: >-
+      All persistent asthma (mild, moderate, severe) requires a daily
+      controller per EPR-3 stepwise approach. Patients with persistent
+      asthma on SABA-only therapy are under-treated by definition. The
+      controller class affects T2-StepTherapyMatch grading.
+    retrieval_hints: 'PREFER the precomputed foundation: read_structured_data(table="demographics")
+      → if `controller_active` is present, use it directly (true/false) and cite that
+      row (source: omop, table: demographics). Otherwise → read_structured_data(table="drugs"). Any
+      row with is_controller=true and a fill within the 12-month lookback counts as yes. drug_class
+      values that qualify: ICS, ICS-LABA, LTRA, biologic. Fallback to notes when
+      drugs is empty: med list mentions of fluticasone, budesonide, mometasone
+      +/- formoterol or salmeterol; montelukast;
+      omalizumab/mepolizumab/benralizumab/dupilumab/tezepelumab. Albuterol-only
+      is NOT a controller.'
+
+  - question_id: T1-ControllerAdherenceProxy
+    text: Based on documented fills or patient report, is controller adherence
+      assessed as adequate (>= 80% of expected doses) in the most recent 6
+      months? Answer "adequate" or "inadequate" only when adherence is
+      explicitly assessed. If adherence is not discussed or cannot be determined
+      from the chart, answer "not_assessed" (do not return null).
+    tier: 1
+    answer_schema:
+      type: string
+      enum:
+        - adequate
+        - inadequate
+        - not_assessed
+    depends_on:
+      - T1-ControllerPrescribed
+    naepp_source: "EPR-3 Section 3, Component 4, p.220 (Safety of ICS, Key
+      Points) — 'Evaluate patient adherence and inhaler technique as well as
+      environmental factors that may contribute to asthma severity before
+      increasing the dose of ICS' (Evidence B). Threshold (PDC ≥ 0.80) is
+      NCQA HEDIS Medication Management for Asthma (MMA), not EPR-3 directly."
+    evidence_grade: B
+    clinical_rationale: >-
+      EPR-3 explicitly requires adherence assessment before escalating
+      therapy — an apparently uncontrolled patient may simply be
+      under-adherent. PDC ≥ 80% is the operational NCQA threshold for
+      adequate adherence; pharmacy fills are the most defensible chart
+      proxy. Patient self-report is acceptable but lower-quality evidence.
+    retrieval_hints: 'STRUCTURED FIRST → read_structured_data(table="drugs"). On the
+      controller row, check `refill_pdc_12mo` (proportion of days covered). PDC
+      >= 0.80 → "adequate"; PDC < 0.80 (but > 0) → "inadequate". If the
+      controller row exists but has no refill_pdc_12mo field, check fills[]
+      cadence vs days_supply manually. Fallback to notes: fill history mentions,
+      patient- reported adherence in HPI. Default to "not_assessed" rather than
+      guessing.'
+
+  - question_id: T1-SABAOveruse
+    text: Has the patient used >= 3 short-acting beta-agonist (SABA) canisters in
+      the past year (a recognized poor-control marker)?
+    tier: 1
+    answer_schema:
+      anyOf:
+        - type: boolean
+        - type: "null"
+      description: true/false when SABA canister utilization is ascertainable; null
+        when unknown.
+    naepp_source: "EPR-3 Section 3, Component 1, Figure 3-5 (Classifying
+      Asthma Severity, p.71-74 in body) — SABA use >2 days/week (not for
+      EIB prevention) classifies as 'not well controlled'. The ≥3
+      canisters/year threshold is the HEDIS Asthma Medication Ratio (AMR)
+      operationalization of EPR-3's SABA-overuse signal."
+    evidence_grade: A
+    clinical_rationale: >-
+      SABA overuse is among the strongest predictors of asthma-related
+      death and hospitalization. ≥3 SABA canisters/year is the NCQA
+      threshold for inappropriate SABA reliance; it implies the patient
+      is treating symptoms reactively rather than achieving control with
+      a controller — a primary step-up indication.
+    retrieval_hints: 'STRUCTURED FIRST → read_structured_data(table="drugs"). Find
+      the SABA row (drug_class="SABA" or names albuterol/levalbuterol). Use
+      `saba_canisters_12mo` if present; otherwise count fills[] entries whose
+      fill_date is within the past 12 months. >= 3 canisters → true. Fallback to
+      notes: HPI mentions of frequent rescue inhaler use.'
+
+  - question_id: T1-ControlLevel
+    text: >-
+      Composite asthma control level for the most recent assessment in the
+      window. When an age-appropriate control-test total is documented (ACT ages
+      12-17 / C-ACT ages 5-11): >= 20 = well_controlled, 16-19 =
+      not_well_controlled, < 16 = very_poorly_controlled. RISK OVERRIDE: if
+      T1-SABAOveruse == true OR T1-ExacerbationsCount >= 2, the level is at most
+      not_well_controlled EVEN WHEN the control-test total is >= 20 — EPR-3
+      classifies control from impairment AND risk, so reactive SABA overuse or
+      recurrent exacerbations downgrade an otherwise-reassuring score. When NO
+      control-test total is documented (common in transmitted HIE data, and always for ages
+      2-4), derive from impairment + risk per EPR-3 Figure 3-5 / 4-2a / 4-2b —
+      daytime symptoms > 2 days/week, >= 1-2 nighttime awakenings/month, any
+      activity limitation, SABA use for symptoms > 2 days/week (T1-SABAOveruse),
+      or >= 2 exacerbations/12 months push toward not_well_controlled /
+      very_poorly_controlled. Return `undetermined` only when neither a control
+      test nor any impairment/risk documentation is available.
+    tier: 1
+    answer_schema:
+      type: string
+      enum:
+        - well_controlled
+        - not_well_controlled
+        - very_poorly_controlled
+        - undetermined
+    depends_on:
+      - T0-AgeBand
+      - T1-ACTScore
+      - T1-ExacerbationsCount
+      - T1-SABAOveruse
+    naepp_source: "EPR-3 Section 3, Component 1, Figures 3-5 / 4-2a / 4-2b —
+      'level of control' classified well controlled / not well controlled / very
+      poorly controlled from impairment (symptoms, nighttime awakenings, activity,
+      SABA use, lung function) and risk (exacerbations). Control-test total >= 20
+      = well controlled for both ACT and C-ACT."
+    evidence_grade: A
+    clinical_rationale: >-
+      The stepwise approach keys every step-up / step-down decision to the control
+      LEVEL, not to the ACT number itself. Making control a first-class composite
+      (ACT when present, else documented impairment + risk) keeps concordance
+      computable when no standardized score is charted — the norm in transmitted
+      HIE records (ACT was absent from structured data for the entire INPC
+      development cohort). Downstream T1/T2 rules key off this field, not raw ACT.
+    retrieval_hints: >-
+      Prefer T1-ACTScore when present (>= 20 well / 16-19 not-well / < 16 very-poor).
+      Otherwise read notes for impairment (daytime symptom frequency, nighttime
+      awakenings, activity limitation) and combine with T1-ExacerbationsCount and
+      T1-SABAOveruse. A clinician's explicit "well/not-well/poorly controlled"
+      statement is authoritative when present.
+
+  - question_id: T1-SpirometryDate
+    text: Date of the most recent spirometry in the lookback window (ISO
+      YYYY-MM-DD). Null if no spirometry is documented.
+    tier: 1
+    answer_schema:
+      type: string
+      description: ISO date string or null.
+    naepp_source: "EPR-3 Section 3, Component 1, p.43-45 — 'Pulmonary
+      function testing (spirometry) is recommended at: (1) the time of
+      initial assessment; (2) after treatment is initiated and symptoms
+      and PEF have stabilized, to document attainment of (near) normal
+      airway function; (3) during a period of progressive or prolonged
+      loss of asthma control; and (4) at least every 1-2 years.'"
+    evidence_grade: B
+    clinical_rationale: >-
+      EPR-3 requires spirometry at least every 1-2 years for persistent
+      asthma. A patient without spirometry within 24 months has incomplete
+      assessment by guideline; this contributes to the management
+      concordance verdict (T2-StepTherapyMatch may be 'unknown' if lung
+      function is not documented).
+    retrieval_hints: >-
+      STRUCTURED FIRST. Check two tables: (1)
+      read_structured_data(table="procedures") — look for cpt="94060"
+          (spirometry pre/post-bronchodilator) or cpt="94010" (simple
+          spirometry); pick the most recent procedure_date.
+      (2) read_structured_data(table="measurements") — most recent
+          row with loinc="19926-5" (FEV1/FVC) or "33452-4" (FEV1 %
+          predicted) — its `date` field is the spirometry date.
+      Take the more recent of the two as the answer. Fallback to notes: PFT
+      reports, spirometry results in narrative.
+
+  - question_id: T1-ComorbidityAssessed
+    text: Has the chart documented assessment of at least one comorbid condition
+      that affects asthma (allergic rhinitis/sinusitis, GERD, obesity, OSA,
+      chronic stress/depression, or tobacco/environmental exposure) when the
+      patient is not well-controlled?
+    tier: 1
+    answer_schema:
+      type: string
+      enum:
+        - assessed_and_addressed
+        - assessed_not_addressed
+        - not_assessed
+        - not_applicable
+    depends_on:
+      - T1-ControlLevel
+    naepp_source: "EPR-3 Section 3, Component 3, p.166 (Key Points) —
+      'Clinicians should evaluate a patient for the presence of a chronic
+      comorbid condition when the patient's asthma cannot be well
+      controlled. Treating the conditions may improve asthma management:
+      ABPA (Evidence A), gastroesophageal reflux (Evidence B), obesity
+      (Evidence B), OSA (Evidence D), rhinitis/sinusitis (Evidence B),
+      chronic stress/depression (Evidence D).'"
+    evidence_grade: B
+    clinical_rationale: >-
+      Uncontrolled asthma despite step-appropriate therapy is the EPR-3
+      indication for comorbidity workup. Skipping this step before
+      escalating therapy is a documented concordance gap. Mark
+      'not_applicable' when T1-ControlLevel == well_controlled.
+    retrieval_hints: >-
+      STRUCTURED FIRST. (1) read_structured_data(table="conditions") for
+          ICD-10 codes: J30.x (allergic rhinitis), J33.x (nasal polyps),
+          J34.x (sinusitis), K21.x (GERD), E66.x (obesity), G47.33 (OSA),
+          F32-F33 (depression), F41.x (anxiety), F43.2 (adjustment),
+          Z72.0 (tobacco use), Z77.x (environmental exposures).
+      (2) read_structured_data(table="observations") for BMI, smoking
+          status, environmental exposure screening.
+      Fallback to notes: ROS sections, HPI mentions of nasal symptoms,
+      reflux, snoring, mood, weight, tobacco exposure. 'assessed_not_addressed'
+      = comorbidity noted but no plan; 'assessed_and_addressed' = noted
+      with referral/treatment plan.

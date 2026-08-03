@@ -1,0 +1,17 @@
+{
+  "name": "@chart-review/domain-bundle",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": { "types": "./src/index.ts", "default": "./src/index.ts" },
+    "./bundle-export": { "types": "./src/bundle-export.ts", "default": "./src/bundle-export.ts" }
+  },
+  "dependencies": {
+    "@chart-review/patients": "*",
+    "@chart-review/lock": "*",
+    "@chart-review/kappa": "*"
+  }
+}

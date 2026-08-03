@@ -1,0 +1,15 @@
+{
+  "name": "@chart-review/workflow-phase-judge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "JUDGE phase: LLM-as-judge prescreen between TRY and VALIDATE. Optional; methodologists can toggle off in meta.yaml.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": { "types": "./src/index.ts", "default": "./src/index.ts" }
+  },
+  "dependencies": {
+    "@chart-review/workflow-phases": "*"
+  }
+}

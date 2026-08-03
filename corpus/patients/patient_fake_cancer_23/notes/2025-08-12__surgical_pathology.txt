@@ -1,0 +1,30 @@
+SURGICAL PATHOLOGY REPORT
+Specimen: Left upper lobe lung mass, lobectomy
+Specimen received: 2025-08-08
+Report finalized: 2025-08-12
+Pathologist: R. Alvarez, MD
+
+GROSS DESCRIPTION
+Lobectomy specimen containing a 3.4 cm firm, tan-white mass abutting but
+not invading the pleura. Margins grossly clear.
+
+MICROSCOPIC DESCRIPTION
+The tumor is biphasic. Approximately 60% of the tumor volume shows
+malignant glandular architecture with mucin production, consistent with
+adenocarcinoma. The remaining ~40% shows keratinizing nests with
+intercellular bridges, consistent with squamous cell carcinoma. The two
+components are intimately admixed. Each component comprises well over the
+10% threshold required for a combined diagnosis.
+
+IMMUNOHISTOCHEMISTRY
+- TTF-1: positive in the glandular component, negative in the squamous component
+- Napsin A: positive in the glandular component
+- p40: positive in the squamous component, negative in the glandular component
+- CK5/6: positive in the squamous component
+
+FINAL DIAGNOSIS
+Left upper lobe, lobectomy: ADENOSQUAMOUS CARCINOMA of the lung
+(adenocarcinoma component ~60%, squamous cell carcinoma component ~40%).
+Pleural margin negative. No lymphovascular invasion identified.
+
+R. Alvarez, MD — electronically signed 2025-08-12

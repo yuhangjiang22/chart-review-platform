@@ -1,0 +1,41 @@
+task_type: phenotype_validation
+uses_structured_data: true
+review_unit: patient
+manual_version: 0.1.0
+status: draft
+final_output: t1d_classification
+source_documents:
+  - T1D_Chart_Review_Guideline_v2.docx
+  - T1D_Chart_Review_Template_v2.xlsx
+overview_prose: >-
+  T1D diabetes-type confirmation phenotype. From a patient's clinical notes AND
+  EHR structured data (OMOP conditions / drugs / measurements), determine whether
+  the patient is true/likely type 1 diabetes vs not T1D vs uncertain
+  (t1d_classification), and identify completed diabetes-distress / depression
+  instruments (DDS-17, T1D-DDS, PHQ-9) with their scores.
+
+  SECTION 1 (confirmation): the agent extracts evidence leaves — diabetes code
+  counts (T1D vs T2D), insulin / glucagon / non-insulin-med / urine-ketone-strip
+  use, diabetes autoantibody and C-peptide findings, endocrinology and
+  nonspecialist provider diagnoses, and longitudinal dates. The DiCAYA
+  proportion, the five Klompas criteria + roll-up, and the sequential
+  ground-truth classification are all COMPUTED (derived) from those leaves, so the
+  rules are deterministic and auditable rather than re-judged by the LLM each run.
+  t1d_classification is the machine PROPOSAL — the final ground-truth call is
+  Human-Only (the reviewer confirms or overrides it during VALIDATE).
+
+  SECTION 2 (surveys): per-instrument completion status + score for DDS-17,
+  T1D-DDS, PHQ-9 (PHQ-9 item 9 recorded separately for the safety process).
+
+  EVIDENCE PROVENANCE: when an answer is determined from a structured OMOP row
+  (an ICD condition, a drug order, a lab measurement), cite THAT row
+  (source: omop, table, row_id) — not a note. Fall back to a verbatim note quote
+  only when the structured tables do not carry the fact. Do NOT force
+  E08.* / E09.* / E13.* / O24.* / gestational / prediabetes / hyperglycemia codes
+  into the T1D or T2D counts. Ported from the standalone T1D agent
+  (T1D/agent, guideline v2).
+phases:
+  - author
+  - try
+  - validate
+  - decide

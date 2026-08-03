@@ -1,0 +1,46 @@
+[
+  {
+    "row_id": 7101,
+    "concept_id": 1502905,
+    "concept_name": "Insulin glargine 100 UNT/ML injectable solution",
+    "rxnorm": "285018",
+    "drug_class": "insulin_basal",
+    "instructions": "20 units subcutaneously at bedtime",
+    "start_date": "2019-04-02",
+    "end_date": null,
+    "active": true
+  },
+  {
+    "row_id": 7102,
+    "concept_id": 1516976,
+    "concept_name": "Insulin aspart 100 UNT/ML injectable solution",
+    "rxnorm": "253182",
+    "drug_class": "insulin_bolus",
+    "instructions": "carb-ratio dosing with meals",
+    "start_date": "2019-04-02",
+    "end_date": null,
+    "active": true
+  },
+  {
+    "row_id": 7103,
+    "concept_id": 1567198,
+    "concept_name": "Glucagon 1 MG injectable emergency kit",
+    "rxnorm": "310496",
+    "drug_class": "glucagon",
+    "instructions": "1 mg IM for severe hypoglycemia; caregiver administered",
+    "start_date": "2025-06-15",
+    "end_date": null,
+    "active": true
+  },
+  {
+    "row_id": 7104,
+    "concept_id": 40224175,
+    "concept_name": "Urine ketone (acetone) test strips",
+    "rxnorm": "992437",
+    "drug_class": "ketone_test_strip_supply",
+    "instructions": "check urine ketones when blood glucose > 250 mg/dL or ill",
+    "start_date": "2025-06-15",
+    "end_date": null,
+    "active": true
+  }
+]

@@ -1,0 +1,15 @@
+{
+  "name": "@chart-review/agent-core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Provider-neutral agent types (AgentEvent, AgentRunInput, ProviderName). The dependency floor of the agent stack — no SDK / runtime dependencies.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  }
+}

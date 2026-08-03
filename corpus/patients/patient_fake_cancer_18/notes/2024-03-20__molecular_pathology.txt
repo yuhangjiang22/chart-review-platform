@@ -1,0 +1,20 @@
+MOLECULAR PATHOLOGY / COMPREHENSIVE GENOMIC PROFILING REPORT
+Assay: FoundationOne CDx (comprehensive genomic profiling, 324-gene panel)
+Specimen: tumor tissue (right lower lobe core biopsy, 2024-03-02)
+Test ordered: 2024-03-08
+Result reported: 2024-03-20
+
+GENOMIC FINDINGS — ACTIONABLE
+  - EGFR exon 19 deletion (E746_A750del) — DETECTED.
+    FDA-approved matched therapy: osimertinib (first-line).
+No ALK, ROS1, BRAF V600E, RET, MET exon 14, or NTRK alterations detected.
+KRAS: wild type.
+
+PD-L1 IMMUNOHISTOCHEMISTRY (22C3)
+  - Tumor Proportion Score (TPS): 5% (low expression, 1-49% band).
+
+INTERPRETATION
+Comprehensive genomic profiling on tissue identified an actionable EGFR exon 19
+deletion with an FDA-approved first-line targeted therapy. Results were
+communicated to oncology on 2024-03-20, prior to initiation of systemic therapy.
+Turnaround (order 2024-03-08 to result 2024-03-20): 12 days.

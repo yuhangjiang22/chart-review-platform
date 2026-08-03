@@ -1,0 +1,18 @@
+{
+  "name": "@chart-review/eval-span-iaa",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Span-level inter-annotator agreement for NER tasks. Pairs two reviewers' span lists by tuple-match (note_id, start, end, entity_type, concept_name) first, then IoU≥0.5 within (note_id, entity_type) as fallback. Emits hard / soft / boundary / miss kinds and per-entity-type F1 + macro κ-style headline number. Pure functions; no I/O.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "dependencies": {
+    "@chart-review/platform-types": "*"
+  }
+}

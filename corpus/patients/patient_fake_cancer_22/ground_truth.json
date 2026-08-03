@@ -1,0 +1,20 @@
+{
+  "patient_id": "patient_fake_cancer_22",
+  "category": "probable",
+  "lung_cancer_status": "probable",
+  "leaf_answers": {
+    "pathology_report_present": "no",
+    "pathology_lung_primary": "not_applicable",
+    "cytology_supports_lung_primary": "no",
+    "imaging_lung_lesion": "yes",
+    "oncologist_lung_cancer_diagnosis_in_note": "yes",
+    "icd_lung_cancer_present": "no"
+  },
+  "applicability": {
+    "pathology_lung_primary": "not_applicable",
+    "cytology_supports_lung_primary": "applicable"
+  },
+  "expected_contradicting_evidence_fields": [],
+  "difficulty": "hard",
+  "difficulty_notes": "Hand-crafted. Multiple decoys for icd_lung_cancer_present and oncologist_lung_cancer_diagnosis_in_note. Family history of lung cancer (father), Z85.118 personal-history code. Real signal: treating oncologist documents active lung cancer diagnosis + suspicious CT. ICD must remain no (Z85.118 does not qualify; no C34 code present). Pathology not yet obtained."
+}

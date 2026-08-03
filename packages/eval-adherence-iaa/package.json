@@ -1,0 +1,18 @@
+{
+  "name": "@chart-review/eval-adherence-iaa",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Inter-annotator agreement for adherence tasks. Pairs agent vs reviewer QuestionAnswer[] by question_id and computes per-question κ + per-rule κ across RuleVerdict[]. Pure functions; no I/O.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "dependencies": {
+    "@chart-review/platform-types": "*"
+  }
+}

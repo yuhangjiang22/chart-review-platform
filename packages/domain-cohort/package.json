@@ -1,0 +1,24 @@
+{
+  "name": "@chart-review/domain-cohort",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": { "types": "./src/index.ts", "default": "./src/index.ts" },
+    "./cohorts": { "types": "./src/cohorts.ts", "default": "./src/cohorts.ts" },
+    "./cohort-sampling": { "types": "./src/cohort-sampling.ts", "default": "./src/cohort-sampling.ts" },
+    "./cohort-stratified-sampling": { "types": "./src/cohort-stratified-sampling.ts", "default": "./src/cohort-stratified-sampling.ts" },
+    "./cohort-validation": { "types": "./src/cohort-validation.ts", "default": "./src/cohort-validation.ts" }
+  },
+  "dependencies": {
+    "@chart-review/patients": "*",
+    "@chart-review/lock": "*",
+    "@chart-review/tasks": "*",
+    "@chart-review/disagreements": "*",
+    "@chart-review/fs-atomic": "*",
+    "@chart-review/domain-review": "*",
+    "@chart-review/rubric": "*"
+  }
+}

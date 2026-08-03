@@ -1,0 +1,26 @@
+{
+  "name": "@chart-review/domain-proposal",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Rule proposal aggregate: translate (NL → DSL edit), replay across locked records, promote (apply to live guideline), guideline-improvement driver. The methodologist's accept/reject lifecycle for guideline edits.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": { "types": "./src/index.ts", "default": "./src/index.ts" },
+    "./rule-store": { "types": "./src/rule-store.ts", "default": "./src/rule-store.ts" },
+    "./rule-translator": { "types": "./src/rule-translator.ts", "default": "./src/rule-translator.ts" },
+    "./rule-replay": { "types": "./src/rule-replay.ts", "default": "./src/rule-replay.ts" },
+    "./rule-replay-llm": { "types": "./src/rule-replay-llm.ts", "default": "./src/rule-replay-llm.ts" },
+    "./rule-promote": { "types": "./src/rule-promote.ts", "default": "./src/rule-promote.ts" },
+    "./guideline-improvement": { "types": "./src/guideline-improvement.ts", "default": "./src/guideline-improvement.ts" },
+    "./verify-application": { "types": "./src/verify-application.ts", "default": "./src/verify-application.ts" }
+  },
+  "dependencies": {
+    "@chart-review/agent-provider": "*",
+    "@chart-review/contract-eval": "*",
+    "@chart-review/lock": "*",
+    "@chart-review/patients": "*",
+    "@chart-review/rubric": "*"
+  }
+}

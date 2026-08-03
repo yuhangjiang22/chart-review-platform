@@ -1,0 +1,22 @@
+SURGICAL PATHOLOGY REPORT
+Specimen: Right upper lobe lung mass, wedge resection
+Specimen received: 2025-08-30
+Report finalized: 2025-09-03
+Pathologist: D. Okonkwo, MD
+
+MICROSCOPIC DESCRIPTION
+The neoplasm is biphasic. About 70% shows glandular/acinar architecture
+with mucin, consistent with adenocarcinoma. The remaining ~30% shows
+keratinizing squamous nests with intercellular bridges. Both components
+clearly exceed the 10% threshold for a combined tumor.
+
+IMMUNOHISTOCHEMISTRY
+- TTF-1 / Napsin A: positive in the glandular component
+- p40 / CK5/6: positive in the squamous component
+
+FINAL DIAGNOSIS
+Right upper lobe, wedge resection: ADENOSQUAMOUS CARCINOMA of the lung
+(adenocarcinoma component ~70%, squamous cell carcinoma component ~30%).
+Margins negative.
+
+D. Okonkwo, MD — electronically signed 2025-09-03

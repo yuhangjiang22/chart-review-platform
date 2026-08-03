@@ -1,0 +1,20 @@
+PRIMARY CARE — FOLLOW-UP
+Provider: R. Osei, MD — Family Medicine
+Encounter date: 2025-07-10
+
+HPI
+Depression symptoms improving on sertraline 100 mg. Most recent PHQ-9 19 (per
+psychiatry note 2025-06-20); no repeat screening performed today. Patient also
+reports burning pain in both feet consistent with diabetic peripheral
+neuropathy.
+
+ASSESSMENT / PLAN
+1. Major depressive disorder — improving, continue sertraline 100 mg daily.
+2. Diabetic peripheral neuropathy — start duloxetine 30 mg daily for
+   neuropathic pain.
+3. Type 2 Diabetes — continue semaglutide 1.0 mg weekly.
+
+MEDICATIONS
+- Sertraline 100 mg daily (for depression)
+- Duloxetine 30 mg daily (for diabetic neuropathy)
+- Semaglutide 1.0 mg weekly

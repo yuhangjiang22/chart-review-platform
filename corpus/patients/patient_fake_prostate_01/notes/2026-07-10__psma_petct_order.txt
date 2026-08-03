@@ -1,0 +1,10 @@
+IMAGING REQUISITION — PSMA PET/CT  (SYNTHETIC — NOT A REAL PATIENT)
+Date: 2026-07-10
+
+Exam: Ga-68 PSMA-11 PET/CT, skull base to mid-thigh.
+
+Indication: Biochemical recurrence of prostate cancer. Rising PSA (now 0.6
+ng/mL) after radical prostatectomy for Grade Group 4 disease. Localize site of
+recurrence.
+
+Referring service: Medical Oncology.

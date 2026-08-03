@@ -1,0 +1,13 @@
+{
+  "name": "@chart-review/workflow-phase-deploy",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Deploy phase. Run the locked rubric on a production cohort + collect feedback. Optional — research-only rubrics may stop at LOCK.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": { "types": "./src/index.ts", "default": "./src/index.ts" }
+  },
+  "dependencies": { "@chart-review/workflow-phases": "*" }
+}

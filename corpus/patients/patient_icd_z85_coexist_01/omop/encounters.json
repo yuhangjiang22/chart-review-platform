@@ -1,4 +1,0 @@
-[
-  { "row_id": 10401, "encounter_id": "enc_8401", "type": "ED", "department": "Emergency", "primary_provider": "V. Park, MD", "start_date": "2025-07-09", "end_date": "2025-07-09" },
-  { "row_id": 10402, "encounter_id": "enc_8402", "type": "Outpatient", "department": "Primary Care", "primary_provider": "D. Lin, MD", "start_date": "2025-07-21", "end_date": "2025-07-21" }
-]

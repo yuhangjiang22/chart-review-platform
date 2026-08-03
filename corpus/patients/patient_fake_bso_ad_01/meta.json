@@ -1,0 +1,16 @@
+{
+  "patient_id": "patient_fake_bso_ad_01",
+  "category": "bso_ad_demo",
+  "demographics": {
+    "age": 72,
+    "sex": "M",
+    "region": "Midwest"
+  },
+  "index_date": "2026-02-12",
+  "doc_types": [
+    "memory_clinic_note",
+    "social_work_assessment"
+  ],
+  "generated_by": "claude_synthetic_bso_ad_demo",
+  "generation_run_id": "bso-ad-fixture-2026-07-18"
+}

@@ -1,0 +1,24 @@
+{
+  "name": "@chart-review/mcp-core-adherence",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Transport-neutral MCP handlers for adherence tasks (list_questions, read_question, set_question_answer, get_adherence_state). Parallel to mcp-core (phenotype) and mcp-core-ner. The agent commits one QuestionAnswer per question via set_question_answer; the platform later runs the deterministic rule engine over the collected answers to produce rule_verdicts. set_question_answer faithfulness-checks its note evidence via @chart-review/faithfulness, same gate the phenotype set_field_assessment uses. The OMOP verifier is intentionally deferred — answers store verifier_status:'no_check'.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "dependencies": {
+    "@chart-review/domain-review": "*",
+    "@chart-review/faithfulness": "*",
+    "@chart-review/patients": "*",
+    "@chart-review/pipeline-extract-adherence": "*",
+    "@chart-review/platform-types": "*",
+    "@chart-review/tasks": "*",
+    "zod": "^3.23.0"
+  }
+}

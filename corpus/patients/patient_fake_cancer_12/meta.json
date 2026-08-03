@@ -1,0 +1,18 @@
+{
+  "patient_id": "patient_fake_cancer_12",
+  "category": "probable",
+  "demographics": {
+    "age": 70,
+    "sex": "F",
+    "region": "Northeast"
+  },
+  "smoking": "25 pack-years, quit 2005",
+  "index_date": "2025-01-28",
+  "doc_types": [
+    "ct_chest",
+    "oncology_consult",
+    "oncology_progress"
+  ],
+  "generated_by": "claude_api",
+  "generation_run_id": "claude-subagent-2026-04-29"
+}

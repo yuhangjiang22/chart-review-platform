@@ -1,0 +1,10 @@
+SURGICAL PATHOLOGY REPORT  (SYNTHETIC — NOT A REAL PATIENT)
+Date of service: 2023-02-08
+Specimen: Prostate, needle core biopsy (12 cores).
+
+FINAL DIAGNOSIS:
+Prostatic adenocarcinoma, Gleason score 4+4=8 (Grade Group 4).
+Tumor involves 7 of 12 cores, bilateral.
+Perineural invasion present. No small cell / neuroendocrine component identified.
+
+COMMENT: Grade Group 4 adenocarcinoma. Findings support a high-grade prostate cancer.

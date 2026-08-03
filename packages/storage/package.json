@@ -1,0 +1,19 @@
+{
+  "name": "@chart-review/storage",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Filesystem-as-state primitive: atomicWriteJson, readJsonOrNull, pathFor.reviewState/runManifest/etc. New code goes through this seam.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "dependencies": {
+    "@chart-review/patients": "*",
+    "@chart-review/fs-atomic": "*"
+  }
+}

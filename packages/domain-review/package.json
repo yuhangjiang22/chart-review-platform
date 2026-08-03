@@ -1,0 +1,30 @@
+{
+  "name": "@chart-review/domain-review",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Per-(patient × task) review_state aggregate: applyUiAction, loadOrCreate, resetReviewState, transitionReviewState. The heart of the reviewer write path.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./review-state": {
+      "types": "./src/review-state.ts",
+      "default": "./src/review-state.ts"
+    }
+  },
+  "dependencies": {
+    "@chart-review/patients": "*",
+    "@chart-review/reviews-context": "*",
+    "@chart-review/faithfulness": "*",
+    "@chart-review/tasks": "*",
+    "@chart-review/platform-types": "*",
+    "@chart-review/live-alerts": "*",
+    "@chart-review/audit-trail": "*",
+    "@chart-review/contract-eval": "*",
+    "@chart-review/fs-atomic": "*"
+  }
+}
