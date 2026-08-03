@@ -1,0 +1,17 @@
+{
+  "patient_id": "patient_fake_t1d_01",
+  "category": "t1d_synth",
+  "phi": false,
+  "demographics": {
+    "age": 29,
+    "sex": "F",
+    "region": "Midwest"
+  },
+  "index_date": "2025-06-15",
+  "doc_types": [
+    "endocrinology_consult",
+    "pcp_followup"
+  ],
+  "generated_by": "synthetic T1D confirmation fixture (true/likely T1D; DKA-onset, GAD65+, low C-peptide, insulin+glucagon+ketone strips); NOT real patient data",
+  "fixture_notes": "Clear true-T1D case for the chart-review-t1d phenotype. Structured: 4 T1D codes (E10.*) + 1 stray early T2D miscode (E11.9) -> proportion 0.8, gt50=yes; insulin glargine+aspart current; glucagon emergency kit + urine ketone strips prescribed; C-peptide 0.3 ng/mL (low); GAD65 250 U/mL (positive); no non-insulin agents (none). Notes: endocrinology consult states Type 1 diabetes mellitus (endo_provider_dx=t1d) and administers DDS-17 mean 2.4; PCP note records PHQ-9 total 6, item 9 not at all. Expected computed: all 5 Klompas criteria met, overall_klompas=met; t1d_classification=true_likely_t1d (resolves at step 1 via endo dx). Intended human ground truth: true_likely_t1d."
+}

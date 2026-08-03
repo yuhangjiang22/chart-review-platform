@@ -1,0 +1,37 @@
+ENDOCRINOLOGY CONSULT NOTE
+Date of service: 2025-06-15
+Service: Adult Endocrinology & Diabetes
+
+CHIEF COMPLAINT: Routine type 1 diabetes follow-up; glucose variability.
+
+HISTORY OF PRESENT ILLNESS:
+29-year-old woman with a well-established history of type 1 diabetes mellitus.
+She initially presented in April 2019 at age 23 in diabetic ketoacidosis. At that
+initial presentation GAD65 autoantibody returned strongly positive (250 U/mL, ref
+<5) and a fasting C-peptide was low at 0.3 ng/mL (ref 0.8-3.1), confirming an
+autoimmune, insulin-deficient (type 1) process. (An E11.9 code entered at the
+initial emergency visit in March 2019, before the workup, was a coding artifact
+and does not reflect her type.) She has been insulin-dependent since diagnosis.
+
+CURRENT DIABETES REGIMEN:
+- Insulin glargine 20 units subcutaneously at bedtime (basal), since 2019.
+- Insulin aspart with meals using carbohydrate-ratio dosing (bolus).
+- No oral or non-insulin injectable diabetes agents.
+Today I prescribed a glucagon 1 mg emergency kit for severe hypoglycemia (caregiver
+administered) and dispensed urine ketone (acetone) test strips with instructions to
+check ketones when glucose exceeds 250 mg/dL or during illness.
+
+LABS: Hemoglobin A1c today 9.8%.
+
+DIABETES DISTRESS SCREENING:
+The 17-item Diabetes Distress Scale (DDS-17) was administered at today's visit.
+Mean item score 2.4 (moderate distress), driven by the regimen-distress subscale.
+We discussed problem areas and coping strategies.
+
+ASSESSMENT:
+1. Type 1 diabetes mellitus, autoimmune (GAD65+), insulin-dependent, suboptimally
+   controlled (A1c 9.8%). Continue basal-bolus insulin; glucagon kit and ketone
+   strips provided; sick-day rules reviewed.
+2. Moderate diabetes distress (DDS-17 mean 2.4) — supportive counseling.
+
+Electronically signed by A. Rao, MD, Endocrinology
