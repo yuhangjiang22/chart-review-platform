@@ -1,0 +1,22 @@
+PRIMARY CARE FOLLOW-UP NOTE
+Date of service: 2025-06-20
+Provider: J. Nguyen, MD, Family Medicine
+
+INTERVAL HISTORY:
+29-year-old woman with type 1 diabetes (followed by Endocrinology) here for a
+routine visit and depression screening. She reports her mood has been low over the
+past few weeks with poor sleep, but denies any thoughts of self-harm.
+
+DEPRESSION SCREENING:
+PHQ-9 completed today, total score 6 (mild depressive symptoms). Item 9 (thoughts
+that you would be better off dead or of hurting yourself): "not at all" (0). No
+active safety concerns; will recheck at next visit and offer counseling resources.
+
+MEDICATIONS: Continues insulin glargine and insulin aspart as managed by
+Endocrinology. No new medications today.
+
+ASSESSMENT/PLAN:
+1. Type 1 diabetes — stable on basal-bolus insulin; continue endocrinology care.
+2. Mild depressive symptoms (PHQ-9 = 6); supportive counseling, recheck in 4 weeks.
+
+Electronically signed by J. Nguyen, MD
