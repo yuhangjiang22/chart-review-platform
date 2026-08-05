@@ -37,11 +37,18 @@ GROUP_I = {
                   "acute_MI_14d", "sbp_low_flag_14d"]},
 }
 GROUP_II = {
+    # Must mirror the skill's 5 g2_*_ruled_out fields exactly (group2_all_ruled_out
+    # requires all 5). Previously this split CMV/EBV/HSV into 3 causes and omitted
+    # chronic HBV/HCV and PBC/PSC entirely, so gii_ruled == len(GROUP_II) could never
+    # align with the skill's actual +1/+2 tier gate.
     "Autoimmune hepatitis": {"results": ["ANA_result", "SMA_result"], "flags": ["autoimmune_hepatitis_hx"]},
-    "Acute CMV": {"results": ["CMV_IgM_result", "CMV_PCR_result"], "flags": ["CMV_acute_dx"]},
-    "Acute EBV": {"results": ["EBV_VCA_IgM_result", "EBV_PCR_result", "EBV_result"], "flags": ["EBV_acute_dx"]},
-    "Acute HSV": {"results": ["HSV_PCR_result"], "flags": ["HSV_hepatitis_dx"]},
     "Sepsis/bacteremia": {"results": [], "flags": ["sepsis_dx", "septicemia_dx", "bacteremia_dx"]},
+    "Chronic HBV/HCV complications": {"results": ["HBsAg_result", "HCV_RNA_result"],
+        "flags": ["chronic_hep_B_hx", "chronic_hep_C_hx"]},
+    "PBC/PSC": {"results": ["ANA_result"], "flags": ["PBC_PSC_hx"]},
+    "Acute CMV/EBV/HSV": {"results": ["CMV_IgM_result", "CMV_PCR_result", "EBV_VCA_IgM_result",
+        "EBV_PCR_result", "EBV_result", "HSV_PCR_result"],
+        "flags": ["CMV_acute_dx", "EBV_acute_dx", "HSV_hepatitis_dx"]},
 }
 
 _POS = {"positive", "pos", "reactive", "detected", "high", "abnormal"}

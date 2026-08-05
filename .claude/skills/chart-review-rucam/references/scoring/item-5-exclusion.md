@@ -26,6 +26,13 @@ This matters because asserting "all causes excluded" without the per-cause work 
 the most common error. Most causes are `not_assessed` in structured data, so a `yes`
 flag requires real note evidence.
 
+**Do not commit any `g1_*`/`g2_*` flag until you have called `search_notes` at least
+once with the Step 4 keyword list, and called `read_note` on every note whose
+title/doctype contains an imaging term (ct, mri, mrcp, us, ultrasound, ercp, abd,
+pelvis, RUQ).** The structured floor makes every cause look already decided — it is
+not. Reaching Step 7 with zero `search_notes`/`read_note` calls means Item 5 is not
+done; go back and run Steps 2-4 first.
+
 ### Step 1 — Collect structured flags (`get_patient_summary`)
 
 **Hypotension/shock/ischemia (within 2 weeks):**
@@ -61,6 +68,17 @@ Raw values and dates for: HAV_IgM, HBsAg, HBc_IgM, HCV_Ab, HCV_RNA, ANA, SMA, Ig
   - acute CMV/EBV/HSV: `DAYS_FROM_LIVER_INJURY` ∈ [-30, +30]
   - Autoimmune hepatitis history: `DAYS_FROM_LIVER_INJURY` ∈ [-365, +30]
 - Note keywords to search: "sepsis", "ischemia", "shock", "biliary", "obstruction", "ERCP", "alcohol", "hepatitis", "pancreatitis", "HAV", "HBV", "HCV", "CMV", "EBV", "cirrhosis", "PBC", "PSC", "sclerosing cholangitis", "AMA"
+
+**MANDATORY sub-step for biliary obstruction — do this before answering
+`g1_biliary_obstruction_ruled_out` as anything other than `yes`:** call `list_notes`
+and scan every returned `doctype`/filename for imaging terms — "ct", "mri", "mrcp",
+"us"/"ultrasound", "ercp", "abd", "pelvis", "imaging", "RUQ". **`read_note` on
+every single match before concluding "not assessed."** This has been observed to fail
+in practice: a note titled `abd_pelvis_ct_w_contr` appeared in `list_notes` and was
+never opened with `read_note`, so an explicit "bile ducts normal caliber, no acute
+findings" result was missed entirely and the cause was wrongly left "not assessed."
+Seeing a relevant title in `list_notes` is not the same as having checked it — you
+must call `read_note` on it.
 
 ### Step 5 — Label every cause with (a), (b), or (c)
 
@@ -143,11 +161,16 @@ Apply the standard — do not require a specific keyword. The evidence must be *
 - An alternative cause is mentioned but not attributed (e.g., cholelithiasis on imaging without ductal dilation → not sufficient)
 - Labs are inconclusive (e.g., viral serology "pending")
 - Only a risk factor is present (e.g., chronic HCV without evidence of flare/decompensation at T0)
+- **A bare chronic-history flag is the only evidence** (`alcohol_use_disorder=1`, `alcoholic_liver_disease=1`, `cirrhosis_hx=1`, etc.). A history flag describes the patient's background, not what caused this episode — it is a risk factor, not an attribution. Require a note-documented pattern of active use/flare **at the injury window** (for alcohol: AST:ALT ≥ 2 plus a note confirming active heavy drinking at T0) or an explicit clinician attribution before setting `yes` on a history-flag basis.
 
 Set `alt_cause_explains = no` otherwise. (When it is `yes`, the platform derives
 item_5 = −3 regardless of the ruled-out counts — but still commit every flag.)
 
 ### Step 7 — Commit the components (do NOT score or count)
+Before calling `set_field_assessment` on any Item 5 field, confirm: have you called
+`search_notes` or `read_note` at least once this session? If not, stop — go back to
+Step 4. A commit with zero note tool calls is not a completed Item 5.
+
 → **Commit all 11 per-cause flags** (`g1_*` ×6, `g2_*` ×5) as `yes`/`no` per the
 Step 5 mapping, plus **`alt_cause_explains`** (`yes`/`no`) from Step 6.
 

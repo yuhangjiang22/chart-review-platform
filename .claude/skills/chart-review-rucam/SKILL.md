@@ -30,8 +30,11 @@ Per-item logic (which component values map to which score) lives in
 - **Structured data (RUCAM plugin):** `get_patient_summary`, `get_suspect_drug`,
   `get_medications`, `get_drug_episodes` (45-day-gap merge), `get_lft_series`,
   `get_lab_extremum`, `get_serology`, `get_conditions`,
-  `get_hepatotoxicity_category`, `compute_r_ratio`. The patient (`person_id`) and
-  data dir are pre-bound — call these WITHOUT `person_id`/`data_dir`.
+  `get_hepatotoxicity_category`, `compute_r_ratio`,
+  `score_item5_exclusion` (structured floor for every Item 5 cause — call this
+  BEFORE setting any `g1_*`/`g2_*` flag; see Step 2 below). The patient
+  (`person_id`) and data dir are pre-bound — call these WITHOUT
+  `person_id`/`data_dir`.
 - **Notes:** `list_notes` / `read_note` (concur MCP, faithfulness-gated).
 - **Write:** one `set_field_assessment` per **component** below (with a brief
   rationale + evidence); `set_review_status` when every applicable component is done.
@@ -74,9 +77,20 @@ by a negative test **or** an explicit note exclusion (per `references/scoring/it
 ## Steps
 
 1. Read `references/scoring/item-0-setup.md`; call `compute_r_ratio` and commit `injury_track`.
-2. Work through the components above, gathering evidence with the tools (+ notes) and
-   committing each via `set_field_assessment`. Answer **every** applicable component —
-   for the Group I/II exclusion flags, that means one flag per cause even when a cause
-   was not assessed (`no`), because a missing flag leaves item 5 Pending.
-3. `set_review_status` when done. The item scores, total, and category compute
+2. **Before setting ANY `g1_*` / `g2_*` / `alt_cause_explains` flag**, read
+   `references/scoring/item-5-exclusion.md` in full and call
+   `score_item5_exclusion`. This is not optional and not just "context" — it is
+   the structured floor for every Item 5 cause. Never rule a cause out
+   (`yes`) just because structured data has no flag for it or is silent —
+   "no flag" is NOT "ruled out"; that shortcut is the single most common
+   Item 5 error. For every cause the floor tool marks `not_assessed`, you MUST
+   call `list_notes`/`read_note` and search for that cause specifically
+   (diagnoses, procedure reports, discharge summaries) before committing a
+   flag — do not commit Item 5 flags from structured data alone.
+3. Work through the remaining components above, gathering evidence with the
+   tools (+ notes) and committing each via `set_field_assessment`. Answer
+   **every** applicable component — for the Group I/II exclusion flags, that
+   means one flag per cause even when a cause was not assessed (`no`),
+   because a missing flag leaves item 5 Pending.
+4. `set_review_status` when done. The item scores, total, and category compute
    automatically from your components.
