@@ -22,6 +22,13 @@ and the stacking — you do not apply the track rule yourself.
 → **Commit `rf_alcohol`** = `yes` if alcohol use disorder **or** alcoholic liver
 disease is present (structured flag = 1 **or** clinician-documented alcohol
 use/abuse in notes), else `no`.
+
+**Before committing `rf_alcohol = no`, check what you already found for Item 5's
+alcoholism cause (`g1_alcoholism_ruled_out`).** If that flag is `no` *because* a note
+documents alcohol use (not because it's simply unassessed), the same note is evidence
+for `rf_alcohol = yes` here — this is the same clinical fact answering two different
+questions. Do not re-search from scratch and land on a different answer than you
+already committed for Item 5; reuse it.
 → **Commit `rf_pregnancy`** = `yes` if pregnancy is present, else `no`. (Report it
 regardless of track — the derivation applies it only on cholestatic/mixed.)
 → **Commit `rf_age_ge_55`** = `yes` if `AGE` ≥ 55 years at T0, else `no`.
