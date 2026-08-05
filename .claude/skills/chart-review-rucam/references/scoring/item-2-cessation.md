@@ -43,8 +43,24 @@ Window (in days from T0, i.e. DAYS_FROM_LIVER_INJURY) for each scoring tier:
 
 **Important:** The overall nadir may occur much later than the first value that reaches a ≥ 50% decrease. Use the minimum value to determine whether the threshold was reached within each window, but use the **earliest laboratory date within that window that meets the ≥ 50% threshold** to determine the outcome bucket.
 
+**Worked example — D_stop before T0:** drug stopped 14 days before T0 (D_stop = −14).
+D_stop+8 = −6 — before T0, so the 8-day window has no valid post-stop days and is
+unreachable; do not fill it with a lab dated at/after T0. D_stop+30 = +16, so the
+30-day window is `day_min=0, day_max=+16` — a lab on day+8 (relative to T0) belongs to
+THIS window, not the 8-day one. When D_stop+8 (or D_stop+30) computes to a negative
+number, skip that tier — check the next one.
+
 ### Step 4 — Commit the component (do NOT score)
 From the peak → follow-up % decrease and the **earliest date on which a ≥ 50% decrease is reached** (measured from the drug stop date), determine ONE outcome bucket. If the drug was stopped before T0, begin evaluating the course at T0, but retain the drug stop date for determining the elapsed dechallenge interval. The platform's `item_2_course` derivation applies the track-specific score. For cholestatic/mixed, evaluate ALP and bilirubin separately and report the **best** qualifying bucket based on the earliest ≥ 50% decrease; if neither reaches 50%, use the larger observed decrease.
+
+**Every nadir/follow-up lab you cite must have `days_from_injury > D_stop` — a lab
+drawn while the drug was still active is not post-cessation evidence, however low the
+value is.** If `get_drug_episodes` shows the suspect drug `ongoing_at_t0` with a large
+positive `end_day`, your usable follow-up window starts AFTER that `end_day`, not at
+T0 — do not substitute early post-injury labs (drawn while still on the drug) for
+genuine post-stop follow-up. **Cite the `get_drug_episodes` result in your evidence
+array whenever D_stop is not 0** — a peak/nadir lab citation alone, with no episode
+citation backing D_stop, is not sufficient.
 
 → **Commit `dechallenge_outcome`** =
 - `ge50_le8d` — ≥ 50% decrease first reached within 8 days of drug stop
@@ -67,5 +83,7 @@ Report the bucket only — the +3/+2/0/−2/+1 mapping is the platform's job.
 - Peak = all post-T0 max: wrong — peak is capped at drug stop date (for drug stopped after onset).
 - Assuming T0 value is the peak when drug stopped before onset: always scan the full post-stop series — a later value may be higher.
 - Counting days from T0 instead of from drug stop: dechallenge window starts at drug stop.
+- **Using pre-cessation labs (drawn while the drug was still active) as if they were post-stop improvement** — e.g. `get_drug_episodes` shows the drug `ongoing_at_t0` with `end_day=+84`, but the cited nadir lab is from day+7 (still on-drug). A lab must postdate D_stop to count.
+- Computing D_stop+8 (or D_stop+30) without checking the sign — when D_stop is well before T0, that window can land in the past and is unreachable.
 - **Picking an arbitrary follow-up value instead of the nadir**: the % decrease is (peak − MIN value in window) / peak. Scan every value in the window — a later value may be lower than the one you first looked at.
 - **Skipping bilirubin for cholestatic/mixed**: the guideline says "ALP or total bilirubin" — check BOTH and use whichever gives the better score. Do not skip bilirubin just because ALP is available.
