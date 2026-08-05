@@ -1,0 +1,32 @@
+[
+  {
+    "row_id": 22401,
+    "encounter_id": "enc_s2101",
+    "type": "Outpatient",
+    "is_ed": false,
+    "department": "Primary Care",
+    "primary_provider": "L. Chen, MD",
+    "start_date": "2025-09-20",
+    "end_date": "2025-09-20"
+  },
+  {
+    "row_id": 22402,
+    "encounter_id": "enc_s2103",
+    "type": "Outpatient",
+    "is_ed": false,
+    "department": "Pulmonology",
+    "primary_provider": "R. Okafor, MD",
+    "start_date": "2026-01-15",
+    "end_date": "2026-01-15"
+  },
+  {
+    "row_id": 22403,
+    "encounter_id": "enc_s2104",
+    "type": "Outpatient",
+    "is_ed": false,
+    "department": "Pulmonology",
+    "primary_provider": "R. Okafor, MD",
+    "start_date": "2026-04-10",
+    "end_date": "2026-04-10"
+  }
+]

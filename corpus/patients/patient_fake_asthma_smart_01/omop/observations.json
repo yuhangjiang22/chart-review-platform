@@ -1,0 +1,30 @@
+[
+  {
+    "row_id": 22301,
+    "concept_id": 4275495,
+    "concept_name": "Tobacco smoking status",
+    "value_as_string": "Never smoker",
+    "date": "2026-01-15"
+  },
+  {
+    "row_id": 22302,
+    "concept_id": 4221869,
+    "concept_name": "Asthma severity classification",
+    "value_as_string": "moderate persistent",
+    "date": "2026-01-15"
+  },
+  {
+    "row_id": 22303,
+    "concept_id": 4188550,
+    "concept_name": "Asthma exacerbations, past 12 months",
+    "value_as_number": 1,
+    "date": "2026-01-15"
+  },
+  {
+    "row_id": 22304,
+    "concept_id": 4262947,
+    "concept_name": "Asthma written action plan given",
+    "value_as_string": "yes",
+    "date": "2026-01-15"
+  }
+]

@@ -3,7 +3,7 @@
 # (p.94-98) defines education and the written action plan; 2020 Focused
 # Update Section IV (Recs 12-16, p.80-95) updates step therapy to favor
 # SMART (ICS-formoterol single inhaler) for moderate-severe persistent
-# asthma in patients 12+.
+# asthma in patients ages 4+ (2020 Update Rec 12); LAMA add-on stays 12+.
 
 questions:
   - question_id: T2-StepTherapyMatch
@@ -11,12 +11,15 @@ questions:
       Does the current controller regimen match the guideline stepwise-therapy
       table FOR THE PATIENT'S AGE BAND (T0-AgeBand) and control level? EPR-3 has
       distinct stepwise tables for ages 0-4, 5-11, and 12+; apply the one for
-      this patient's band. (Ages 12-17: per the 2020 Update, moderate-severe
-      persistent favors ICS-formoterol SMART or ICS-LABA; mild persistent =
-      low-dose ICS. Ages 5-11: EPR-3 Figures 4-1b/4-2b — low-dose ICS preferred
-      at Step 2, medium-dose ICS or ICS-LABA at Steps 3-4. Ages 2-4: EPR-3
-      Figure 4-1a — low-dose ICS preferred at Step 2, LTRA/cromolyn alternative;
-      SMART and LABA are NOT first-line in this band.)
+      this patient's band. Per the 2020 Update (Rec 12), ICS-formoterol SMART is
+      a preferred option for moderate-severe persistent asthma at ages >=4. (Ages
+      12-17: moderate-severe persistent favors ICS-formoterol SMART or ICS-LABA;
+      mild persistent = low-dose ICS. Ages 5-11: EPR-3 Figures 4-1b/4-2b —
+      low-dose ICS preferred at Step 2, medium-dose ICS or ICS-LABA at Steps 3-4
+      — OR ICS-formoterol SMART per the 2020 Update. Ages 2-4: EPR-3 Figure 4-1a
+      — low-dose ICS preferred at Step 2, LTRA/cromolyn alternative; SMART applies
+      only to 4-year-olds in this band (>=4), not ages 2-3, and LABA is not
+      first-line.)
     tier: 2
     answer_schema:
       type: string
@@ -49,13 +52,14 @@ questions:
       direction (under-treated = symptoms despite low step; over-treated
       = high step despite well-controlled symptoms) signals a
       concordance gap. SMART is the 2020 Update's preferred regimen for
-      moderate-severe persistent in patients 12+.
+      moderate-severe persistent asthma at ages 4+ (Rec 12).
     retrieval_hints: >-
       FIRST select the stepwise table for T0-AgeBand (2-4 -> EPR-3 Fig 4-1a;
-      5-11 -> Fig 4-1b; 12-17 -> Fig 4-5 + 2020 SMART/LAMA). SMART and biologics
-      referenced below apply to ages 12+ (and, for some biologics, 6+); for ages
-      2-11 the preferred step-up is medium-dose ICS or ICS-LABA per the pediatric
-      figures, NOT SMART. The control cutoffs (>= 20 well controlled) use the
+      5-11 -> Fig 4-1b; 12-17 -> Fig 4-5 + 2020 SMART/LAMA). ICS-formoterol SMART
+      applies to ages >=4 (available for the 5-11 and 12-17 bands, and 4-year-olds
+      in the 2-4 band); LAMA add-on and most biologics apply to ages 12+ (some
+      biologics 6+). For ages 5-11 the step-up is medium-dose ICS or ICS-LABA OR
+      ICS-formoterol SMART. The control cutoffs (>= 20 well controlled) use the
       band-appropriate score (ACT 12-17 / C-ACT 5-11). Then:
       Compare T1 control signals to the regimen captured in
       T1-ControllerPrescribed:

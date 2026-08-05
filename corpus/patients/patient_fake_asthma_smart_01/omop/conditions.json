@@ -1,0 +1,18 @@
+[
+  {
+    "row_id": 22001,
+    "concept_id": 317009,
+    "concept_name": "Moderate persistent asthma, uncomplicated",
+    "icd10cm": "J45.41",
+    "status": "active",
+    "date": "2024-03-10"
+  },
+  {
+    "row_id": 22002,
+    "concept_id": 4051466,
+    "concept_name": "Allergic rhinitis",
+    "icd10cm": "J30.9",
+    "status": "active",
+    "date": "2024-03-10"
+  }
+]

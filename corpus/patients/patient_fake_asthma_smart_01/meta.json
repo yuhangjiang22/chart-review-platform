@@ -1,0 +1,18 @@
+{
+  "patient_id": "patient_fake_asthma_smart_01",
+  "category": "asthma_synth",
+  "phi": false,
+  "demographics": {
+    "age": 8,
+    "sex": "M",
+    "region": "Midwest"
+  },
+  "index_date": "2026-01-15",
+  "data_through_date": "2026-06-30",
+  "doc_types": [
+    "pcp_followup",
+    "pulmonology_note"
+  ],
+  "generated_by": "synthetic A3-verification fixture: 8yo (age_5_11), moderate-severe persistent, on budesonide-formoterol (Symbicort) as SMART maintenance+reliever; NOT real patient data",
+  "fixture_notes": "Purpose: verify A3 (2020 Update Rec 12 \u2014 ICS-formoterol SMART applies to ages >=4). This 8-year-old in the 5-11 band is on ICS-formoterol used as SMART. Under the corrected v0.4, T2-StepTherapyMatch should be 'matches' (previously 'SMART not for 2-11' would have flagged it). C-ACT 18 = not well controlled; SMART is the guideline-appropriate step -> matches."
+}

@@ -1,0 +1,43 @@
+[
+  {
+    "row_id": 22101,
+    "concept_id": 1549786,
+    "concept_name": "Budesonide 80 MCG / formoterol 4.5 MCG per actuation metered dose inhaler",
+    "rxnorm": "1367268",
+    "drug_class": "ICS-LABA",
+    "regimen": "SMART (single maintenance and reliever)",
+    "is_controller": true,
+    "instructions": "2 puffs BID controller + up to 1 puff PRN reliever (SMART)",
+    "start_date": "2024-03-10",
+    "end_date": null,
+    "active": true,
+    "fills": [
+      {
+        "fill_date": "2025-08-01",
+        "days_supply": 60,
+        "quantity": 1
+      },
+      {
+        "fill_date": "2025-10-05",
+        "days_supply": 60,
+        "quantity": 1
+      },
+      {
+        "fill_date": "2025-12-10",
+        "days_supply": 60,
+        "quantity": 1
+      },
+      {
+        "fill_date": "2026-02-18",
+        "days_supply": 60,
+        "quantity": 1
+      },
+      {
+        "fill_date": "2026-04-24",
+        "days_supply": 60,
+        "quantity": 1
+      }
+    ],
+    "refill_pdc_12mo": 0.83
+  }
+]

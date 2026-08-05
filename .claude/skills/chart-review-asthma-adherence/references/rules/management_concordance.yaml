@@ -15,8 +15,9 @@ rules:
       p.343). For ages 12+: 2020 Focused Update Rec 12 (strong) and Rec 13
       (conditional) p.80-86 — ICS-formoterol SMART for moderate-severe
       persistent asthma; Recs 14-16 p.90-95 — LAMA add-on as Step 4
-      alternative when LABA is contraindicated or unavailable. SMART/LAMA are
-      NOT first-line for ages 2-11 (use the pediatric figures).
+      alternative when LABA is contraindicated or unavailable. Per Rec 12,
+      ICS-formoterol SMART applies to ages >=4 (available for the 5-11 band); LAMA
+      stays ages >=12. For ages 2-4, use the pediatric figures (SMART only for 4-year-olds).
     evidence_grade: A_with_SMART_strong_LAMA_conditional
     verdict_if: "T2-StepTherapyMatch == \"matches\""
     excluded_if: "T2-StepTherapyMatch == \"unknown\""

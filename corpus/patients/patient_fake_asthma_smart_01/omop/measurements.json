@@ -1,0 +1,22 @@
+[
+  {
+    "row_id": 22201,
+    "concept_id": 40757452,
+    "concept_name": "Childhood Asthma Control Test (C-ACT) total score",
+    "loinc": "82672-4",
+    "value": 18,
+    "unit": "{score}",
+    "date": "2026-01-15",
+    "encounter_id": "enc_s2103"
+  },
+  {
+    "row_id": 22202,
+    "concept_id": 40757452,
+    "concept_name": "Childhood Asthma Control Test (C-ACT) total score",
+    "loinc": "82672-4",
+    "value": 16,
+    "unit": "{score}",
+    "date": "2025-09-20",
+    "encounter_id": "enc_s2101"
+  }
+]
