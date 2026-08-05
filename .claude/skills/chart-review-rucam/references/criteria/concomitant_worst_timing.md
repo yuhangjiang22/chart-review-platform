@@ -36,3 +36,12 @@ confirmed* no concomitant drug exists; never conclude `none` from absent structu
 data alone (that under-penalizes Item 4). This matters most for out-of-window suspect
 drugs, where the true culprit is often a recent concomitant the structured cohort tables
 missed.
+
+**`ongoing_at_t0` is not evidence of `suggestive` timing by itself — it only means
+the drug was active on T0, which is true of every chronic daily medication.** Before
+answering `suggestive`, read the episode's `start_day` and check it against the
+window (−5 to −90 initial / −1 to −15 re-exposure for hepatocellular; −5 to −90 /
+−1 to −90 for cholestatic-mixed). **Cite the `start_day` value itself in your
+evidence — a citation of only the `relative_to_t0` flag, with no `start_day`, is not
+sufficient to support `suggestive`.** A drug started 244 days before T0 is `compatible`
+even though it is `ongoing_at_t0`, because 244 falls outside every suggestive window.

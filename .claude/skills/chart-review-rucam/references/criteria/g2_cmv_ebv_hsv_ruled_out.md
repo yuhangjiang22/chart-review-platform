@@ -27,3 +27,10 @@ Check `CMV_acute_dx` / `EBV_acute_dx` / `HSV_hepatitis_dx` and the serologies
 hepatitis workup.** A documented negative for CMV/EBV/HSV (PCR or serology) = ruled out
 → `yes`, even if not labeled "acute viral hepatitis excluded." Reserve `no` for a
 positive/indeterminate result or when none of the trio was tested in [-30, +30].
+
+**Do not accept an incidental mention of "CMV"/"EBV"/"HSV" outside acute systemic
+infection as evidence.** An ophthalmology note's "no CMV retinopathy" does not rule out
+acute CMV hepatitis (retinopathy is an unrelated end-organ finding); a remote EBV
+mononucleosis history does not rule out acute infection now. Valid evidence is a
+CMV/EBV/HSV serology or PCR **result** (positive or negative), or an explicit clinician
+statement about acute viral hepatitis/systemic infection from one of these viruses.

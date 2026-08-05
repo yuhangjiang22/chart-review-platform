@@ -121,8 +121,13 @@ export function ensureEvidenceShape(ev: any): asserts ev is {
       );
     }
   } else if (ev.source === "omop" || ev.source === "structured") {
-    if (typeof ev.table !== "string" || ev.row_id === undefined) {
-      throw new Error("omop/structured evidence requires table and row_id");
+    // row_id is NOT required: citing an absent/never-run test (value: null) has
+    // no row to point at. Requiring it anyway reproduces the retry-storm bug
+    // this file's header comment warns about — agents that omit row_id for a
+    // null value do not recover and resend the identical call until the turn
+    // budget is exhausted. table alone is enough to make the claim traceable.
+    if (typeof ev.table !== "string") {
+      throw new Error("omop/structured evidence requires table");
     }
   }
 }
