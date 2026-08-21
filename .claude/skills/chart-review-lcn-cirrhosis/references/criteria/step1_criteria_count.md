@@ -15,3 +15,9 @@ derivation: 'count_true([crit_a_imaging == "met", crit_b_stiffness == "met", cri
 Count of Step-1 criteria A-E that are `met`. **Computed - do not answer
 directly.** Because every criterion leaf is always committed
 (`met`/`not_met`), this count always resolves.
+
+Distinct-studies rule (v2 op 4): the ">= 2 of A-E" requirement means two
+criteria from DISTINCT studies ("sequential or paired testing of two or more
+modalities"). The known overlap risk is one imaging study supplying both A
+and C — the crit_c_varices guidance asks the agent to flag that case in its
+rationale for reviewer adjudication.

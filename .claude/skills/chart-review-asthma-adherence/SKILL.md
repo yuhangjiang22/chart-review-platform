@@ -86,12 +86,24 @@ The verifier exists to catch it before the methodologist has to.
 
 ### Evidence citations
 
-When you commit an answer from a structured row, cite the table +
-row_id in `evidence`:
+**Match the evidence shape to WHERE you got the fact.** Getting this wrong
+is the #1 cause of rejected writes + retry loops.
+
+Structured (fact came from `read_structured_data`) — cite the ROW, no quote:
 ```
-{ note_id: "omop:drugs:9101", quote: "Fluticasone propionate 110 MCG BID" }
+{ source: "omop", table: "drugs", row_id: 9101 }
 ```
-When you fall back to a note, cite the verbatim quote with note filename.
+Do NOT invent a `note_id` like `"omop:drugs:9101"`, and do NOT put the
+`concept_name` (a diagnosis / drug / lab name) into a `quote` — a structured
+concept is NOT note text, so the faithfulness gate rejects it and you loop.
+Cite `source:"omop"` with `table` + `row_id` only.
+
+Note fallback (fact came from `read_note` / `search_notes`) — cite exact text:
+```
+{ source: "note", note_id: "<filename>", span_offsets: [start, end],
+  verbatim_quote: "<copied character-for-character from the note>" }
+```
+Copy the quote exactly; if unsure of the offsets, call `find_quote_offsets`.
 
 ## Tables to expect
 

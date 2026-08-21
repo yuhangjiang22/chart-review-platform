@@ -45,7 +45,9 @@ questions:
   - question_id: T1-ExacerbationsCount
     text: How many asthma exacerbations are documented in the past 12 months?
       (Exacerbation = oral steroid burst, ED visit, or hospitalization for
-      asthma.) Return 0 if you can review ANY meaningful clinical documentation
+      asthma. Markers within 14 days of each other count as ONE event; a new
+      exacerbation requires >14 days from the previous burst.) Return 0 if you
+      can review ANY meaningful clinical documentation
       covering the past 12 months and you do not find a qualifying exacerbation
       (you do not need an explicit "no exacerbations" statement). Use null only
       when the chart has essentially no clinical documentation in the lookback
@@ -78,7 +80,18 @@ questions:
       read_structured_data(table="drugs") — dates of OCS burst courses
       (drug_class="OCS"). Union the date sets; cite the OMOP rows (source: omop).
       Fallback to notes only when the tables are empty. Routine controller refills
-      do NOT count.
+      do NOT count. BURST DEFINITION (v0.5, per clinical reviewers): a NEW
+      short-course systemic corticosteroid prescription (typically 3-10 days)
+      for asthma symptoms = one burst. A REFILL of a standing/provisional OCS
+      script counts ONLY when a note documents it was actually taken for an
+      exacerbation (PCPs rarely write provisional OCS; subspecialists do, for
+      poorly controlled/severe patients). Telephone-encounter notes are valid
+      evidence of a burst. EVENT SEPARATION (v0.5, Blake RCT definition): a new
+      exacerbation is counted only when its start is MORE THAN 14 DAYS after the
+      start of the previous burst/exacerbation marker; markers within 14 days
+      of each other (a second OCS course, or an ED visit followed by discharge
+      steroids) are the SAME event — a prolonged or inadequately treated
+      exacerbation with 2 steroid courses counts ONCE.
 
   - question_id: T1-ControllerPrescribed
     text: Is at least one daily controller (ICS, ICS-LABA, LTRA, or biologic)
@@ -100,61 +113,46 @@ questions:
       controller per EPR-3 stepwise approach. Patients with persistent
       asthma on SABA-only therapy are under-treated by definition. The
       controller class affects T2-StepTherapyMatch grading.
-    retrieval_hints: 'PREFER the precomputed foundation: read_structured_data(table="demographics")
-      → if `controller_active` is present, use it directly (true/false) and cite that
-      row (source: omop, table: demographics). Otherwise → read_structured_data(table="drugs"). Any
-      row with is_controller=true and a fill within the 12-month lookback counts as yes. drug_class
-      values that qualify: ICS, ICS-LABA, LTRA, biologic. Fallback to notes when
-      drugs is empty: med list mentions of fluticasone, budesonide, mometasone
-      +/- formoterol or salmeterol; montelukast;
-      omalizumab/mepolizumab/benralizumab/dupilumab/tezepelumab. Albuterol-only
-      is NOT a controller.'
+    retrieval_hints: >-
+      STRUCTURED FIRST — but a NEGATIVE from structured data is NEVER final
+      (v0.5 audit: 6 of 30 patients had note-documented controllers that an
+      empty drugs table hid). (1) read_structured_data(table="demographics") →
+      controller_active == true → answer true, cite that row. (2) Otherwise →
+      read_structured_data(table="drugs"): a row with is_controller=true and a
+      fill in the 12-month lookback → true (drug_class ICS, ICS-LABA, LTRA,
+      biologic). (3) If still nothing, DO NOT answer false yet — sweep the
+      NOTES in the lookback window (progress notes, ED/discharge medication
+      lists, pulmonary notes) for an active daily controller:
+      fluticasone/Flovent, budesonide/Pulmicort, budesonide-formoterol/
+      Symbicort, mometasone/Asmanex, mometasone-formoterol/Dulera,
+      beclomethasone/QVAR, ciclesonide, fluticasone-salmeterol/Advair,
+      fluticasone-vilanterol/Breo, montelukast/Singulair, and the biologics
+      (omalizumab/mepolizumab/benralizumab/dupilumab/tezepelumab). An active
+      med-list entry or a "uses X daily/BID" statement → true (cite the note).
+      Answer false only after BOTH structured and note sweeps find nothing.
+      Albuterol-only is NOT a controller; NASAL fluticasone (Flonase) is NOT
+      an asthma controller.
 
-  - question_id: T1-ControllerAdherenceProxy
-    text: Based on documented fills or patient report, is controller adherence
-      assessed as adequate (>= 80% of expected doses) in the most recent 6
-      months? Answer "adequate" or "inadequate" only when adherence is
-      explicitly assessed. If adherence is not discussed or cannot be determined
-      from the chart, answer "not_assessed" (do not return null).
+  - question_id: T1-SABAOveruse
+    text: >-
+      Were >= 3 short-acting beta-agonist (SABA) canisters DISPENSED in the
+      past year? Dispensing volume is a recognized poor-control marker — a
+      known proxy for actual use (fills do not equal puffs; claims data are not
+      available). This question records the DISPENSING FACT only; documented
+      use-frequency from notes ("uses albuterol daily") is captured separately
+      in T1-ControlLevel's impairment assessment. Answer "not_applicable" when
+      the patient is on ICS-formoterol SMART — the reliever IS the controller
+      inhaler, so separate SABA canister counts are meaningless. Cite the fill
+      rows.
     tier: 1
     answer_schema:
       type: string
       enum:
-        - adequate
-        - inadequate
-        - not_assessed
-    depends_on:
-      - T1-ControllerPrescribed
-    naepp_source: "EPR-3 Section 3, Component 4, p.220 (Safety of ICS, Key
-      Points) — 'Evaluate patient adherence and inhaler technique as well as
-      environmental factors that may contribute to asthma severity before
-      increasing the dose of ICS' (Evidence B). Threshold (PDC ≥ 0.80) is
-      NCQA HEDIS Medication Management for Asthma (MMA), not EPR-3 directly."
-    evidence_grade: B
-    clinical_rationale: >-
-      EPR-3 explicitly requires adherence assessment before escalating
-      therapy — an apparently uncontrolled patient may simply be
-      under-adherent. PDC ≥ 80% is the operational NCQA threshold for
-      adequate adherence; pharmacy fills are the most defensible chart
-      proxy. Patient self-report is acceptable but lower-quality evidence.
-    retrieval_hints: 'STRUCTURED FIRST → read_structured_data(table="drugs"). On the
-      controller row, check `refill_pdc_12mo` (proportion of days covered). PDC
-      >= 0.80 → "adequate"; PDC < 0.80 (but > 0) → "inadequate". If the
-      controller row exists but has no refill_pdc_12mo field, check fills[]
-      cadence vs days_supply manually. Fallback to notes: fill history mentions,
-      patient- reported adherence in HPI. Default to "not_assessed" rather than
-      guessing.'
-
-  - question_id: T1-SABAOveruse
-    text: Has the patient used >= 3 short-acting beta-agonist (SABA) canisters in
-      the past year (a recognized poor-control marker)?
-    tier: 1
-    answer_schema:
-      anyOf:
-        - type: boolean
-        - type: "null"
-      description: true/false when SABA canister utilization is ascertainable; null
-        when unknown.
+        - "true"
+        - "false"
+        - not_applicable
+      description: '"true"/"false" from dispensing records when ascertainable;
+        not_applicable for ICS-formoterol SMART patients; null when unknown.'
     naepp_source: "EPR-3 Section 3, Component 1, Figure 3-5 (Classifying
       Asthma Severity, p.71-74 in body) — SABA use >2 days/week (not for
       EIB prevention) classifies as 'not well controlled'. The ≥3
@@ -224,8 +222,11 @@ questions:
       statement is authoritative when present.
 
   - question_id: T1-SpirometryDate
-    text: Date of the most recent spirometry in the lookback window (ISO
-      YYYY-MM-DD). Null if no spirometry is documented.
+    text: Date of the most recent spirometry in the 24 MONTHS before the index
+      date (ISO YYYY-MM-DD) — the guideline's outer bound, since EPR-3 requires
+      spirometry at least every 1-2 years. Null if none is documented in that
+      window. (Note this window is 24 months, wider than the 12-month
+      observation window used by most other questions.)
     tier: 1
     answer_schema:
       type: string
@@ -242,7 +243,12 @@ questions:
       asthma. A patient without spirometry within 24 months has incomplete
       assessment by guideline; this contributes to the management
       concordance verdict (T2-StepTherapyMatch may be 'unknown' if lung
-      function is not documented).
+      function is not documented). ANALYSIS NOTE (v0.5, per reviewers):
+      children managed purely in primary care essentially never get
+      spirometry (only via a PFT clinic in the same system) — results are
+      REPORTED STRATIFIED by management setting (PCP vs specialty); missing
+      spirometry in a PCP-managed patient is a guideline-reality gap
+      finding, not an individual-clinician failure.
     retrieval_hints: >-
       STRUCTURED FIRST. Check two tables: (1)
       read_structured_data(table="procedures") — look for cpt="94060"

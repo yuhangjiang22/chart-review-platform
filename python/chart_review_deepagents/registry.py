@@ -117,7 +117,10 @@ def resolve(key, env=None, models_path=None):
                 "azure_deployment": entry["deployment"],
                 # Reasoning effort for gpt-5.x models (minimal|low|medium|high).
                 # None for non-reasoning models (gpt-4o) -> not passed to the client.
-                "reasoning_effort": entry.get("reasoning_effort")}
+                "reasoning_effort": entry.get("reasoning_effort"),
+                # Reasoning model run on chat.completions: omit temperature AND
+                # reasoning_effort (both 400 with function tools on these models).
+                "omit_temperature": entry.get("omit_temperature")}
     # vllm: endpoint from base_url_env (read at run time) or a literal base_url.
     base_url = env.get(entry["base_url_env"]) if entry.get("base_url_env") else entry.get("base_url")
     if not _is_configured(base_url):

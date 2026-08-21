@@ -21,6 +21,15 @@ umbilical vein**. (LCN Table 2, criterion A.)
 primary source. Cite the report span; state the imaging date and that it is
 within 1 year of index.
 
+Wording rules (v2 ops 2, 13, 14):
+- **Nodular**: accept "nodular contour" / "surface nodularity". "Irregular"
+  alone does NOT count (indeterminate). "Coarse" or "heterogeneous
+  echotexture" does NOT count - it tracks steatosis, not fibrosis.
+- **Splenomegaly**: the radiologist's assertion, or a craniocaudal
+  measurement above the local threshold (commonly >12-13 cm) where reported.
+- **Umbilical vein**: "paraumbilical vein" counts equally (known misnomer).
+  Caput medusae is supportive but is NOT the same finding.
+
 ## Examples
 - "CT: cirrhotic, nodular liver contour; spleen 16 cm (splenomegaly)" (8mo before index) -> `met`
 - "US: nodular liver echotexture; recanalized paraumbilical vein" -> `met`

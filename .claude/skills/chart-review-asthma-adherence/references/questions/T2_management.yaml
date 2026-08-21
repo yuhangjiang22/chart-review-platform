@@ -54,7 +54,10 @@ questions:
       concordance gap. SMART is the 2020 Update's preferred regimen for
       moderate-severe persistent asthma at ages 4+ (Rec 12).
     retrieval_hints: >-
-      FIRST select the stepwise table for T0-AgeBand (2-4 -> EPR-3 Fig 4-1a;
+      FIRST call read_criterion(field_id="T2-StepTherapyMatch") — it returns the
+      verbatim stepwise ladders (all three age bands, with the 2020 SMART/LAMA
+      overlays) and the ICS daily-dose bands (EPR-3 Fig 4-4b / 4-8b). Judge steps
+      and dose levels FROM THAT FILE, not from memory. Then select the stepwise table for T0-AgeBand (2-4 -> EPR-3 Fig 4-1a;
       5-11 -> Fig 4-1b; 12-17 -> Fig 4-5 + 2020 SMART/LAMA). ICS-formoterol SMART
       applies to ages >=4 (available for the 5-11 and 12-17 bands, and 4-year-olds
       in the 2-4 band); LAMA add-on and most biologics apply to ages 12+ (some

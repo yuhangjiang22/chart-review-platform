@@ -1,18 +1,36 @@
 task_type: phenotype_validation
 uses_structured_data: true
 review_unit: patient
-manual_version: 0.2.0
+manual_version: 0.3.0
 status: draft
 final_output: lcn_compensated_cirrhosis
 source_documents:
-  - lcn-definitions.docx (liver-cp/docs)
+  - "Compensated_CP_v2 Tapper.docx (liver-cp/; copy in chart-review-platform/docs/) - v2 spec with 14 operational definitions"
+  - lcn-definitions.docx (liver-cp/docs, superseded by v2)
   - "Tapper EB, Goldberg D, Parikh ND, et al. Am J Gastroenterol. 2025;120(3):570-575. doi:10.14309/ajg.0000000000002953 (NCT05740358)"
 overview_prose: >-
   LCN compensated-cirrhosis phenotype (Tapper et al. 2025, the Liver Cirrhosis
-  Network cohort definition). Assessed AS OF the patient's index date (each
-  patient's meta.json carries the candidate date; every criterion applies its
-  own lookback window relative to that date; evidence AFTER the index date is
-  ignored).
+  Network cohort definition).
+
+  SCOPE OF ONE RUN - one run covers ONE PATIENT, not one date. The agent reads
+  the whole chart once and produces (a) 16 evidence leaves and (b) 10 evidence
+  DATES. Every criterion is evaluated against the reference date carried in the
+  patient's meta.json, applying its own lookback window; evidence dated AFTER
+  that reference date is ignored.
+
+  WHAT THE COMPUTED VERDICT IS, AND IS NOT. The derived fields (step1_cirrhosis,
+  step2_compensated, lcn_compensated_cirrhosis) state whether the phenotype held
+  AT THE REFERENCE DATE. That verdict exists to calibrate agreement between the
+  agent and the reviewer - it is NOT the study outcome. The study outcome is the
+  FIRST date on which Step 1 and Step 2 are both satisfied, scanning forward
+  from each patient's index date (first documented AUD); that scan runs as rules
+  over the 10 evidence-date fields, DOWNSTREAM of this task. Re-running the
+  agent per candidate date is not the intended design.
+
+  WHAT THE REVIEWER ADJUDICATES in VALIDATE is therefore the evidence and its
+  dates - did the agent read the chart correctly - rather than the final
+  time-to-event outcome. PERFORMANCE scores per-field accuracy on the same
+  basis.
 
   TWO-STEP definition. STEP 1 - does the patient have cirrhosis? Adults >=18.
   A cirrhotic liver biopsy (METAVIR 4 / Ishak 5-6) within 5 years is sufficient
@@ -27,8 +45,25 @@ overview_prose: >-
   365 days or present; current MELD-Na >=15; current Child-Turcotte-Pugh B or C;
   TIPS / BRTO / porto-systemic shunt surgery at any time. Decompensation events
   are graded definite / highly_likely / probable per the paper's operational
-  definitions; v0.1 counts ANY tier as decompensation (author decision, marked
-  clinician-adjustable).
+  definitions; v0.3 (per Compensated_CP_v2 op 6, settling the v0.1 any-tier
+  decision) counts: ascites definite only; overt HE definite or highly_likely;
+  variceal/PHG bleeding definite only; probable never counts. The 365-day
+  no-decompensation window additionally requires >=1 encounter (a patient
+  simply not seen is not read as stable - enforced in the outcome scanner).
+
+  v0.2 -> v0.3 (2026-08, from the v2 spec's operational definitions): (op 5)
+  Step 1 is PERMANENT once met - scanner no longer requires criteria windows
+  to be concurrently active at the candidate date; (op 4) ">=2 of A-E" must
+  come from distinct studies (crit_c flags same-study overlap with crit_a);
+  (op 8) ascites diuretic-initiation = newly started aldosterone antagonist
+  (180-day washout), loop/thiazide alone excluded; (op 9) SAAG AND protein
+  both required; (op 10) OHE provider tiers read hierarchically; (ops 11-12)
+  variceal-bleed competing-source list + Hgb-drop = 2 g/dL per rolling 48h;
+  (ops 2/13/14) imaging wording rules (irregular/coarse do not count as
+  nodular; paraumbilical = umbilical; splenomegaly by assertion or local
+  threshold); (op 3) varices must be described, history-of and collaterals
+  excluded; liver cancer (HCC/cholangiocarcinoma) on or before index excluded
+  at COHORT ENTRY (prefilter-level, not a per-review field).
 
   The agent extracts 16 evidence leaves; the Step-1 count, Step-1 verdict,
   decompensation roll-up, Step-2 verdict, and the final phenotype are COMPUTED

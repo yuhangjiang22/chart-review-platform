@@ -6,7 +6,9 @@ rules:
     description: >-
       Patient is in scope for the adherence audit: asthma diagnosis
       documented, age 2-17 (the study's pediatric cohort), and at least 2
-      outpatient/specialty notes available to assess longitudinal care.
+      asthma-related encounters (any type except inpatient — primary care,
+      specialty, urgent care, and ED all count), at least one of them
+      outpatient (non-ED), to assess longitudinal care.
       (T0-AgeBand then selects the age-appropriate guideline logic; it does
       not gate eligibility.)
     naepp_source: >-

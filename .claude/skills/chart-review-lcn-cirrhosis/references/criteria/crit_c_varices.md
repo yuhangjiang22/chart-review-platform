@@ -19,6 +19,15 @@ wording.) The varices merely need to EXIST - bleeding is a Step-2 matter.
 qualify ("esophageal varices", "gastric varices", "paraesophageal varices").
 Cite the report span; state the date/window.
 
+Wording rules (v2 op 3): the report must DESCRIBE varices — a "history of
+varices" mention does not qualify. Collaterals are NOT varices (Baveno VII
+lists them separately). No size threshold applies.
+
+Distinct-studies rule (v2 op 4): if the ONLY evidence for varices is the SAME
+imaging study that satisfied criterion A, say so in the rationale — Step-1
+criteria must come from distinct studies, and the reviewer will not count
+both from one study.
+
 ## Examples
 - "EGD: small esophageal varices, no stigmata" (1y before index) -> `met`
 - "CT: gastroesophageal varices" -> `met`

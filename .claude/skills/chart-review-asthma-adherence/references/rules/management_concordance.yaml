@@ -113,11 +113,12 @@ rules:
 
   - rule_id: R-T2-SpecialtyReferralWhenIndicated
     description: >-
-      A patient who is not well-controlled (T1-ControlLevel in
-      not_well_controlled / very_poorly_controlled) or who requires Step 4+
-      therapy has a documented referral to asthma specialty care
-      (allergy/immunology or pulmonology). Well-controlled, sub-Step-4 patients
-      are excluded (referral not indicated).
+      Not-well-controlled (T1-ControlLevel in not_well_controlled /
+      very_poorly_controlled) or Step 4+ patients have a documented specialty
+      referral OR are already receiving specialty care (an actual
+      pulmonology / allergy-immunology visit in the encounters data counts).
+      Well-controlled, sub-Step-4 patients are excluded (referral not
+      indicated).
     naepp_source: >-
       EPR-3 Section 4 p.373 (Referral to an Asthma Specialist) — referral is
       recommended for a life-threatening exacerbation, failure to meet therapy

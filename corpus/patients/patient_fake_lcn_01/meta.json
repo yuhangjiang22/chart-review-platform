@@ -1,0 +1,12 @@
+{
+  "patient_id": "patient_fake_lcn_01",
+  "category": "lcn_synth",
+  "phi": false,
+  "demographics": {
+    "age": 58,
+    "sex": "M"
+  },
+  "index_date": "2025-09-10",
+  "generated_by": "synthetic LCN compensated-cirrhosis fixture; NOT real patient data",
+  "fixture_notes": "Expected: crit A met (CT nodular+splenomegaly, 6mo), B met (VCTE 18.5, 4mo), D met (plt 112, 1mo), C not_met (EGD 15mo ago: no varices), biopsies none; no decompensation; MELD-Na ~9, CTP A, no TIPS -> step1 count=3 met, step2 met, phenotype met."
+}

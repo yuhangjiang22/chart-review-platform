@@ -19,3 +19,5 @@ The exam date on which varices were demonstrated (earliest qualifying). Blank wh
 - **Leave blank/unanswered when there is no such evidence.** This field feeds
   the outcome-date scanner, not the verdict derivations.
 - Cite the same evidence you cited for the parent criterion.
+
+ABSENT VALUE: when no qualifying evidence exists, commit **null** (JSON null / unanswered) — never the strings "none", "no_info", or "unknown". Downstream date parsing treats only null/ISO dates as valid.

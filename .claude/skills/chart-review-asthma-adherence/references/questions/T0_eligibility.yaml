@@ -87,16 +87,26 @@ questions:
       when age is unavailable from every source.
 
   - question_id: T0-LookbackHasNotes
-    text: Are there at least 2 outpatient/specialty (non-ED, non-inpatient)
-      encounters in the lookback window? This is the deterministic proxy for the
-      longitudinal outpatient documentation adherence is measured against.
+    text: ELIGIBILITY CHECK (study inclusion criterion, NOT a care measure) —
+      are there at least 2 ASTHMA-RELATED encounters (primary care, specialty,
+      urgent care, or emergency department; NOT inpatient) in the 12 months
+      before the index date, AT LEAST ONE of which is outpatient (non-ED)? A
+      patient failing this is EXCLUDED from the audit for insufficient
+      longitudinal documentation — it is never scored as a care gap.
     tier: 0
     answer_schema:
       type: boolean
-    naepp_source: "Methodological — not a NAEPP recommendation. Derived from
-      EPR-3 p.94 (Component 2 KP) requirement for 'regular review by an
-      informed clinician' (Evidence B), which presupposes longitudinal
-      outpatient care."
+    naepp_source: "Study cohort definition §3 Inclusion Criteria — 'At least 2
+      asthma-related encounters within the study period' (v0.5 aligns the
+      operationalization to this study-plan wording; v0.4 counted ALL outpatient
+      encounters). ED included per clinical reviewers (Fedele: many children get
+      most asthma care through the ED; Blake: the urgent-care / stand-alone-ED
+      line is blurring), with Fedele's floor — the study audits OUTPATIENT
+      guideline adherence, so at least one encounter must be outpatient.
+      Methodological gate, not a NAEPP recommendation; EPR-3 —
+      'Regular review of progress by a concerned clinician is the basis for the
+      patient-clinician partnership necessary to achieve asthma control' —
+      presupposes longitudinal care."
     evidence_grade: methodological
     clinical_rationale: >-
       Adherence cannot be assessed from a single encounter. EPR-3 grounds the
@@ -105,14 +115,18 @@ questions:
       the eligibility gate is reproducible run-to-run — note-title counting was
       an unreliable, nondeterministic signal.
     retrieval_hints: >-
-      STRUCTURED, deterministic → read_structured_data(table="encounters").
-      Count encounter rows in the lookback window that are OUTPATIENT / office /
-      clinic / specialty-consult visits: `is_ed` = false AND the visit `type` is
-      an outpatient/office visit (e.g. "Outpatient Visit", "Office Visit", a
-      specialty consult). EXCLUDE Emergency (`is_ed` = true), Inpatient /
-      hospitalization visits, and administrative/telephone contacts. If there are
-      >= 2 such encounters, answer true; otherwise false. Do NOT judge from note
-      titles — that count varies between runs; count the structured encounter
-      rows. Cite the qualifying encounter rows as evidence (source: omop, table:
-      encounters, row_id). Fall back to list_notes only if the encounters table
-      is empty.
+      STRUCTURED, deterministic. PREFER the v0.5 foundations:
+      read_structured_data(table="demographics") → true iff
+      `lookback_asthma_encounter_count_12mo` >= 2 (total: any type except
+      inpatient, ED included) AND `lookback_asthma_outpatient_count_12mo` >= 1
+      (the non-ED floor); cite that row. If those fields are absent (pre-v0.5
+      extract), count from read_structured_data(table="encounters"): rows in
+      the 12-month lookback that are ASTHMA-RELATED (`asthma_related` = true)
+      and NOT inpatient — primary care, specialty clinic, urgent care, AND
+      emergency department (`is_ed` = true) all count toward the total of 2,
+      but AT LEAST ONE counted encounter must be outpatient (`is_ed` = false).
+      EXCLUDE inpatient/hospitalization and administrative/telephone contacts.
+      Do NOT use demographics.lookback_outpatient_count_12mo (v0.4: all
+      outpatient, not asthma-related). Do NOT judge from note titles. Cite the
+      qualifying encounter rows as evidence (source: omop, table: encounters,
+      row_id). Fall back to list_notes only if the encounters table is empty.

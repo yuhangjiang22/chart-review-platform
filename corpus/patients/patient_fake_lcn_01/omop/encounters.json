@@ -1,0 +1,20 @@
+[
+  {
+    "row_id": 31301,
+    "encounter_id": "enc_l1",
+    "type": "Outpatient",
+    "is_ed": false,
+    "department": "Hepatology",
+    "start_date": "2025-09-10",
+    "end_date": "2025-09-10"
+  },
+  {
+    "row_id": 31302,
+    "encounter_id": "enc_l2",
+    "type": "Outpatient",
+    "is_ed": false,
+    "department": "Radiology",
+    "start_date": "2025-03-14",
+    "end_date": "2025-03-14"
+  }
+]

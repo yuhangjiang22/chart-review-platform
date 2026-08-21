@@ -1,7 +1,7 @@
 task_type: adherence
 task_kind: adherence
 uses_structured_data: true
-manual_version: 0.4
+manual_version: 0.5
 source_document_sha: sha256:asthma-adherence-pediatric-2-17-naepp-2026-07-v0.4
 status: draft
 review_unit: patient
@@ -59,6 +59,65 @@ overview_prose: >-
   caveat: a `false` on T2-WrittenActionPlan or T2-InhalerTechniqueChecked means "not
   in available records," not "not done" (design section 2). See
   docs/asthma-adherence-finalized-instrument-v0.4.md for the full finalized list.
+  v0.4 -> v0.5 (2026-08, from clinical review by Fedele/Blake/Hollenbach on the
+  team-update doc): (1) T1-ControllerAdherenceProxy REMOVED entirely, with its
+  rule R-T1-AdherenceAssessed (unanimous reviewer consensus that fill data and
+  self-report adherence signals are "not worth collecting"); the paired EPR-3
+  p.220 requirement (evaluate adherence AND inhaler technique before stepping
+  up) remains partially covered by T2-InhalerTechniqueChecked. (2) T1-SABAOveruse: reworded to the
+  observable DISPENSING fact (were >=3 canisters dispensed) — a declared proxy
+  for use (fills != puffs; no claims data); documented use-frequency lives in
+  T1-ControlLevel's impairment path; not_applicable for ICS-formoterol SMART
+  patients (reliever = controller); R-T1-NoSABAOveruse excluded for SMART.
+  (3) T1-ExacerbationsCount: OCS burst definition detail (new short-course
+  script = burst; provisional-script refill needs note evidence of actual use;
+  phone notes valid). (4) ACQ considered but NOT
+  adopted (rarely charted, per the same review; score-absent charts are already
+  covered by the composite impairment+risk path). (5) T1-SpirometryDate kept with
+  STRATIFIED-BY-SETTING interpretation (PCP-managed children essentially never
+  get spirometry); its window CORRECTED from the 12-month observation window to
+  24 months (EPR-3's 'at least every 1-2 years' outer bound) and the rule
+  renamed R-T1-SpirometryWithin12mo -> R-T1-SpirometryWithin24mo — the 12-month
+  version was stricter than the guideline it cited. (6) T0-LookbackHasNotes reworded as an explicit ELIGIBILITY
+  CHECK and re-scoped to ASTHMA-RELATED encounters per the study plan's
+  inclusion wording. Round-2 review (Fedele + Blake): ED encounters COUNT
+  toward eligibility — only inpatient is excluded (Fedele: many children get
+  most asthma care through the ED; Blake: the urgent-care / stand-alone-ED
+  line is blurring) — with Fedele's floor: at least one counted encounter
+  must be OUTPATIENT (non-ED), since the study audits outpatient guideline
+  adherence. Foundations: lookback_asthma_encounter_count_12mo (total incl.
+  ED, >= 2) + lookback_asthma_outpatient_count_12mo (non-ED floor, >= 1);
+  the v0.4 all-outpatient count must not be used for this question. (7) T1-ExacerbationsCount:
+  14-DAY EVENT SEPARATION (Blake, from her RCT): a new exacerbation only
+  when >14 days from the previous burst's start; markers within 14 days
+  (second OCS course, ED visit + discharge steroids) are one event — the
+  ETL's precomputed exacerbation count applies the same rule.
+  (8) R-T1-ControllerForPersistent SCOPING FIX (found via the first
+  30-patient annotation batch): the v0.4 verdict_if fired on ALL patients
+  without a controller, contradicting the rule's own description —
+  well-controlled or undetermined patients without >=2 exacerbations were
+  scored NON_CONCORDANT even though SABA-only intermittent asthma is
+  guideline-appropriate. v0.5 excluded_if now exempts patients whose
+  controller obligation is not established (not not-well/very-poor, <2 or
+  missing exacerbations, no controller); engine-validated on 10 vectors.
+  (9) T1-ControllerPrescribed EXTRACTION FIX (found by an independent
+  keyword audit of the agent's absence claims against raw note text): 6 of
+  30 first-batch patients had active controllers documented ONLY in notes
+  (Flovent/Symbicort/Dulera/Asmanex med lists), which the agent missed
+  because the controller_active foundation — computed from a nearly-empty
+  HIE drugs table — said false and the hint told the agent to trust it.
+  Fixes: ETL now emits controller_active only when the drugs table is
+  nonempty, and the retrieval hint requires a note-text medication sweep
+  before ANY false answer (structured negatives are never final). The same
+  audit cleared the other absence claims (action plan, inhaler technique,
+  spirometry, ACT: zero in-window misses).
+  (10) STEP-TABLE REFERENCE EMBEDDED (implements decision A2's "verbatim"
+  intent): references/criteria/T2-StepTherapyMatch.md now carries the three
+  age-band stepwise ladders (EPR-3 Fig 4-1a/4-1b/4-5 with 2020 SMART/LAMA
+  overlays) and the ICS daily-dose bands (Fig 4-4b p.314, Fig 4-8b p.349),
+  transcribed from the guideline PDFs in docs/ — the agent reads it via
+  read_criterion instead of relying on trained memory for steps or dose
+  cutoffs; the T2-StepTherapyMatch hint now points there first.
 final_output: rule_verdicts
 phases:
   - author

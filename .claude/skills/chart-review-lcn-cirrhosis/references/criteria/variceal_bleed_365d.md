@@ -27,6 +27,18 @@ or present at index**.
   varices as the only potential source.
 - **`none`** - no tier satisfied in the window.
 
+## Operational details (v2 ops 11-12)
+- **Hemoglobin drop** = >2 g/dL within a ROLLING 48 HOURS - not versus a
+  long-lookback baseline (chronic anemia is not a bleed).
+- **"No other potential source"** - competing sources to screen for: peptic
+  ulcer, Mallory-Weiss tear, erosive esophagitis, malignancy, Dieulafoy
+  lesion, angiodysplasia.
+
+## Interpretation note (v2 op 6)
+Only `definite` counts toward the decompensation verdict (portal-hypertensive
+bleeding tier per the registry); extract the true tier regardless - the
+derivation applies the rule.
+
 ## Examples
 - "EGD: actively oozing esophageal varix, banded" -> `definite`
 - "Melena; EGD (same admission, <24h): red wale signs, no other source" -> `highly_likely`

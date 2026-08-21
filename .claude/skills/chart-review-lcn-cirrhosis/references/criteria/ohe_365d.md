@@ -28,8 +28,19 @@ or present at index**.
   a non-GI/non-hepatology provider (no documented therapy response).
 - **`none`** - no tier satisfied in the window.
 
+## Provider tiers read HIERARCHICALLY (v2 op 10)
+GI/hepatology documentation satisfies the provider requirement of ANY tier.
+So a hepatologist-documented episode WITHOUT a recorded therapy response goes
+to `probable` - it does not fall out of the grading entirely.
+
+## Interpretation note (v2 op 6)
+`definite` and `highly_likely` count toward the decompensation verdict;
+`probable` does not. Extract the true tier regardless - the derivation
+applies the rule.
+
 ## Examples
 - Hepatology note: "OHE episode, resolved with lactulose titration" -> `definite`
 - Hospitalist: "confusion attributed to HE, improved on lactulose" -> `highly_likely`
 - ED note documents HE with disorientation; no therapy-response documented -> `probable`
+- Hepatologist documents an OHE episode, no therapy response recorded -> `probable` (op 10)
 - "Wife reports occasional confusion" only -> `none`

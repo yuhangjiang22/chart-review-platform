@@ -54,7 +54,15 @@ def make_model(model_key=None, serial_tool_calls=True):
             # output) = cheaper + faster. They REJECT temperature != 1 ("only the
             # default (1) is supported"), so we omit temperature entirely for them
             # (RUCAM scoring is thus non-deterministic on these models).
+            # NOTE: reasoning_effort + function tools requires Azure's /v1/responses
+            # API; on chat.completions it 400s. Use omit_temperature (below) to run
+            # a reasoning model on chat.completions with default reasoning instead.
             kwargs["reasoning_effort"] = conn["reasoning_effort"]
+        elif conn.get("omit_temperature"):
+            # Reasoning model on chat.completions: send neither temperature nor
+            # reasoning_effort (both 400 on these models with function tools).
+            # Uses the model's default reasoning; non-deterministic.
+            pass
         else:
             # Non-reasoning models (gpt-4o): pin temperature=0 for determinism.
             kwargs["temperature"] = 0

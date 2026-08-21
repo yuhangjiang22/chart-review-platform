@@ -84,3 +84,6 @@ scratch/
 # local — they're internal working material, not for the published repo.
 docs/*
 !docs/assets
+
+# Playwright/vitest artifacts
+/test-results/

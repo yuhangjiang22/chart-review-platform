@@ -196,7 +196,7 @@ async function runAction(
     // {ok:false,...} and can retry (the documented intent of this funnel).
     const hint =
       code === "faithfulness_failed"
-        ? "Evidence offsets did not match the verbatim_quote. Call find_quote_offsets to get the exact offsets for your quote, then retry set_field_assessment."
+        ? "The verbatim_quote was NOT found in this note. If this fact came from a structured OMOP row (you read it via read_structured_data), re-submit the write with evidence {source:'omop', table, row_id} and NO note quote/note_id — a structured concept_name (diagnosis/drug/lab name) is NOT note text. Only if the wording genuinely appears in the note, call find_quote_offsets for the exact offsets and re-submit."
         : undefined;
     return {
       content: [

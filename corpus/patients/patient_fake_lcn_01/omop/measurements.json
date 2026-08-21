@@ -1,0 +1,74 @@
+[
+  {
+    "row_id": 31101,
+    "concept_id": 3007461,
+    "concept_name": "Platelets [#/volume] in Blood",
+    "loinc": "777-3",
+    "value": 112,
+    "unit": "10*3/uL",
+    "date": "2025-08-14"
+  },
+  {
+    "row_id": 31102,
+    "concept_id": 3013721,
+    "concept_name": "AST [Enzymatic activity/volume]",
+    "loinc": "1920-8",
+    "value": 68,
+    "unit": "U/L",
+    "date": "2025-08-14"
+  },
+  {
+    "row_id": 31103,
+    "concept_id": 3006923,
+    "concept_name": "ALT [Enzymatic activity/volume]",
+    "loinc": "1742-6",
+    "value": 42,
+    "unit": "U/L",
+    "date": "2025-08-14"
+  },
+  {
+    "row_id": 31104,
+    "concept_id": 3024128,
+    "concept_name": "Bilirubin.total [Mass/volume]",
+    "loinc": "1975-2",
+    "value": 1.1,
+    "unit": "mg/dL",
+    "date": "2025-08-14"
+  },
+  {
+    "row_id": 31105,
+    "concept_id": 3032080,
+    "concept_name": "INR",
+    "loinc": "6301-6",
+    "value": 1.1,
+    "unit": "{INR}",
+    "date": "2025-08-14"
+  },
+  {
+    "row_id": 31106,
+    "concept_id": 3016723,
+    "concept_name": "Creatinine [Mass/volume] in Serum",
+    "loinc": "2160-0",
+    "value": 0.8,
+    "unit": "mg/dL",
+    "date": "2025-08-14"
+  },
+  {
+    "row_id": 31107,
+    "concept_id": 3019550,
+    "concept_name": "Sodium [Moles/volume] in Serum",
+    "loinc": "2951-2",
+    "value": 139,
+    "unit": "mmol/L",
+    "date": "2025-08-14"
+  },
+  {
+    "row_id": 31108,
+    "concept_id": 36303797,
+    "concept_name": "Liver stiffness by transient elastography (VCTE)",
+    "loinc": "94301-4",
+    "value": 18.5,
+    "unit": "kPa",
+    "date": "2025-05-06"
+  }
+]

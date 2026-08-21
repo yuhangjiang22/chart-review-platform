@@ -186,6 +186,15 @@ def main():
         procedures = sorted([{"row_id":r["row_id"],"concept_id":r["concept_id"],"concept_name":r["concept_name"],
                               "cpt":r["cpt"],"date":str(r["date"])[:10]} for r in G["procedures"].get(pid, [])], key=lambda x: x["date"])
         op12 = sum(1 for e in enc if not e["is_ed"] and e["type"]=="Outpatient Visit" and lo < e["start_date"] <= idx)
+        # v0.5 foundations: ASTHMA-RELATED encounters (study-plan inclusion
+        # wording: ">= 2 asthma-related encounters"). Only inpatient is
+        # excluded — primary care, specialty, urgent care AND ED all count
+        # (clinical reviewers: urgent care / stand-alone ED lines blur).
+        # Eligibility floor (Fedele): >= 1 of them must be outpatient (non-ED).
+        enc12_asthma = sum(1 for e in enc if "Inpatient" not in e["type"]
+                           and e["asthma_related"] and lo < e["start_date"] <= idx)
+        op12_asthma = sum(1 for e in enc if not e["is_ed"] and "Inpatient" not in e["type"]
+                          and e["asthma_related"] and lo < e["start_date"] <= idx)
         ctrl_active = any(e["is_controller"] and any(lo < f["fill_date"] <= idx for f in e["fills"]) for e in drugs)
         exac = set()
         for e in enc:
@@ -194,10 +203,26 @@ def main():
             if e["drug_class"] == "OCS":
                 for f in e["fills"]:
                     if lo < f["fill_date"] <= idx: exac.add(f["fill_date"])
+        # 14-day event separation (clinical reviewers, Blake RCT definition):
+        # a new exacerbation only when >14 days from the previous event's start;
+        # markers within 14 days (second OCS course, ED visit + discharge
+        # steroids) are the SAME prolonged/undertreated exacerbation.
+        from datetime import date as _date
+        exac_events, last_start = 0, None
+        for d_ in (_date.fromisoformat(s) for s in sorted(exac)):
+            if last_start is None or (d_ - last_start).days > 14:
+                exac_events += 1; last_start = d_
         demographics = [{"row_id":"dem1","age_at_index":age,"age_band":band(age),"sex":sex,
-                         "lookback_outpatient_count_12mo":op12,"controller_active":ctrl_active,"index_date":idx}]
-        observations = [{"row_id":"exa1","concept_id":9990001,"concept_name":"Asthma exacerbations, past 12 months (computed)",
-                         "value_as_number":len(exac),"date":idx}]
+                         "lookback_outpatient_count_12mo":op12,
+                         "lookback_asthma_encounter_count_12mo":enc12_asthma,
+                         "lookback_asthma_outpatient_count_12mo":op12_asthma,
+                         "index_date":idx}]
+        # controller_active is only trustworthy when dispensing data exists;
+        # an empty drugs table must NOT produce a confident false (v0.5 audit:
+        # 6/30 patients had note-only controllers hidden by this shortcut).
+        if drugs: demographics[0]["controller_active"] = ctrl_active
+        observations = [{"row_id":"exa1","concept_id":9990001,"concept_name":"Asthma exacerbations, past 12 months (computed, 14-day event separation)",
+                         "value_as_number":exac_events,"date":idx}]
         # write
         anon = a.prefix + hashlib.sha256((a.salt + str(pid)).encode()).hexdigest()[:12]
         pdir = os.path.join(a.out, anon); os.makedirs(os.path.join(pdir,"omop"), exist_ok=True); os.makedirs(os.path.join(pdir,"notes"), exist_ok=True)
