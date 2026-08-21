@@ -1,0 +1,51 @@
+task_type: phenotype_validation
+uses_structured_data: true
+review_unit: patient
+manual_version: 0.2.0
+status: draft
+final_output: lcn_compensated_cirrhosis
+source_documents:
+  - lcn-definitions.docx (liver-cp/docs)
+  - "Tapper EB, Goldberg D, Parikh ND, et al. Am J Gastroenterol. 2025;120(3):570-575. doi:10.14309/ajg.0000000000002953 (NCT05740358)"
+overview_prose: >-
+  LCN compensated-cirrhosis phenotype (Tapper et al. 2025, the Liver Cirrhosis
+  Network cohort definition). Assessed AS OF the patient's index date (each
+  patient's meta.json carries the candidate date; every criterion applies its
+  own lookback window relative to that date; evidence AFTER the index date is
+  ignored).
+
+  TWO-STEP definition. STEP 1 - does the patient have cirrhosis? Adults >=18.
+  A cirrhotic liver biopsy (METAVIR 4 / Ishak 5-6) within 5 years is sufficient
+  alone; otherwise AT LEAST TWO of criteria A-E must be met: A imaging <=1y
+  (nodular liver with splenomegaly or recanalized umbilical vein), B liver
+  stiffness <=1y (VCTE >=12.5 kPa or MRE >=5.0 kPa), C varices <=3y (endoscopy
+  or imaging), D blood biomarker <=6mo (FIB-4 >2.67 or platelet count <150),
+  E cirrhotic biopsy OLDER than 5 years. Excluded: documented cardiac
+  cirrhosis; Fontan-associated liver disease (FALD). STEP 2 - was the patient
+  COMPENSATED at index? Any of these disqualifies: hepatic decompensation
+  (ascites/hydrothorax, overt hepatic encephalopathy, variceal bleeding) within
+  365 days or present; current MELD-Na >=15; current Child-Turcotte-Pugh B or C;
+  TIPS / BRTO / porto-systemic shunt surgery at any time. Decompensation events
+  are graded definite / highly_likely / probable per the paper's operational
+  definitions; v0.1 counts ANY tier as decompensation (author decision, marked
+  clinician-adjustable).
+
+  The agent extracts 16 evidence leaves; the Step-1 count, Step-1 verdict,
+  decompensation roll-up, Step-2 verdict, and the final phenotype are COMPUTED
+  (derivations), so the classification is deterministic and auditable. The
+  final phenotype is the machine proposal - the reviewer confirms or overrides
+  during VALIDATE. v0.2 adds 10 evidence-DATE fields (crit_a/b/c/d_date,
+  biopsy_cirrhosis_date, 4 decompensation event dates, shunt_date) so the
+  first-date-satisfying-Step1+Step2 outcome scan can run as pure rules over one
+  agent read.
+
+  EVIDENCE: notes FIRST (the definition doc: "use notes first, ICD code might
+  be used later"); structured OMOP rows corroborate labs/procedures - when a
+  fact comes from an OMOP row cite that row (source: omop, table, row_id).
+  Paper wording is reproduced uncorrected where marked [sic] in the source doc
+  ("<=3 year", "platelet count <150/mL").
+phases:
+  - author
+  - try
+  - validate
+  - decide
