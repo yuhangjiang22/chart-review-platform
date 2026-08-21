@@ -15,11 +15,15 @@ Within 6 months before index: **FIB-4 >2.67** or **platelet count <150**
 <150 x10^9/L). (LCN Table 2, criterion D.)
 
 ## Extraction guidance
-**Always commit one value.** Platelets: use the structured `measurements` row
-(cite table+row_id). FIB-4: use a documented value; otherwise compute
-(age x AST) / (platelets x sqrt(ALT)) ONLY when all inputs are within the
-window - say `computed` in the rationale and cite the input rows. Either
-branch (FIB-4 OR platelets) suffices.
+**Always commit one value.** MANDATORY ORDER: FIRST call
+read_structured_data(table="measurements") and look for a PLATELET COUNT in
+the 6-month window — a platelet value <150 ALONE satisfies this criterion;
+the absence of a documented FIB-4/APRI is IRRELEVANT when platelets qualify.
+Do NOT answer `not_met` on "no FIB-4 documented" without having checked the
+platelet rows. Platelets: cite the structured row (table+row_id). FIB-4: use
+a documented value; otherwise compute (age x AST) / (platelets x sqrt(ALT))
+ONLY when all inputs are within the window - say `computed` in the rationale
+and cite the input rows. Either branch (FIB-4 OR platelets) suffices.
 
 ## Examples
 - Platelets 112 (2mo before index) -> `met`
