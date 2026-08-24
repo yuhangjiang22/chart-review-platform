@@ -239,6 +239,7 @@ def main():
         for name, rows in (("asthma_encounters", _enc_anchors), ("ocs_bursts", _bursts), ("obligation_points", obligation_point_anchors(_bursts))):
             with open(os.path.join(adir, f"{name}.json"), "w") as f:
                 json.dump(rows, f, indent=1)
+                f.write("\n")
         used = set(); doctypes = set()
         for r in G["notes"].get(pid, []):
             dt = str(r["note_date"])[:10]; dtp = slug(r["doc_type"]); doctypes.add(dtp)
