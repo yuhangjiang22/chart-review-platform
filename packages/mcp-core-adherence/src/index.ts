@@ -29,7 +29,7 @@
 
 import { z } from "zod";
 import type { CompiledTask } from "@chart-review/tasks";
-import type { QuestionAnswer } from "@chart-review/platform-types";
+import type { QuestionAnswer, RuleEvent } from "@chart-review/platform-types";
 import { loadOrCreate, writeReviewState } from "@chart-review/domain-review";
 import { verifyEvidence } from "@chart-review/faithfulness";
 import { readStructured } from "@chart-review/patients";
@@ -333,5 +333,143 @@ export async function getAdherenceState(
     version: state.version,
     question_answers: state.question_answers ?? [],
     answered_count: (state.question_answers ?? []).length,
+  });
+}
+
+// ── set_event_answer ──────────────────────────────────────────────────
+// Event-level commit (spec 2026-08-24). The run seeds ETL-enumerated
+// RuleEvent stubs into review_state before the agent starts; the agent
+// upserts answers per event_id, and may supplement note-origin events
+// via new_event. Verdicts are NOT written here — the engine pass after
+// the agent loop computes them.
+
+const eventAnswerSchema = z.object({
+  question_id: z.string(),
+  answer: z.union([z.string(), z.number(), z.boolean(), z.null()]),
+  confidence: z.number().min(0).max(1).optional(),
+  evidence: z.array(evidenceSchema).optional(),
+  reasoning: z.string().optional(),
+});
+
+export const setEventAnswerArgsSchema = z.object({
+  event_id: z.string().optional(),
+  evaluable: z.boolean().optional(),
+  evaluable_reason: z.string().optional(),
+  answers: z.array(eventAnswerSchema).default([]),
+  new_event: z.object({
+    rule_id: z.string(),
+    anchor_type: z.string(),
+    date: z.string(),
+    note_id: z.string(),
+  }).optional(),
+});
+export type SetEventAnswerArgs = z.infer<typeof setEventAnswerArgsSchema>;
+
+export async function setEventAnswer(
+  session: AdherenceMcpSession,
+  args: SetEventAnswerArgs,
+): Promise<CallToolResult> {
+  let skill: AdherenceSkill;
+  try { skill = getSkill(session.task.task_id); }
+  catch (e) { return err(`failed to load skill: ${(e as Error).message}`); }
+
+  if (args.evaluable === false && !args.evaluable_reason) {
+    return err("evaluable:false requires evaluable_reason");
+  }
+
+  const state = loadOrCreate(session.patientId, session.task);
+  state.task_kind = "adherence";
+  const events = state.rule_events ?? [];
+
+  let idx = -1;
+  let eventId = args.event_id;
+  if (args.new_event) {
+    const ne = args.new_event;
+    // Reject unknown rule_ids — otherwise the event becomes an orphan the
+    // engine passes through unevaluated (Task 2 review erratum).
+    if (!skill.rules.some((r) => r.rule_id === ne.rule_id)) {
+      return err(`unknown rule_id '${ne.rule_id}'`);
+    }
+    eventId = `${ne.rule_id}@${ne.date}@note:${ne.note_id}`;
+    idx = events.findIndex((e) => e.event_id === eventId);
+    if (idx < 0) {
+      events.push({
+        event_id: eventId,
+        rule_id: ne.rule_id,
+        anchor: { type: ne.anchor_type, date: ne.date, origin: "note", ref: `note:${ne.note_id}` },
+      });
+      idx = events.length - 1;
+    }
+  } else {
+    if (!eventId) return err("pass event_id (from the event work-list) or new_event");
+    idx = events.findIndex((e) => e.event_id === eventId);
+    if (idx < 0) {
+      return err(`unknown event_id '${eventId}'`, {
+        hint: "Use an event_id from the event work-list in your instructions, or new_event to add a note-documented event.",
+      });
+    }
+  }
+
+  // Coerce + faithfulness-check each event answer against its question def.
+  const stored: QuestionAnswer[] = [];
+  for (const a of args.answers) {
+    const q = findQuestion(skill, a.question_id);
+    if (!q) return err(`question_id '${a.question_id}' not found`);
+    const check = verifyAnswerEvidence(session.patientId, a.evidence ?? []);
+    if (!check.ok) {
+      return err(check.error, {
+        error_code: "faithfulness_failed",
+        hint: "Evidence quote was not found in the note. Call find_quote_offsets (or read_note) to confirm the exact text, then retry.",
+      });
+    }
+    stored.push({
+      question_id: a.question_id,
+      tier: q.tier,
+      answer: coerce(a.answer, q),
+      confidence: a.confidence,
+      evidence: check.verified.length > 0 ? check.verified : undefined,
+      reasoning: a.reasoning,
+      verifier_status: "no_check",
+      source: "agent",
+      ts: new Date().toISOString(),
+    });
+  }
+
+  const prev = events[idx];
+  const prevAnswers = prev.answers ?? [];
+  const merged = [...prevAnswers.filter((p) => !stored.some((s) => s.question_id === p.question_id)), ...stored];
+  events[idx] = {
+    ...prev,
+    evaluable: args.evaluable ?? prev.evaluable,
+    evaluable_reason: args.evaluable_reason ?? prev.evaluable_reason,
+    answers: merged.length > 0 ? merged : prev.answers,
+    source: "agent",
+    ts: new Date().toISOString(),
+  };
+  state.rule_events = events;
+  state.version += 1;
+  state.updated_at = new Date().toISOString();
+  state.updated_by = "agent";
+  writeReviewState(session.patientId, session.task.task_id, state);
+
+  return ok({ event_id: eventId, version: state.version, committed_events: events.length });
+}
+
+// ── get_event_state ───────────────────────────────────────────────────
+
+export async function getEventState(
+  session: AdherenceMcpSession,
+): Promise<CallToolResult> {
+  const state = loadOrCreate(session.patientId, session.task);
+  const events = state.rule_events ?? [];
+  return ok({
+    count: events.length,
+    events: events.map((e) => ({
+      event_id: e.event_id,
+      rule_id: e.rule_id,
+      anchor: e.anchor,
+      evaluable: e.evaluable,
+      answered: (e.answers ?? []).length,
+    })),
   });
 }

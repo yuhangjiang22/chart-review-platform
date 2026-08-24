@@ -55,6 +55,9 @@ import {
   readQuestion as hReadQuestion,
   setQuestionAnswer as hSetQuestionAnswer,
   getAdherenceState as hGetAdherenceState,
+  setEventAnswer as hSetEventAnswer,
+  getEventState as hGetEventState,
+  setEventAnswerArgsSchema,
 } from "@chart-review/mcp-core-adherence";
 import { loadCompiledTask } from "@chart-review/tasks";
 
@@ -505,6 +508,50 @@ if (task.task_kind === "adherence") {
         inputSchema: {},
       },
       async (): Promise<CallToolResult> => hGetAdherenceState(session),
+    );
+  }
+
+  if (want("set_event_answer")) {
+    server.registerTool(
+      "set_event_answer",
+      {
+        description: [
+          "Commit answers for ONE rule event from the event work-list in your",
+          "instructions. Pass event_id plus answers (each answer carries its own",
+          "evidence — same faithfulness rules as set_question_answer). Use",
+          "evaluable:false + evaluable_reason when this anchor cannot be judged",
+          "for this rule. Use new_event {rule_id, anchor_type, date, note_id} to",
+          "add an event documented only in a note (origin is recorded).",
+        ].join(" "),
+        inputSchema: {
+          event_id: z.string().optional(),
+          evaluable: z.boolean().optional(),
+          evaluable_reason: z.string().optional(),
+          answers: z.array(z.object({
+            question_id: z.string(),
+            answer: z.union([z.string(), z.number(), z.boolean(), z.null()]),
+            confidence: z.number().optional(),
+            evidence: z.array(z.record(z.unknown())).optional(),
+            reasoning: z.string().optional(),
+          })).optional(),
+          new_event: z.object({
+            rule_id: z.string(), anchor_type: z.string(), date: z.string(), note_id: z.string(),
+          }).optional(),
+        },
+      },
+      async (args): Promise<CallToolResult> =>
+        hSetEventAnswer(session, setEventAnswerArgsSchema.parse(args ?? {})),
+    );
+  }
+
+  if (want("get_event_state")) {
+    server.registerTool(
+      "get_event_state",
+      {
+        description: "List the rule events committed so far (event_id, rule, anchor, answered count).",
+        inputSchema: {},
+      },
+      async (): Promise<CallToolResult> => hGetEventState(session),
     );
   }
 }

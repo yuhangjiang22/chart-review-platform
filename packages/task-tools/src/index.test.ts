@@ -26,6 +26,7 @@ describe("toolProfileFor", () => {
     const p = toolProfileFor({ task_id: "asthma-adherence", task_kind: "adherence", uses_structured_data: true } as any);
     const allow = mcpAllowlist(p).split(",");
     expect(allow).toEqual(expect.arrayContaining(["list_questions", "set_question_answer"]));
+    expect(allow).toEqual(expect.arrayContaining(["set_event_answer", "get_event_state"]));
     expect(allow).not.toContain("set_field_assessment");
   });
 

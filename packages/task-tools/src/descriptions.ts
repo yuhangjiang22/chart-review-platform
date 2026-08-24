@@ -29,6 +29,8 @@ export const TOOL_DESCRIPTIONS: Record<string, string> = {
   read_question: "Read one question's text, schema, and retrieval hints.",
   set_question_answer: "Commit an answer for one adherence question.",
   get_adherence_state: "Read back the adherence draft (answers committed so far).",
+  set_event_answer: "Commit answers for one rule event from the event work-list (event-level concordance).",
+  get_event_state: "Read back the rule events committed so far (event_id, rule, anchor, answered count).",
   // Structured (OMOP) — opt-in via uses_structured_data
   list_structured_data: "List the patient's OMOP tables + row counts.",
   read_structured_data: "Read rows (conditions/measurements/drugs…) as citable structured evidence.",
