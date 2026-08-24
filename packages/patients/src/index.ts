@@ -302,6 +302,23 @@ export function readStructured(patientId: string): StructuredResponse {
   };
 }
 
+/** Read the patient's per-task anchor lists (anchors/<name>.json arrays).
+ *  Used by adherence event expansion (spec 2026-08-24). Missing dir or
+ *  unparseable file → that list is absent; never throws. */
+export function readAnchors(patientId: string): Record<string, unknown[]> {
+  const dir = path.join(patientDir(patientId), "anchors");
+  const out: Record<string, unknown[]> = {};
+  if (!fs.existsSync(dir)) return out;
+  for (const f of fs.readdirSync(dir).sort()) {
+    if (!f.endsWith(".json")) continue;
+    try {
+      const parsed = JSON.parse(fs.readFileSync(path.join(dir, f), "utf-8"));
+      if (Array.isArray(parsed)) out[f.replace(/\.json$/, "")] = parsed;
+    } catch { /* skip unparseable list */ }
+  }
+  return out;
+}
+
 export interface GroundTruth {
   patient_id?: string;
   leaf_answers?: Record<string, string>;

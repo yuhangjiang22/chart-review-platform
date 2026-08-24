@@ -166,6 +166,7 @@ describe("evaluateAllRuleEvents", () => {
     const nowEvaluable = secondPass.rule_events[0];
     expect(nowEvaluable.evaluable).toBe(true);
     expect(nowEvaluable.verdict).toBe("CONCORDANT");
+    expect(nowEvaluable.evaluable_reason).toBeUndefined();
   });
 
   it("events for an unknown rule_id pass through unevaluated with no rollup or verdict", () => {

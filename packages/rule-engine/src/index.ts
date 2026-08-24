@@ -555,7 +555,7 @@ export function evaluateRuleEvents(
       }
     }
     const v = evaluateRule(compiled, merged);
-    return { ...e, evaluable: true, verdict: v.verdict, attribution: v.attribution };
+    return { ...e, evaluable: true, evaluable_reason: undefined, verdict: v.verdict, attribution: v.attribution };
   });
 
   let nConc = 0, nNon = 0, nExc = 0;
@@ -633,8 +633,10 @@ export function evaluateAllRuleEvents(
     } catch (e) {
       // Compile error (malformed expression) — contain to this rule, mirror
       // evaluateAllRules' per-rule try/catch. Input events pass through
-      // unevaluated; rollup is all-zero except n_events.
-      allEvents.push(...ruleEvents);
+      // unevaluated; rollup is all-zero except n_events. Scrub any stale
+      // verdict/attribution from a prior pass so a round-tripped event
+      // doesn't retain a verdict while the rollup reports zero counts.
+      allEvents.push(...ruleEvents.map((e) => ({ ...e, verdict: undefined, attribution: undefined })));
       rollups.push({
         rule_id: rule.rule_id,
         n_events: ruleEvents.length,
