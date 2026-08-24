@@ -19,6 +19,9 @@ rules:
       ICS-formoterol SMART applies to ages >=4 (available for the 5-11 band); LAMA
       stays ages >=12. For ages 2-4, use the pediatric figures (SMART only for 4-year-olds).
     evidence_grade: A_with_SMART_strong_LAMA_conditional
+    event_anchor: asthma_encounters
+    # Per-event: judge only visits where a control picture is ascertainable.
+    event_evaluable_if: "T1-ControlLevel is present"
     verdict_if: "T2-StepTherapyMatch == \"matches\""
     excluded_if: "T2-StepTherapyMatch == \"unknown\""
     attribution_when:
@@ -67,8 +70,11 @@ rules:
       at 2-6 weeks when initiating/stepping up, then every 1-6 months
       when controlled. 3 months is the cap for non-controlled patients.
     evidence_grade: B
+    event_anchor: [asthma_encounters, ocs_bursts]
+    # A burst always needs follow-up; a visit only when not well controlled
+    # at THAT visit.
+    event_evaluable_if: "_anchor_type == \"ocs_bursts\" or (T1-ControlLevel is present and T1-ControlLevel != \"well_controlled\")"
     verdict_if: "T2-FollowupScheduled == true"
-    excluded_if: "T1-ControlLevel == \"well_controlled\""
     attribution: DOCUMENTATION_GAP
     supporting_questions: [T2-FollowupScheduled, T1-ControlLevel]
 

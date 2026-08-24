@@ -20,6 +20,11 @@ questions:
       — low-dose ICS preferred at Step 2, LTRA/cromolyn alternative; SMART applies
       only to 4-year-olds in this band (>=4), not ages 2-3, and LABA is not
       first-line.)
+
+      EVENT SCOPE: when this question is answered inside a rule event
+      (set_event_answer), answer it AS OF THE EVENT DATE — the control
+      picture at that visit, the regimen active on that date, the follow-up
+      scheduled after that event — not the most recent state in the window.
     tier: 2
     answer_schema:
       type: string
@@ -110,8 +115,14 @@ questions:
       reviewed", patient education sections of visit notes.
 
   - question_id: T2-FollowupScheduled
-    text: Is a follow-up visit (in person or telehealth) scheduled within 3 months
-      of the most recent encounter?
+    text: >-
+      Is a follow-up visit (in person or telehealth) scheduled within 3
+      months of this event (the visit or exacerbation being evaluated)?
+
+      EVENT SCOPE: when this question is answered inside a rule event
+      (set_event_answer), answer it AS OF THE EVENT DATE — the control
+      picture at that visit, the regimen active on that date, the follow-up
+      scheduled after that event — not the most recent state in the window.
     tier: 2
     answer_schema:
       type: boolean

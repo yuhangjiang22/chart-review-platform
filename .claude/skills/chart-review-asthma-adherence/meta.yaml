@@ -1,7 +1,7 @@
 task_type: adherence
 task_kind: adherence
 uses_structured_data: true
-manual_version: 0.5
+manual_version: 0.6
 source_document_sha: sha256:asthma-adherence-pediatric-2-17-naepp-2026-07-v0.4
 status: draft
 review_unit: patient
@@ -118,6 +118,17 @@ overview_prose: >-
   transcribed from the guideline PDFs in docs/ — the agent reads it via
   read_criterion instead of relying on trained memory for steps or dose
   cutoffs; the T2-StepTherapyMatch hint now points there first.
+  v0.5 -> v0.6 (2026-08, spec 2026-08-24-adherence-event-concordance-design):
+  EVENT-LEVEL CONCORDANCE. Three rules now evaluate per trigger event
+  (R-T2-StepTherapyMatches per asthma encounter with an ascertainable
+  control picture; R-T2-FollowupScheduled per uncontrolled visit and per
+  OCS burst; R-T1-ControllerForPersistent per obligation point), with
+  ETL-enumerated anchors (anchors/{asthma_encounters,ocs_bursts,
+  obligation_points}.json), agent note-supplements flagged origin=note,
+  and dual-track rollup (event rate + worst-case period boolean — the
+  boolean keeps v0.4/v0.5 comparability). The remaining 8 rules are
+  single window events; their semantics are unchanged. PENDING clinical
+  confirmation: the ControllerForPersistent grace window.
 final_output: rule_verdicts
 phases:
   - author

@@ -16,14 +16,12 @@ rules:
       anti-inflammatory medication' (Evidence A). Stepwise approach
       Figure 4-5 prescribes a controller at Step 2 and above.
     evidence_grade: A
+    event_anchor: obligation_points
+    # Grace window (how soon after the obligation a controller must be
+    # active to count) — PENDING clinical confirmation (Fedele/Blake);
+    # until then: controller active at/after the obligation date within
+    # the observation window.
     verdict_if: "T1-ControllerPrescribed == true"
-    # Applicable only when the controller obligation is established: patient is
-    # not-well/very-poorly controlled OR has >= 2 exacerbations OR already has a
-    # controller (then trivially concordant). Well-controlled or undetermined
-    # patients WITHOUT a controller are excluded — SABA-only intermittent asthma
-    # is guideline-appropriate care, not a gap (v0.5 fix: the v0.4 expression
-    # fired on those patients, contradicting this rule's own description).
-    excluded_if: "(T1-ControlLevel != \"not_well_controlled\" and T1-ControlLevel != \"very_poorly_controlled\") and (T1-ExacerbationsCount is missing or T1-ExacerbationsCount < 2) and T1-ControllerPrescribed != true"
     attribution_when:
       - when: "T1-ControllerPrescribed != true and T2-ContraindicationDocumented == \"patient_refusal\""
         category: PATIENT_REFUSAL

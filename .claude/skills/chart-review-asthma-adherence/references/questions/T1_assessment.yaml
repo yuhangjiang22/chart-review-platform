@@ -188,6 +188,11 @@ questions:
       or >= 2 exacerbations/12 months push toward not_well_controlled /
       very_poorly_controlled. Return `undetermined` only when neither a control
       test nor any impairment/risk documentation is available.
+
+      EVENT SCOPE: when this question is answered inside a rule event
+      (set_event_answer), answer it AS OF THE EVENT DATE — the control
+      picture at that visit, the regimen active on that date, the follow-up
+      scheduled after that event — not the most recent state in the window.
     tier: 1
     answer_schema:
       type: string
