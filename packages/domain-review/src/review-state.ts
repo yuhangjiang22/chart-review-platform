@@ -31,7 +31,7 @@ import type { Evidence } from "@chart-review/faithfulness";
 import { verifyEvidence } from "@chart-review/faithfulness";
 import type { CompiledTask } from "@chart-review/tasks";
 import type {
-  CrossCriterionAlert, SpanLabel, QuestionAnswer, RuleVerdict,
+  CrossCriterionAlert, SpanLabel, QuestionAnswer, RuleVerdict, RuleEvent, RuleRollup,
 } from "@chart-review/platform-types";
 import { recomputeLiveAlerts } from "@chart-review/live-alerts";
 import { evalDerivation } from "@chart-review/contract-eval";
@@ -225,6 +225,12 @@ export interface ReviewState {
    *  NON_CONCORDANT / EXCLUDED) computed from question_answers by the
    *  rule engine. Empty / absent until the rule-eval pass runs. */
   rule_verdicts?: RuleVerdict[];
+  /** Event-level concordance (spec 2026-08-24). One entry per rule event. */
+  rule_events?: RuleEvent[];
+  /** Deterministic per-rule aggregation over rule_events. */
+  rule_rollups?: RuleRollup[];
+  /** Reviewer-validated event_ids (parallel to validated_questions). */
+  validated_events?: string[];
   /** Adherence-only: question_ids the reviewer has marked validated.
    *  Drives per-question progress in the AdherenceReview UI; analogous
    *  to validated_notes for NER. */
@@ -240,6 +246,8 @@ export interface ReviewState {
   /** Adherence-only: per-agent shadow rule verdicts at import time.
    *  Same shape + role as agent_question_answers. */
   agent_rule_verdicts?: Record<string, RuleVerdict[]>;
+  /** Adherence-only: per-agent shadow rule events at import time. */
+  agent_rule_events?: Record<string, RuleEvent[]>;
 }
 
 function reviewDir(patientId: string, taskId: string): string {

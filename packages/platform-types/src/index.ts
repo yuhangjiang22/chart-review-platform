@@ -236,3 +236,58 @@ export interface RuleVerdict {
   source?: "rule_engine" | "llm_judge" | "reviewer";
   ts?: string;
 }
+
+/** Where one rule event is anchored in time. */
+export interface RuleEventAnchor {
+  /** Task-defined anchor kind ("encounter", "ocs_burst", …) or "window"
+   *  for a rule evaluated once over the whole observation window. */
+  type: string;
+  /** ISO date the event is pinned to. Unset for window anchors. */
+  date?: string;
+  /** For window-spanning anchors: window end. */
+  end_date?: string;
+  /** "omop" = ETL-enumerated candidate; "note" = agent-supplemented. */
+  origin: "omop" | "note";
+  /** Provenance: OMOP "table:row_id", or "note:<filename>#<offset>". */
+  ref?: string;
+}
+
+/** One evaluable occurrence of one rule for one patient.
+ *  See docs/superpowers/specs/2026-08-24-adherence-event-concordance-design.md */
+export interface RuleEvent {
+  /** "<rule_id>@<date>@<ref>" for anchored events, "<rule_id>@window" otherwise. */
+  event_id: string;
+  rule_id: string;
+  anchor: RuleEventAnchor;
+  /** false = the agent judged this anchor not evaluable for this rule. */
+  evaluable?: boolean;
+  /** Required when evaluable === false. */
+  evaluable_reason?: string;
+  /** Event-scoped answers; they SHADOW patient-level answers with the
+   *  same question_id when the rule engine evaluates this event. */
+  answers?: QuestionAnswer[];
+  /** Filled by the engine pass (per-event). */
+  verdict?: RuleVerdict["verdict"];
+  attribution?: AttributionCategory;
+  source?: "agent" | "reviewer";
+  ts?: string;
+}
+
+/** Deterministic per-rule aggregation over that rule's events. */
+export interface RuleRollup {
+  rule_id: string;
+  n_events: number;
+  /** Events that produced a CONCORDANT or NON_CONCORDANT verdict. */
+  n_evaluable: number;
+  n_concordant: number;
+  n_non_concordant: number;
+  n_excluded: number;
+  /** n_concordant / n_evaluable; null when n_evaluable === 0. */
+  rate: number | null;
+  /** Worst-case reduction: any NON_CONCORDANT → NON_CONCORDANT;
+   *  else any CONCORDANT → CONCORDANT; else EXCLUDED. */
+  period_verdict: RuleVerdict["verdict"];
+  /** Attribution of the first NON_CONCORDANT event, when period_verdict
+   *  is NON_CONCORDANT. */
+  period_attribution?: AttributionCategory;
+}
