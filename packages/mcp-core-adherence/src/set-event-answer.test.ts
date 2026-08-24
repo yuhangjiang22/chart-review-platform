@@ -155,6 +155,67 @@ describe("setEventAnswer", () => {
     expect(loadOrCreate(session.patientId, session.task).version).toBe(before);
   });
 
+  it("merge preservation: sequential answers accumulate; re-answering one question overwrites only that one", async () => {
+    const created = parse(await setEventAnswer(session, {
+      new_event: { rule_id: "R-Step", anchor_type: "asthma_encounters", date: "2025-02-01", note_id: "merge_note.txt" },
+      answers: [{ question_id: "ControlLevel", answer: "well_controlled" }],
+    }));
+    expect(created.ok).toBe(true);
+    const eventId = created.event_id;
+
+    const second = parse(await setEventAnswer(session, {
+      event_id: eventId,
+      answers: [{ question_id: "StepMatch", answer: "matches" }],
+    }));
+    expect(second.ok).toBe(true);
+
+    let st = loadOrCreate(session.patientId, session.task);
+    let ev = st.rule_events!.find((e) => e.event_id === eventId)!;
+    expect(ev.answers).toHaveLength(2);
+    expect(ev.answers!.find((a) => a.question_id === "ControlLevel")!.answer).toBe("well_controlled");
+    expect(ev.answers!.find((a) => a.question_id === "StepMatch")!.answer).toBe("matches");
+
+    const third = parse(await setEventAnswer(session, {
+      event_id: eventId,
+      answers: [{ question_id: "StepMatch", answer: "under_treated" }],
+    }));
+    expect(third.ok).toBe(true);
+
+    st = loadOrCreate(session.patientId, session.task);
+    ev = st.rule_events!.find((e) => e.event_id === eventId)!;
+    expect(ev.answers).toHaveLength(2);
+    expect(ev.answers!.find((a) => a.question_id === "ControlLevel")!.answer).toBe("well_controlled");
+    expect(ev.answers!.find((a) => a.question_id === "StepMatch")!.answer).toBe("under_treated");
+  });
+
+  it("new_event idempotency: identical new_event twice yields the same event_id, no duplicate", async () => {
+    const ne = { rule_id: "R-Step", anchor_type: "asthma_encounters", date: "2025-03-01", note_id: "idem_note.txt" };
+    const first = parse(await setEventAnswer(session, { new_event: ne, answers: [] }));
+    expect(first.ok).toBe(true);
+    const second = parse(await setEventAnswer(session, { new_event: ne, answers: [] }));
+    expect(second.ok).toBe(true);
+    expect(second.event_id).toBe(first.event_id);
+
+    const st = loadOrCreate(session.patientId, session.task);
+    const matches = st.rule_events!.filter((e) => e.event_id === first.event_id);
+    expect(matches).toHaveLength(1);
+  });
+
+  it("enum coercion visibility: invalid enum value commits ok:true and echoes answer:null in the response", async () => {
+    const created = parse(await setEventAnswer(session, {
+      new_event: { rule_id: "R-Step", anchor_type: "asthma_encounters", date: "2025-04-01", note_id: "enum_note.txt" },
+      answers: [{ question_id: "ControlLevel", answer: "well-controlled" }],
+    }));
+    expect(created.ok).toBe(true);
+    const entry = created.answers.find((a: { question_id: string }) => a.question_id === "ControlLevel");
+    expect(entry).toBeTruthy();
+    expect(entry.answer).toBeNull();
+
+    const st = loadOrCreate(session.patientId, session.task);
+    const ev = st.rule_events!.find((e) => e.event_id === created.event_id)!;
+    expect(ev.answers!.find((a) => a.question_id === "ControlLevel")!.answer).toBeNull();
+  });
+
   it("get_event_state lists committed events", async () => {
     const body = parse(await getEventState(session));
     expect(body.ok).toBe(true);

@@ -29,7 +29,7 @@
 
 import { z } from "zod";
 import type { CompiledTask } from "@chart-review/tasks";
-import type { QuestionAnswer, RuleEvent } from "@chart-review/platform-types";
+import type { QuestionAnswer } from "@chart-review/platform-types";
 import { loadOrCreate, writeReviewState } from "@chart-review/domain-review";
 import { verifyEvidence } from "@chart-review/faithfulness";
 import { readStructured } from "@chart-review/patients";
@@ -190,7 +190,7 @@ const omopEvidenceSchema = z.object({
   concept_id: z.number().optional(),
   concept_name: z.string().optional(),
 });
-const evidenceSchema = z.union([omopEvidenceSchema, noteEvidenceSchema]);
+export const evidenceSchema = z.union([omopEvidenceSchema, noteEvidenceSchema]);
 
 export const setQuestionAnswerArgsSchema = z.object({
   question_id: z.string(),
@@ -411,18 +411,20 @@ export async function setEventAnswer(
   }
 
   // Coerce + faithfulness-check each event answer against its question def.
-  const stored: QuestionAnswer[] = [];
+  // Dedupe duplicate question_ids WITHIN this call's answers array — last
+  // wins — before merging onto the event's existing answers.
+  const storedByQuestion = new Map<string, QuestionAnswer>();
   for (const a of args.answers) {
     const q = findQuestion(skill, a.question_id);
     if (!q) return err(`question_id '${a.question_id}' not found`);
     const check = verifyAnswerEvidence(session.patientId, a.evidence ?? []);
     if (!check.ok) {
-      return err(check.error, {
+      return err(`answer '${a.question_id}': ${check.error}`, {
         error_code: "faithfulness_failed",
         hint: "Evidence quote was not found in the note. Call find_quote_offsets (or read_note) to confirm the exact text, then retry.",
       });
     }
-    stored.push({
+    storedByQuestion.set(a.question_id, {
       question_id: a.question_id,
       tier: q.tier,
       answer: coerce(a.answer, q),
@@ -434,14 +436,19 @@ export async function setEventAnswer(
       ts: new Date().toISOString(),
     });
   }
+  const stored = [...storedByQuestion.values()];
 
   const prev = events[idx];
   const prevAnswers = prev.answers ?? [];
   const merged = [...prevAnswers.filter((p) => !stored.some((s) => s.question_id === p.question_id)), ...stored];
+  // Explicit flip back to evaluable:true clears any stale evaluable_reason;
+  // otherwise inherit the prior reason unless a new one was passed.
+  const evaluableReason =
+    args.evaluable === true ? undefined : (args.evaluable_reason ?? prev.evaluable_reason);
   events[idx] = {
     ...prev,
     evaluable: args.evaluable ?? prev.evaluable,
-    evaluable_reason: args.evaluable_reason ?? prev.evaluable_reason,
+    evaluable_reason: evaluableReason,
     answers: merged.length > 0 ? merged : prev.answers,
     source: "agent",
     ts: new Date().toISOString(),
@@ -452,7 +459,12 @@ export async function setEventAnswer(
   state.updated_by = "agent";
   writeReviewState(session.patientId, session.task.task_id, state);
 
-  return ok({ event_id: eventId, version: state.version, committed_events: events.length });
+  return ok({
+    event_id: eventId,
+    version: state.version,
+    committed_events: events.length,
+    answers: stored.map((s) => ({ question_id: s.question_id, answer: s.answer })),
+  });
 }
 
 // ── get_event_state ───────────────────────────────────────────────────
@@ -470,6 +482,7 @@ export async function getEventState(
       anchor: e.anchor,
       evaluable: e.evaluable,
       answered: (e.answers ?? []).length,
+      answered_questions: (e.answers ?? []).map((a) => a.question_id),
     })),
   });
 }

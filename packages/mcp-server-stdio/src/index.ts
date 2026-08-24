@@ -58,6 +58,7 @@ import {
   setEventAnswer as hSetEventAnswer,
   getEventState as hGetEventState,
   setEventAnswerArgsSchema,
+  evidenceSchema as adherenceEvidenceSchema,
 } from "@chart-review/mcp-core-adherence";
 import { loadCompiledTask } from "@chart-review/tasks";
 
@@ -521,7 +522,8 @@ if (task.task_kind === "adherence") {
           "evidence — same faithfulness rules as set_question_answer). Use",
           "evaluable:false + evaluable_reason when this anchor cannot be judged",
           "for this rule. Use new_event {rule_id, anchor_type, date, note_id} to",
-          "add an event documented only in a note (origin is recorded).",
+          "add an event documented only in a note (origin is recorded). If both",
+          "event_id and new_event are passed, new_event wins.",
         ].join(" "),
         inputSchema: {
           event_id: z.string().optional(),
@@ -530,8 +532,8 @@ if (task.task_kind === "adherence") {
           answers: z.array(z.object({
             question_id: z.string(),
             answer: z.union([z.string(), z.number(), z.boolean(), z.null()]),
-            confidence: z.number().optional(),
-            evidence: z.array(z.record(z.unknown())).optional(),
+            confidence: z.number().min(0).max(1).optional(),
+            evidence: z.array(adherenceEvidenceSchema).optional(),
             reasoning: z.string().optional(),
           })).optional(),
           new_event: z.object({
@@ -539,8 +541,22 @@ if (task.task_kind === "adherence") {
           }).optional(),
         },
       },
-      async (args): Promise<CallToolResult> =>
-        hSetEventAnswer(session, setEventAnswerArgsSchema.parse(args ?? {})),
+      async (args): Promise<CallToolResult> => {
+        const parsed = setEventAnswerArgsSchema.safeParse(args ?? {});
+        if (!parsed.success) {
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify({
+                ok: false,
+                error: `invalid arguments: ${parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`,
+                hint: "Check the tool schema — evidence items need note_id+quote (or source:'omop'+table); confidence is 0..1.",
+              }),
+            }],
+          };
+        }
+        return hSetEventAnswer(session, parsed.data);
+      },
     );
   }
 
