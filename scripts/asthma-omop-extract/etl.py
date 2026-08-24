@@ -30,6 +30,8 @@ from datetime import date
 import duckdb
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+from derive_anchors import asthma_encounter_anchors, ocs_burst_anchors, obligation_point_anchors
 def load(n): return open(os.path.join(HERE, n)).read()
 def strip_comments(s):
     s = re.sub(r"/\*.*?\*/", "", s, flags=re.S)   # block comments
@@ -229,6 +231,14 @@ def main():
         for t, data in [("conditions",conditions),("drugs",drugs),("observations",observations),
                         ("measurements",measurements),("encounters",enc),("procedures",procedures),("demographics",demographics)]:
             json.dump(data, open(os.path.join(pdir,"omop",f"{t}.json"),"w"), indent=2, default=str)
+        # event-anchor lists (spec 2026-08-24): derived from the same in-memory
+        # enc/drugs rows just written above (identical shape to the on-disk json).
+        adir = os.path.join(pdir, "anchors"); os.makedirs(adir, exist_ok=True)
+        _enc_anchors = asthma_encounter_anchors(enc)
+        _bursts = ocs_burst_anchors(drugs)
+        for name, rows in (("asthma_encounters", _enc_anchors), ("ocs_bursts", _bursts), ("obligation_points", obligation_point_anchors(_bursts))):
+            with open(os.path.join(adir, f"{name}.json"), "w") as f:
+                json.dump(rows, f, indent=1)
         used = set(); doctypes = set()
         for r in G["notes"].get(pid, []):
             dt = str(r["note_date"])[:10]; dtp = slug(r["doc_type"]); doctypes.add(dtp)
