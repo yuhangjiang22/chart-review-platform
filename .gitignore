@@ -87,3 +87,6 @@ docs/*
 
 # Playwright/vitest artifacts
 /test-results/
+
+# brainstorming visual-companion sessions
+/.superpowers/
