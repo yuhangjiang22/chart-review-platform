@@ -875,7 +875,7 @@ export async function readCriterionTool(
   args: ReadCriterionArgs,
 ): Promise<CallToolResult> {
   try {
-    if (!/^[a-zA-Z0-9_]+$/.test(args.field_id)) {
+    if (!/^[a-zA-Z0-9_-]+$/.test(args.field_id)) {
       return {
         isError: true,
         content: [{ type: "text", text: JSON.stringify({
@@ -969,7 +969,7 @@ export async function readCriteriaTool(
   const dir = path.join(resolveRubricRoot(session.task.task_id), "references", "criteria");
   const results: Array<Record<string, unknown>> = [];
   for (const field_id of args.field_ids) {
-    if (!/^[a-zA-Z0-9_]+$/.test(field_id)) {
+    if (!/^[a-zA-Z0-9_-]+$/.test(field_id)) {
       results.push({ field_id, ok: false, error: `invalid field_id` });
       continue;
     }

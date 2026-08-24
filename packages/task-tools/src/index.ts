@@ -13,9 +13,13 @@ export const PHENOTYPE_BASE_TOOLS = [
   "find_quote_offsets", "set_field_assessment", "select_evidence",
   "set_summary", "set_review_status", "get_review_state", "recommend_keywords",
 ];
-/** Adherence's MCP surface: its question tools + notes + status (no phenotype write). */
+/** Adherence's MCP surface: its question tools + notes + status (no phenotype write).
+ *  Criteria tools are read-only reference reads: adherence bundles can ship
+ *  references/criteria/*.md docs the question hints point at (e.g. asthma's
+ *  T2-StepTherapyMatch step ladders + ICS dose tables). */
 export const ADHERENCE_BASE_TOOLS = [
   "list_questions", "read_question", "set_question_answer", "get_adherence_state",
+  "list_criteria", "read_criterion", "read_criteria",
   "list_notes", "read_note", "read_notes", "search_notes", "get_note_section", "set_review_status",
 ];
 /** EHR/OMOP read tools, added when a task opts into structured data. */

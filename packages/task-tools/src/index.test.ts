@@ -29,6 +29,15 @@ describe("toolProfileFor", () => {
     expect(allow).not.toContain("set_field_assessment");
   });
 
+  it("adherence profile exposes the read-only criteria reference tools", () => {
+    // Adherence bundles can ship references/criteria/*.md reference docs the
+    // question hints point at (e.g. asthma's T2-StepTherapyMatch step ladders);
+    // the agent reads them via read_criterion, so the tools must be allowlisted.
+    const p = toolProfileFor({ task_id: "asthma-adherence", task_kind: "adherence", uses_structured_data: true } as any);
+    const allow = mcpAllowlist(p).split(",");
+    expect(allow).toEqual(expect.arrayContaining(["list_criteria", "read_criterion", "read_criteria"]));
+  });
+
   it("a named tool_profile resolves to its registered entry (rucam → python plugins)", () => {
     const p = toolProfileFor({ task_id: "rucam", task_kind: "phenotype", tool_profile: "rucam", uses_structured_data: true } as any);
     expect(p.pythonPlugins.length).toBeGreaterThan(0);
