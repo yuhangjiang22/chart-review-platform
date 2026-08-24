@@ -52,5 +52,21 @@
       { "fill_date": "2025-11-15", "days_supply": 5, "quantity": 10 }
     ],
     "indication": "asthma exacerbation burst"
+  },
+  {
+    "row_id": 9104,
+    "concept_id": 1738139,
+    "concept_name": "Prednisone 10 MG oral tablet",
+    "rxnorm": "197583",
+    "drug_class": "OCS",
+    "is_controller": false,
+    "instructions": "40 mg PO daily x 5 days for asthma exacerbation",
+    "start_date": "2025-03-10",
+    "end_date": "2025-03-14",
+    "active": false,
+    "fills": [
+      { "fill_date": "2025-03-10", "days_supply": 5, "quantity": 20 }
+    ],
+    "indication": "asthma exacerbation burst (per 2025-11-04 PCP note: prior short course of oral prednisone in March 2025 for a flare-like respiratory illness; structured record backfilled here, no separate encounter row)"
   }
 ]

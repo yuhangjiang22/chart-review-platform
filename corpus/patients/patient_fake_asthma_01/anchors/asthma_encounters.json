@@ -1,9 +1,30 @@
 [
  {
+  "date": "2025-11-04",
+  "ref": "encounters:12102",
+  "meta": {
+   "kind": "outpatient"
+  }
+ },
+ {
   "date": "2025-11-15",
   "ref": "encounters:12201",
   "meta": {
    "kind": "ed"
+  }
+ },
+ {
+  "date": "2025-12-16",
+  "ref": "encounters:12103",
+  "meta": {
+   "kind": "outpatient"
+  }
+ },
+ {
+  "date": "2026-04-12",
+  "ref": "encounters:12104",
+  "meta": {
+   "kind": "outpatient"
   }
  }
 ]
