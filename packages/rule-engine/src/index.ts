@@ -481,7 +481,9 @@ export async function evaluateAllRules(
 // ── Event-level evaluation (spec 2026-08-24) ─────────────────────────────────
 
 /** Merged answer list for one event: patient-level answers, overlaid by the
- *  event's own answers (same question_id shadows), plus `_anchor_type`. */
+ *  event's own answers (same question_id shadows), plus `_anchor_type`.
+ *  `_anchor_type` is a reserved synthetic question_id — a real question
+ *  authored with that id would be shadowed by this synthetic value. */
 function mergedAnswers(patient: QuestionAnswer[], event: RuleEvent): QuestionAnswer[] {
   const map = new Map<string, QuestionAnswer>();
   for (const a of patient) map.set(a.question_id, a);
@@ -498,19 +500,45 @@ export interface RuleEventsResult {
   rule_verdicts: RuleVerdict[];
 }
 
-/** Evaluate one rule over its events; also compute the rollup. */
+/** Reason stamped on an event the engine itself marked not evaluable (via
+ *  `event_evaluable_if`). Re-evaluation is idempotent because of this
+ *  sentinel: an event carrying exactly this reason is re-derived from
+ *  scratch on the next pass (not short-circuited), so newly-supplied
+ *  answers can flip it back to evaluable. Any other `evaluable_reason`
+ *  string is agent-supplied and authoritative — it always short-circuits. */
+export const ENGINE_NOT_EVALUABLE_REASON = "event_evaluable_if not met";
+
+/** Anchor type stamped on the single synthetic event a rule gets when no
+ *  input events reference its rule_id (see `windowEventStub`). */
+export const WINDOW_ANCHOR_TYPE = "window";
+
+/** The default single-event stub for a rule with no matching input events —
+ *  current single-verdict behavior, evaluated over patient-level answers
+ *  only. */
+export function windowEventStub(ruleId: string): RuleEvent {
+  return {
+    event_id: `${ruleId}@window`,
+    rule_id: ruleId,
+    anchor: { type: WINDOW_ANCHOR_TYPE, origin: "omop" as const },
+  };
+}
+
+/** Evaluate one rule over its events; also compute the rollup.
+ *  Duplicate `event_id`s across `events` are NOT deduplicated — the
+ *  caller (deterministic upstream event enumeration) is assumed to never
+ *  produce them. */
 export function evaluateRuleEvents(
   rule: RuleDefinition,
   patientAnswers: QuestionAnswer[],
   events: RuleEvent[],
-): { events: RuleEvent[]; rollup: RuleRollup } {
+): { events: RuleEvent[]; rollup: RuleRollup; qids: string[] } {
   const compiled = compileRule(rule);
   const evaluableAst = rule.event_evaluable_if
     ? parseExpression(rule.event_evaluable_if)
     : null;
 
   const outEvents: RuleEvent[] = events.map((e) => {
-    if (e.evaluable === false) {
+    if (e.evaluable === false && e.evaluable_reason !== ENGINE_NOT_EVALUABLE_REASON) {
       return { ...e, verdict: undefined, attribution: undefined };
     }
     const merged = mergedAnswers(patientAnswers, e);
@@ -520,7 +548,7 @@ export function evaluateRuleEvents(
         return {
           ...e,
           evaluable: false,
-          evaluable_reason: e.evaluable_reason ?? "event_evaluable_if not met",
+          evaluable_reason: e.evaluable_reason ?? ENGINE_NOT_EVALUABLE_REASON,
           verdict: undefined,
           attribution: undefined,
         };
@@ -552,11 +580,25 @@ export function evaluateRuleEvents(
     period_verdict: nNon > 0 ? "NON_CONCORDANT" : nConc > 0 ? "CONCORDANT" : "EXCLUDED",
     period_attribution: nNon > 0 ? periodAttribution : undefined,
   };
-  return { events: outEvents, rollup };
+  return { events: outEvents, rollup, qids: compiled.qids };
 }
 
 /** Evaluate every rule over the patient's events. Rules with no events in
- *  the list get one default window event (current single-verdict behavior). */
+ *  the list get one default window event (current single-verdict behavior).
+ *  Input events whose rule_id matches none of `rules` pass through into
+ *  `rule_events` unevaluated — no rollup or verdict is produced for them.
+ *
+ *  A rule that fails to compile (malformed `verdict_if` / `excluded_if` /
+ *  `event_evaluable_if`) does not abort the batch: its input events pass
+ *  through unevaluated and the rule gets a NON_CONCORDANT rollup + verdict
+ *  carrying the compile-error rationale, mirroring `evaluateAllRules`'
+ *  per-rule compile-error containment (see there).
+ *
+ *  Nuanced-rule judge refinement (`evaluateAllRules`' `opts.llmJudge`) is
+ *  intentionally NOT supported on the event path — the adherence batch
+ *  runner never passes a judge today, and the spec (2026-08-24) scopes
+ *  per-event judging out. Revisit this signature (sync → async + opts) if
+ *  that changes. */
 export function evaluateAllRuleEvents(
   rules: RuleDefinition[],
   patientAnswers: QuestionAnswer[],
@@ -568,28 +610,55 @@ export function evaluateAllRuleEvents(
     arr.push(e);
     byRule.set(e.rule_id, arr);
   }
+  const knownRuleIds = new Set(rules.map((r) => r.rule_id));
   const allEvents: RuleEvent[] = [];
   const rollups: RuleRollup[] = [];
   const verdicts: RuleVerdict[] = [];
   for (const rule of rules) {
-    const ruleEvents = byRule.get(rule.rule_id) ?? [{
-      event_id: `${rule.rule_id}@window`,
-      rule_id: rule.rule_id,
-      anchor: { type: "window", origin: "omop" as const },
-    }];
-    const { events: evs, rollup } = evaluateRuleEvents(rule, patientAnswers, ruleEvents);
-    allEvents.push(...evs);
-    rollups.push(rollup);
-    verdicts.push({
-      rule_id: rule.rule_id,
-      verdict: rollup.period_verdict,
-      ...(rollup.period_verdict === "NON_CONCORDANT"
-        ? { attribution: rollup.period_attribution ?? "OTHER" }
-        : {}),
-      supporting_questions: compileRule(rule).qids,
-      source: "rule_engine",
-      ts: new Date().toISOString(),
-    });
+    const ruleEvents = byRule.get(rule.rule_id) ?? [windowEventStub(rule.rule_id)];
+    try {
+      const { events: evs, rollup, qids } = evaluateRuleEvents(rule, patientAnswers, ruleEvents);
+      allEvents.push(...evs);
+      rollups.push(rollup);
+      verdicts.push({
+        rule_id: rule.rule_id,
+        verdict: rollup.period_verdict,
+        ...(rollup.period_verdict === "NON_CONCORDANT"
+          ? { attribution: rollup.period_attribution ?? "OTHER" }
+          : {}),
+        supporting_questions: qids,
+        source: "rule_engine",
+        ts: new Date().toISOString(),
+      });
+    } catch (e) {
+      // Compile error (malformed expression) — contain to this rule, mirror
+      // evaluateAllRules' per-rule try/catch. Input events pass through
+      // unevaluated; rollup is all-zero except n_events.
+      allEvents.push(...ruleEvents);
+      rollups.push({
+        rule_id: rule.rule_id,
+        n_events: ruleEvents.length,
+        n_evaluable: 0,
+        n_concordant: 0,
+        n_non_concordant: 0,
+        n_excluded: 0,
+        rate: null,
+        period_verdict: "NON_CONCORDANT",
+      });
+      verdicts.push({
+        rule_id: rule.rule_id,
+        verdict: "NON_CONCORDANT",
+        attribution: "OTHER",
+        rationale: `rule compile error: ${(e as Error).message}`,
+        source: "rule_engine",
+        ts: new Date().toISOString(),
+      });
+    }
+  }
+  // Orphan events: rule_id present in the input but not in `rules` — pass
+  // through unevaluated, with no rollup or verdict.
+  for (const [ruleId, evs] of byRule) {
+    if (!knownRuleIds.has(ruleId)) allEvents.push(...evs);
   }
   return { rule_events: allEvents, rule_rollups: rollups, rule_verdicts: verdicts };
 }

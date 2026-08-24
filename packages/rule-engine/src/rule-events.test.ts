@@ -3,6 +3,7 @@ import type { QuestionAnswer, RuleEvent } from "@chart-review/platform-types";
 import {
   evaluateAllRules,
   evaluateAllRuleEvents,
+  ENGINE_NOT_EVALUABLE_REASON,
   type RuleDefinition,
 } from "./index.js";
 
@@ -117,5 +118,81 @@ describe("evaluateAllRuleEvents", () => {
     };
     const out = evaluateAllRuleEvents([rule], [], [burst]);
     expect(out.rule_events[0].verdict).toBe("NON_CONCORDANT");
+  });
+
+  it("a rule with a malformed expression yields a compile-error verdict without breaking other rules", () => {
+    const badRule: RuleDefinition = {
+      rule_id: "R-Bad",
+      description: "malformed expression",
+      verdict_if: "(((",
+    };
+    const patient = [qa("SpiroDate", "2024-03-01")];
+    const out = evaluateAllRuleEvents([WINDOW_RULE, badRule], patient, []);
+
+    const good = out.rule_verdicts.find((v) => v.rule_id === "R-Spiro")!;
+    expect(good.verdict).toBe("CONCORDANT");
+
+    const bad = out.rule_verdicts.find((v) => v.rule_id === "R-Bad")!;
+    expect(bad.verdict).toBe("NON_CONCORDANT");
+    expect(bad.attribution).toBe("OTHER");
+    expect(bad.rationale).toMatch(/^rule compile error:/);
+
+    const badRollup = out.rule_rollups.find((r) => r.rule_id === "R-Bad")!;
+    expect(badRollup.n_events).toBe(1);
+    expect(badRollup.n_evaluable).toBe(0);
+    expect(badRollup.rate).toBeNull();
+    expect(badRollup.period_verdict).toBe("NON_CONCORDANT");
+
+    const badEvents = out.rule_events.filter((e) => e.rule_id === "R-Bad");
+    expect(badEvents).toHaveLength(1);
+    expect(badEvents[0].verdict).toBeUndefined();
+  });
+
+  it("re-evaluating an engine-marked-not-evaluable event with the missing answer now present makes it evaluable", () => {
+    const firstPass = evaluateAllRuleEvents(
+      [STEP_RULE],
+      [],
+      [ev("R-Step", "R-Step@2024-02-01@e1", { answers: [qa("StepMatch", "matches")] })],
+    );
+    const notEvaluable = firstPass.rule_events[0];
+    expect(notEvaluable.evaluable).toBe(false);
+    expect(notEvaluable.evaluable_reason).toBe(ENGINE_NOT_EVALUABLE_REASON);
+
+    const fedBack: RuleEvent = {
+      ...notEvaluable,
+      answers: [...(notEvaluable.answers ?? []), qa("ControlLevel", "well_controlled")],
+    };
+    const secondPass = evaluateAllRuleEvents([STEP_RULE], [], [fedBack]);
+    const nowEvaluable = secondPass.rule_events[0];
+    expect(nowEvaluable.evaluable).toBe(true);
+    expect(nowEvaluable.verdict).toBe("CONCORDANT");
+  });
+
+  it("events for an unknown rule_id pass through unevaluated with no rollup or verdict", () => {
+    const orphan = ev("R-Nope", "R-Nope@2024-01-01@o1");
+    const out = evaluateAllRuleEvents([STEP_RULE], [], [orphan]);
+
+    const passthrough = out.rule_events.filter((e) => e.rule_id === "R-Nope");
+    expect(passthrough).toHaveLength(1);
+    expect(passthrough[0].verdict).toBeUndefined();
+    expect(out.rule_rollups.some((r) => r.rule_id === "R-Nope")).toBe(false);
+    expect(out.rule_verdicts.some((v) => v.rule_id === "R-Nope")).toBe(false);
+  });
+
+  it("a mixed rollup with an EXCLUDED event keeps it out of n_evaluable and the rate", () => {
+    const events = [
+      ev("R-Step", "R-Step@2024-02-01@e1", { answers: [qa("ControlLevel", "well_controlled"), qa("StepMatch", "matches")] }),
+      ev("R-Step", "R-Step@2024-11-14@e2", { answers: [qa("ControlLevel", "not_well_controlled"), qa("StepMatch", "unknown")] }),
+      ev("R-Step", "R-Step@2024-12-02@e3", { answers: [qa("ControlLevel", "not_well_controlled"), qa("StepMatch", "under_treated")] }),
+    ];
+    const out = evaluateAllRuleEvents([STEP_RULE], [], events);
+    const roll = out.rule_rollups[0];
+    const excludedEvent = out.rule_events.find((e) => e.event_id === "R-Step@2024-11-14@e2")!;
+    expect(excludedEvent.verdict).toBe("EXCLUDED");
+    expect(roll.n_events).toBe(3);
+    expect(roll.n_excluded).toBe(1);
+    expect(roll.n_evaluable).toBe(2);
+    expect(roll.rate).toBeCloseTo(1 / 2);
+    expect(roll.period_verdict).toBe("NON_CONCORDANT");
   });
 });
