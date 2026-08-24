@@ -375,11 +375,11 @@ import { buildMcpServersConfig } from "@chart-review/mcp-server-anthropic";
 import { toolProfileFor, mcpAllowlist } from "@chart-review/task-tools";
 import { buildAuditHooks } from "@chart-review/audit-trail";
 import { loadCompiledTask, type CompiledTask } from "@chart-review/tasks";
-import type { QuestionAnswer, RuleVerdict } from "@chart-review/platform-types";
+import type { QuestionAnswer, RuleVerdict, RuleEvent, RuleRollup } from "@chart-review/platform-types";
 import { computeTaskSha } from "@chart-review/lock";
 import { guidelineDir, phenotypeSkillDir, resolveRubricRoot, baselineRubricRoot } from "@chart-review/rubric";
 import { getActiveVersion, snapshotVersion, draftDiffersFromActive } from "@chart-review/rubric-versions";
-import { patientDir, listNotes, isPhiPatient, patientPersonId } from "@chart-review/patients";
+import { patientDir, listNotes, isPhiPatient, patientPersonId, readAnchors } from "@chart-review/patients";
 import { resolveRolePrompt, validateAgentSpec } from "@chart-review/agent-specs";
 import { extractSpansDirect } from "@chart-review/pipeline-extract-ner";
 import { extractLabelsForNote, parseVaccineTables, type VaccineCatalog } from "@chart-review/pipeline-extract-pernote";
@@ -1191,6 +1191,48 @@ async function runOneAgent(
         cfg.env = { ...(cfg.env ?? {}), CHART_REVIEW_MCP_TOOLS: adherenceTools };
       }
 
+      // Event work-list (spec 2026-08-24): expand rules × ETL anchors, seed
+      // the stubs into the scratch review_state so set_event_answer can
+      // upsert by event_id, and render the prompt block (empty for tasks
+      // with no anchored rules — legacy prompt unchanged). `skill` and
+      // `scratchStateFp` are reused by the post-agent engine pass below —
+      // same lexical scope, no need to re-load/re-derive.
+      const { loadAdherenceSkill, expandEventWorklist, toAnchorEntries, buildEventWorklistBlock } =
+        await import("@chart-review/pipeline-extract-adherence");
+      const skill = loadAdherenceSkill(taskId);
+      const rawAnchors = readAnchors(patientId);
+      const eventWorklist = expandEventWorklist(
+        skill.rules,
+        Object.fromEntries(Object.entries(rawAnchors).map(([k, v]) => [k, toAnchorEntries(v)])),
+      );
+      const scratchStateFp = path.join(scratchRoot, patientId, taskId, "review_state.json");
+      {
+        // Seed stubs into the scratch state BEFORE the agent subprocess
+        // starts — the MCP subprocess reads/writes the same path via its
+        // CHART_REVIEW_REVIEWS_ROOT override (buildMcpServersConfig's
+        // reviewsRoot:scratchRoot above).
+        if (!fs.existsSync(scratchStateFp)) {
+          fs.mkdirSync(path.dirname(scratchStateFp), { recursive: true });
+          atomicWriteJson(scratchStateFp, {
+            schema_version: "1",
+            patient_id: patientId,
+            task_id: taskId,
+            task_kind: "adherence",
+            review_status: "draft",
+            version: 0,
+            updated_at: new Date().toISOString(),
+            updated_by: "system",
+            field_assessments: [],
+            rule_events: eventWorklist,
+          });
+        } else {
+          const st = JSON.parse(fs.readFileSync(scratchStateFp, "utf8"));
+          st.rule_events = eventWorklist;
+          atomicWriteJson(scratchStateFp, st);
+        }
+      }
+      const eventBlock = buildEventWorklistBlock(eventWorklist);
+
       const adherenceUserPrompt = [
         `Adherence chart review for patient \`${patientId}\` on task \`${taskId}\`.`,
         "",
@@ -1236,6 +1278,10 @@ async function runOneAgent(
         "Step 5: After every question has been answered, call",
         "        `set_review_status({status:'complete'})`. The platform runs the",
         "        rule engine afterwards — you DO NOT compute rule verdicts yourself.",
+        // Non-empty only when this task has anchored (per-event) rules —
+        // an empty eventBlock is skipped entirely (not just blank) so a
+        // legacy task's prompt stays byte-identical.
+        ...(eventBlock ? [eventBlock] : []),
         "",
         "Active tools (use ONLY these — in the recommended call order):",
         "  - list_questions          (catalog of questions, call once)",
@@ -1245,6 +1291,10 @@ async function runOneAgent(
         "  - search_notes            (keyword search across notes)",
         "  - read_note / read_notes  (read a note's text)",
         "  - set_question_answer     (call N times, one per question_id)",
+        ...(eventBlock ? [
+          "  - set_event_answer        (one call per event in the EVENT WORK-LIST, if present)",
+          "  - get_event_state         (events committed so far)",
+        ] : []),
         "  - set_review_status       (call once at the very end)",
         "Read-only escape hatches:",
         "  - read_question(question_id)   (one question's full definition)",
@@ -1304,43 +1354,53 @@ async function runOneAgent(
         return;
       }
 
-      // Post-agent: load the committed question_answers from the scratch
-      // review_state, run the deterministic rule engine (eligibility gate
-      // included), and write BOTH question_answers + rule_verdicts into the
-      // per-agent draft (mirrors the phenotype promote, but inline since the
-      // verdicts are computed here, not by the agent).
-      const { evaluateAllRules } = await import("@chart-review/rule-engine");
-      const { loadAdherenceSkill } = await import(
-        "@chart-review/pipeline-extract-adherence"
-      );
-      const skill = loadAdherenceSkill(taskId);
-      const scratchStateFp = path.join(scratchRoot, patientId, taskId, "review_state.json");
+      // Post-agent: load the committed question_answers + rule_events from
+      // the scratch review_state (seeded + updated above/by the agent), run
+      // the deterministic rule engine (eligibility gate included, then the
+      // per-event engine pass), and write question_answers + rule_verdicts +
+      // rule_events + rule_rollups into the per-agent draft (mirrors the
+      // phenotype promote, but inline since the verdicts are computed here,
+      // not by the agent). `skill` and `scratchStateFp` come from the
+      // pre-run event work-list setup above — same lexical scope.
+      const { evaluateAllRules, evaluateAllRuleEvents } = await import("@chart-review/rule-engine");
       let questionAnswers: QuestionAnswer[] = [];
+      let committedEvents: RuleEvent[] = [];
       if (fs.existsSync(scratchStateFp)) {
         try {
           const state = JSON.parse(fs.readFileSync(scratchStateFp, "utf8")) as {
             question_answers?: QuestionAnswer[];
+            rule_events?: RuleEvent[];
           };
           questionAnswers = state.question_answers ?? [];
+          committedEvents = state.rule_events ?? [];
         } catch { /* leave empty */ }
       }
       // Eligibility gate — if the conventional `R-T0-Eligible` rule resolves
-      // to EXCLUDED, every rule becomes EXCLUDED.
+      // to EXCLUDED, every rule (and every event) becomes EXCLUDED.
       const eligibilityRule = skill.rules.find((r) => r.rule_id === "R-T0-Eligible");
       let auditExcluded = false;
       if (eligibilityRule) {
         const eligV = await evaluateAllRules([eligibilityRule], questionAnswers);
         auditExcluded = eligV[0]?.verdict === "EXCLUDED";
       }
-      const ruleVerdicts: RuleVerdict[] = auditExcluded
-        ? skill.rules.map((r) => ({
-            rule_id: r.rule_id,
-            verdict: "EXCLUDED" as const,
-            supporting_questions: r.supporting_questions,
-            source: "rule_engine" as const,
-            ts: new Date().toISOString(),
-          }))
-        : await evaluateAllRules(skill.rules, questionAnswers);
+      let ruleVerdicts: RuleVerdict[];
+      let ruleEvents: RuleEvent[] = [];
+      let ruleRollups: RuleRollup[] = [];
+      if (auditExcluded) {
+        ruleVerdicts = skill.rules.map((r) => ({
+          rule_id: r.rule_id,
+          verdict: "EXCLUDED" as const,
+          supporting_questions: r.supporting_questions,
+          source: "rule_engine" as const,
+          ts: new Date().toISOString(),
+        }));
+        ruleEvents = committedEvents.map((e) => ({ ...e, verdict: "EXCLUDED" as const }));
+      } else {
+        const res = evaluateAllRuleEvents(skill.rules, questionAnswers, committedEvents);
+        ruleVerdicts = res.rule_verdicts;
+        ruleEvents = res.rule_events;
+        ruleRollups = res.rule_rollups;
+      }
 
       const draftFp = agentDraftPath(runId, patientId, spec.id);
       fs.mkdirSync(path.dirname(draftFp), { recursive: true });
@@ -1356,6 +1416,8 @@ async function runOneAgent(
         field_assessments: [],
         question_answers: questionAnswers,
         rule_verdicts: ruleVerdicts,
+        rule_events: ruleEvents,
+        rule_rollups: ruleRollups,
         adherence_excluded: auditExcluded || undefined,
         lock_task_sha: manifest.guideline_sha,
       });
