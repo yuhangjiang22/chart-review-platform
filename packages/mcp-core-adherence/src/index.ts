@@ -81,6 +81,36 @@ function findQuestion(skill: AdherenceSkill, qid: string): QuestionDefinition | 
   return null;
 }
 
+/** Verify one evidence array: OMOP rows pass through; note quotes go
+ *  through the faithfulness gate (absent quote → error string; real quote
+ *  at wrong offsets → corrected offsets). Returns the verified list or
+ *  an error message. */
+function verifyAnswerEvidence(
+  patientId: string,
+  evidence: Array<z.infer<typeof evidenceSchema>>,
+): { ok: true; verified: NonNullable<QuestionAnswer["evidence"]> } | { ok: false; error: string } {
+  const verified: NonNullable<QuestionAnswer["evidence"]> = [];
+  for (const ev of evidence) {
+    if ((ev as { source?: string }).source === "omop") {
+      const o = ev as { table: string; row_id?: string; concept_id?: number; concept_name?: string };
+      verified.push({ source: "omop", table: o.table, row_id: o.row_id, concept_id: o.concept_id, concept_name: o.concept_name });
+      continue;
+    }
+    const n = ev as { note_id: string; quote: string; start?: number | null; end?: number | null };
+    const start = n.start ?? 0;
+    const end = n.end ?? (start + (n.quote?.length ?? 0));
+    const result = verifyEvidence(patientId, {
+      source: "note", note_id: n.note_id, span_offsets: [start, end], verbatim_quote: n.quote,
+    });
+    if (result.status === "fail") {
+      return { ok: false, error: `faithfulness check failed for evidence in note '${n.note_id}': ${result.detail ?? "quote not found"}` };
+    }
+    const [cs, ce] = result.corrected_offsets ?? [start, end];
+    verified.push({ source: "note", note_id: n.note_id, quote: n.quote, start: cs, end: ce });
+  }
+  return { ok: true, verified };
+}
+
 // ── list_questions(tier?) ─────────────────────────────────────────────
 
 export const listQuestionsArgsSchema = z.object({
@@ -243,35 +273,14 @@ export async function setQuestionAnswer(
   // absent quote rejects the write; a real quote at wrong offsets is
   // accepted with corrected offsets written back. OMOP evidence is recorded
   // as-is (verifyEvidence skips it — only note quotes are byte-checked).
-  const evidence = args.evidence ?? [];
-  const verifiedEvidence: NonNullable<QuestionAnswer["evidence"]> = [];
-  for (const ev of evidence) {
-    if ((ev as { source?: string }).source === "omop") {
-      const o = ev as { table: string; row_id?: string; concept_id?: number; concept_name?: string };
-      verifiedEvidence.push({ source: "omop", table: o.table, row_id: o.row_id, concept_id: o.concept_id, concept_name: o.concept_name });
-      continue;
-    }
-    const n = ev as { note_id: string; quote: string; start?: number | null; end?: number | null };
-    const start = n.start ?? 0;
-    const end = n.end ?? (start + (n.quote?.length ?? 0));
-    const result = verifyEvidence(session.patientId, {
-      source: "note",
-      note_id: n.note_id,
-      span_offsets: [start, end],
-      verbatim_quote: n.quote,
+  const evidenceCheck = verifyAnswerEvidence(session.patientId, args.evidence ?? []);
+  if (!evidenceCheck.ok) {
+    return err(evidenceCheck.error, {
+      error_code: "faithfulness_failed",
+      hint: "Evidence quote was not found in the note. Call find_quote_offsets (or read_note) to confirm the exact text, then retry set_question_answer with the verbatim quote.",
     });
-    if (result.status === "fail") {
-      return err(
-        `faithfulness check failed for evidence in note '${n.note_id}': ${result.detail ?? "quote not found"}`,
-        {
-          error_code: "faithfulness_failed",
-          hint: "Evidence quote was not found in the note. Call find_quote_offsets (or read_note) to confirm the exact text, then retry set_question_answer with the verbatim quote.",
-        },
-      );
-    }
-    const [cs, ce] = result.corrected_offsets ?? [start, end];
-    verifiedEvidence.push({ source: "note", note_id: n.note_id, quote: n.quote, start: cs, end: ce });
   }
+  const verifiedEvidence = evidenceCheck.verified;
 
   // Upgrade: attach OMOP provenance for a structured-sourced answer the agent
   // didn't already cite from a row. Table-level (the row the agent used isn't
