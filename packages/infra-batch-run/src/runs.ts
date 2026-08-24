@@ -367,7 +367,7 @@ export function generateRunId(now = new Date()): string {
 // final review_state.json to `runs/<run_id>/per_patient/<pid>/agent_draft
 // .json`. Errors per patient are isolated; the run keeps going.
 
-import { withReviewsRoot } from "@chart-review/domain-review";
+import { withReviewsRoot, type ReviewState } from "@chart-review/domain-review";
 import { runAgent, type AgentEvent } from "@chart-review/agent-provider";
 import { modelFor } from "@chart-review/model-config";
 import { atomicWriteJson } from "@chart-review/storage";
@@ -431,12 +431,14 @@ export function applyAgentEventToTally(
     return { ...tally, agentError: event.error ?? "agent error" };
   }
   // Primary write tools per task kind: phenotype commits via
-  // set_field_assessment, adherence via set_question_answer. Each run uses
-  // exactly one, so counting both is safe (the other never fires).
+  // set_field_assessment; adherence via set_question_answer (patient-level)
+  // and/or set_event_answer (per-event, event-anchored rules). Each run is
+  // one task kind, so counting all three is safe (the others never fire).
   if (
     event.type === "tool_use" &&
     (event.tool_name === "set_field_assessment" ||
-      event.tool_name === "set_question_answer")
+      event.tool_name === "set_question_answer" ||
+      event.tool_name === "set_event_answer")
   ) {
     return { ...tally, writeCount: tally.writeCount + 1 };
   }
@@ -1210,23 +1212,33 @@ async function runOneAgent(
         // Seed stubs into the scratch state BEFORE the agent subprocess
         // starts — the MCP subprocess reads/writes the same path via its
         // CHART_REVIEW_REVIEWS_ROOT override (buildMcpServersConfig's
-        // reviewsRoot:scratchRoot above).
+        // reviewsRoot:scratchRoot above). Typed via `satisfies ReviewState`
+        // so a shape drift from the domain-review type is compiler-visible.
+        const freshSeed = {
+          schema_version: "1",
+          patient_id: patientId,
+          task_id: taskId,
+          task_kind: "adherence",
+          review_status: "draft",
+          version: 0,
+          updated_at: new Date().toISOString(),
+          updated_by: "system",
+          field_assessments: [],
+          rule_events: eventWorklist,
+        } satisfies ReviewState;
         if (!fs.existsSync(scratchStateFp)) {
           fs.mkdirSync(path.dirname(scratchStateFp), { recursive: true });
-          atomicWriteJson(scratchStateFp, {
-            schema_version: "1",
-            patient_id: patientId,
-            task_id: taskId,
-            task_kind: "adherence",
-            review_status: "draft",
-            version: 0,
-            updated_at: new Date().toISOString(),
-            updated_by: "system",
-            field_assessments: [],
-            rule_events: eventWorklist,
-          });
+          atomicWriteJson(scratchStateFp, freshSeed);
         } else {
-          const st = JSON.parse(fs.readFileSync(scratchStateFp, "utf8"));
+          // A corrupt/unparseable existing scratch file falls back to the
+          // fresh seed rather than throwing — same recovery the rest of
+          // this branch gives a missing file.
+          let st: ReviewState;
+          try {
+            st = JSON.parse(fs.readFileSync(scratchStateFp, "utf8")) as ReviewState;
+          } catch {
+            st = freshSeed;
+          }
           st.rule_events = eventWorklist;
           atomicWriteJson(scratchStateFp, st);
         }
@@ -1275,13 +1287,17 @@ async function runOneAgent(
         "        eligibility encounter count come from OMOP rows → cite",
         "        source:'omop'. Reserve note evidence for facts that truly live in",
         "        the note text (action plan, inhaler technique, comorbidity).",
+        // Non-empty only when this task has anchored (per-event) rules — an
+        // empty eventBlock contributes zero array elements (not a blank
+        // string) so a legacy task's prompt stays byte-identical.
+        ...(eventBlock ? [
+          "Step 4b (only when an EVENT WORK-LIST section appears below): commit every",
+          "        listed event via set_event_answer BEFORE calling set_review_status.",
+          eventBlock,
+        ] : []),
         "Step 5: After every question has been answered, call",
         "        `set_review_status({status:'complete'})`. The platform runs the",
         "        rule engine afterwards — you DO NOT compute rule verdicts yourself.",
-        // Non-empty only when this task has anchored (per-event) rules —
-        // an empty eventBlock is skipped entirely (not just blank) so a
-        // legacy task's prompt stays byte-identical.
-        ...(eventBlock ? [eventBlock] : []),
         "",
         "Active tools (use ONLY these — in the recommended call order):",
         "  - list_questions          (catalog of questions, call once)",
@@ -1362,7 +1378,8 @@ async function runOneAgent(
       // phenotype promote, but inline since the verdicts are computed here,
       // not by the agent). `skill` and `scratchStateFp` come from the
       // pre-run event work-list setup above — same lexical scope.
-      const { evaluateAllRules, evaluateAllRuleEvents } = await import("@chart-review/rule-engine");
+      const { evaluateAllRules, evaluateAllRuleEvents, WINDOW_ANCHOR_TYPE } =
+        await import("@chart-review/rule-engine");
       let questionAnswers: QuestionAnswer[] = [];
       let committedEvents: RuleEvent[] = [];
       if (fs.existsSync(scratchStateFp)) {
@@ -1386,6 +1403,10 @@ async function runOneAgent(
       let ruleVerdicts: RuleVerdict[];
       let ruleEvents: RuleEvent[] = [];
       let ruleRollups: RuleRollup[] = [];
+      // Anchored (omop-origin) events the agent never committed an answer
+      // for — the engine falls back to patient-level answers for these, so
+      // surface the count for the reviewer instead of letting it pass silently.
+      let unansweredAnchored = 0;
       if (auditExcluded) {
         ruleVerdicts = skill.rules.map((r) => ({
           rule_id: r.rule_id,
@@ -1394,12 +1415,43 @@ async function runOneAgent(
           source: "rule_engine" as const,
           ts: new Date().toISOString(),
         }));
-        ruleEvents = committedEvents.map((e) => ({ ...e, verdict: "EXCLUDED" as const }));
+        // Non-evaluable events carry no verdict — matches the engine path's
+        // convention (evaluateRuleEvents leaves verdict undefined for them).
+        ruleEvents = committedEvents.map((e) =>
+          e.evaluable === false ? e : { ...e, verdict: "EXCLUDED" as const },
+        );
+        ruleRollups = skill.rules.map((r) => {
+          const n = committedEvents.filter((e) => e.rule_id === r.rule_id).length;
+          return {
+            rule_id: r.rule_id,
+            n_events: n,
+            n_evaluable: 0,
+            n_concordant: 0,
+            n_non_concordant: 0,
+            n_excluded: n,
+            rate: null,
+            period_verdict: "EXCLUDED" as const,
+          };
+        });
       } else {
         const res = evaluateAllRuleEvents(skill.rules, questionAnswers, committedEvents);
         ruleVerdicts = res.rule_verdicts;
         ruleEvents = res.rule_events;
         ruleRollups = res.rule_rollups;
+        unansweredAnchored = ruleEvents.filter((e) =>
+          e.anchor.type !== WINDOW_ANCHOR_TYPE &&
+          e.anchor.origin === "omop" &&
+          (e.answers ?? []).length === 0 &&
+          e.evaluable !== false,
+        ).length;
+        if (unansweredAnchored > 0) {
+          try {
+            fs.appendFileSync(agentTranscriptPath(runId, patientId, spec.id), JSON.stringify({
+              ts: new Date().toISOString(), type: "text",
+              text: `warning: ${unansweredAnchored} anchored event(s) uncommitted — verdicts fell back to patient-level answers`,
+            }) + "\n");
+          } catch { /* ignore */ }
+        }
       }
 
       const draftFp = agentDraftPath(runId, patientId, spec.id);
@@ -1418,6 +1470,7 @@ async function runOneAgent(
         rule_verdicts: ruleVerdicts,
         rule_events: ruleEvents,
         rule_rollups: ruleRollups,
+        events_unanswered: unansweredAnchored || undefined,
         adherence_excluded: auditExcluded || undefined,
         lock_task_sha: manifest.guideline_sha,
       });

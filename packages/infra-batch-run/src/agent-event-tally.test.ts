@@ -37,6 +37,17 @@ describe("applyAgentEventToTally", () => {
     expect(classifyAgentOutcome(t)).toEqual({ status: "error", error: "APIConnectionError: Connection error." });
   });
 
+  it("counts set_event_answer tool_use events (adherence per-event commits)", () => {
+    const t = fold([
+      { type: "tool_use", tool_name: "list_questions", tool_input: {} },
+      { type: "tool_use", tool_name: "set_event_answer", tool_input: { event_id: "R-Step@2024-11-14@encounters:18" } },
+      { type: "result", result: "done" },
+    ]);
+    expect(t.writeCount).toBe(1);
+    expect(t.agentError).toBeNull();
+    expect(classifyAgentOutcome(t)).toEqual({ status: "ok" });
+  });
+
   it("a run with no set_field_assessment writes is classified error", () => {
     const t = fold([
       { type: "tool_use", tool_name: "list_notes", tool_input: {} },
