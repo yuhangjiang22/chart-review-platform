@@ -225,11 +225,13 @@ export interface ReviewState {
    *  NON_CONCORDANT / EXCLUDED) computed from question_answers by the
    *  rule engine. Empty / absent until the rule-eval pass runs. */
   rule_verdicts?: RuleVerdict[];
-  /** Event-level concordance (spec 2026-08-24). One entry per rule event. */
+  /** Adherence-only: event-level concordance (spec 2026-08-24). One entry
+   *  per rule event. */
   rule_events?: RuleEvent[];
-  /** Deterministic per-rule aggregation over rule_events. */
+  /** Adherence-only: deterministic per-rule aggregation over rule_events. */
   rule_rollups?: RuleRollup[];
-  /** Reviewer-validated event_ids (parallel to validated_questions). */
+  /** Adherence-only: reviewer-validated event_ids (parallel to
+   *  validated_questions). */
   validated_events?: string[];
   /** Adherence-only: question_ids the reviewer has marked validated.
    *  Drives per-question progress in the AdherenceReview UI; analogous

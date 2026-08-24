@@ -268,6 +268,7 @@ export interface RuleEvent {
   answers?: QuestionAnswer[];
   /** Filled by the engine pass (per-event). */
   verdict?: RuleVerdict["verdict"];
+  /** For NON_CONCORDANT; undefined otherwise. */
   attribution?: AttributionCategory;
   source?: "agent" | "reviewer";
   ts?: string;
@@ -277,7 +278,9 @@ export interface RuleEvent {
 export interface RuleRollup {
   rule_id: string;
   n_events: number;
-  /** Events that produced a CONCORDANT or NON_CONCORDANT verdict. */
+  /** Events that produced a CONCORDANT or NON_CONCORDANT verdict.
+   *  Not the same as RuleEvent.evaluable — an evaluable event may
+   *  still be EXCLUDED. */
   n_evaluable: number;
   n_concordant: number;
   n_non_concordant: number;

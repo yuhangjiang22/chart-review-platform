@@ -31,7 +31,7 @@
  */
 
 import type {
-  QuestionAnswer, RuleVerdict, AttributionCategory,
+  QuestionAnswer, RuleVerdict, AttributionCategory, RuleEvent, RuleRollup,
 } from "@chart-review/platform-types";
 
 // ── Rule schema (matches references/rules/*.yaml) ────────────────────────────
@@ -67,6 +67,14 @@ export interface RuleDefinition {
    *  drill-down UI and to scope the LLM-judge prompt. Computed
    *  automatically from `verdict_if` parsing if omitted. */
   supporting_questions?: string[];
+  /** Name(s) of per-patient anchor lists this rule expands over
+   *  (spec 2026-08-24). Omitted = one window-spanning event —
+   *  current single-verdict behavior. */
+  event_anchor?: string | string[];
+  /** Per-event applicability expression over the event's merged answer
+   *  map (patient answers overlaid with event answers, plus the
+   *  synthetic `_anchor_type` answer). False → event not evaluable. */
+  event_evaluable_if?: string;
 }
 
 // ── AST types (internal) ─────────────────────────────────────────────────────
@@ -468,4 +476,120 @@ export async function evaluateAllRules(
     out.push(verdict);
   }
   return out;
+}
+
+// ── Event-level evaluation (spec 2026-08-24) ─────────────────────────────────
+
+/** Merged answer list for one event: patient-level answers, overlaid by the
+ *  event's own answers (same question_id shadows), plus `_anchor_type`. */
+function mergedAnswers(patient: QuestionAnswer[], event: RuleEvent): QuestionAnswer[] {
+  const map = new Map<string, QuestionAnswer>();
+  for (const a of patient) map.set(a.question_id, a);
+  for (const a of event.answers ?? []) map.set(a.question_id, a);
+  map.set("_anchor_type", { question_id: "_anchor_type", tier: -1, answer: event.anchor.type });
+  return [...map.values()];
+}
+
+export interface RuleEventsResult {
+  rule_events: RuleEvent[];
+  rule_rollups: RuleRollup[];
+  /** Period verdicts mirrored from the rollups — same shape existing
+   *  consumers (AdherenceReview, compare.py, IAA) already read. */
+  rule_verdicts: RuleVerdict[];
+}
+
+/** Evaluate one rule over its events; also compute the rollup. */
+export function evaluateRuleEvents(
+  rule: RuleDefinition,
+  patientAnswers: QuestionAnswer[],
+  events: RuleEvent[],
+): { events: RuleEvent[]; rollup: RuleRollup } {
+  const compiled = compileRule(rule);
+  const evaluableAst = rule.event_evaluable_if
+    ? parseExpression(rule.event_evaluable_if)
+    : null;
+
+  const outEvents: RuleEvent[] = events.map((e) => {
+    if (e.evaluable === false) {
+      return { ...e, verdict: undefined, attribution: undefined };
+    }
+    const merged = mergedAnswers(patientAnswers, e);
+    if (evaluableAst) {
+      const map = new Map(merged.map((a) => [a.question_id, a]));
+      if (!evalAst(evaluableAst, map)) {
+        return {
+          ...e,
+          evaluable: false,
+          evaluable_reason: e.evaluable_reason ?? "event_evaluable_if not met",
+          verdict: undefined,
+          attribution: undefined,
+        };
+      }
+    }
+    const v = evaluateRule(compiled, merged);
+    return { ...e, evaluable: true, verdict: v.verdict, attribution: v.attribution };
+  });
+
+  let nConc = 0, nNon = 0, nExc = 0;
+  let periodAttribution: RuleRollup["period_attribution"];
+  for (const e of outEvents) {
+    if (e.evaluable === false) continue;
+    if (e.verdict === "CONCORDANT") nConc++;
+    else if (e.verdict === "NON_CONCORDANT") {
+      nNon++;
+      periodAttribution ??= e.attribution;
+    } else nExc++;
+  }
+  const nEval = nConc + nNon;
+  const rollup: RuleRollup = {
+    rule_id: rule.rule_id,
+    n_events: outEvents.length,
+    n_evaluable: nEval,
+    n_concordant: nConc,
+    n_non_concordant: nNon,
+    n_excluded: nExc,
+    rate: nEval > 0 ? nConc / nEval : null,
+    period_verdict: nNon > 0 ? "NON_CONCORDANT" : nConc > 0 ? "CONCORDANT" : "EXCLUDED",
+    period_attribution: nNon > 0 ? periodAttribution : undefined,
+  };
+  return { events: outEvents, rollup };
+}
+
+/** Evaluate every rule over the patient's events. Rules with no events in
+ *  the list get one default window event (current single-verdict behavior). */
+export function evaluateAllRuleEvents(
+  rules: RuleDefinition[],
+  patientAnswers: QuestionAnswer[],
+  events: RuleEvent[],
+): RuleEventsResult {
+  const byRule = new Map<string, RuleEvent[]>();
+  for (const e of events) {
+    const arr = byRule.get(e.rule_id) ?? [];
+    arr.push(e);
+    byRule.set(e.rule_id, arr);
+  }
+  const allEvents: RuleEvent[] = [];
+  const rollups: RuleRollup[] = [];
+  const verdicts: RuleVerdict[] = [];
+  for (const rule of rules) {
+    const ruleEvents = byRule.get(rule.rule_id) ?? [{
+      event_id: `${rule.rule_id}@window`,
+      rule_id: rule.rule_id,
+      anchor: { type: "window", origin: "omop" as const },
+    }];
+    const { events: evs, rollup } = evaluateRuleEvents(rule, patientAnswers, ruleEvents);
+    allEvents.push(...evs);
+    rollups.push(rollup);
+    verdicts.push({
+      rule_id: rule.rule_id,
+      verdict: rollup.period_verdict,
+      ...(rollup.period_verdict === "NON_CONCORDANT"
+        ? { attribution: rollup.period_attribution ?? "OTHER" }
+        : {}),
+      supporting_questions: compileRule(rule).qids,
+      source: "rule_engine",
+      ts: new Date().toISOString(),
+    });
+  }
+  return { rule_events: allEvents, rule_rollups: rollups, rule_verdicts: verdicts };
 }
