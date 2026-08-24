@@ -304,7 +304,8 @@ export function readStructured(patientId: string): StructuredResponse {
 
 /** Read the patient's per-task anchor lists (anchors/<name>.json arrays).
  *  Used by adherence event expansion (spec 2026-08-24). Missing dir or
- *  unparseable file → that list is absent; never throws. */
+ *  unparseable file → that list is absent. Throws only for an
+ *  unknown/invalid patient id (via patientDir), like every reader here. */
 export function readAnchors(patientId: string): Record<string, unknown[]> {
   const dir = path.join(patientDir(patientId), "anchors");
   const out: Record<string, unknown[]> = {};
@@ -314,7 +315,9 @@ export function readAnchors(patientId: string): Record<string, unknown[]> {
     try {
       const parsed = JSON.parse(fs.readFileSync(path.join(dir, f), "utf-8"));
       if (Array.isArray(parsed)) out[f.replace(/\.json$/, "")] = parsed;
-    } catch { /* skip unparseable list */ }
+    } catch {
+      console.warn(`[patients] skipping unparseable anchor list ${f} for ${patientId}`);
+    }
   }
   return out;
 }

@@ -250,6 +250,9 @@ export interface RuleEventAnchor {
   origin: "omop" | "note";
   /** Provenance: OMOP "table:row_id", or "note:<filename>#<offset>". */
   ref?: string;
+  /** Task-defined extras from the anchor entry, e.g. encounter kind —
+   *  surfaced in the agent work-list, never interpreted by the platform. */
+  meta?: Record<string, unknown>;
 }
 
 /** One evaluable occurrence of one rule for one patient.

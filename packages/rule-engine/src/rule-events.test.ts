@@ -148,6 +148,23 @@ describe("evaluateAllRuleEvents", () => {
     expect(badEvents[0].verdict).toBeUndefined();
   });
 
+  it("the compile-error catch scrubs a stale verdict/attribution off a previously-evaluated event", () => {
+    const priorEvent: RuleEvent = ev("R-Bad", "R-Bad@2024-01-01@e1", {
+      verdict: "NON_CONCORDANT",
+      attribution: "DOCUMENTATION_GAP",
+    });
+    const badRule: RuleDefinition = {
+      rule_id: "R-Bad",
+      description: "now-malformed expression",
+      verdict_if: "(((",
+    };
+    const out = evaluateAllRuleEvents([badRule], [], [priorEvent]);
+
+    const passedThrough = out.rule_events.find((e) => e.event_id === "R-Bad@2024-01-01@e1")!;
+    expect(passedThrough.verdict).toBeUndefined();
+    expect(passedThrough.attribution).toBeUndefined();
+  });
+
   it("re-evaluating an engine-marked-not-evaluable event with the missing answer now present makes it evaluable", () => {
     const firstPass = evaluateAllRuleEvents(
       [STEP_RULE],
