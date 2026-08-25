@@ -28,3 +28,10 @@ note. State the biopsy date and confirm it is within 5 years of index.
 - "Liver biopsy (2023-04): stage 4/4 fibrosis (METAVIR), consistent with cirrhosis", index 2025-06 -> `yes`
 - "Biopsy 2015: Ishak 6" with index 2025 -> `no` (older than 5y; see crit_e_biopsy_old)
 - "Biopsy: METAVIR F3" -> `no` (below threshold)
+
+## Window anchor (v0.4)
+The lookback window for THIS met/not_met answer is anchored to the
+**reference date** (`demographics.reference_date`; in legacy extracts where it
+is absent, the index date). This enum is a calibration snapshot — the dated
+evidence for the outcome scan goes in the companion _date field, which is
+WINDOWLESS (see that field's guidance).

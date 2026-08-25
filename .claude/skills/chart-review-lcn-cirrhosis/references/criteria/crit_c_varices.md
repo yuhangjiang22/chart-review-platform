@@ -32,3 +32,12 @@ both from one study.
 - "EGD: small esophageal varices, no stigmata" (1y before index) -> `met`
 - "CT: gastroesophageal varices" -> `met`
 - "EGD: no varices" -> `not_met`
+
+## Window anchor (v0.4)
+The lookback window for THIS met/not_met answer is anchored to the
+**reference date** (`demographics.reference_date`; in legacy extracts where it
+is absent, the index date). This enum is a calibration snapshot — the dated
+evidence for the outcome scan goes in the companion _date field, which is
+WINDOWLESS (see that field's guidance).
+SEARCH STEMS (v0.4.1): search notes with the stem "varic" — it matches both
+"varices" and "variceal"; searching "varix" alone MISSES "varices".

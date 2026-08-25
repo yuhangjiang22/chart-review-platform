@@ -7,6 +7,15 @@ cardinality: one
 group: step1_criteria
 ---
 
+## FORWARD-SCAN SEMANTICS (v0.4 — read this FIRST)
+Commit the date of the **EARLIEST qualifying evidence ANYWHERE in the chart**
+— IGNORE every lookback window when answering this date field. Windows are
+applied downstream by the outcome scanner at each candidate date; your job is
+only to date the evidence. Evidence BEFORE or AFTER the index date both count.
+If several qualify, the EARLIEST wins. Null only when no qualifying evidence
+exists anywhere.
+
+
 # Criterion: crit_a_date (evidence date)
 
 ## Definition

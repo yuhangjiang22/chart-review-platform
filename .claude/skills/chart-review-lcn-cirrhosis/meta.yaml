@@ -1,7 +1,7 @@
 task_type: phenotype_validation
 uses_structured_data: true
 review_unit: patient
-manual_version: 0.3.0
+manual_version: 0.4.0
 status: draft
 final_output: lcn_compensated_cirrhosis
 source_documents:
@@ -64,6 +64,19 @@ overview_prose: >-
   threshold); (op 3) varices must be described, history-of and collaterals
   excluded; liver cancer (HCC/cholangiocarcinoma) on or before index excluded
   at COHORT ENTRY (prefilter-level, not a per-review field).
+
+  v0.3 -> v0.4 (2026-08-24, from the 3-patient forward pilot): DATE FIELDS ARE
+  NOW WINDOWLESS — each crit_*_date / biopsy_cirrhosis_date asks for the
+  EARLIEST qualifying evidence ANYWHERE in the chart (before or after index);
+  lookback windows are applied downstream by the outcome scanner at each
+  candidate date. Pilot showed the agent correctly REJECTING true evidence as
+  'after index' under the old wording (crit_a: 2020 CT vs 2016 AUD index), and
+  sampling a single platelet draw instead of scanning all rows (crit_d).
+  The met/not_met enums stay as calibration snapshots, now explicitly anchored
+  to demographics.reference_date (falls back to index in legacy extracts);
+  crit_d requires the MINIMUM platelet across all rows in-window. LIMITATION:
+  earliest-only dates mean a later re-qualification is invisible to the scan
+  (same shape as the most-recent-decompensation limitation; both documented).
 
   The agent extracts 16 evidence leaves; the Step-1 count, Step-1 verdict,
   decompensation roll-up, Step-2 verdict, and the final phenotype are COMPUTED

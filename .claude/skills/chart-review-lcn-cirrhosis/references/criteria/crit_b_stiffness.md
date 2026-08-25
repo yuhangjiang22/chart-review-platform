@@ -23,3 +23,10 @@ Cite the report span containing the kPa value; state the exam date/window.
 - "MRE: liver stiffness 5.6 kPa" -> `met`
 - "VCTE 9.8 kPa" -> `not_met`
 - "FibroScan 14 kPa" 20 months before index -> `not_met` (out of window)
+
+## Window anchor (v0.4)
+The lookback window for THIS met/not_met answer is anchored to the
+**reference date** (`demographics.reference_date`; in legacy extracts where it
+is absent, the index date). This enum is a calibration snapshot — the dated
+evidence for the outcome scan goes in the companion _date field, which is
+WINDOWLESS (see that field's guidance).

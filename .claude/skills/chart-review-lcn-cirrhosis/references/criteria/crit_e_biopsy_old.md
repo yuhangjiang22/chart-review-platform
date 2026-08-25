@@ -22,3 +22,10 @@ the only difference is age of the biopsy. A biopsy WITHIN 5 years belongs to
 ## Examples
 - "Liver biopsy 2016: Ishak stage 5" with index 2025 -> `met`
 - Only a 2023 biopsy exists (index 2025) -> `not_met` (that one is recent)
+
+## Window anchor (v0.4)
+The lookback window for THIS met/not_met answer is anchored to the
+**reference date** (`demographics.reference_date`; in legacy extracts where it
+is absent, the index date). This enum is a calibration snapshot — the dated
+evidence for the outcome scan goes in the companion _date field, which is
+WINDOWLESS (see that field's guidance).

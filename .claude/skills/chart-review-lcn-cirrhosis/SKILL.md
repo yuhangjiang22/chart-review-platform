@@ -138,3 +138,20 @@ every leaf right, with dated, in-window evidence.
 
 Commit every enum leaf (and every date field whose evidence exists), do NOT set the computed fields, do NOT call
 `set_review_status`, then emit a one-line summary and stop.
+
+## STRUCTURED READ BUDGET (context / rate-limit discipline)
+
+Real charts here can carry THOUSANDS of structured rows and long notes. Your
+context window and the model's per-minute token quota are finite — one
+oversized read can rate-limit the whole run. Hard rules:
+
+- **read_structured_data: never request more than max_rows=300 per call, on
+  ANY table** (conditions, measurements, observations, encounters). Tables are
+  date-sorted; prefer the computed FOUNDATION rows in `observations`
+  (fnd_plt / fnd_stiff — they carry date+value+row_id you can cite directly).
+- **Do not re-read a table you have already read.** Cache what you saw.
+- **read_notes: at most 2 notes per call**; prefer search_notes hits +
+  get_note_section over full reads.
+- If a table is bigger than the cap, reason from the foundation rows, the
+  date-sorted head, and targeted note searches — do NOT page through
+  everything.

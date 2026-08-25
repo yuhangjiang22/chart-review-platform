@@ -35,3 +35,10 @@ Wording rules (v2 ops 2, 13, 14):
 - "US: nodular liver echotexture; recanalized paraumbilical vein" -> `met`
 - "MRI: nodular liver; spleen normal size; no varices" -> `not_met` (nodularity alone)
 - Qualifying CT but 2 years before index -> `not_met` (out of window)
+
+## Window anchor (v0.4)
+The lookback window for THIS met/not_met answer is anchored to the
+**reference date** (`demographics.reference_date`; in legacy extracts where it
+is absent, the index date). This enum is a calibration snapshot — the dated
+evidence for the outcome scan goes in the companion _date field, which is
+WINDOWLESS (see that field's guidance).
