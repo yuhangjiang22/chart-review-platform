@@ -125,10 +125,14 @@ overview_prose: >-
   OCS burst; R-T1-ControllerForPersistent per obligation point), with
   ETL-enumerated anchors (anchors/{asthma_encounters,ocs_bursts,
   obligation_points}.json), agent note-supplements flagged origin=note,
-  and dual-track rollup (event rate + worst-case period boolean — the
-  boolean keeps v0.4/v0.5 comparability). The remaining 8 rules are
-  single window events; their semantics are unchanged. PENDING clinical
-  confirmation: the ControllerForPersistent grace window.
+  and dual-track rollup (event rate + worst-case period boolean —
+  the worst-case boolean remains comparable to v0.4/v0.5 up to four
+  documented flip classes (bursts now always owe follow-up; mid-window
+  uncontrolled visits now surface; all-missing control data now EXCLUDEs
+  instead of judging; zero-obligation patients now EXCLUDE structurally)).
+  The remaining 8 rules are single window events; their semantics are
+  unchanged. PENDING clinical confirmation: the ControllerForPersistent
+  grace window.
 final_output: rule_verdicts
 phases:
   - author

@@ -583,10 +583,16 @@ export function evaluateRuleEvents(
   return { events: outEvents, rollup, qids: compiled.qids };
 }
 
-/** Evaluate every rule over the patient's events. Rules with no events in
- *  the list get one default window event (current single-verdict behavior).
- *  Input events whose rule_id matches none of `rules` pass through into
- *  `rule_events` unevaluated — no rollup or verdict is produced for them.
+/** Evaluate every rule over the patient's events. Anchor-FREE rules (no
+ *  `event_anchor`) with no events in the list get one default window event
+ *  (current single-verdict behavior). Anchored rules with zero events —
+ *  an empty or missing anchor list, and no agent-supplemented events — roll
+ *  up EXCLUDED instead: the denominator for an anchored rule is
+ *  anchor-defined, so zero anchors means zero obligation, not an implicit
+ *  patient-level judgment (see `evaluateRuleEvents`'s all-zero rollup on an
+ *  empty `events` array). Input events whose rule_id matches none of
+ *  `rules` pass through into `rule_events` unevaluated — no rollup or
+ *  verdict is produced for them.
  *
  *  A rule that fails to compile (malformed `verdict_if` / `excluded_if` /
  *  `event_evaluable_if`) does not abort the batch: its input events pass
@@ -615,7 +621,15 @@ export function evaluateAllRuleEvents(
   const rollups: RuleRollup[] = [];
   const verdicts: RuleVerdict[] = [];
   for (const rule of rules) {
-    const ruleEvents = byRule.get(rule.rule_id) ?? [windowEventStub(rule.rule_id)];
+    // Window-stub fallback applies ONLY to anchor-free rules. An anchored
+    // rule with zero input events (empty/missing anchor list) must NOT
+    // fall back to a patient-level window judgment — that resurrects the
+    // v0.4 false-gap bug (e.g. R-T1-ControllerForPersistent firing
+    // NON_CONCORDANT on a well-controlled SABA-only patient with zero
+    // obligation anchors). It gets zero events instead, which
+    // `evaluateRuleEvents` already rolls up to EXCLUDED / rate null.
+    const ruleEvents = byRule.get(rule.rule_id)
+      ?? (rule.event_anchor ? [] : [windowEventStub(rule.rule_id)]);
     try {
       const { events: evs, rollup, qids } = evaluateRuleEvents(rule, patientAnswers, ruleEvents);
       allEvents.push(...evs);

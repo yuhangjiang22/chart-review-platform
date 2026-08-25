@@ -57,6 +57,26 @@ describe("evaluateAllRuleEvents", () => {
     expect(verdicts).toEqual(["CONCORDANT", "NON_CONCORDANT", "CONCORDANT"]);
   });
 
+  it("an event_anchor rule with zero input events rolls up EXCLUDED — no window-stub fallback", () => {
+    const out = evaluateAllRuleEvents([STEP_RULE], [], []);
+
+    const stepEvents = out.rule_events.filter((e) => e.rule_id === "R-Step");
+    expect(stepEvents).toHaveLength(0);
+
+    const roll = out.rule_rollups.find((r) => r.rule_id === "R-Step")!;
+    expect(roll.n_events).toBe(0);
+    expect(roll.n_evaluable).toBe(0);
+    expect(roll.n_concordant).toBe(0);
+    expect(roll.n_non_concordant).toBe(0);
+    expect(roll.n_excluded).toBe(0);
+    expect(roll.rate).toBeNull();
+    expect(roll.period_verdict).toBe("EXCLUDED");
+
+    const verdict = out.rule_verdicts.find((v) => v.rule_id === "R-Step")!;
+    expect(verdict.verdict).toBe("EXCLUDED");
+    expect(verdict.attribution).toBeUndefined();
+  });
+
   it("a rule without event_anchor gets one window event evaluated over patient answers", () => {
     const patient = [qa("SpiroDate", "2024-03-01")];
     const out = evaluateAllRuleEvents([WINDOW_RULE], patient, []);

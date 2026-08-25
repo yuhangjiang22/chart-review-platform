@@ -94,8 +94,14 @@ questions:
       exacerbation with 2 steroid courses counts ONCE.
 
   - question_id: T1-ControllerPrescribed
-    text: Is at least one daily controller (ICS, ICS-LABA, LTRA, or biologic)
+    text: >-
+      Is at least one daily controller (ICS, ICS-LABA, LTRA, or biologic)
       prescribed and active in the lookback window?
+
+      EVENT SCOPE: when this question is answered inside a rule event
+      (set_event_answer), answer whether a controller was active AT OR AFTER
+      the event date (the obligation point) — a controller discontinued
+      before the event date does not count.
     tier: 1
     answer_schema:
       type: boolean

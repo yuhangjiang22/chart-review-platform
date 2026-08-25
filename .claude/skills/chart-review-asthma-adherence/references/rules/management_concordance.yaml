@@ -21,7 +21,9 @@ rules:
     evidence_grade: A_with_SMART_strong_LAMA_conditional
     event_anchor: asthma_encounters
     # Per-event: judge only visits where a control picture is ascertainable.
-    event_evaluable_if: "T1-ControlLevel is present"
+    # undetermined = "no control picture ascertainable" too, so it is
+    # excluded from evaluability the same as an absent answer.
+    event_evaluable_if: "T1-ControlLevel is present and T1-ControlLevel != \"undetermined\""
     verdict_if: "T2-StepTherapyMatch == \"matches\""
     excluded_if: "T2-StepTherapyMatch == \"unknown\""
     attribution_when:
