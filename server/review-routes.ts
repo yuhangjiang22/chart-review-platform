@@ -36,6 +36,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { readNote } from "@chart-review/patients";
+import { fieldApplicability } from "@chart-review/contract-eval";
 import type { RouteEntry } from "./router.js";
 import type { SSEStream } from "./core-routes.js";
 import { isMethodologist, readReviewerFromRequest } from "./auth.js";
@@ -479,10 +480,23 @@ export const reviewRoutes: RouteEntry[] = [
           gate_results = { adherence_units_complete };
           if (!adherence_units_complete) return { ok: false, gate_results };
         } else {
-          // phenotype — existing leaf-field gate, unchanged.
+          // phenotype — leaf-field gate. Fields whose `is_applicable_when`
+          // gate evaluates NOT_APPLICABLE against the current answers are
+          // excluded: the UI hides their controls ("no action required"), so
+          // requiring a reviewer touch on them deadlocks validation (ACTS
+          // quit_time with smoking_status=current — reported by the annotator).
+          // "unknown" applicability (controlling answer missing) stays required.
           const fieldId = (f: { field_id?: string; id?: string }) => f.field_id ?? f.id;
+          const answersEnv: Record<string, unknown> = {};
+          for (const fa of state.field_assessments) answersEnv[fa.field_id] = (fa as { answer?: unknown }).answer;
           const leafFields = (task.fields as Array<{ derivation?: unknown; field_id?: string; id?: string }>)
-            .filter((f) => !f.derivation);
+            .filter((f) => !f.derivation)
+            .filter((f) =>
+              fieldApplicability(
+                task as Parameters<typeof fieldApplicability>[0],
+                answersEnv as Parameters<typeof fieldApplicability>[1],
+                fieldId(f)!,
+              ) !== "not_applicable");
           const faOf = (f: { field_id?: string; id?: string }) =>
             state.field_assessments.find((x) => x.field_id === fieldId(f));
           const all_terminal = leafFields.every((f) => {
