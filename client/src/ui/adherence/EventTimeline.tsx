@@ -29,6 +29,17 @@ export interface RuleRollup {
   period_verdict: "CONCORDANT" | "NON_CONCORDANT" | "EXCLUDED"; period_attribution?: string;
 }
 
+/** Whether a rule_event is "anchored" (has a specific position on the
+ *  timeline) vs a whole-window rule (anchor.type==="window", rendered only
+ *  as a chip). A card needs an x-position, which needs a valid date — an
+ *  event with anchor.type!=="window" but no date can't be placed and is
+ *  excluded from both the timeline cards AND (via this shared predicate)
+ *  the reviewer's Events list in AdherenceReview.tsx, so the two surfaces
+ *  can't disagree on the anchored count. */
+export function isAnchoredEvent(e: Pick<RuleEvent, "anchor">): boolean {
+  return e.anchor.type !== "window" && !!e.anchor.date;
+}
+
 export interface EventTimelineProps {
   events: RuleEvent[];
   rollups: RuleRollup[];
@@ -57,7 +68,7 @@ export function EventTimeline(props: EventTimelineProps) {
   const { events, rollups, validatedEvents, mode, compareEvents, selectedEventId, onSelectEvent } = props;
   const anchored = useMemo(
     () => events
-      .filter((e) => e.anchor.type !== "window" && e.anchor.date)
+      .filter(isAnchoredEvent)
       .sort((a, b) => (a.anchor.date ?? "").localeCompare(b.anchor.date ?? "")),
     [events],
   );

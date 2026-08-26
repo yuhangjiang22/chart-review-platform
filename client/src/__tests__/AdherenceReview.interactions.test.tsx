@@ -187,7 +187,13 @@ const RULE_EVENTS = [
     rule_id: "r_concordant",
     anchor: { type: "encounter", date: "2025-03-01", origin: "note", ref: "note_12" },
     evaluable: true,
-    answers: [{ question_id: "q_act_band", tier: 1, answer: 2 }],
+    // TWO committed answers, deliberately — see fix I8's test: editing only
+    // one must post only that one, proving untouched answers are never
+    // re-stamped source:"reviewer".
+    answers: [
+      { question_id: "q_act_band", tier: 1, answer: 2 },
+      { question_id: "q_visits", tier: 1, answer: 5 },
+    ],
     verdict: "CONCORDANT",
     source: "rule_engine",
   },
@@ -1147,17 +1153,35 @@ describe("session_id threading", () => {
   });
 });
 
+// jsdom has no scrollIntoView implementation. vi.spyOn requires the target
+// property to already be a function, so seed a base no-op ONCE at module
+// load; each test below wraps it with vi.spyOn(...).mockImplementation(), and
+// the file's global afterEach (vi.restoreAllMocks()) unwraps back to this
+// no-op rather than to "undefined".
+if (typeof Element.prototype.scrollIntoView !== "function") {
+  Element.prototype.scrollIntoView = () => {};
+}
+
+/** The EventRow container for a given event_id (id="event-row-<id>", set by
+ *  the component so EventTimeline's onSelectEvent can scroll to it). */
+function eventRowFor(eventId: string): HTMLElement {
+  const row = document.getElementById(`event-row-${eventId}`);
+  if (!row) throw new Error(`event row not found for ${eventId}`);
+  return row as HTMLElement;
+}
+/** EventRow's Save button, by ACCESSIBLE NAME — not a single-match
+ *  getByRole("button") assumption, because a row with a note-origin anchor
+ *  ref also renders an "Open note" button (I10). */
+function eventSaveBtn(row: HTMLElement): HTMLButtonElement {
+  return within(row).getByRole("button", { name: /save|validated/i }) as HTMLButtonElement;
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // 11. Event timeline + per-event validation (Task 4, event-concordance design)
 // ────────────────────────────────────────────────────────────────────────────
 describe("Event timeline + per-event validation", () => {
-  beforeEach(() => {
-    // jsdom has no scrollIntoView implementation; EventTimeline's
-    // onSelectEvent handler calls it on the matching event-row element.
-    Element.prototype.scrollIntoView = vi.fn();
-  });
-
-  it("(a) timeline renders an anchored event card; clicking it selects + scrolls the matching row", async () => {
+  it("(a) timeline renders an anchored event card; clicking it selects the row and scrolls to it", async () => {
+    const scrollSpy = vi.spyOn(Element.prototype, "scrollIntoView").mockImplementation(() => {});
     setupMocks({ state: () => stateWithEvents() });
     renderPane();
     await waitLoaded();
@@ -1174,21 +1198,23 @@ describe("Event timeline + per-event validation", () => {
     expect(card).toBeTruthy();
 
     fireEvent.click(card!);
-
     expect(card!.getAttribute("aria-current")).toBe("true");
-    expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+
+    // Scrolling now happens in a useEffect (after paint), not synchronously
+    // in the click handler — see fix I6 — so it must be awaited.
+    await waitFor(() => expect(scrollSpy).toHaveBeenCalled());
+    const scrolledEl = scrollSpy.mock.instances[0] as HTMLElement;
+    expect(scrolledEl.id).toBe("event-row-ev_1");
   });
 
-  it("(b) EventRow Save POSTs event-verdict with edited answers, then refetches state", async () => {
+  it("(b) EventRow Save posts ONLY the CHANGED answer, never a re-stamp of the untouched one (I8)", async () => {
     setupMocks({ state: () => stateWithEvents() });
     renderPane();
     await waitLoaded();
 
-    const row = document.getElementById("event-row-ev_1")!;
-    expect(row).toBeTruthy();
-
-    // q_act_band is a number-enum ([1,2,3]) → renders as a <select>. Agent/
-    // event answer starts at 2; change it to 3.
+    // ev_1 carries TWO committed answers (q_act_band, q_visits). Edit only
+    // q_act_band (the number-enum <select>) and leave q_visits untouched.
+    const row = eventRowFor("ev_1");
     const sel = within(row).getByRole("combobox") as HTMLSelectElement;
     fireEvent.change(sel, { target: { value: "3" } });
 
@@ -1196,14 +1222,18 @@ describe("Event timeline + per-event validation", () => {
       ([url]) => url.includes("/api/reviews/"),
     ).length;
 
-    fireEvent.click(within(row).getByRole("button"));
+    fireEvent.click(eventSaveBtn(row));
 
     await waitFor(() => expect(postsTo("event-verdict").length).toBe(1));
     const post = lastPost("event-verdict");
     expect(post.url).toContain("/api/reviews/p1/asthma-adherence/adherence/event-verdict");
     expect(post.url).toContain("session_id=sess-1");
     expect(post.body.event_id).toBe("ev_1");
+    // This is the assertion that discriminates I8: q_visits (unchanged, still
+    // 5) must NOT be in the payload — only the edited q_act_band.
     expect(post.body.answers).toEqual([{ question_id: "q_act_band", answer: 3 }]);
+    // Always an explicit boolean (C3) — the event stayed evaluable throughout.
+    expect(post.body.evaluable).toBe(true);
 
     // refreshState() re-fetches review state after a successful save.
     await waitFor(() => {
@@ -1220,9 +1250,9 @@ describe("Event timeline + per-event validation", () => {
     await waitLoaded();
 
     // ev_1 starts evaluable (no reason) so the checkbox starts unchecked.
-    const row = document.getElementById("event-row-ev_1")!;
+    const row = eventRowFor("ev_1");
     const checkbox = within(row).getByRole("checkbox") as HTMLInputElement;
-    const saveBtn = within(row).getByRole("button") as HTMLButtonElement;
+    const saveBtn = eventSaveBtn(row);
 
     expect(checkbox.checked).toBe(false);
     fireEvent.click(checkbox);
@@ -1231,15 +1261,18 @@ describe("Event timeline + per-event validation", () => {
     expect(within(row).getByText(/reason required/i)).toBeInTheDocument();
 
     const reasonInput = within(row).getByPlaceholderText(/reason/i) as HTMLInputElement;
-    fireEvent.change(reasonInput, { target: { value: "chart unavailable for this encounter" } });
-    expect(saveBtn.disabled).toBe(false);
+    // aria-label is also present (fix 13) — assert both ways of finding it agree.
+    expect(within(row).getByLabelText(/not evaluable reason/i)).toBe(reasonInput);
+    fireEvent.change(reasonInput, { target: { value: "  chart unavailable for this encounter  " } });
+    expect(eventSaveBtn(row).disabled).toBe(false);
 
-    fireEvent.click(saveBtn);
+    fireEvent.click(eventSaveBtn(row));
 
     await waitFor(() => expect(postsTo("event-verdict").length).toBe(1));
     const post = lastPost("event-verdict");
     expect(post.body.event_id).toBe("ev_1");
     expect(post.body.evaluable).toBe(false);
+    // Trimmed before posting (fix 13).
     expect(post.body.evaluable_reason).toBe("chart unavailable for this encounter");
   });
 
@@ -1249,11 +1282,197 @@ describe("Event timeline + per-event validation", () => {
     await waitLoaded();
 
     expect(screen.queryByText(/Adherence timeline/)).not.toBeInTheDocument();
-    expect(screen.queryByText("Events")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Events/ })).not.toBeInTheDocument();
     expect(screen.queryByText(/Events:.*validated/)).not.toBeInTheDocument();
     // Everything else renders exactly as before.
     expect(screen.getByText("Question framework")).toBeInTheDocument();
     expect(screen.getByText("Rule verdicts")).toBeInTheDocument();
+  });
+
+  it("drafts survive a refresh triggered by ANOTHER row's save (C2)", async () => {
+    setupMocks({ state: () => stateWithEvents() });
+    renderPane();
+    await waitLoaded();
+
+    // Edit ev_1's q_act_band but do NOT save it.
+    const row1 = eventRowFor("ev_1");
+    const sel1 = within(row1).getByRole("combobox") as HTMLSelectElement;
+    fireEvent.change(sel1, { target: { value: "3" } });
+    expect(sel1.value).toBe("3");
+
+    // Fully edit + save a DIFFERENT row (ev_2) — its own real change.
+    const row2 = eventRowFor("ev_2");
+    const visitsInput = row2.querySelector('input[type="number"]') as HTMLInputElement;
+    fireEvent.change(visitsInput, { target: { value: "4" } });
+    fireEvent.click(eventSaveBtn(row2));
+
+    await waitFor(() => expect(postsTo("event-verdict").length).toBe(1));
+    // refreshState() re-fetches and re-renders with a BRAND NEW state object
+    // (new array/object identities throughout) — ev_1's still-unsaved edit
+    // must survive this, not silently revert to the canonical "2".
+    await waitFor(() => {
+      const freshSel1 = within(eventRowFor("ev_1")).getByRole("combobox") as HTMLSelectElement;
+      expect(freshSel1.value).toBe("3");
+    });
+  });
+
+  it("drafts survive the Events section collapsing and reopening (I5)", async () => {
+    setupMocks({ state: () => stateWithEvents() });
+    renderPane();
+    await waitLoaded();
+
+    const row1 = eventRowFor("ev_1");
+    const sel1 = within(row1).getByRole("combobox") as HTMLSelectElement;
+    fireEvent.change(sel1, { target: { value: "3" } });
+
+    const eventsToggle = screen.getByRole("button", { name: /^Events/ });
+    fireEvent.click(eventsToggle); // collapse
+    await waitFor(() => expect(document.getElementById("event-row-ev_1")).not.toBeInTheDocument());
+    fireEvent.click(eventsToggle); // reopen
+    await waitFor(() => expect(document.getElementById("event-row-ev_1")).toBeInTheDocument());
+
+    const freshSel1 = within(eventRowFor("ev_1")).getByRole("combobox") as HTMLSelectElement;
+    expect(freshSel1.value).toBe("3");
+  });
+
+  it("clicking a timeline card while the Events section is collapsed opens it and scrolls to the row (I6)", async () => {
+    const scrollSpy = vi.spyOn(Element.prototype, "scrollIntoView").mockImplementation(() => {});
+    setupMocks({ state: () => stateWithEvents() });
+    renderPane();
+    await waitLoaded();
+
+    fireEvent.click(screen.getByRole("button", { name: /^Events/ })); // collapse
+    await waitFor(() => expect(document.getElementById("event-row-ev_1")).not.toBeInTheDocument());
+
+    const card = screen
+      .getAllByText("ev_1")
+      .map((el) => el.closest("button"))
+      .find((b): b is HTMLButtonElement => b !== null);
+    expect(card).toBeTruthy();
+    fireEvent.click(card!);
+
+    // The section reopens (the row exists again)...
+    await waitFor(() => expect(document.getElementById("event-row-ev_1")).toBeInTheDocument());
+    // ...and only THEN does the scroll effect fire against it.
+    await waitFor(() => expect(scrollSpy).toHaveBeenCalled());
+    const scrolledEl = scrollSpy.mock.instances[scrollSpy.mock.instances.length - 1] as HTMLElement;
+    expect(scrolledEl.id).toBe("event-row-ev_1");
+  });
+
+  it("clicking a window-rule chip scrolls to its RuleRow, not an EventRow (I7)", async () => {
+    const scrollSpy = vi.spyOn(Element.prototype, "scrollIntoView").mockImplementation(() => {});
+    setupMocks({ state: () => stateWithEvents() });
+    renderPane();
+    await waitLoaded();
+
+    const windowRulesLabel = screen.getByText(/Window rules/);
+    const chip = within(windowRulesLabel.parentElement as HTMLElement).getByRole("button");
+    fireEvent.click(chip);
+
+    expect(chip.getAttribute("aria-current")).toBe("true");
+    await waitFor(() => expect(scrollSpy).toHaveBeenCalled());
+    const scrolledEl = scrollSpy.mock.instances[scrollSpy.mock.instances.length - 1] as HTMLElement;
+    expect(scrolledEl.id).toBe("rule-row-r_unadjudicated");
+  });
+
+  it("unchecking 'Not evaluable' posts evaluable:true, undoing a prior mis-marking (C3)", async () => {
+    setupMocks({ state: () => stateWithEvents() });
+    renderPane();
+    await waitLoaded();
+
+    // ev_2 starts evaluable:false with a preset reason.
+    const row = eventRowFor("ev_2");
+    const checkbox = within(row).getByRole("checkbox") as HTMLInputElement;
+    expect(checkbox.checked).toBe(true);
+
+    fireEvent.click(checkbox); // uncheck → evaluable again
+    expect(checkbox.checked).toBe(false);
+
+    fireEvent.click(eventSaveBtn(row));
+
+    await waitFor(() => expect(postsTo("event-verdict").length).toBe(1));
+    const post = lastPost("event-verdict");
+    expect(post.body.event_id).toBe("ev_2");
+    expect(post.body.evaluable).toBe(true);
+    expect(post.body.evaluable_reason).toBeUndefined();
+  });
+
+  it("a failed event save preserves the draft and shows a row-scoped error, not the page banner (I12)", async () => {
+    setupMocks({
+      state: () => stateWithEvents(),
+      postResult: (k) => (k === "event-verdict" ? errJson(500, { message: "event save blew up" }) : undefined),
+    });
+    renderPane();
+    await waitLoaded();
+
+    const row = eventRowFor("ev_1");
+    const sel = within(row).getByRole("combobox") as HTMLSelectElement;
+    fireEvent.change(sel, { target: { value: "3" } });
+    fireEvent.click(eventSaveBtn(row));
+
+    await waitFor(() => expect(within(eventRowFor("ev_1")).getByText("event save blew up")).toBeInTheDocument());
+    // Draft preserved — the select still shows the edited value, not reverted.
+    expect((within(eventRowFor("ev_1")).getByRole("combobox") as HTMLSelectElement).value).toBe("3");
+    // Row-scoped only — the page-level banner never shows this message.
+    const outsideRow = screen
+      .queryAllByText("event save blew up")
+      .filter((el) => !eventRowFor("ev_1").contains(el));
+    expect(outsideRow.length).toBe(0);
+
+    // Retrying clears the row error even before the (still-failing) result
+    // lands — the disabled-briefly busy state confirms the click registered.
+    fireEvent.click(eventSaveBtn(eventRowFor("ev_1")));
+    await waitFor(() => expect(postsTo("event-verdict").length).toBe(2));
+  });
+
+  it("'Events: N / M validated' counts only anchored events, excluding the window event", async () => {
+    setupMocks({ state: () => stateWithEvents({ validated_events: ["ev_1"] }) });
+    renderPane();
+    await waitLoaded();
+
+    // 2 anchored events (ev_1, ev_2); ev_window is excluded from both N and M.
+    expect(screen.getByText("Events: 1 / 2 validated")).toBeInTheDocument();
+  });
+
+  it("I4: a validated row reads '✓ Validated' until edited, then flips to a dirty 'Save'", async () => {
+    setupMocks({ state: () => stateWithEvents({ validated_events: ["ev_1"] }) });
+    renderPane();
+    await waitLoaded();
+
+    const row = eventRowFor("ev_1");
+    expect(eventSaveBtn(row).textContent).toMatch(/✓ Validated/);
+
+    const sel = within(row).getByRole("combobox") as HTMLSelectElement;
+    fireEvent.change(sel, { target: { value: "3" } });
+    await waitFor(() => expect(eventSaveBtn(eventRowFor("ev_1")).textContent).toBe("Save"));
+  });
+
+  it("I9/I10: EventRow shows the rule's clinical context and an actionable note-origin ref", async () => {
+    setupMocks({ state: () => stateWithEvents() });
+    renderPane();
+    await waitLoaded();
+
+    const row = eventRowFor("ev_1");
+    // Rule id + description (mirrors RuleRow's own presentation).
+    expect(within(row).getByText("r_concordant")).toBeInTheDocument();
+    expect(within(row).getByText("Controller prescribed")).toBeInTheDocument();
+    // The note-origin anchor ref is a clickable button, not inert text.
+    expect(within(row).getByRole("button", { name: "note_12" })).toBeInTheDocument();
+  });
+
+  it("I11: an anchored event with NO committed answers still renders controls (unioned from supporting_questions) plus a notice", async () => {
+    const noAnswersState = stateWithEvents({
+      rule_events: RULE_EVENTS.map((e) => (e.event_id === "ev_1" ? { ...e, answers: [] } : e)),
+    });
+    setupMocks({ state: () => noAnswersState });
+    renderPane();
+    await waitLoaded();
+
+    const row = eventRowFor("ev_1");
+    expect(within(row).getByText(/no answers committed/i)).toBeInTheDocument();
+    // r_concordant's supporting_questions is ["q_act_band"] — still gets a
+    // (empty) control instead of rendering zero controls.
+    expect(within(row).getByRole("combobox")).toBeInTheDocument();
   });
 });
 
