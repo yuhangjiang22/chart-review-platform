@@ -50,7 +50,9 @@ def test_resolve_azure_reads_env_values(tmp_path):
                     "api_key": "secret", "api_version": "2024-10-21",
                     "azure_deployment": "gpt-4o",
                     # non-reasoning entry -> reasoning_effort is None
-                    "reasoning_effort": None}
+                    "reasoning_effort": None,
+                    # non-omit_temperature entry -> omit_temperature is None
+                    "omit_temperature": None}
 
 
 def test_resolve_azure_passes_reasoning_effort(tmp_path):
