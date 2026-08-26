@@ -478,17 +478,12 @@ if (task.task_kind === "adherence") {
           question_id: z.string(),
           answer: z.union([z.string(), z.number(), z.boolean(), z.null()]),
           confidence: z.number().min(0).max(1).optional(),
-          evidence: z
-            .array(
-              z.object({
-                note_id: z.string(),
-                quote: z.string(),
-                // `.nullish()`: agents serialize uncomputed offsets as null.
-                start: z.number().int().nonnegative().nullish(),
-                end: z.number().int().nonnegative().nullish(),
-              }),
-            )
-            .optional(),
+          // Shared note|omop union from mcp-core-adherence — the previous
+          // note-only shape rejected every OMOP row citation at the SDK layer
+          // (-32602) even though the handler, the prompt, and the question
+          // hints all mandate citing structured rows. gpt-4o looped 124
+          // attempts to the recursion limit on exactly this mismatch.
+          evidence: z.array(adherenceEvidenceSchema).optional(),
           reasoning: z.string().optional(),
         },
       },
