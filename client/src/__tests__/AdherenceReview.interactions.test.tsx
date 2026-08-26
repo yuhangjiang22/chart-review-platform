@@ -213,7 +213,13 @@ const RULE_EVENTS = [
     evaluable: false,
     evaluable_reason: "no visit note found",
     answers: [{ question_id: "q_visits", tier: 1, answer: null }],
-    verdict: "EXCLUDED",
+    // undefined, NOT "EXCLUDED" (Task 6 review, Important 1) — the engine
+    // never emits a verdict for a not-evaluable event; a stray "EXCLUDED"
+    // here was masking the "NE vs genuinely-absent vs a real EXCLUDED
+    // verdict" distinction the compare-mode chip fix depends on. Review
+    // mode is unaffected either way — its badge already branches on
+    // `evaluable === false` BEFORE ever reading e.verdict.
+    verdict: undefined,
     source: "rule_engine",
   },
   {
@@ -1527,8 +1533,10 @@ describe("Event timeline + per-event validation", () => {
 //     and the matched/agent-only/human-only summary.
 // ────────────────────────────────────────────────────────────────────────────
 describe("Compare mode (Task 6)", () => {
-  // Two sessions for the picker: the ACTIVE one (sess-1, must be excluded)
-  // and a second session (sess-2) to compare against. Same response shape
+  // Three sessions for the picker: the ACTIVE one (sess-1, excluded by
+  // activeSessionId), a compare target (sess-2, gold/blind), and one whose
+  // cohort does NOT cover patient p1 (sess-3 — Task 6 review Critical 2:
+  // must never even appear as a selectable option). Same response shape
   // GET /api/sessions/:taskId returns — { sessions: SessionListItem[] } —
   // see server/session-routes.ts buildSessionListing / SessionSwitcher.tsx.
   const SESSIONS_LIST = {
@@ -1543,21 +1551,56 @@ describe("Compare mode (Task 6)", () => {
       {
         session: {
           session_id: "sess-2", session_num: 2, name: "Blind gold v1", state: "active",
-          started_at: "2025-02-01T00:00:00Z", cohort: { patient_ids: ["p1"] },
+          started_at: "2025-02-01T00:00:00Z", cohort: { patient_ids: ["p1"] }, blind: true,
         },
         iter_count: 1, iter_ids: ["iter-2"],
+      },
+      {
+        session: {
+          session_id: "sess-3", session_num: 3, name: "Other cohort", state: "active",
+          started_at: "2025-03-01T00:00:00Z", cohort: { patient_ids: ["p2"] },
+        },
+        iter_count: 1, iter_ids: ["iter-3"],
       },
     ],
   };
 
+  // ACTIVE-session fixture demonstrating the Critical-1 bug directly: ev_1's
+  // CANONICAL entry (rule_events) has been REVIEWER-EDITED — source:
+  // "reviewer", verdict flipped to NON_CONCORDANT — exactly "the normal
+  // state after any validation" the review describes. agent_rule_events
+  // preserves the frozen ORIGINAL agent draft (verdict CONCORDANT). Before
+  // the fix, the "A:" chip read the canonical array and showed "A: NC" —
+  // the reviewer's own edit mislabeled as the agent's opinion (and, since
+  // the compare side below also happens to be NON_CONCORDANT, that would
+  // have rendered as manufactured AGREEMENT with the human side). After the
+  // fix, "A:" reads agent_rule_events.agent_1 and correctly shows "A: C".
+  const ACTIVE_STATE_REVIEWER_EDITED = stateWithEvents({
+    agent_rule_events: {
+      agent_1: [
+        { ...RULE_EVENTS[0], verdict: "CONCORDANT", source: "agent" },
+        RULE_EVENTS[1],
+        RULE_EVENTS[2],
+      ],
+    },
+    rule_events: [
+      { ...RULE_EVENTS[0], verdict: "NON_CONCORDANT", source: "reviewer" },
+      RULE_EVENTS[1],
+      RULE_EVENTS[2],
+    ],
+    validated_events: ["ev_1"],
+  });
+
   // Compare-session review state: rule_events deliberately diverges from the
   // active session's RULE_EVENTS (ev_1, ev_2, ev_window) —
-  //   - ev_1: present on BOTH sides but with a DIFFERENT verdict, so the
-  //     A:/H: chips can only be right if each side renders its OWN verdict
-  //     (not the same card's data shown twice).
-  //   - ev_2, ev_window: agent-only (compare side lacks them).
+  //   - ev_1: present on BOTH sides, human's OWN verdict is NON_CONCORDANT
+  //     (matches the reviewer's canonical edit above but NOT the agent's
+  //     original CONCORDANT draft — the discriminating case for Critical 1).
+  //   - ev_2, ev_window: agent-only (compare side lacks them; ev_window is a
+  //     window stub, excluded from the anchored enumeration entirely).
   //   - ev_human_only: compare-only (agent side lacks it).
-  // → matched=1 (ev_1), agent only=2 (ev_2, ev_window), human only=1 (ev_human_only).
+  // → anchored matched=1 (ev_1), agent only=1 (ev_2), human only=1 (ev_human_only);
+  //   ev_window reported separately as "+1 window rules" (Important 2).
   const COMPARE_STATE = {
     ...stateWithEvents(),
     rule_events: [
@@ -1579,7 +1622,7 @@ describe("Compare mode (Task 6)", () => {
       if (url.includes("/api/tasks/") && url.includes("/adherence")) return okJson(FRAMEWORK);
       if (url.includes("/api/sessions/")) return okJson(SESSIONS_LIST);
       if (url.includes("/api/reviews/") && url.includes("session_id=sess-2")) return okJson(COMPARE_STATE);
-      if (url.includes("/api/reviews/")) return okJson(stateWithEvents());
+      if (url.includes("/api/reviews/")) return okJson(ACTIVE_STATE_REVIEWER_EDITED);
       if (url.includes("/api/runs")) return okJson([]);
       return okJson(null);
     });
@@ -1611,15 +1654,18 @@ describe("Compare mode (Task 6)", () => {
     return card;
   }
 
-  it("choosing a session issues the second review fetch (?session_id=<that id>) and renders compare chips", async () => {
+  it("choosing a session issues the second review fetch (?session_id=<that id>), renders compare chips sourced from the agent draft (Critical 1), and excludes patient-uncovered sessions (Critical 2)", async () => {
     setupCompareMocks();
     renderPane();
     await waitLoaded();
 
     const picker = (await screen.findByLabelText(/compare with session/i)) as HTMLSelectElement;
-    await waitFor(() => expect(optionTexts(picker)).toContain("Blind gold v1"));
+    await waitFor(() => expect(optionTexts(picker)).toContain("Blind gold v1 (gold)"));
     // The ACTIVE session (sess-1) must never appear as a compare target.
     expect(optionTexts(picker)).not.toContain("Main session");
+    // sess-3's cohort doesn't cover patient p1 — must never be offered, and
+    // (Critical 2) never fetched at all.
+    expect(optionTexts(picker).some((t) => t.includes("Other cohort"))).toBe(false);
 
     await selectCompareSession("sess-2");
 
@@ -1630,18 +1676,59 @@ describe("Compare mode (Task 6)", () => {
         ),
       ).toBe(true);
     });
+    expect(
+      (mockAuthFetch.mock.calls as Call[]).some(([url]) => url.includes("session_id=sess-3")),
+    ).toBe(false);
 
-    // Compare chips render INSIDE ev_1's card — the agent's own CONCORDANT
-    // ("A: C") next to the human session's own NON_CONCORDANT ("H: NC"),
-    // proving each chip reflects its OWN session's verdict.
+    // Compare chips render INSIDE ev_1's card — the FROZEN agent draft's
+    // CONCORDANT ("A: C"), not the reviewer-edited canonical NON_CONCORDANT
+    // that would otherwise (falsely) agree with the human side's own "H: NC".
+    // This is the assertion that fails against the pre-fix code (which read
+    // canonical rule_events and would show "A: NC" here instead).
     await waitFor(() => {
       const card = eventCard("ev_1");
       expect(within(card).getByText("A: C")).toBeInTheDocument();
       expect(within(card).getByText("H: NC")).toBeInTheDocument();
     });
+    // The axis-naming row names which agent draft is in use — proves the
+    // shadow-map path (not the fallback) was taken.
+    expect(screen.getByText(/agent draft: agent_1/)).toBeInTheDocument();
+    // ...and since the shadow map WAS available, the fallback warning must
+    // NOT render (it's only for when there's nothing to fall back FROM but
+    // the edited canonical array).
+    expect(screen.queryByText(/carry your edits/)).not.toBeInTheDocument();
   });
 
-  it("the compare summary renders correct matched / agent-only / human-only counts", async () => {
+  it("the fallback warning renders when there's no agent-draft shadow map (Critical 1, PLUS)", async () => {
+    // No agent_rule_events key at all — ev_1 is reviewer-edited on the
+    // canonical array with nothing to fall back FROM.
+    const fallbackState = stateWithEvents({
+      rule_events: [
+        { ...RULE_EVENTS[0], verdict: "NON_CONCORDANT", source: "reviewer" },
+        RULE_EVENTS[1],
+        RULE_EVENTS[2],
+      ],
+    });
+    mockAuthFetch.mockImplementation((url: string) => {
+      if (url.includes("/api/tasks/") && url.includes("/adherence")) return okJson(FRAMEWORK);
+      if (url.includes("/api/sessions/")) return okJson(SESSIONS_LIST);
+      if (url.includes("/api/reviews/") && url.includes("session_id=sess-2")) return okJson(COMPARE_STATE);
+      if (url.includes("/api/reviews/")) return okJson(fallbackState);
+      if (url.includes("/api/runs")) return okJson([]);
+      return okJson(null);
+    });
+    renderPane();
+    await waitLoaded();
+    await selectCompareSession("sess-2");
+
+    // 1 of 3 events (ev_1) on the canonical array is reviewer-sourced.
+    await waitFor(() => {
+      expect(screen.getByText(/⚠ 1 of 3 events on the agent side carry your edits/)).toBeInTheDocument();
+    });
+    expect(screen.getByText(/\(includes your edits\)/)).toBeInTheDocument();
+  });
+
+  it("the compare summary counts ANCHORED events only and reports window rules separately (Important 2)", async () => {
     setupCompareMocks();
     renderPane();
     await waitLoaded();
@@ -1649,7 +1736,9 @@ describe("Compare mode (Task 6)", () => {
     await selectCompareSession("sess-2");
 
     await waitFor(() => {
-      expect(screen.getByText("matched: 1 · agent only: 2 · human only: 1")).toBeInTheDocument();
+      expect(
+        screen.getByText("matched: 1 · agent only: 1 · human only: 1 · +1 window rules"),
+      ).toBeInTheDocument();
     });
   });
 
@@ -1668,12 +1757,195 @@ describe("Compare mode (Task 6)", () => {
       // No compare chips left...
       expect(within(card).queryByText(/^A:/)).not.toBeInTheDocument();
       expect(within(card).queryByText(/^H:/)).not.toBeInTheDocument();
-      // ...and the plain review-mode verdict badge is back (ev_1 is
-      // evaluable:true, verdict CONCORDANT on the active session).
-      expect(within(card).getByText("CONCORDANT")).toBeInTheDocument();
+      // ...and the plain review-mode verdict badge is back, reading the
+      // CANONICAL (reviewer-edited) verdict — NON_CONCORDANT on
+      // ACTIVE_STATE_REVIEWER_EDITED — not the agent draft the compare
+      // chip used a moment ago. Review mode was never in scope for the
+      // Critical-1 fix; it's correct for it to show the current, edited
+      // truth.
+      expect(within(card).getByText("NON-CONCORDANT")).toBeInTheDocument();
     });
     // The summary disappears along with compare mode.
     expect(screen.queryByText(/matched:/)).not.toBeInTheDocument();
+  });
+
+  it("a compare session with rule_events: [] does NOT activate compare mode — 'no state for this patient' instead (Critical 2)", async () => {
+    mockAuthFetch.mockImplementation((url: string) => {
+      if (url.includes("/api/tasks/") && url.includes("/adherence")) return okJson(FRAMEWORK);
+      if (url.includes("/api/sessions/")) return okJson(SESSIONS_LIST);
+      if (url.includes("/api/reviews/") && url.includes("session_id=sess-2")) {
+        return okJson({ patient_id: "p1", task_id: "asthma-adherence", version: 1, task_kind: "adherence", rule_events: [] });
+      }
+      if (url.includes("/api/reviews/")) return okJson(ACTIVE_STATE_REVIEWER_EDITED);
+      if (url.includes("/api/runs")) return okJson([]);
+      return okJson(null);
+    });
+    renderPane();
+    await waitLoaded();
+
+    await selectCompareSession("sess-2");
+
+    await waitFor(() => {
+      expect(screen.getByText("this session has no state for p1")).toBeInTheDocument();
+    });
+    // NOT total disagreement — no chips, no summary at all.
+    expect(within(eventCard("ev_1")).queryByText(/^A:/)).not.toBeInTheDocument();
+    expect(within(eventCard("ev_1")).queryByText(/^H:/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/matched:/)).not.toBeInTheDocument();
+  });
+
+  it("compareSessionId === activeSessionId never renders as a self-comparison (Important 3)", async () => {
+    setupCompareMocks();
+    const { rerender } = renderPane();
+    await waitLoaded();
+
+    await selectCompareSession("sess-2");
+    await waitFor(() => expect(within(eventCard("ev_1")).getByText("A: C")).toBeInTheDocument());
+
+    // App can auto-select the EXACT session the reviewer picked as compare,
+    // without remounting AdherenceReview — just a changed activeSessionId prop.
+    rerender(
+      <AdherenceReview
+        patientId="p1"
+        patientDisplay="Patient 1"
+        taskId="asthma-adherence"
+        onBack={() => {}}
+        activeSessionId="sess-2"
+      />,
+    );
+
+    await waitFor(() => {
+      const card = eventCard("ev_1");
+      expect(within(card).queryByText(/^A:/)).not.toBeInTheDocument();
+      expect(within(card).queryByText(/^H:/)).not.toBeInTheDocument();
+    });
+    expect(screen.queryByText(/matched:/)).not.toBeInTheDocument();
+  });
+
+  it("after saveEvent, the A: chip reflects the new canonical value when there's no agent-draft shadow (fallback mode; already worked — locked in)", async () => {
+    let activeState: Record<string, unknown> = stateWithEvents();
+    mockAuthFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (url.includes("/api/tasks/") && url.includes("/adherence")) return okJson(FRAMEWORK);
+      if (url.includes("/api/sessions/")) return okJson(SESSIONS_LIST);
+      if (url.includes("/adherence/event-verdict") && init?.method === "POST") {
+        const body = JSON.parse((init!.body as string) ?? "{}");
+        const newBand = body.answers?.find((a: { question_id: string }) => a.question_id === "q_act_band")?.answer;
+        activeState = {
+          ...activeState,
+          rule_events: (activeState.rule_events as Array<Record<string, unknown>>).map((e) =>
+            e.event_id === body.event_id
+              ? {
+                  ...e,
+                  answers: (e.answers as Array<{ question_id: string; answer: unknown }>).map((a) =>
+                    a.question_id === "q_act_band" ? { ...a, answer: newBand } : a),
+                  verdict: newBand <= 2 ? "CONCORDANT" : "NON_CONCORDANT",
+                  source: "reviewer",
+                }
+              : e,
+          ),
+        };
+        return okJson({ ok: true, version: 2 });
+      }
+      if (url.includes("/api/reviews/") && url.includes("session_id=sess-2")) return okJson(COMPARE_STATE);
+      if (url.includes("/api/reviews/")) return okJson(activeState);
+      if (url.includes("/api/runs")) return okJson([]);
+      return okJson(null);
+    });
+    renderPane();
+    await waitLoaded();
+    await selectCompareSession("sess-2");
+
+    await waitFor(() => expect(within(eventCard("ev_1")).getByText("A: C")).toBeInTheDocument());
+
+    const row = eventRowFor("ev_1");
+    const sel = within(row).getByRole("combobox") as HTMLSelectElement;
+    fireEvent.change(sel, { target: { value: "3" } }); // q_act_band 2 -> 3, flips the rule
+    fireEvent.click(eventSaveBtn(row));
+
+    await waitFor(() => {
+      expect(within(eventCard("ev_1")).getByText("A: NC")).toBeInTheDocument();
+    });
+    // The summary survives the refresh too — not blown away by the identity
+    // change in `state` a successful save always triggers.
+    expect(screen.getByText(/matched: /)).toBeInTheDocument();
+  });
+
+  it("NOT_EVALUABLE renders as NE on both sides, distinct from a genuinely absent '—' (Important 1)", async () => {
+    const activeNE = stateWithEvents({
+      rule_events: [
+        {
+          event_id: "ev_ne", rule_id: "r_concordant",
+          anchor: { type: "encounter", date: "2025-06-01", origin: "note", ref: "note_40" },
+          evaluable: false, evaluable_reason: "chart gap", answers: [], verdict: undefined, source: "rule_engine",
+        },
+        {
+          event_id: "ev_agent_only", rule_id: "r_concordant",
+          anchor: { type: "encounter", date: "2025-07-01", origin: "note", ref: "note_41" },
+          evaluable: true, answers: [], verdict: "CONCORDANT", source: "rule_engine",
+        },
+      ],
+      rule_rollups: [],
+    });
+    const compareNE = {
+      rule_events: [
+        {
+          event_id: "ev_ne", rule_id: "r_concordant",
+          anchor: { type: "encounter", date: "2025-06-01", origin: "note", ref: "note_40" },
+          evaluable: false, evaluable_reason: "chart gap (human)", answers: [], verdict: undefined, source: "reviewer",
+        },
+      ],
+    };
+    mockAuthFetch.mockImplementation((url: string) => {
+      if (url.includes("/api/tasks/") && url.includes("/adherence")) return okJson(FRAMEWORK);
+      if (url.includes("/api/sessions/")) return okJson(SESSIONS_LIST);
+      if (url.includes("/api/reviews/") && url.includes("session_id=sess-2")) return okJson(compareNE);
+      if (url.includes("/api/reviews/")) return okJson(activeNE);
+      if (url.includes("/api/runs")) return okJson([]);
+      return okJson(null);
+    });
+    renderPane();
+    await waitLoaded();
+    await selectCompareSession("sess-2");
+
+    await waitFor(() => {
+      const card = eventCard("ev_ne");
+      expect(within(card).getByText("A: NE")).toBeInTheDocument();
+      expect(within(card).getByText("H: NE")).toBeInTheDocument();
+    });
+    const agentOnlyCard = eventCard("ev_agent_only");
+    expect(within(agentOnlyCard).getByText("A: C")).toBeInTheDocument();
+    expect(within(agentOnlyCard).getByText("H: —")).toBeInTheDocument();
+  });
+
+  it("shows a work-list mismatch warning when the two sessions' rule_events_provenance hashes differ (Important 4)", async () => {
+    const activeWithProv = stateWithEvents({
+      rule_events_provenance: {
+        seeded_by: "runner", ts: "2025-01-01T00:00:00Z",
+        guideline_sha: "abcdef1234567890", anchor_lists: {}, worklist_hash: "hash-A",
+      },
+    });
+    const compareWithProv = {
+      ...COMPARE_STATE,
+      rule_events_provenance: {
+        seeded_by: "blind-seed-route", ts: "2025-02-01T00:00:00Z",
+        guideline_sha: "1234567890abcdef", anchor_lists: {}, worklist_hash: "hash-B",
+      },
+    };
+    mockAuthFetch.mockImplementation((url: string) => {
+      if (url.includes("/api/tasks/") && url.includes("/adherence")) return okJson(FRAMEWORK);
+      if (url.includes("/api/sessions/")) return okJson(SESSIONS_LIST);
+      if (url.includes("/api/reviews/") && url.includes("session_id=sess-2")) return okJson(compareWithProv);
+      if (url.includes("/api/reviews/")) return okJson(activeWithProv);
+      if (url.includes("/api/runs")) return okJson([]);
+      return okJson(null);
+    });
+    renderPane();
+    await waitLoaded();
+    await selectCompareSession("sess-2");
+
+    await waitFor(() => {
+      expect(screen.getByText("⚠ different work-lists (guideline abcdef1 vs 1234567)")).toBeInTheDocument();
+    });
   });
 
   it("blind mode never renders the compare picker", async () => {

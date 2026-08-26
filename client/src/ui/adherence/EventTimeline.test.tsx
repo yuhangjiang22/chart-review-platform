@@ -76,6 +76,78 @@ describe("EventTimeline (compare mode)", () => {
   });
 });
 
+describe("EventTimeline (compare mode — agentEvents override, spec 2026-08-24 review Critical 1)", () => {
+  it("without agentEvents, the A: chip falls back to `events` (byte-identical to before the prop existed)", () => {
+    const human: RuleEvent[] = [{ ...EVENTS[0], verdict: "CONCORDANT" }];
+    render(<EventTimeline events={EVENTS} rollups={ROLLUPS} validatedEvents={new Set()} mode="compare" compareEvents={human} onSelectEvent={() => {}} />);
+    const card = screen.getByText(/R-Step@2025-11-04@encounters:1/).closest("button")!;
+    // EVENTS[0].verdict is NON_CONCORDANT — the fallback source.
+    expect(within(card).getByText(/A:\s*NC/)).toBeInTheDocument();
+  });
+
+  it("with agentEvents, the A: chip reads the frozen agent draft, NOT the (differently-valued) canonical `events`", () => {
+    // Simulates the real bug: `events` (canonical, active-session) has been
+    // reviewer-edited to CONCORDANT, but the frozen agent draft actually
+    // said NON_CONCORDANT. Before this prop existed, "A:" would show "C" —
+    // the reviewer's own edit mislabeled as the agent's opinion.
+    const canonicalEdited: RuleEvent[] = [{ ...EVENTS[0], verdict: "CONCORDANT", source: "reviewer" }];
+    const agentDraft: RuleEvent[] = [{ ...EVENTS[0], verdict: "NON_CONCORDANT", source: "agent" }];
+    render(
+      <EventTimeline
+        events={canonicalEdited}
+        rollups={ROLLUPS}
+        validatedEvents={new Set()}
+        mode="compare"
+        compareEvents={[]}
+        agentEvents={agentDraft}
+        onSelectEvent={() => {}}
+      />,
+    );
+    const card = screen.getByText(/R-Step@2025-11-04@encounters:1/).closest("button")!;
+    expect(within(card).getByText(/A:\s*NC/)).toBeInTheDocument();
+    expect(within(card).queryByText(/A:\s*C\b/)).not.toBeInTheDocument();
+  });
+});
+
+describe("EventTimeline (compare mode — NOT_EVALUABLE chips, spec 2026-08-24 review Important 1)", () => {
+  it("renders NE (not the same '—' as absent) on both sides when evaluable===false", () => {
+    const agentSide: RuleEvent[] = [
+      { ...EVENTS[0], evaluable: false, verdict: undefined },
+    ];
+    const humanSide: RuleEvent[] = [
+      { ...EVENTS[0], evaluable: false, verdict: undefined },
+    ];
+    render(
+      <EventTimeline
+        events={agentSide}
+        rollups={[]}
+        validatedEvents={new Set()}
+        mode="compare"
+        compareEvents={humanSide}
+        onSelectEvent={() => {}}
+      />,
+    );
+    const card = screen.getByText(/R-Step@2025-11-04@encounters:1/).closest("button")!;
+    expect(within(card).getByText("A: NE")).toBeInTheDocument();
+    expect(within(card).getByText("H: NE")).toBeInTheDocument();
+  });
+
+  it("a genuinely absent human side still reads '—', not 'NE'", () => {
+    render(
+      <EventTimeline
+        events={EVENTS}
+        rollups={ROLLUPS}
+        validatedEvents={new Set()}
+        mode="compare"
+        compareEvents={[]}
+        onSelectEvent={() => {}}
+      />,
+    );
+    const card = screen.getByText(/R-Step@2025-11-04@encounters:1/).closest("button")!;
+    expect(within(card).getByText("H: —")).toBeInTheDocument();
+  });
+});
+
 describe("EventTimeline (not-evaluable styling)", () => {
   it("shows NOT EVALUABLE with the muted/excluded style, not the oxblood non-concordant style", () => {
     const events: RuleEvent[] = [

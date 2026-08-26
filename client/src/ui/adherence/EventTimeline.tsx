@@ -54,6 +54,21 @@ export interface EventTimelineProps {
   validatedEvents: Set<string>;
   mode: "review" | "blind" | "compare";
   compareEvents?: RuleEvent[]; // human side, compare mode only
+  /** Agent-draft snapshot for compare mode's "A:" chip (spec 2026-08-24
+   *  event-concordance design, Task 6 review Critical 1). `events` is the
+   *  ACTIVE session's CANONICAL rule_events, which drifts toward
+   *  reviewer-edited values as validation proceeds (the event-verdict route
+   *  stamps ev.source="reviewer" + re-derives the verdict on every save) —
+   *  showing THAT as "A:" manufactures agreement with the human side that
+   *  isn't real. When provided, the "A:" chip's verdict/evaluable is looked
+   *  up in THIS array by event_id instead of `events` — pass the frozen
+   *  import-time agent draft (state.agent_rule_events[<agent id>]), which no
+   *  save route ever touches. Falls back to `events` itself when omitted, so
+   *  every non-compare caller (and any compare caller with no shadow
+   *  snapshot to fall back on) is byte-identical to before this prop
+   *  existed. Card POSITIONS/enumeration are unaffected either way — those
+   *  always come from `events`, never from this. */
+  agentEvents?: RuleEvent[];
   selectedEventId?: string | null;
   onSelectEvent: (eventId: string) => void;
 }
@@ -67,13 +82,35 @@ const verdictLabel = (v?: string) =>
   v === "NON_CONCORDANT" ? "NON-CONCORDANT" : v ?? "—";
 const verdictAbbrev = (v?: string) =>
   v === "CONCORDANT" ? "C" : v === "NON_CONCORDANT" ? "NC" : v === "EXCLUDED" ? "EXCL" : "—";
+// Compare-chip helpers (spec 2026-08-24 review, Important 1): a compare-mode
+// chip must distinguish THREE states that all used to render as the same
+// "—" — "not evaluable" (evaluable===false; the engine leaves verdict
+// undefined for these), "genuinely absent" (no event on this side at all),
+// and an evaluable event with an actual verdict. Collapsing the first two
+// made Task 7's IAA score a not-evaluable event against a not-observed one
+// as a plain disagreement, when neither is really comparable to a verdict.
+function chipAbbrev(e?: RuleEvent): string {
+  if (!e) return "—"; // genuinely absent — no event on this side
+  if (e.evaluable === false) return "NE";
+  return verdictAbbrev(e.verdict);
+}
+function chipClass(e?: RuleEvent): string {
+  if (!e) return "bg-[hsl(var(--ochre))]/20 text-[hsl(var(--ochre))]"; // "not observed"
+  if (e.evaluable === false) return VERDICT_STYLE.EXCLUDED; // same muted style review mode uses for NOT EVALUABLE
+  return VERDICT_STYLE[e.verdict ?? "EXCLUDED"];
+}
+function chipTitle(prefix: string, e?: RuleEvent): string {
+  if (!e) return `${prefix}: not observed`;
+  if (e.evaluable === false) return `${prefix}: not evaluable`;
+  return `${prefix} ${verdictLabel(e.verdict)}`;
+}
 const ANCHOR_GLYPH: Record<string, string> = { encounter: "●", ed: "▲", burst: "◆" };
 // px — must match the card button's rendered width (Tailwind w-[150px] below).
 const CARD_W = 150;
 const LANE_PX = 64;
 
 export function EventTimeline(props: EventTimelineProps) {
-  const { events, rollups, validatedEvents, mode, compareEvents, selectedEventId, onSelectEvent } = props;
+  const { events, rollups, validatedEvents, mode, compareEvents, agentEvents, selectedEventId, onSelectEvent } = props;
   const anchored = useMemo(
     () => events
       .filter(isAnchoredEvent)
@@ -120,6 +157,13 @@ export function EventTimeline(props: EventTimelineProps) {
   const lanes = useMemo(() => assignLanes(anchored, win, halfPct), [anchored, win, halfPct]);
 
   const humanById = useMemo(() => new Map((compareEvents ?? []).map((e) => [e.event_id, e])), [compareEvents]);
+  // Falls back to `events` when no agentEvents snapshot is supplied — see
+  // the prop's doc comment. Byte-identical A: data to before this prop
+  // existed for every caller that doesn't pass it.
+  const agentById = useMemo(
+    () => new Map((agentEvents ?? events).map((e) => [e.event_id, e])),
+    [agentEvents, events],
+  );
   const humanOnly = useMemo(
     () => (compareEvents ?? []).filter((h) => !events.some((e) => e.event_id === h.event_id)),
     [compareEvents, events],
@@ -205,22 +249,25 @@ export function EventTimeline(props: EventTimelineProps) {
                       {notEvaluable ? "NOT EVALUABLE" : verdictLabel(e.verdict)}
                     </span>
                   )}
-                  {mode === "compare" && (
-                    <div className="flex flex-wrap gap-1">
-                      <span
-                        className={cn("rounded px-1 whitespace-nowrap", VERDICT_STYLE[e.verdict ?? "EXCLUDED"])}
-                        title={`agent ${verdictLabel(e.verdict)}`}
-                      >
-                        A: {verdictAbbrev(e.verdict)}
-                      </span>
-                      <span
-                        className={cn("rounded px-1 whitespace-nowrap", human ? VERDICT_STYLE[human.verdict ?? "EXCLUDED"] : "bg-[hsl(var(--ochre))]/20 text-[hsl(var(--ochre))]")}
-                        title={human ? `human ${verdictLabel(human.verdict)}` : "human: not observed"}
-                      >
-                        H: {human ? verdictAbbrev(human.verdict) : "—"}
-                      </span>
-                    </div>
-                  )}
+                  {mode === "compare" && (() => {
+                    const agentSide = agentById.get(e.event_id);
+                    return (
+                      <div className="flex flex-wrap gap-1">
+                        <span
+                          className={cn("rounded px-1 whitespace-nowrap", chipClass(agentSide))}
+                          title={chipTitle("agent", agentSide)}
+                        >
+                          A: {chipAbbrev(agentSide)}
+                        </span>
+                        <span
+                          className={cn("rounded px-1 whitespace-nowrap", chipClass(human))}
+                          title={chipTitle("human", human)}
+                        >
+                          H: {chipAbbrev(human)}
+                        </span>
+                      </div>
+                    );
+                  })()}
                   {mode !== "blind" && validatedEvents.has(e.event_id) && (
                     <span className="text-[9px] text-[hsl(var(--sage))] uppercase">validated</span>
                   )}

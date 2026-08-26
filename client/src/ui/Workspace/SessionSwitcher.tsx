@@ -21,6 +21,12 @@ export interface SessionListItem {
     state: "active" | "archived";
     started_at: string;
     cohort: { patient_ids: string[] };
+    /** Blind gold-collection session (spec 2026-08-24 Task 5/6). Server
+     *  already sends this on every session manifest (packages/domain-iter's
+     *  SessionManifest.blind) — declared here so consumers (AdherenceReview's
+     *  compare-session picker) can mark gold candidates without re-fetching
+     *  the full manifest. */
+    blind?: boolean;
   };
   iter_count: number;
   iter_ids: string[];

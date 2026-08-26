@@ -201,6 +201,19 @@ function buildEventSavePayload(event: RuleEvent, draft: EventDraft): EventSavePa
   };
 }
 
+// Mirrors @chart-review/platform-types RuleEventsProvenance field-for-field
+// (same convention as the other local shapes in this file — see the header
+// note). Stamped by both rule_events seed sites (the blind seed-events
+// route and the batch runner) so two sessions' rule_events can be checked
+// for a shared denominator (Task 6 review, Important 4).
+interface RuleEventsProvenance {
+  seeded_by: "blind-seed-route" | "runner";
+  ts: string;
+  guideline_sha: string;
+  anchor_lists: Record<string, number>;
+  worklist_hash: string;
+}
+
 // The slice of review_state.json AdherenceReview reads. The server's
 // domain ReviewState is a union across all task kinds; the client only
 // needs the adherence fields plus the seed-guard markers.
@@ -229,6 +242,7 @@ interface AdherenceReviewState {
   rule_rollups?: RuleRollup[];
   validated_events?: string[];
   agent_rule_events?: Record<string, RuleEvent[]>;
+  rule_events_provenance?: RuleEventsProvenance;
 }
 
 /** Blind-mode contamination check (spec 2026-08-24 Task 5 review, Critical
@@ -347,6 +361,11 @@ export function AdherenceReview(props: AdherenceReviewProps) {
   const [compareSessionId, setCompareSessionId] = useState<string | null>(null);
   const [compareState, setCompareState] = useState<AdherenceReviewState | null>(null);
   const [compareError, setCompareError] = useState<string | null>(null);
+  // Loading state between picking a session and its response arriving (spec
+  // 2026-08-24 Task 6 review, Minor 3) — without this, the summary/message
+  // row is simply blank while the fetch is in flight, indistinguishable
+  // from "nothing selected".
+  const [compareLoading, setCompareLoading] = useState(false);
   // Cancellation token for the compare-session fetch, mirroring
   // refreshTokenRef above — a late response for a superseded
   // (compareSessionId, patientId, taskId) combination must never clobber a
@@ -523,20 +542,29 @@ export function AdherenceReview(props: AdherenceReviewProps) {
   // Compare-session state: a READ-ONLY fetch of a SECOND session's review
   // state via the exact same endpoint the active session's own refreshState
   // uses above, differing only in ?session_id=. Re-runs on every
-  // (compareSessionId, patientId, taskId) change; each run clears
-  // compareState/compareError SYNCHRONOUSLY first — this is what satisfies
-  // both "picker set back to '—' clears compare mode" (compareSessionId
-  // becomes null, effect returns right after the clear) and "patient switch
-  // clears the stale compare view" (a new run always clears before its own
-  // fetch, even if compareSessionId itself didn't change) — before the
-  // (possibly slow) fetch resolves. Token-guarded exactly like
-  // refreshTokenRef so a late response for a superseded selection can never
-  // clobber a newer one.
+  // (compareSessionId, patientId, taskId, activeSessionId) change; each run
+  // clears compareState/compareError/compareLoading SYNCHRONOUSLY first —
+  // this is what satisfies both "picker set back to '—' clears compare
+  // mode" (compareSessionId becomes null, effect returns right after the
+  // clear) and "patient switch clears the stale compare view" (a new run
+  // always clears before its own fetch, even if compareSessionId itself
+  // didn't change) — before the (possibly slow) fetch resolves.
+  // Token-guarded exactly like refreshTokenRef so a late response for a
+  // superseded selection can never clobber a newer one.
   useEffect(() => {
     const token = ++compareTokenRef.current;
     setCompareState(null);
     setCompareError(null);
+    setCompareLoading(false);
     if (!compareSessionId) return;
+    // Self-compare guard (Task 6 review, Important 3): activeSessionId is a
+    // dependency of THIS effect specifically so that App auto-selecting the
+    // very session the reviewer picked as compare (no AdherenceReview
+    // remount — just a changed activeSessionId prop) re-runs this effect
+    // and hits this guard immediately, instead of leaving a stale compare
+    // fetch showing a session comparing 100%-agreeing with itself.
+    if (compareSessionId === activeSessionId) return;
+    setCompareLoading(true);
     (async () => {
       try {
         const r = await authFetch(
@@ -545,17 +573,20 @@ export function AdherenceReview(props: AdherenceReviewProps) {
         if (compareTokenRef.current !== token) return;
         if (!r.ok) {
           setCompareError(`compare session load failed: ${r.status}`);
+          setCompareLoading(false);
           return;
         }
         const body = (await r.json()) as AdherenceReviewState;
         if (compareTokenRef.current !== token) return;
         setCompareState(body);
+        setCompareLoading(false);
       } catch (e) {
         if (compareTokenRef.current !== token) return;
         setCompareError(`compare session load error: ${(e as Error).message}`);
+        setCompareLoading(false);
       }
     })();
-  }, [compareSessionId, patientId, taskId]);
+  }, [compareSessionId, patientId, taskId, activeSessionId]);
 
   // Defense-in-depth (spec 2026-08-24 Task 5 review, Critical 2b): in blind
   // mode, ONLY reviewer-sourced canonical answers ever seed a control — an
@@ -618,28 +649,19 @@ export function AdherenceReview(props: AdherenceReviewProps) {
   // win/ticks/anchors/lanes) stays stable across unrelated re-renders.
   const ruleEvents = useMemo(() => state?.rule_events ?? [], [state]);
   const ruleRollups = useMemo(() => state?.rule_rollups ?? [], [state]);
-  // Compare summary (Task 6): the enumeration axis, keyed on event_id —
-  // matched = present in both sides; agent only = active-session-only;
-  // human only = compare-session-only. Mirrors EventTimeline's own
-  // `humanOnly` computation (full rule_events, not just anchored ones) so
-  // this count and the timeline's "human only: <ids>" strip can never
-  // disagree. Task 7 (per-event IAA between the same two sessions) keys off
-  // this identical event_id axis — keep these definitions in lockstep with it.
-  const compareSummary = useMemo(() => {
-    if (!compareState) return null;
-    const activeIds = new Set(ruleEvents.map((e) => e.event_id));
-    const compareIds = new Set((compareState.rule_events ?? []).map((e) => e.event_id));
-    let matched = 0;
-    let agentOnly = 0;
-    for (const id of activeIds) {
-      if (compareIds.has(id)) matched++; else agentOnly++;
-    }
-    let humanOnly = 0;
-    for (const id of compareIds) {
-      if (!activeIds.has(id)) humanOnly++;
-    }
-    return { matched, agentOnly, humanOnly };
-  }, [ruleEvents, compareState]);
+  // Compare mode gate (Task 6 review, Critical 2): a session picked for
+  // compare but returning no state for THIS patient — either it wasn't
+  // filtered out of the picker for some reason, or (more commonly) it's
+  // patient-covered but this patient hasn't been annotated in it yet —
+  // must NOT be treated as "compare active". The server's GET review-state
+  // route creates-and-returns an EMPTY state on first read (200, not 404),
+  // which would otherwise render as total enumeration disagreement,
+  // indistinguishable from a real one. Gate on the response actually
+  // carrying events, not merely `compareState !== null`.
+  const compareActive = useMemo(
+    () => !!compareState && (compareState.rule_events?.length ?? 0) > 0,
+    [compareState],
+  );
   // Anchored events only, sorted left-to-right by date to match the
   // timeline's order — window events (anchor.type==="window") stay
   // represented in EventTimeline's window-rule chips and the existing Rules
@@ -655,6 +677,88 @@ export function AdherenceReview(props: AdherenceReviewProps) {
     () => anchoredEvents.filter((e) => validatedEvents.has(e.event_id)).length,
     [anchoredEvents, validatedEvents],
   );
+
+  // Agent side for compare mode's "A:" chip (Task 6 review, Critical 1) —
+  // see EventTimeline's `agentEvents` prop doc comment for the full
+  // rationale. Prefer the frozen import-time draft in
+  // state.agent_rule_events; multiple agents → lowest-sorted id wins (and
+  // is named in the UI, not silently picked). Falls back to the canonical
+  // `ruleEvents` (which DOES include reviewer edits) only when no shadow
+  // snapshot exists at all.
+  const agentShadowKeys = useMemo(
+    () => Object.keys(state?.agent_rule_events ?? {}).sort(),
+    [state],
+  );
+  const agentSideAgentId = agentShadowKeys.length > 0 ? agentShadowKeys[0] : null;
+  const agentSideEvents = useMemo(() => {
+    if (agentSideAgentId) return state?.agent_rule_events?.[agentSideAgentId] ?? [];
+    return ruleEvents;
+  }, [agentSideAgentId, state, ruleEvents]);
+  // Belt-and-braces (Task 6 review, Critical 1 PLUS): when there's no
+  // shadow snapshot to fall back on, surface HOW MUCH of the fallback is
+  // actually reviewer-authored rather than pristine agent output, instead
+  // of silently degrading.
+  const reviewerEditedCount = useMemo(
+    () => (agentSideAgentId ? 0 : ruleEvents.filter((e) => e.source === "reviewer").length),
+    [agentSideAgentId, ruleEvents],
+  );
+
+  // Compare summary (Task 6 review, Important 2): ANCHORED events only —
+  // matched = event_id present on both sides; agent only = active-only;
+  // human only = compare-only. Window-rule stubs (anchor.type==="window")
+  // are reported SEPARATELY (windowCount) rather than folded in here —
+  // they're static whole-period rows, not clinical events, and counting
+  // them would silently inflate "matched" before any real event is even
+  // compared. This keeps the summary's population consistent with what's
+  // ALREADY anchored-only on screen: the timeline's own cards and the
+  // "Events: x/y" counter next to this summary. Task 7 (per-event IAA
+  // between the same two sessions) must key the SAME way — anchored events
+  // for the enumeration axis, window rules reported separately.
+  //
+  // Gated on compareActive, not merely `compareState !== null` (Critical 2
+  // — see compareActive's own doc comment).
+  const compareSummary = useMemo(() => {
+    if (!compareActive || !compareState) return null;
+    const compareAnchored = (compareState.rule_events ?? []).filter(isAnchoredEvent);
+    const activeIds = new Set(anchoredEvents.map((e) => e.event_id));
+    const compareIds = new Set(compareAnchored.map((e) => e.event_id));
+    let matched = 0;
+    let agentOnly = 0;
+    for (const id of activeIds) {
+      if (compareIds.has(id)) matched++; else agentOnly++;
+    }
+    let humanOnly = 0;
+    for (const id of compareIds) {
+      if (!activeIds.has(id)) humanOnly++;
+    }
+    const windowCount = ruleEvents.filter((e) => e.anchor.type === "window").length;
+    return { matched, agentOnly, humanOnly, windowCount };
+  }, [anchoredEvents, ruleEvents, compareActive, compareState]);
+
+  // Denominator check (Task 6 review, Important 4): both rule_events seed
+  // sites (the blind seed-events route and the batch runner) stamp
+  // rule_events_provenance.worklist_hash — the cheapest signal two
+  // sessions' rule_events came from the SAME work-list. A guideline edit or
+  // ETL re-run between the two sessions' seeds would otherwise silently
+  // shift one side's denominator, and the enumeration axis above would
+  // misreport that shift as human-vs-agent disagreement instead of a seed
+  // mismatch. worklist_hash drives the CHECK (that's exactly what it's
+  // for); guideline_sha is what's SHOWN — a human-legible rubric pointer,
+  // not an opaque hash.
+  const worklistMismatch = useMemo(() => {
+    const a = state?.rule_events_provenance;
+    const h = compareState?.rule_events_provenance;
+    if (!compareActive || !a || !h) return null;
+    if (a.worklist_hash === h.worklist_hash) return null;
+    return { activeSha: a.guideline_sha, compareSha: h.guideline_sha };
+  }, [state, compareState, compareActive]);
+
+  // Compare session's human-readable name, for the "H = <name>" axis label.
+  const compareSessionName = useMemo(
+    () => sessions.find((s) => s.session.session_id === compareSessionId)?.session.name ?? null,
+    [sessions, compareSessionId],
+  );
+
   // Looked up by EventRow to resolve the QuestionDefinition (and hence the
   // answer_schema/control type) for each answer, across tiers. A useMemo
   // (not a plain per-render loop) — called unconditionally here, ABOVE the
@@ -898,19 +1002,64 @@ export function AdherenceReview(props: AdherenceReviewProps) {
             >
               <option value="">—</option>
               {sessions
-                .filter((s) => s.session.session_id !== activeSessionId)
+                // Excludes the active session AND (Task 6 review, Critical
+                // 2) any session whose cohort doesn't cover this patient —
+                // picking an uncovered session would 200 with a freshly
+                // minted EMPTY state (the server's loadOrCreate mkdir+writes
+                // it), reading as total enumeration disagreement AND
+                // leaving a phantom review_state.json for directory-scanning
+                // consumers (qa-panel, bundle-export, Task 7's CLI) to count.
+                .filter((s) => s.session.session_id !== activeSessionId
+                  && s.session.cohort.patient_ids.includes(patientId))
                 .map((s) => (
                   <option key={s.session.session_id} value={s.session.session_id}>
-                    {s.session.name}
+                    {s.session.name}{s.session.blind ? " (gold)" : ""}
                   </option>
                 ))}
             </select>
           </label>
-          {compareSummary && (
-            <span className="text-muted-foreground">
-              matched: {compareSummary.matched} · agent only: {compareSummary.agentOnly} · human only: {compareSummary.humanOnly}
-            </span>
+
+          {compareSessionId && compareLoading && (
+            <span className="text-muted-foreground italic">loading…</span>
           )}
+
+          {/* Critical 2's second layer: even a patient-covered session can
+           *  return a state with no rule_events (not yet annotated for THIS
+           *  patient). Detection, not just prevention — compareActive gates
+           *  on the response actually carrying events. */}
+          {compareSessionId && !compareLoading && compareState && !compareActive && (
+            <span className="text-muted-foreground">this session has no state for {patientId}</span>
+          )}
+
+          {compareActive && (
+            <>
+              <span className="text-muted-foreground">
+                A = {activeSessionName ?? "active session"}
+                {agentSideAgentId ? ` (agent draft: ${agentSideAgentId})` : " (includes your edits)"}
+                {" · "}H = {compareSessionName ?? compareSessionId}
+              </span>
+              {/* Critical 1 PLUS — only meaningful in the fallback case
+               *  (no agent_rule_events shadow): the "A:" side above is
+               *  reading the canonical, possibly reviewer-edited array. */}
+              {!agentSideAgentId && reviewerEditedCount > 0 && (
+                <span className="text-[hsl(var(--ochre))]">
+                  ⚠ {reviewerEditedCount} of {ruleEvents.length} events on the agent side carry your edits
+                </span>
+              )}
+              {worklistMismatch && (
+                <span className="text-[hsl(var(--oxblood))]">
+                  ⚠ different work-lists (guideline {worklistMismatch.activeSha.slice(0, 7)} vs {worklistMismatch.compareSha.slice(0, 7)})
+                </span>
+              )}
+              {compareSummary && (
+                <span className="text-muted-foreground">
+                  matched: {compareSummary.matched} · agent only: {compareSummary.agentOnly} · human only: {compareSummary.humanOnly}
+                  {compareSummary.windowCount > 0 ? ` · +${compareSummary.windowCount} window rules` : ""}
+                </span>
+              )}
+            </>
+          )}
+
           {compareError && (
             <span className="text-[hsl(var(--oxblood))]">{compareError}</span>
           )}
@@ -948,8 +1097,9 @@ export function AdherenceReview(props: AdherenceReviewProps) {
             events={ruleEvents}
             rollups={ruleRollups}
             validatedEvents={validatedEvents}
-            mode={blind ? "blind" : compareState ? "compare" : "review"}
-            compareEvents={!blind && compareState ? compareState.rule_events ?? undefined : undefined}
+            mode={blind ? "blind" : compareActive ? "compare" : "review"}
+            compareEvents={!blind && compareActive ? compareState!.rule_events ?? undefined : undefined}
+            agentEvents={!blind ? agentSideEvents : undefined}
             selectedEventId={selectedEventId}
             onSelectEvent={(id) => {
               setSelectedEventId(id);
