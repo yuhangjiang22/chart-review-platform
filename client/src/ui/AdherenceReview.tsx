@@ -685,8 +685,17 @@ export function AdherenceReview(props: AdherenceReviewProps) {
   // is named in the UI, not silently picked). Falls back to the canonical
   // `ruleEvents` (which DOES include reviewer edits) only when no shadow
   // snapshot exists at all.
+  //
+  // Filtered to NON-EMPTY arrays before picking (Task 6 re-review, Important
+  // 4) — an empty array under a key (`{ agent_1: [] }`) would otherwise win
+  // on a multi-agent run purely by sorting first (e.g. "agent_1" < "agent_2"
+  // lexically) even when agent_2's shadow is the only usable one, blanking
+  // the whole A column to "—" everywhere for no visible reason.
   const agentShadowKeys = useMemo(
-    () => Object.keys(state?.agent_rule_events ?? {}).sort(),
+    () => Object.entries(state?.agent_rule_events ?? {})
+      .filter(([, arr]) => (arr ?? []).length > 0)
+      .map(([k]) => k)
+      .sort(),
     [state],
   );
   const agentSideAgentId = agentShadowKeys.length > 0 ? agentShadowKeys[0] : null;
@@ -702,6 +711,31 @@ export function AdherenceReview(props: AdherenceReviewProps) {
     () => (agentSideAgentId ? 0 : ruleEvents.filter((e) => e.source === "reviewer").length),
     [agentSideAgentId, ruleEvents],
   );
+  // Stale-shadow detector (Task 6 re-review, Important 4): a NON-empty
+  // shadow can still be USELESS — reachable after a rubric bump, where the
+  // per-agent merge (jobs-routes.ts mergeAdherenceImport) keeps a
+  // non-participating agent's OLD shadow verbatim, whose event_ids no
+  // longer intersect the current canonical work-list at all. Without this,
+  // the header still confidently claims "(agent draft: agent_1)" and the
+  // summary still reports "matched: N" while every "A:" chip silently reads
+  // "—" (absent) — indistinguishable from "the agent genuinely observed
+  // none of these events" instead of "this shadow is stale". Threshold:
+  // covering FEWER THAN HALF of the active session's anchored events is
+  // treated as stale — chosen because a genuinely current shadow from the
+  // SAME work-list covers at or near 100% (it's the same event_id set by
+  // construction), so anything much below full coverage is already a
+  // meaningful drop-off, and "half" is a comfortably wide margin below that
+  // rather than a tight threshold tuned to a specific scenario. Skipped
+  // (returns null) in the fallback case — that path is canonical `ruleEvents`
+  // itself, trivially 100% "coverage" by definition, and when there are no
+  // anchored events at all (nothing to check coverage against).
+  const agentCoverage = useMemo(() => {
+    if (!agentSideAgentId || anchoredEvents.length === 0) return null;
+    const shadowIds = new Set(agentSideEvents.map((e) => e.event_id));
+    const covered = anchoredEvents.filter((e) => shadowIds.has(e.event_id)).length;
+    return { covered, total: anchoredEvents.length };
+  }, [agentSideAgentId, agentSideEvents, anchoredEvents]);
+  const agentShadowStale = !!agentCoverage && agentCoverage.covered * 2 < agentCoverage.total;
 
   // Compare summary (Task 6 review, Important 2): ANCHORED events only —
   // matched = event_id present on both sides; agent only = active-only;
@@ -731,7 +765,15 @@ export function AdherenceReview(props: AdherenceReviewProps) {
     for (const id of compareIds) {
       if (!activeIds.has(id)) humanOnly++;
     }
-    const windowCount = ruleEvents.filter((e) => e.anchor.type === "window").length;
+    // The non-anchored bucket — in practice almost entirely window-rule
+    // stubs, but computed as the EXHAUSTIVE complement of the anchored
+    // count (Task 6 re-review, Minor 6) rather than a separate
+    // `anchor.type === "window"` filter: that filter isn't actually the
+    // complement of isAnchoredEvent (which ALSO requires a date), so a
+    // dateless anchored-TYPE straggler — itself a data-quality issue
+    // upstream, see isAnchoredEvent's own doc comment — fell through both
+    // counts and vanished from the summary's arithmetic entirely.
+    const windowCount = ruleEvents.length - anchoredEvents.length;
     return { matched, agentOnly, humanOnly, windowCount };
   }, [anchoredEvents, ruleEvents, compareActive, compareState]);
 
@@ -745,6 +787,15 @@ export function AdherenceReview(props: AdherenceReviewProps) {
   // mismatch. worklist_hash drives the CHECK (that's exactly what it's
   // for); guideline_sha is what's SHOWN — a human-legible rubric pointer,
   // not an opaque hash.
+  // KNOWN GAP (Task 6 re-review #7): when EITHER side lacks
+  // rule_events_provenance (a session predating the field, or a hand-built
+  // state), this silently returns null — no mismatch AND no "denominator
+  // unchecked" note. A reviewer sees only the enumeration counts with no
+  // signal that the check itself couldn't run, indistinguishable from "the
+  // check ran and the work-lists matched". Not fixed here — filed for a
+  // follow-up (a muted "denominator unchecked (no provenance)" note when
+  // provenance is missing on either side, distinct from both the match and
+  // mismatch cases).
   const worklistMismatch = useMemo(() => {
     const a = state?.rule_events_provenance;
     const h = compareState?.rule_events_provenance;
@@ -1010,7 +1061,11 @@ export function AdherenceReview(props: AdherenceReviewProps) {
                 // leaving a phantom review_state.json for directory-scanning
                 // consumers (qa-panel, bundle-export, Task 7's CLI) to count.
                 .filter((s) => s.session.session_id !== activeSessionId
-                  && s.session.cohort.patient_ids.includes(patientId))
+                  // Optional-chained (Task 6 re-review, Minor 9): SessionListItem
+                  // types `cohort` as required, but this is raw JSON off the
+                  // wire — a legacy manifest predating the cohort field would
+                  // otherwise throw here instead of just excluding the session.
+                  && (s.session.cohort?.patient_ids ?? []).includes(patientId))
                 .map((s) => (
                   <option key={s.session.session_id} value={s.session.session_id}>
                     {s.session.name}{s.session.blind ? " (gold)" : ""}
@@ -1044,6 +1099,16 @@ export function AdherenceReview(props: AdherenceReviewProps) {
               {!agentSideAgentId && reviewerEditedCount > 0 && (
                 <span className="text-[hsl(var(--ochre))]">
                   ⚠ {reviewerEditedCount} of {ruleEvents.length} events on the agent side carry your edits
+                </span>
+              )}
+              {/* Symmetric with the reviewer-edited warning above, but for
+               *  the SHADOW-MAP path (Task 6 re-review, Important 4): a
+               *  non-empty but stale shadow (e.g. after a rubric bump) can
+               *  cover almost none of the current work-list while the
+               *  header still confidently names it. */}
+              {agentSideAgentId && agentShadowStale && agentCoverage && (
+                <span className="text-[hsl(var(--ochre))]">
+                  ⚠ agent draft covers {agentCoverage.covered} of {agentCoverage.total} events (stale shadow?)
                 </span>
               )}
               {worklistMismatch && (

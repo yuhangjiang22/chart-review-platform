@@ -1948,6 +1948,115 @@ describe("Compare mode (Task 6)", () => {
     });
   });
 
+  it("the human-only strip's id count stays in lockstep with the summary's human-only count (Important 3), even with a compare-side window event", async () => {
+    const compareWithWindow = {
+      ...COMPARE_STATE,
+      rule_events: [
+        ...COMPARE_STATE.rule_events,
+        {
+          event_id: "ev_window_human_only",
+          rule_id: "r_unadjudicated",
+          anchor: { type: "window", origin: "omop" },
+          verdict: "NON_CONCORDANT",
+          source: "reviewer",
+        },
+      ],
+    };
+    mockAuthFetch.mockImplementation((url: string) => {
+      if (url.includes("/api/tasks/") && url.includes("/adherence")) return okJson(FRAMEWORK);
+      if (url.includes("/api/sessions/")) return okJson(SESSIONS_LIST);
+      if (url.includes("/api/reviews/") && url.includes("session_id=sess-2")) return okJson(compareWithWindow);
+      if (url.includes("/api/reviews/")) return okJson(ACTIVE_STATE_REVIEWER_EDITED);
+      if (url.includes("/api/runs")) return okJson([]);
+      return okJson(null);
+    });
+    renderPane();
+    await waitLoaded();
+    await selectCompareSession("sess-2");
+
+    // Summary still says human only: 1 — the window event never counts,
+    // exactly as before adding it (Important 2's anchored-only fix).
+    await waitFor(() => {
+      expect(
+        screen.getByText("matched: 1 · agent only: 1 · human only: 1 · +1 window rules"),
+      ).toBeInTheDocument();
+    });
+    // The strip (a SEPARATE element from the summary, text starting
+    // "human only:") names exactly one id — the anchored one — not two.
+    const strip = screen.getByText(/^human only:/);
+    expect(strip.textContent).toBe("human only: ev_human_only");
+  });
+
+  it("a stale agent shadow (event_ids that no longer intersect canonical) triggers a coverage warning, not a silent blank A column (Important 4)", async () => {
+    // Simulates a rubric bump: agent_1's shadow event_ids belong to an
+    // OLDER work-list, sharing nothing with the CURRENT canonical rule_events.
+    const staleShadowState = stateWithEvents({
+      agent_rule_events: {
+        agent_1: [
+          {
+            event_id: "old_ev_1", rule_id: "r_concordant",
+            anchor: { type: "encounter", date: "2024-01-01", origin: "note", ref: "old_note" },
+            evaluable: true, verdict: "CONCORDANT", source: "agent",
+          },
+        ],
+      },
+    });
+    mockAuthFetch.mockImplementation((url: string) => {
+      if (url.includes("/api/tasks/") && url.includes("/adherence")) return okJson(FRAMEWORK);
+      if (url.includes("/api/sessions/")) return okJson(SESSIONS_LIST);
+      if (url.includes("/api/reviews/") && url.includes("session_id=sess-2")) return okJson(COMPARE_STATE);
+      if (url.includes("/api/reviews/")) return okJson(staleShadowState);
+      if (url.includes("/api/runs")) return okJson([]);
+      return okJson(null);
+    });
+    renderPane();
+    await waitLoaded();
+    await selectCompareSession("sess-2");
+
+    // 0 of the 2 anchored events (ev_1, ev_2) intersect agent_1's shadow.
+    await waitFor(() => {
+      expect(screen.getByText("⚠ agent draft covers 0 of 2 events (stale shadow?)")).toBeInTheDocument();
+    });
+    // The header still correctly names the (stale) shadow in use — the
+    // warning is IN ADDITION to that, not a replacement for it.
+    expect(screen.getByText(/agent draft: agent_1/)).toBeInTheDocument();
+    // Every "A:" chip reads absent — never a fabricated verdict.
+    expect(within(eventCard("ev_1")).getByText("A: —")).toBeInTheDocument();
+  });
+
+  it("an empty array under one agent key is skipped in favor of a non-empty one (Important 4, filter-before-pick)", async () => {
+    const multiAgentState = stateWithEvents({
+      agent_rule_events: {
+        agent_1: [], // empty — must NOT win purely by sorting first
+        agent_2: [
+          { ...RULE_EVENTS[0], verdict: "CONCORDANT", source: "agent" },
+          RULE_EVENTS[1],
+          RULE_EVENTS[2],
+        ],
+      },
+    });
+    mockAuthFetch.mockImplementation((url: string) => {
+      if (url.includes("/api/tasks/") && url.includes("/adherence")) return okJson(FRAMEWORK);
+      if (url.includes("/api/sessions/")) return okJson(SESSIONS_LIST);
+      if (url.includes("/api/reviews/") && url.includes("session_id=sess-2")) return okJson(COMPARE_STATE);
+      if (url.includes("/api/reviews/")) return okJson(multiAgentState);
+      if (url.includes("/api/runs")) return okJson([]);
+      return okJson(null);
+    });
+    renderPane();
+    await waitLoaded();
+    await selectCompareSession("sess-2");
+
+    // agent_2 wins (agent_1's empty array is skipped), not agent_1.
+    await waitFor(() => {
+      expect(screen.getByText(/agent draft: agent_2/)).toBeInTheDocument();
+    });
+    // Full coverage from agent_2's shadow — no stale-shadow warning.
+    expect(screen.queryByText(/stale shadow/)).not.toBeInTheDocument();
+    // ev_1's chip correctly reflects agent_2's CONCORDANT draft.
+    expect(within(eventCard("ev_1")).getByText("A: C")).toBeInTheDocument();
+  });
+
   it("blind mode never renders the compare picker", async () => {
     // A blind-safe (non-contaminated) fixture — reviewer-sourced rule_events,
     // no imported_from_run, no agent shadow maps — so this exercises the

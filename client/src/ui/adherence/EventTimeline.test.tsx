@@ -148,6 +148,74 @@ describe("EventTimeline (compare mode — NOT_EVALUABLE chips, spec 2026-08-24 r
   });
 });
 
+describe("EventTimeline (compare mode — present-but-unscored chips, Task 6 re-review Important 2)", () => {
+  it("renders '?' (not '—') on both sides for a present event with no verdict yet — distinct from NE and absent", () => {
+    // Seeded stub: present, evaluable NOT explicitly false, but no verdict
+    // computed yet — the common mid-annotation state (a blind-seeded event
+    // before the annotator answers it, or an agent draft event before the
+    // rule engine has run).
+    const agentSide: RuleEvent[] = [
+      { ...EVENTS[0], evaluable: undefined, verdict: undefined },
+    ];
+    const humanSide: RuleEvent[] = [
+      { ...EVENTS[0], evaluable: true, verdict: undefined },
+    ];
+    render(
+      <EventTimeline
+        events={agentSide}
+        rollups={[]}
+        validatedEvents={new Set()}
+        mode="compare"
+        compareEvents={humanSide}
+        onSelectEvent={() => {}}
+      />,
+    );
+    const card = screen.getByText(/R-Step@2025-11-04@encounters:1/).closest("button")!;
+    const agentChip = within(card).getByText("A: ?");
+    const humanChip = within(card).getByText("H: ?");
+    expect(agentChip).toBeInTheDocument();
+    expect(humanChip).toBeInTheDocument();
+    expect(agentChip.title).toBe("agent: not yet scored");
+    expect(humanChip.title).toBe("human: not yet scored");
+    // Distinct from NE's muted-fill style — "?" carries no background fill.
+    expect(agentChip.className).not.toMatch(/bg-muted/);
+  });
+
+  it("evaluable===false still wins over 'not yet scored' — NE, not '?'", () => {
+    const agentSide: RuleEvent[] = [
+      { ...EVENTS[0], evaluable: false, verdict: undefined },
+    ];
+    render(
+      <EventTimeline events={agentSide} rollups={[]} validatedEvents={new Set()} mode="compare" compareEvents={[]} onSelectEvent={() => {}} />,
+    );
+    const card = screen.getByText(/R-Step@2025-11-04@encounters:1/).closest("button")!;
+    expect(within(card).getByText("A: NE")).toBeInTheDocument();
+    expect(within(card).queryByText("A: ?")).not.toBeInTheDocument();
+  });
+});
+
+describe("EventTimeline (human-only strip — anchored only, Task 6 re-review Important 3)", () => {
+  it("a compare-side WINDOW event absent from the active side is NOT listed in the 'human only' strip", () => {
+    const humanWithWindow: RuleEvent[] = [
+      { ...EVENTS[0], verdict: "CONCORDANT" }, // present on both sides — not "human only"
+      { event_id: "R-Extra@window", rule_id: "R-T1-SpirometryWithin24mo",
+        anchor: { type: "window", origin: "omop" }, verdict: "NON_CONCORDANT" }, // window, absent from active side
+      { event_id: "R-Extra@2026-02-01@note:extra.txt", rule_id: "R-T2-StepTherapyMatches",
+        anchor: { type: "asthma_encounters", date: "2026-02-01", origin: "note", ref: "note:extra.txt" }, verdict: "NON_CONCORDANT" }, // anchored, genuinely human-only
+    ];
+    render(<EventTimeline events={EVENTS} rollups={ROLLUPS} validatedEvents={new Set()} mode="compare" compareEvents={humanWithWindow} onSelectEvent={() => {}} />);
+    // The strip's ids are joined into a single flat text node (no nested
+    // elements per id), so assert directly on its textContent.
+    const strip = screen.getByText(/human only:/i);
+    // The anchored human-only event is named...
+    expect(strip.textContent).toContain("R-Extra@2026-02-01@note:extra.txt");
+    // ...the window human-only event is NOT — it would otherwise inflate
+    // the strip with an id that has no corresponding timeline card AND no
+    // way to compare it (window rules aren't rendered as compare chips).
+    expect(strip.textContent).not.toContain("R-Extra@window");
+  });
+});
+
 describe("EventTimeline (not-evaluable styling)", () => {
   it("shows NOT EVALUABLE with the muted/excluded style, not the oxblood non-concordant style", () => {
     const events: RuleEvent[] = [

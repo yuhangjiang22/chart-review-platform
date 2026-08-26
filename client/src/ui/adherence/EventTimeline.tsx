@@ -82,26 +82,38 @@ const verdictLabel = (v?: string) =>
   v === "NON_CONCORDANT" ? "NON-CONCORDANT" : v ?? "—";
 const verdictAbbrev = (v?: string) =>
   v === "CONCORDANT" ? "C" : v === "NON_CONCORDANT" ? "NC" : v === "EXCLUDED" ? "EXCL" : "—";
-// Compare-chip helpers (spec 2026-08-24 review, Important 1): a compare-mode
-// chip must distinguish THREE states that all used to render as the same
-// "—" — "not evaluable" (evaluable===false; the engine leaves verdict
-// undefined for these), "genuinely absent" (no event on this side at all),
-// and an evaluable event with an actual verdict. Collapsing the first two
-// made Task 7's IAA score a not-evaluable event against a not-observed one
-// as a plain disagreement, when neither is really comparable to a verdict.
+// Compare-chip helpers (spec 2026-08-24 review, Important 1 + Task 6
+// re-review Important 2): a compare-mode chip must distinguish FOUR states
+// that all used to collapse toward the same "—" —
+//   "not evaluable"   (evaluable===false; the engine leaves verdict
+//                      undefined for these)
+//   "not yet scored"  (present, evaluable!==false, but verdict is still
+//                      undefined — the COMMON mid-annotation case: a seeded
+//                      stub carries neither evaluable nor verdict, and the
+//                      blind seed route deliberately computes no verdicts
+//                      until the annotator answers it)
+//   "genuinely absent" (no event on this side at all)
+//   an evaluable, scored event with an actual verdict.
+// Collapsing "not evaluable"/"not yet scored" into "genuinely absent" made
+// Task 7's IAA score an in-progress or excluded event against a not-observed
+// one as a plain disagreement, when none of those three are comparable to a
+// real verdict, and not to EACH OTHER either.
 function chipAbbrev(e?: RuleEvent): string {
   if (!e) return "—"; // genuinely absent — no event on this side
   if (e.evaluable === false) return "NE";
+  if (!e.verdict) return "?"; // present, not yet scored
   return verdictAbbrev(e.verdict);
 }
 function chipClass(e?: RuleEvent): string {
   if (!e) return "bg-[hsl(var(--ochre))]/20 text-[hsl(var(--ochre))]"; // "not observed"
-  if (e.evaluable === false) return VERDICT_STYLE.EXCLUDED; // same muted style review mode uses for NOT EVALUABLE
+  if (e.evaluable === false) return VERDICT_STYLE.EXCLUDED; // settled: not evaluable — same muted style review mode uses
+  if (!e.verdict) return "text-muted-foreground/70"; // pending: no fill, reads lighter than a settled NE
   return VERDICT_STYLE[e.verdict ?? "EXCLUDED"];
 }
 function chipTitle(prefix: string, e?: RuleEvent): string {
   if (!e) return `${prefix}: not observed`;
   if (e.evaluable === false) return `${prefix}: not evaluable`;
+  if (!e.verdict) return `${prefix}: not yet scored`;
   return `${prefix} ${verdictLabel(e.verdict)}`;
 }
 const ANCHOR_GLYPH: Record<string, string> = { encounter: "●", ed: "▲", burst: "◆" };
@@ -164,10 +176,17 @@ export function EventTimeline(props: EventTimelineProps) {
     () => new Map((agentEvents ?? events).map((e) => [e.event_id, e])),
     [agentEvents, events],
   );
-  const humanOnly = useMemo(
-    () => (compareEvents ?? []).filter((h) => !events.some((e) => e.event_id === h.event_id)),
-    [compareEvents, events],
-  );
+  // ANCHORED-only (Task 6 re-review, Important 3) — must stay in lockstep
+  // with AdherenceReview's compareSummary, which counts `human only` over
+  // anchored events exclusively (window-rule stubs are reported separately,
+  // never as comparable cards). Before this fix, a compare-side window (or
+  // dateless) event absent from the active side was NAMED here but not
+  // counted in the summary's `human only: N` — exactly the discrepancy a
+  // reviewer consults this strip to resolve.
+  const humanOnly = useMemo(() => {
+    const activeAnchoredIds = new Set(events.filter(isAnchoredEvent).map((e) => e.event_id));
+    return (compareEvents ?? []).filter((h) => isAnchoredEvent(h) && !activeAnchoredIds.has(h.event_id));
+  }, [compareEvents, events]);
   const showVerdicts = mode !== "blind";
   const maxLane = { above: 0, below: 0 };
   for (const l of lanes.values()) maxLane[l.side] = Math.max(maxLane[l.side], l.lane);
@@ -284,6 +303,16 @@ export function EventTimeline(props: EventTimelineProps) {
         </div>
       )}
 
+      {/* KNOWN GAP (Task 6 re-review #5): this strip's dot/verdict always
+       *  reads `e.verdict` off `events` — the ACTIVE session's canonical
+       *  array — even in compare mode. That's the SAME provenance ambiguity
+       *  Critical 1 fixed for anchored-event "A:" chips (a reviewer-edited
+       *  canonical value rendering as if it were untouched agent output),
+       *  just not yet extended to window rules — which is where MOST rules
+       *  actually live (8 of 11 on asthma). Not fixed here: window rules
+       *  aren't compared at all yet (no A/H chips, no agentEvents lookup),
+       *  which is Issue 1's other half — a design question for the
+       *  dataviz/UX pass, not this task. Filed for that pass. */}
       <div className="border-t border-dashed border-border px-3 py-2">
         <div className="uppercase tracking-wider text-[10px] text-muted-foreground mb-1">Window rules (whole observation window)</div>
         <div className="flex flex-wrap gap-1">

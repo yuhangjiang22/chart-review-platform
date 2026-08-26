@@ -21,11 +21,15 @@ export interface SessionListItem {
     state: "active" | "archived";
     started_at: string;
     cohort: { patient_ids: string[] };
-    /** Blind gold-collection session (spec 2026-08-24 Task 5/6). Server
-     *  already sends this on every session manifest (packages/domain-iter's
-     *  SessionManifest.blind) — declared here so consumers (AdherenceReview's
-     *  compare-session picker) can mark gold candidates without re-fetching
-     *  the full manifest. */
+    /** Blind gold-collection session (spec 2026-08-24 Task 5/6). Optional —
+     *  packages/domain-iter's createSession only spreads `blind: true` into
+     *  the manifest when the session WAS created blind; it's OMITTED
+     *  entirely (not sent as `false`) otherwise, so this is absent on every
+     *  existing/ordinary manifest, present-and-true only on a blind one.
+     *  The truthy check at consumers (AdherenceReview's compare-session
+     *  picker, marking gold candidates) is correct as-is because of that —
+     *  declared here just so TypeScript knows the field exists on the
+     *  response this type already describes. */
     blind?: boolean;
   };
   iter_count: number;
