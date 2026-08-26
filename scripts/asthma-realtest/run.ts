@@ -25,7 +25,10 @@ const batch = await import("@chart-review/infra-batch-run");
 const { startBatchRun, getRunStatus } = batch as any;
 
 console.log(`[run] task=asthma-adherence patients=[${patients.join(", ")}]`);
-console.log(`[run] PHI model (HIPAA) = ${process.env.CHART_REVIEW_PHI_MODEL}`);
+// Log both lanes explicitly — printing only the PHI env var made every run
+// look like luna traffic regardless of actual per-patient routing (phi flag).
+console.log(`[run] PHI lane (patient_real_*, meta.phi=true) = ${process.env.CHART_REVIEW_PHI_MODEL}`);
+console.log(`[run] non-PHI lane (patient_fake_*) = ${process.env.RUN_MODEL ?? "(registry default)"}`);
 console.log(`[run] usage log = ${process.env.DEEPAGENTS_USAGE_LOG}`);
 
 const { run_id } = startBatchRun({
