@@ -32,6 +32,7 @@ import {
 import { sessionIdForRun } from "./lib/session-reviews.js";
 import { deriveNerReviewStatus } from "./lib/review-completion.js";
 import { pathFor } from "@chart-review/storage";
+import type { RuleEvent, RuleRollup } from "@chart-review/platform-types";
 
 // Path resolution — uses the canonical PLATFORM_ROOT from
 // @chart-review/patients (v2's directory), not this file's old default
@@ -87,6 +88,108 @@ export function buildImportedReviewState(
     state.encounters = primaryDraft.encounters;
   }
   return state;
+}
+
+/**
+ * Pure merge for the adherence-specific fields of an imported review_state.
+ * Exported (mirroring buildImportedReviewState) so tests can exercise the
+ * reviewer-win merge semantics without spinning up a run manifest + on-disk
+ * agent drafts. The handler calls this after the ingest() loop has built
+ * the first-agent-wins canonical arrays and the per-agent shadow maps.
+ *
+ * Reviewer-win semantics (question_answers / rule_verdicts / rule_events):
+ * a row the reviewer already edited (source==="reviewer") on the EXISTING
+ * review_state survives a re-import by its stable id (question_id / rule_id
+ * / event_id); everything else comes from the new draft. Agent-map shadow
+ * fields (agent_question_answers / agent_rule_verdicts / agent_rule_events)
+ * always refresh to the new iter's per-agent drafts so the UI's A/B columns
+ * show current data. rule_rollups are derived (not reviewer-editable
+ * directly) — keep the EXISTING (reviewer-recomputed) rollups when the
+ * reviewer has edited any event, else take the new draft's.
+ */
+export function mergeAdherenceImport(
+  existing: Record<string, unknown>,
+  input: {
+    questionAnswers: unknown[];
+    ruleVerdicts: unknown[];
+    ruleEvents: RuleEvent[];
+    ruleRollups: RuleRollup[];
+    adherenceExcluded?: boolean;
+    adherenceExclusionReason?: string;
+    agentQuestionAnswers: Record<string, unknown[]>;
+    agentRuleVerdicts: Record<string, unknown[]>;
+    agentRuleEvents: Record<string, RuleEvent[]>;
+  },
+): Record<string, unknown> {
+  const {
+    questionAnswers, ruleVerdicts, ruleEvents, ruleRollups,
+    adherenceExcluded, adherenceExclusionReason,
+    agentQuestionAnswers, agentRuleVerdicts, agentRuleEvents,
+  } = input;
+
+  const existingQa = (existing.question_answers as Array<{
+    question_id: string; source?: string;
+  }> | undefined) ?? [];
+  const existingRv = (existing.rule_verdicts as Array<{
+    rule_id: string; source?: string;
+  }> | undefined) ?? [];
+  const reviewerQa = existingQa.filter((q) => q.source === "reviewer");
+  const reviewerRv = existingRv.filter((v) => v.source === "reviewer");
+  const reviewerQidSet = new Set(reviewerQa.map((q) => q.question_id));
+  const reviewerRidSet = new Set(reviewerRv.map((v) => v.rule_id));
+
+  // Merged canonical lists: reviewer wins per question_id / rule_id;
+  // the agent's new draft fills in everything else.
+  const mergedQa: unknown[] = [
+    ...reviewerQa,
+    ...(questionAnswers as Array<{ question_id: string }>).filter(
+      (q) => !reviewerQidSet.has(q.question_id),
+    ),
+  ];
+  const mergedRv: unknown[] = [
+    ...reviewerRv,
+    ...(ruleVerdicts as Array<{ rule_id: string }>).filter(
+      (v) => !reviewerRidSet.has(v.rule_id),
+    ),
+  ];
+
+  const out: Record<string, unknown> = {
+    question_answers: mergedQa,
+    rule_verdicts: mergedRv,
+    task_kind: "adherence",
+  };
+
+  // Agent-map fields: always refreshed with the new iter's drafts.
+  if (Object.keys(agentQuestionAnswers).length > 0) out.agent_question_answers = agentQuestionAnswers;
+  if (Object.keys(agentRuleVerdicts).length > 0) out.agent_rule_verdicts = agentRuleVerdicts;
+
+  // Preserve reviewer validation markers verbatim.
+  if (Array.isArray(existing.validated_questions)) out.validated_questions = existing.validated_questions;
+  if (Array.isArray(existing.validated_rules)) out.validated_rules = existing.validated_rules;
+
+  if (adherenceExcluded !== undefined) out.adherence_excluded = adherenceExcluded;
+  if (adherenceExclusionReason) out.adherence_exclusion_reason = adherenceExclusionReason;
+
+  // Event-level concordance (spec 2026-08-24): reviewer-sourced events win
+  // by event_id on reimport; agent shadows always refresh; rollups are
+  // derived data — keep the reviewer's recomputed rollups when the
+  // reviewer has edited any event, else take the draft's.
+  const existingEvents = (existing.rule_events as RuleEvent[] | undefined) ?? [];
+  const reviewerEvents = new Map(
+    existingEvents.filter((e) => e.source === "reviewer").map((e) => [e.event_id, e]),
+  );
+  const mergedEvents = ruleEvents.map((e) => reviewerEvents.get(e.event_id) ?? e);
+  for (const [id, ev] of reviewerEvents) {
+    if (!mergedEvents.some((e) => e.event_id === id)) mergedEvents.push(ev);
+  }
+  out.rule_events = mergedEvents;
+  out.rule_rollups = reviewerEvents.size > 0
+    ? ((existing.rule_rollups as RuleRollup[] | undefined) ?? ruleRollups)
+    : ruleRollups;
+  if (Object.keys(agentRuleEvents).length > 0) out.agent_rule_events = agentRuleEvents;
+  out.validated_events = (existing.validated_events as string[] | undefined) ?? [];
+
+  return out;
 }
 
 export const jobsRoutes: RouteEntry[] = [
@@ -234,6 +337,8 @@ export const jobsRoutes: RouteEntry[] = [
         span_labels?: Array<{ span_id?: string; [k: string]: unknown }>;
         question_answers?: unknown[];
         rule_verdicts?: unknown[];
+        rule_events?: RuleEvent[];
+        rule_rollups?: RuleRollup[];
         excluded?: boolean;
         exclusion_reason?: string;
         task_kind?: string;
@@ -249,6 +354,8 @@ export const jobsRoutes: RouteEntry[] = [
       let encounters: unknown[] | undefined;
       let questionAnswers: unknown[] = [];
       let ruleVerdicts: unknown[] = [];
+      let ruleEvents: RuleEvent[] = [];
+      let ruleRollups: RuleRollup[] = [];
       let adherenceExcluded: boolean | undefined;
       let adherenceExclusionReason: string | undefined;
       // Per-agent shadow drafts for adherence so the UI can render A/B
@@ -257,6 +364,7 @@ export const jobsRoutes: RouteEntry[] = [
       // read-only and indexed by agent id.
       const agentQuestionAnswers: Record<string, unknown[]> = {};
       const agentRuleVerdicts: Record<string, unknown[]> = {};
+      const agentRuleEvents: Record<string, RuleEvent[]> = {};
       const mergedSpans = new Map<string, Record<string, unknown> & { proposed_by: string[] }>();
       const sources: string[] = [];
 
@@ -274,6 +382,13 @@ export const jobsRoutes: RouteEntry[] = [
         if (Array.isArray(draft.rule_verdicts)) {
           if (ruleVerdicts.length === 0) ruleVerdicts = draft.rule_verdicts;
           agentRuleVerdicts[id] = draft.rule_verdicts;
+        }
+        if (Array.isArray(draft.rule_events)) {
+          if (ruleEvents.length === 0) ruleEvents = draft.rule_events;
+          agentRuleEvents[id] = draft.rule_events;
+        }
+        if (Array.isArray(draft.rule_rollups) && ruleRollups.length === 0) {
+          ruleRollups = draft.rule_rollups;
         }
         if (typeof draft.excluded === "boolean" && adherenceExcluded === undefined) {
           adherenceExcluded = draft.excluded;
@@ -361,56 +476,18 @@ export const jobsRoutes: RouteEntry[] = [
         }
       }
 
-      if (questionAnswers.length > 0 || ruleVerdicts.length > 0 || adherenceExcluded !== undefined) {
-        // Adherence-specific merge.
-        const existingQa = (existing.question_answers as Array<{
-          question_id: string; source?: string;
-        }> | undefined) ?? [];
-        const existingRv = (existing.rule_verdicts as Array<{
-          rule_id: string; source?: string;
-        }> | undefined) ?? [];
-        const reviewerQa = existingQa.filter((q) => q.source === "reviewer");
-        const reviewerRv = existingRv.filter((v) => v.source === "reviewer");
-        const reviewerQidSet = new Set(reviewerQa.map((q) => q.question_id));
-        const reviewerRidSet = new Set(reviewerRv.map((v) => v.rule_id));
-
-        // Merged canonical lists: reviewer wins per question_id / rule_id;
-        // the agent's new draft fills in everything else.
-        const mergedQa: unknown[] = [
-          ...reviewerQa,
-          ...(questionAnswers as Array<{ question_id: string }>).filter(
-            (q) => !reviewerQidSet.has(q.question_id),
-          ),
-        ];
-        const mergedRv: unknown[] = [
-          ...reviewerRv,
-          ...(ruleVerdicts as Array<{ rule_id: string }>).filter(
-            (v) => !reviewerRidSet.has(v.rule_id),
-          ),
-        ];
-
-        reviewState.question_answers = mergedQa;
-        reviewState.rule_verdicts = mergedRv;
-        reviewState.task_kind = "adherence";
-
-        // Agent-map fields: always refreshed with the new iter's drafts.
-        if (Object.keys(agentQuestionAnswers).length > 0) {
-          reviewState.agent_question_answers = agentQuestionAnswers;
-        }
-        if (Object.keys(agentRuleVerdicts).length > 0) {
-          reviewState.agent_rule_verdicts = agentRuleVerdicts;
-        }
-
-        // Preserve reviewer validation markers verbatim.
-        if (Array.isArray(existing.validated_questions)) {
-          reviewState.validated_questions = existing.validated_questions;
-        }
-        if (Array.isArray(existing.validated_rules)) {
-          reviewState.validated_rules = existing.validated_rules;
-        }
-
-        if (adherenceExcluded !== undefined) reviewState.adherence_excluded = adherenceExcluded;
-        if (adherenceExclusionReason) reviewState.adherence_exclusion_reason = adherenceExclusionReason;
+      if (
+        questionAnswers.length > 0 || ruleVerdicts.length > 0 ||
+        adherenceExcluded !== undefined || ruleEvents.length > 0
+      ) {
+        Object.assign(
+          reviewState,
+          mergeAdherenceImport(existing, {
+            questionAnswers, ruleVerdicts, ruleEvents, ruleRollups,
+            adherenceExcluded, adherenceExclusionReason,
+            agentQuestionAnswers, agentRuleVerdicts, agentRuleEvents,
+          }),
+        );
       }
       fs.writeFileSync(reviewStatePath, JSON.stringify(reviewState, null, 2));
       return {

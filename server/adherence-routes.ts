@@ -22,6 +22,14 @@
 //     body: { rule_id, verdict, attribution?, rationale? }
 //     Reviewer overrides one rule verdict; marks validated_rules.
 //
+//   POST  /api/reviews/:patientId/:taskId/adherence/event-verdict
+//     body: { event_id, answers?: [{question_id, answer}], evaluable?, evaluable_reason? }
+//     Reviewer overrides one event's answers (or its evaluability); the
+//     deterministic engine then re-derives THAT rule's per-event verdicts,
+//     rollup, and mirrored rule_verdict. Marks validated_events. Verdicts
+//     are NOT settable here — they are engine-derived; rule-verdict above
+//     remains the reviewer's explicit period-level override channel.
+//
 // DEFERRED (not ported): the two authoring PATCH routes (questions/rules
 // edits) and the stats/iaa/summary routes.
 
@@ -30,6 +38,7 @@ import { mutate as mutateReviewState, withReviewsRoot } from "./lib/domain/revie
 import { sessionReviewsRoot } from "./lib/session-reviews.js";
 import { loadCompiledTask } from "./lib/tasks.js";
 import { loadAdherenceSkill } from "@chart-review/pipeline-extract-adherence";
+import { evaluateAllRuleEvents } from "@chart-review/rule-engine";
 import { deriveAdherenceReviewStatus } from "./lib/review-completion.js";
 import type {
   QuestionAnswer, RuleVerdict, AttributionCategory,
@@ -184,6 +193,100 @@ export const adherenceRoutes: RouteEntry[] = [
           const validated = new Set(state.validated_rules ?? []);
           validated.add(b.rule_id!);
           state.validated_rules = [...validated];
+          if (state.review_status !== "locked") {
+            const derived = deriveAdherenceReviewStatus(state, { questionIds, ruleIds });
+            if (derived) state.review_status = derived;
+          }
+        });
+        return { ok: true, version: result.version };
+      });
+    },
+  },
+
+  // POST /api/reviews/:patientId/:taskId/adherence/event-verdict
+  //   body: { event_id, answers?: [{question_id, answer}], evaluable?, evaluable_reason? }
+  // Reviewer overrides one event's answers (or its evaluability); the
+  // deterministic engine then re-derives THAT rule's per-event verdicts,
+  // rollup, and mirrored rule_verdict, so the dual-track stays consistent.
+  // Marks validated_events. Verdicts are NOT settable here — they are
+  // engine-derived; the period-level rule-verdict route remains the
+  // reviewer's explicit override channel.
+  {
+    method: "POST",
+    pattern: "/api/reviews/:patientId/:taskId/adherence/event-verdict",
+    handler: async (body, _req, p, query) => {
+      const sid = sessionIdOf(query);
+      return withReviewsRoot(sessionReviewsRoot(sid), async () => {
+        const task = adherenceTaskOrFail(p.taskId);
+        const b = (body ?? {}) as {
+          event_id?: string;
+          answers?: Array<{ question_id: string; answer: QuestionAnswer["answer"] }>;
+          evaluable?: boolean;
+          evaluable_reason?: string;
+        };
+        if (!b.event_id) throw httpErr(400, { ok: false, message: "event_id required" });
+        if (b.evaluable === false && !b.evaluable_reason) {
+          throw httpErr(400, { ok: false, message: "evaluable:false requires evaluable_reason" });
+        }
+        const skill = loadAdherenceSkill(p.taskId);
+        const qTier = new Map<string, number>();
+        for (const [t, qs] of skill.questions_by_tier) for (const q of qs) qTier.set(q.question_id, t);
+        for (const a of b.answers ?? []) {
+          if (!qTier.has(a.question_id)) {
+            throw httpErr(404, { ok: false, message: `question ${a.question_id} not found in task ${p.taskId}` });
+          }
+        }
+        const questionIds = [...qTier.keys()];
+        const ruleIds = skill.rules.map((r) => r.rule_id);
+        const result = mutateReviewState(p.patientId, task, "reviewer", (state) => {
+          state.task_kind = "adherence";
+          const events = [...(state.rule_events ?? [])];
+          const idx = events.findIndex((e) => e.event_id === b.event_id);
+          if (idx < 0) throw httpErr(404, { ok: false, message: `event ${b.event_id} not found` });
+          const ev = { ...events[idx] };
+          for (const a of b.answers ?? []) {
+            const answers = (ev.answers ?? []).filter((x) => x.question_id !== a.question_id);
+            answers.push({
+              question_id: a.question_id,
+              tier: qTier.get(a.question_id)!,
+              answer: a.answer,
+              source: "reviewer",
+              ts: new Date().toISOString(),
+            });
+            ev.answers = answers;
+          }
+          if (b.evaluable !== undefined) {
+            ev.evaluable = b.evaluable;
+            ev.evaluable_reason = b.evaluable === false ? b.evaluable_reason : undefined;
+          }
+          ev.source = "reviewer";
+          ev.ts = new Date().toISOString();
+          events[idx] = ev;
+          // Re-derive this rule's per-event verdicts + rollup + mirrored verdict.
+          const rule = skill.rules.find((r) => r.rule_id === ev.rule_id);
+          if (rule) {
+            const ruleEvents = events.filter((e) => e.rule_id === rule.rule_id);
+            const res = evaluateAllRuleEvents([rule], state.question_answers ?? [], ruleEvents);
+            const byId = new Map(res.rule_events.map((e) => [e.event_id, e]));
+            state.rule_events = events.map((e) =>
+              e.rule_id === rule.rule_id
+                ? { ...(byId.get(e.event_id) ?? e), source: e.source, ts: e.ts }
+                : e,
+            );
+            state.rule_rollups = [
+              ...(state.rule_rollups ?? []).filter((r) => r.rule_id !== rule.rule_id),
+              ...res.rule_rollups,
+            ];
+            state.rule_verdicts = [
+              ...(state.rule_verdicts ?? []).filter((v) => v.rule_id !== rule.rule_id),
+              ...res.rule_verdicts,
+            ];
+          } else {
+            state.rule_events = events;
+          }
+          const validated = new Set(state.validated_events ?? []);
+          validated.add(b.event_id!);
+          state.validated_events = [...validated];
           if (state.review_status !== "locked") {
             const derived = deriveAdherenceReviewStatus(state, { questionIds, ruleIds });
             if (derived) state.review_status = derived;
