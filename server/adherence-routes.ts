@@ -290,6 +290,16 @@ export const adherenceRoutes: RouteEntry[] = [
           ev.ts = new Date().toISOString();
           events[idx] = ev;
           // Re-derive this rule's per-event verdicts + rollup + mirrored verdict.
+          // KNOWN GAP (Task 5 re-review #4): this unconditionally
+          // OVERWRITES state.rule_verdicts for `rule` with the engine's
+          // recomputed verdict below, even when the existing entry was
+          // source:"reviewer" (set via the separate rule-verdict route /
+          // RuleRow's Accept button) — a pre-existing overwrite, not
+          // introduced here. The NEW symptom: in blind mode, RuleRow's
+          // "Engine:" readout that would normally show the replacement is
+          // hidden, so a reviewer's own rule verdict can silently vanish
+          // with no visible signal it happened. Not fixed here — filed for
+          // the coordinator to schedule.
           const rule = skill.rules.find((r) => r.rule_id === ev.rule_id);
           if (rule) {
             const ruleEvents = events.filter((e) => e.rule_id === rule.rule_id);

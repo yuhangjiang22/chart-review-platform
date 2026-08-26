@@ -203,6 +203,18 @@ const AGENT_POPULATED_UNCONTAMINATED_STATE = {
       verdict: "CONCORDANT",
       source: "agent",
     },
+    // Task 5 re-review, IMPORTANT 1: a SECOND event, evaluable:false with an
+    // agent-authored evaluable_reason — the "key" fixture above dodged this
+    // leak entirely by using evaluable:true on its only event.
+    {
+      event_id: "ev_2",
+      rule_id: "r_controller_use",
+      anchor: { type: "encounter", date: "2025-04-01", origin: "note", ref: "note_2" },
+      evaluable: false,
+      evaluable_reason: "chart note says therapy discontinued (agent-authored, must not leak)",
+      verdict: "EXCLUDED",
+      source: "agent",
+    },
   ],
   rule_rollups: [],
   validated_events: [],
@@ -242,6 +254,21 @@ describe("AdherenceReview — blind mode (spec 2026-08-24 Task 5 review)", () =>
     expect(screen.queryByText(/\(A\)/)).not.toBeInTheDocument();
     // No "= A1" agent-source hint on the Reviewer column either.
     expect(screen.queryByText(/=\s*A1/)).not.toBeInTheDocument();
+    // Task 5 re-review, IMPORTANT 1: ev_2's agent-authored evaluable_reason
+    // (event.source:"agent", evaluable:false) must not print either — it's
+    // free text (the MCP tool takes z.string().optional()), rendered right
+    // above the very control this file otherwise refuses to seed for a
+    // non-reviewer event.
+    expect(screen.queryByText(/agent-authored, must not leak/)).not.toBeInTheDocument();
+  });
+
+  it("the SAME agent-authored evaluable_reason DOES render in non-blind mode (control case, proves the assertion above isn't vacuous)", async () => {
+    setupMocksWith(AGENT_POPULATED_UNCONTAMINATED_STATE);
+    renderPane({ blind: false });
+
+    await waitFor(() => {
+      expect(screen.getByText(/agent-authored, must not leak/)).toBeInTheDocument();
+    });
   });
 
   it("contamination refusal: the SAME fixture + imported_from_run set → hard error panel, no controls (Critical 2a)", async () => {
@@ -264,6 +291,24 @@ describe("AdherenceReview — blind mode (spec 2026-08-24 Task 5 review)", () =>
     expect(screen.queryAllByRole("textbox")).toHaveLength(0);
     expect(screen.queryByRole("button", { name: /accept|save/i })).not.toBeInTheDocument();
     expect(screen.queryByText("ACT score band")).not.toBeInTheDocument();
+  });
+
+  it("MODERATE: a contaminated blind session with empty rule_events does NOT POST to seed-events (never seeds into a state the pane refuses to show)", async () => {
+    // REVIEW_STATE: imported_from_run set AND a non-empty agent_question_answers
+    // shadow (both contaminating) AND no rule_events key at all (the exact
+    // shape that would otherwise trigger the seed-on-empty chain).
+    setupMocks();
+    renderPane({ blind: true });
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/This session contains agent output — it cannot be used for blind gold collection/),
+      ).toBeInTheDocument();
+    });
+    // Give any (incorrectly) in-flight seed chain a real chance to fire.
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(callsTo("/adherence/seed-events")).toHaveLength(0);
   });
 
   it("never calls the run-import endpoint, even with empty question_answers and no imported_from_run", async () => {

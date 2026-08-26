@@ -80,7 +80,7 @@ describe("deriveAdherenceReviewStatus", () => {
       fw,
     )).toBe("reviewer_validated");
   });
-  it("questions/rules done but an anchored event still pending → in_progress", () => {
+  it("PINS THE TIGHTENING: a non-blind session with ALL questions+rules validated but one anchored event still unvalidated does NOT reach reviewer_validated (Task 5 re-review, Important 2)", () => {
     expect(deriveAdherenceReviewStatus(
       {
         validated_questions: ["q1", "q2"],
@@ -105,16 +105,26 @@ describe("deriveAdherenceReviewStatus", () => {
       fw,
     )).toBe("reviewer_validated");
   });
-  it("a BLIND gold session answering ONLY events (no validated_questions/validated_rules at all) still reaches reviewer_validated once every anchored event is validated", () => {
+  // NOTE: the first draft of this test passed {questionIds: [], ruleIds: []}
+  // — an EMPTY framework — which made it vacuous: the original (pre-fix)
+  // three-axis check ALSO returns reviewer_validated for an empty framework
+  // (questionsDone/rulesDone are trivially true when there's nothing to
+  // validate), so the test passed even before the events-only completion
+  // path existed. Every real call site (adherence-routes.ts, ×4) builds
+  // `framework` from loadAdherenceSkill's REAL question/rule ids, which are
+  // never empty for asthma-adherence — so this now uses `fw` (non-empty),
+  // matching production, to actually exercise the new path (Task 5
+  // re-review, Important 2).
+  it("a BLIND gold session answering ONLY events (no validated_questions/validated_rules at all, REAL non-empty framework) still reaches reviewer_validated once every anchored event is validated", () => {
     expect(deriveAdherenceReviewStatus(
       { rule_events: anchoredEvents, validated_events: ["ev1", "ev2"] },
-      { questionIds: [], ruleIds: [] },
+      fw,
     )).toBe("reviewer_validated");
   });
-  it("only some events validated, nothing else touched → in_progress (not undefined)", () => {
+  it("only some events validated, nothing else touched, REAL non-empty framework → in_progress (not undefined)", () => {
     expect(deriveAdherenceReviewStatus(
       { rule_events: anchoredEvents, validated_events: ["ev1"] },
-      { questionIds: [], ruleIds: [] },
+      fw,
     )).toBe("in_progress");
   });
 });

@@ -426,6 +426,7 @@ export function AdherenceReview(props: AdherenceReviewProps) {
         }
       } else if (
         blind
+        && !isBlindContaminated(body)
         && (!body.rule_events || body.rule_events.length === 0)
         && !blindSeedAttemptedRef.current
       ) {
@@ -434,6 +435,15 @@ export function AdherenceReview(props: AdherenceReviewProps) {
         // output involved. One attempt per patient/task — the seed route
         // itself also refuses to overwrite existing rule_events (409), so
         // this is safe even if the guard ref were somehow reset.
+        //
+        // !isBlindContaminated(body) (Task 5 re-review, MODERATE): a
+        // contaminated blind session (imported_from_run set, or a
+        // non-empty agent shadow map) must never POST here either — the
+        // render already refuses to show this session's controls at all,
+        // and seeding rule_events into it would be pointless work at best
+        // and, if the reviewer later annotates via a DIFFERENT (clean)
+        // route, a second denominator competing with the contaminated one
+        // at worst.
         blindSeedAttemptedRef.current = true;
         const seedRes = await authFetch(
           `/api/reviews/${encodeURIComponent(patientId)}/${encodeURIComponent(taskId)}/adherence/seed-events${sessionQs}`,
@@ -732,6 +742,16 @@ export function AdherenceReview(props: AdherenceReviewProps) {
             ? `BLIND MODE — writing gold to session "${activeSessionName}" — agent output hidden`
             : "BLIND MODE — agent output hidden; your answers become the gold standard"}
         </div>
+        {/* Duplicated from the normal-render error banner below (Task 5
+         *  re-review, MODERATE) — this early return happens BEFORE that
+         *  banner's JSX, so without this a set `error` (e.g. a failed
+         *  review-state fetch) would be invisible whenever the refusal
+         *  panel is what's actually showing. */}
+        {error && (
+          <div className="px-4 py-2 bg-[hsl(var(--oxblood))]/10 text-[hsl(var(--oxblood))] text-[12px]">
+            {error}
+          </div>
+        )}
         <div className="flex-1 flex items-start justify-center overflow-y-auto p-8">
           <div className="max-w-md text-center space-y-2">
             <div className="text-[13px] font-semibold text-[hsl(var(--oxblood))]">
@@ -1587,7 +1607,14 @@ function EventRowImpl({
             )}
           </div>
           {rule?.description && <div className="text-foreground">{rule.description}</div>}
-          {event.evaluable === false && event.evaluable_reason && (
+          {/* event.evaluable_reason is agent free text (the MCP tool takes
+           *  z.string().optional()) — gated the SAME way seedEventDraft
+           *  seeds the not-evaluable control (Task 5 re-review, Important
+           *  1): only a reviewer-sourced event's reason may render in
+           *  blind mode. Without this, an agent-authored reason string
+           *  would print right above the very control whose seeding this
+           *  file otherwise refuses for a non-reviewer event. */}
+          {(!blind || event.source === "reviewer") && event.evaluable === false && event.evaluable_reason && (
             event.evaluable_reason === ENGINE_GATED_REASON ? (
               // The engine itself re-derives evaluable:false from this
               // event's gating question on every run — sending
@@ -1604,6 +1631,13 @@ function EventRowImpl({
               </div>
             )
           )}
+          {/* KNOWN GAP (Task 5 re-review #5): hasCommittedAnswers reflects
+           *  event.answers.length regardless of blind/source — its ABSENCE
+           *  (i.e. this hint NOT showing) tells a blind annotator "this
+           *  event already has committed answers", which is a soft signal
+           *  of prior (possibly agent) activity even though the actual
+           *  values stay hidden. Not fixed here — filed for the coordinator
+           *  to schedule. */}
           {!hasCommittedAnswers && (
             <div className="text-[11px] text-muted-foreground italic mt-0.5">
               no answers committed — verdict used patient-level answers

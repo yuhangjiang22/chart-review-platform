@@ -193,6 +193,18 @@ export function App() {
   // effect below must NOT proceed while this is true — proceeding would
   // mean treating "haven't checked yet" as "definitely not blind".
   const sessionBlindPending = !!activeSessionId && activeSessionBlind === null && route.blind !== true;
+  // KNOWN GAP (Task 5 re-review #6): sessionBlindPending is `false` while
+  // activeSessionId ITSELF is still null — a real, if usually brief, window
+  // on first mount (activeSessionId starts as useState(null) and is only
+  // populated by a later effect reading localStorage). In practice the
+  // Critical-1 auto-import effect below also requires authReady &&
+  // activePatient, which are equally unresolved that early, so this hasn't
+  // been observed to let anything through — but the exact interleaving for
+  // a RETURNING session (activeSessionId already in localStorage, so the
+  // localStorage-read effect and the auto-import effect race on the SAME
+  // commit) is untested; App.blind-import.test.tsx only exercises the
+  // fresh/auto-point-to-newest-session path. Not fixed here — filed for
+  // the coordinator to schedule.
 
   // Auto-point: when NO session is active for this task, default the pointer to
   // the most-recent session (highest session_num) instead of leaving the

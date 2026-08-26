@@ -73,11 +73,38 @@ function isAnchoredEvent(e: AdherenceStateViewRuleEvent): boolean {
  * doesn't block completion.) `in_progress` once any unit on any axis is
  * validated but not all.
  *
- * Without the events axis, a blind gold-collection session (which answers
- * ONLY events, never touching validated_questions/validated_rules) could
- * never reach reviewer_validated — which also means the anti-clobber
- * "never re-import over an already-validated patient" guard (App.tsx)
- * would never engage for it.
+ * EVENTS-ONLY COMPLETION PATH (Task 5 re-review, Important 2): the
+ * three-axis rule above is unreachable for a real framework by a BLIND
+ * gold-collection session, which answers ONLY events and never calls the
+ * question-answer / rule-verdict routes — so `validated_questions` /
+ * `validated_rules` stay permanently empty while `framework.questionIds` /
+ * `ruleIds` (built from the real skill at every call site) are non-empty.
+ * `questionsDone`/`rulesDone` would never be satisfiable, so the patient
+ * would sit at `in_progress` forever and the anti-clobber "never re-import
+ * over an already-validated patient" guard (App.tsx) would never engage.
+ *
+ * Fix: `validated_questions` and `validated_rules` BOTH being empty is used
+ * as the signal for "this is the blind-gold shape" (there is no session
+ * context available to this pure function — it only sees `state` +
+ * `framework`). When that shape holds AND every anchored event is
+ * validated, completion is satisfied on the events axis alone,
+ * independent of framework.questionIds/ruleIds. This does NOT weaken the
+ * normal (non-blind) path below it: a session that has validated ANY
+ * question or rule falls through to the original three-axis check, which
+ * NOW also requires eventsDone (tightened by the events axis added above) —
+ * so a non-blind session with all questions+rules validated but one
+ * anchored event still unvalidated stays `in_progress`, not
+ * `reviewer_validated` (pinned by a regression test).
+ *
+ * Known accepted edge case: nothing here distinguishes "a genuinely blind
+ * session" from "a non-blind reviewer who validated every event before
+ * ever touching the Question framework / Rule verdicts panels" — both
+ * produce the same (empty vq, empty vr, full ve) shape and both complete
+ * via this path. The question-framework panel isn't required by the UI
+ * before saving event answers, so this is a real possibility, not just a
+ * theoretical one; it was judged an acceptable tradeoff since the
+ * alternative (threading `session.blind` into this pure derivation) adds
+ * a dependency this function doesn't otherwise have.
  */
 export function deriveAdherenceReviewStatus(
   state: AdherenceStateView,
@@ -89,14 +116,22 @@ export function deriveAdherenceReviewStatus(
   const anchoredEventIds = (state.rule_events ?? [])
     .filter(isAnchoredEvent)
     .map((e) => e.event_id);
+  const eventsDone =
+    anchoredEventIds.length === 0 || anchoredEventIds.every((id) => ve.has(id));
+
+  // Blind-gold shape: only events are being tracked at all. Complete as
+  // soon as every anchored event is validated, regardless of what the
+  // real framework's questionIds/ruleIds are.
+  if (vq.size === 0 && vr.size === 0 && anchoredEventIds.length > 0 && eventsDone) {
+    return "reviewer_validated";
+  }
+
   const hasFramework =
     framework.questionIds.length > 0 || framework.ruleIds.length > 0 || anchoredEventIds.length > 0;
   const questionsDone =
     framework.questionIds.length === 0 || framework.questionIds.every((q) => vq.has(q));
   const rulesDone =
     framework.ruleIds.length === 0 || framework.ruleIds.every((r) => vr.has(r));
-  const eventsDone =
-    anchoredEventIds.length === 0 || anchoredEventIds.every((id) => ve.has(id));
   if (hasFramework && questionsDone && rulesDone && eventsDone) return "reviewer_validated";
   if (vq.size > 0 || vr.size > 0 || ve.size > 0) return "in_progress";
   return undefined;
