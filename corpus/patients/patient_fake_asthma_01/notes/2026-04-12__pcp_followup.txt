@@ -1,7 +1,7 @@
 INDIANA UNIVERSITY HEALTH — PRIMARY CARE
 FOLLOW-UP NOTE
 Date: 2026-04-12
-Patient: Janet R. Ellis  DOB: 1983-09-22  MRN: 740219
+Patient: Janet R. Ellis  DOB: 2016-09-22  MRN: 740219
 Provider: Dr. Aaron K. Whitman, MD (Internal Medicine)
 
 SUBJECTIVE:

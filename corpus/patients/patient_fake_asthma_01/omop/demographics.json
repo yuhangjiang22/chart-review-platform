@@ -1,0 +1,8 @@
+{
+  "age_at_index": 9,
+  "age_band": "age_5_11",
+  "sex": "F",
+  "controller_active": true,
+  "lookback_asthma_encounter_count_12mo": 4,
+  "lookback_asthma_outpatient_count_12mo": 3
+}

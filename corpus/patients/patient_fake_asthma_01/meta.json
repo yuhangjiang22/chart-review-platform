@@ -2,7 +2,7 @@
   "patient_id": "patient_fake_asthma_01",
   "category": "asthma_adherence_demo",
   "demographics": {
-    "age": 42,
+    "age": 9,
     "sex": "F",
     "region": "Midwest"
   },

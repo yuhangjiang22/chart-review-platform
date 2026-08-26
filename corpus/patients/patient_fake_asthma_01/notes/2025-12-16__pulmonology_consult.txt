@@ -1,7 +1,7 @@
 INDIANA UNIVERSITY HEALTH — PULMONOLOGY
 CONSULT NOTE
 Date: 2025-12-16
-Patient: Janet R. Ellis  DOB: 1983-09-22  MRN: 740219
+Patient: Janet R. Ellis  DOB: 2016-09-22  MRN: 740219
 Provider: Dr. Priya Ramanathan, MD (Pulmonology)
 
 REFERRAL: Persistent asthma not at goal on step-up ICS-LABA started 2025-11-04. Referred by Dr. Whitman.
@@ -10,7 +10,7 @@ SUBJECTIVE:
 Janet reports modest improvement since starting budesonide-formoterol. Daytime symptoms now 1-2x/week; she has not needed albuterol in the past 10 days. She is "using the controller most mornings now, maybe 5-6 days a week." She reports no recent exacerbations. No emergency visits or steroid bursts since the March 2025 episode.
 
 OBJECTIVE:
-Spirometry today: FEV1 2.34 L (78% predicted), FVC 3.10 L, FEV1/FVC 0.75. Post-bronchodilator FEV1 2.61 L (87% predicted, +12% reversibility, consistent with asthma).
+Spirometry today: FEV1 1.17 L (78% predicted), FVC 1.56 L, FEV1/FVC 0.75. Post-bronchodilator FEV1 1.31 L (87% predicted, +12% reversibility, consistent with asthma).
 Vitals: BP 122/74, HR 76, SpO2 98%. Lungs: clear bilaterally today.
 
 ACT score: 21/25.
