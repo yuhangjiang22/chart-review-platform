@@ -34,7 +34,13 @@ const { run_id } = startBatchRun({
   started_by: "asthma-realtest",
   max_concurrency: 1,
   max_turns_per_patient: Number(process.env.RUN_MAX_TURNS ?? 120),
-  agent_specs: [{ id: "agent_1", search_mode_preset: "smart-search", interpretation_preset: "default" }],
+  // RUN_MODEL pins non-PHI (fake-fixture) runs to a specific registry model —
+  // without it they fall to the registry DEFAULT (currently the vllm qwen box).
+  // PHI patients ignore this: resolveAgentModel forces CHART_REVIEW_PHI_MODEL.
+  agent_specs: [{
+    id: "agent_1", search_mode_preset: "smart-search", interpretation_preset: "default",
+    ...(process.env.RUN_MODEL ? { model: process.env.RUN_MODEL } : {}),
+  }],
 });
 console.log(`[run] run_id=${run_id}`);
 
