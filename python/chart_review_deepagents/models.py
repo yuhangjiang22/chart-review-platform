@@ -11,13 +11,26 @@ class _RetryingModelMixin:
     call. `super()._agenerate`/`super()._generate` is the same method the
     unwrapped class would have run; wrapping it here just re-issues that
     exact call on a transient failure (see llm_retry.py for why this layer,
-    not the SDK's own max_retries, has to catch the gateway-504 case)."""
+    not the SDK's own max_retries, has to catch the gateway-504 case).
 
-    async def _agenerate(self, *args, **kwargs):
-        return await call_with_retry(super()._agenerate, *args, **kwargs)
+    IMPORTANT: signatures are declared explicitly (messages, stop, run_manager,
+    **kwargs) rather than `*args, **kwargs`. langchain_core decides whether to
+    pass `run_manager` at all via
+    `inspect.signature(self._generate).parameters.get("run_manager")` — a
+    `*args, **kwargs` override has no literal `run_manager` parameter name, so
+    that check would come back False and langchain would silently call us
+    WITHOUT run_manager, breaking callback/tracing threading. Matching the
+    real `_generate`/`_agenerate` signature keeps that gate honest."""
 
-    def _generate(self, *args, **kwargs):
-        return call_with_retry_sync(super()._generate, *args, **kwargs)
+    async def _agenerate(self, messages, stop=None, run_manager=None, **kwargs):
+        return await call_with_retry(
+            super()._agenerate, messages, stop=stop, run_manager=run_manager, **kwargs
+        )
+
+    def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+        return call_with_retry_sync(
+            super()._generate, messages, stop=stop, run_manager=run_manager, **kwargs
+        )
 
 
 def make_model(model_key=None, serial_tool_calls=True):

@@ -23,6 +23,18 @@
 # writes are not idempotent). Callers wrap `super()._generate` /
 # `super()._agenerate` directly (see models.py), so a retry re-issues
 # exactly one HTTP call and nothing else.
+#
+# NOTE: `_stream`/`_astream` are NOT wrapped — the current sidecar config
+# never streams (models.py always calls generate-style paths; the agent
+# loop consumes `agent.astream()` at the graph level, not model-level
+# token streaming). Revisit if that changes.
+#
+# NOTE: the 5xx/429 branch here intentionally overlaps with the openai
+# SDK's own `max_retries` (set in models.py). That's deliberate, not
+# redundant: this outer layer exists specifically to catch the in-band
+# `{"error": {...}}` case the SDK's HTTP-level retry logic misses (see
+# above) — it also happens to give 5xx/429 a second line of defense.
+import asyncio
 import sys
 import time
 from typing import Any, Awaitable, Callable, TypeVar
@@ -34,27 +46,43 @@ T = TypeVar("T")
 # Named constants so the policy is a one-line change, not a hunt.
 RETRY_MAX_ATTEMPTS = 3
 RETRY_BACKOFF_SECONDS = (15, 45)  # sleep before attempt 2, before attempt 3
+RETRY_AFTER_CAP_SECONDS = 300.0  # clamp a server-supplied Retry-After
+
+
+def _is_transient_value_error(exc: ValueError) -> bool:
+    """Structure-first match for the gateway-504-shaped ValueError:
+    `langchain_openai` raises `ValueError(response_dict["error"])` with the
+    RAW error dict as `exc.args[0]` (not a formatted string) — so inspect
+    that dict's `code` first (504, 429, or any >=500 int all count; a
+    string digit code is coerced). Falls back to a `"Timeout Occurred"`
+    substring match on the dict's `message`, and only falls back to
+    matching `str(exc)` when `args[0]` isn't a dict at all (defensive,
+    in case a future SDK version formats this differently)."""
+    if exc.args and isinstance(exc.args[0], dict):
+        body = exc.args[0]
+        code = body.get("code")
+        if isinstance(code, str) and code.isdigit():
+            code = int(code)
+        if isinstance(code, int) and (code == 429 or code >= 500):
+            return True
+        return "Timeout Occurred" in str(body.get("message") or "")
+    return "Timeout Occurred" in str(exc)
 
 
 def _is_transient(exc: BaseException) -> bool:
     """True when `exc` looks like a transient Azure/openai infra error worth
     retrying:
-      - the gateway-504-shaped ValueError described above (matched
-        defensively on message content since it isn't a typed exception —
-        `raise ValueError(response_dict["error"])` just re-raises whatever
-        dict Azure sent);
+      - the gateway-504-shaped ValueError described above;
       - an httpx/openai timeout (ConnectTimeout, ReadTimeout, APITimeoutError, …);
       - a 5xx APIStatusError (InternalServerError etc.);
       - a 429 RateLimitError.
     Matched by message/name/status_code rather than importing openai/httpx
     exception classes directly, so this stays correct across SDK versions
     and is trivially unit-testable with plain exception instances."""
-    msg = str(exc)
-    name = type(exc).__name__
-
-    if isinstance(exc, ValueError) and ("504" in msg or "Timeout Occurred" in msg):
+    if isinstance(exc, ValueError) and _is_transient_value_error(exc):
         return True
 
+    name = type(exc).__name__
     if "Timeout" in name:  # httpx.*Timeout*, openai.APITimeoutError
         return True
 
@@ -67,8 +95,10 @@ def _is_transient(exc: BaseException) -> bool:
 
 def _retry_after_seconds(exc: BaseException) -> float | None:
     """Best-effort Retry-After (seconds), read from a 429's response headers
-    when the SDK surfaced one. Returns None when absent/unparseable, in
-    which case the caller falls back to RETRY_BACKOFF_SECONDS."""
+    when the SDK surfaced one. Clamped to RETRY_AFTER_CAP_SECONDS so a
+    misbehaving/huge server-supplied value can't stall the sidecar for an
+    unbounded time. Returns None when absent/unparseable, in which case the
+    caller falls back to RETRY_BACKOFF_SECONDS."""
     response = getattr(exc, "response", None)
     headers = getattr(response, "headers", None)
     if not headers:
@@ -81,9 +111,10 @@ def _retry_after_seconds(exc: BaseException) -> float | None:
     if value is None:
         return None
     try:
-        return float(value)
+        seconds = float(value)
     except (TypeError, ValueError):
         return None
+    return min(seconds, RETRY_AFTER_CAP_SECONDS)
 
 
 def _summarize(exc: BaseException) -> str:
@@ -113,9 +144,11 @@ def _log_retry(attempt: int, exc: BaseException, sleep_s: float) -> None:
 
 async def call_with_retry(fn: Callable[..., Awaitable[T]], *args: Any, **kwargs: Any) -> T:
     """Await `fn(*args, **kwargs)`, retrying on a transient error with
-    backoff (see policy above). On exhaustion (or a non-transient error),
-    re-raises the ORIGINAL exception unchanged — the loud-fail contract for
-    real failures is preserved."""
+    backoff (see policy above). Sleeps with `asyncio.sleep` (this is the
+    async path, invoked from `_agenerate` inside a live event loop — a
+    blocking `time.sleep` here would stall the loop for no reason). On
+    exhaustion (or a non-transient error), re-raises the ORIGINAL exception
+    unchanged — the loud-fail contract for real failures is preserved."""
     attempt = 1
     while True:
         try:
@@ -125,7 +158,7 @@ async def call_with_retry(fn: Callable[..., Awaitable[T]], *args: Any, **kwargs:
                 raise
             sleep_s = _backoff_for(attempt, exc)
             _log_retry(attempt, exc, sleep_s)
-            time.sleep(sleep_s)
+            await asyncio.sleep(sleep_s)
             attempt += 1
 
 
