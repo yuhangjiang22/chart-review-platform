@@ -315,3 +315,172 @@ export function computeAdherenceIaa(input: AdherenceIaaInput): AdherenceIaaRepor
     rules_kappa_macro: macroOver(per_rule),
   };
 }
+
+// ── Per-event agreement ──────────────────────────────────────────────────────
+//
+// Third surface, added for the event-concordance timeline (spec
+// 2026-08-24, Task 7). Pairs agent vs reviewer RuleEvent[] — flattened to
+// EventSide[] by the caller — by `${patient_id}|${event_id}`. Two axes,
+// reported separately (plan ERRATA, Task 6 re-review):
+//
+//   1. Enumeration — did both sides produce the same anchored events at
+//      all? Window-rule stubs (anchor.type === "window", no date) are
+//      constants present on both sides by construction and are never
+//      rendered as comparable timeline cards, so they are excluded from
+//      matched/a_only/b_only/jaccard and reported separately as
+//      `window_rules`.
+//   2. Verdict agreement — for MATCHED keys (from either population),
+//      do the two sides' verdict labels agree? A present-but-unscored
+//      event (no verdict yet — a seeded stub the annotator hasn't
+//      reached) is label "NONE", distinct from an event the agent
+//      explicitly judged NOT_EVALUABLE. Both are scored as verdict
+//      disagreements against a differently-labeled counterpart, but
+//      neither is ever an enumeration miss — the KEY existed on both
+//      sides, only the label differs.
+
+/** One side's view of one event, flattened for comparison. */
+export interface EventSide {
+  patient_id: string;
+  event_id: string;
+  rule_id: string;
+  /** anchor.type !== "window" && anchor.date — window stubs are constants on
+   *  both sides and are reported separately, never inside the enumeration
+   *  counts (plan ERRATA, Task 6 re-review). */
+  anchored: boolean;
+  verdict?: "CONCORDANT" | "NON_CONCORDANT" | "EXCLUDED";
+  evaluable?: boolean;
+}
+
+export interface PerEventRuleMetrics {
+  rule_id: string;
+  n_matched: number;
+  verdict_agreement: number;
+  a_only: number;
+  b_only: number;
+}
+
+export interface PerEventReport {
+  per_rule: PerEventRuleMetrics[];
+  verdict_kappa: number;
+  enumeration: { matched: number; a_only: number; b_only: number; jaccard: number };
+  /** Window-scoped events seen (max of the two sides) — reported, not scored. */
+  window_rules: number;
+}
+
+interface EventKeyed {
+  key: string;
+  rule_id: string;
+  anchored: boolean;
+  side: EventSide;
+}
+
+function keyOf(e: EventSide): string {
+  return `${e.patient_id}|${e.event_id}`;
+}
+
+function labelOf(e: EventSide): string {
+  return e.evaluable === false ? "NOT_EVALUABLE" : e.verdict ?? "NONE";
+}
+
+function indexEvents(events: EventSide[]): Map<string, EventKeyed> {
+  const idx = new Map<string, EventKeyed>();
+  for (const e of events) {
+    idx.set(keyOf(e), { key: keyOf(e), rule_id: e.rule_id, anchored: e.anchored, side: e });
+  }
+  return idx;
+}
+
+/**
+ * Per-event inter-annotator agreement. Pairs two flattened event lists
+ * (agent vs reviewer, or any two annotation sides) by
+ * `${patient_id}|${event_id}` and reports enumeration + verdict-agreement
+ * axes separately. Both axes — global `verdict_kappa` and each rule's
+ * `n_matched`/`verdict_agreement`/`a_only`/`b_only` — are scoped to
+ * ANCHORED events only; window-rule stubs never touch those counters, they
+ * only bump `window_rules`. `per_rule` still lists every rule_id seen on
+ * either side (a pure-window rule gets a zeroed row, not an absent one).
+ * Pure / deterministic / no I/O — same shape as computePerRuleMetrics
+ * above.
+ */
+export function computePerEventMetrics(a: EventSide[], b: EventSide[]): PerEventReport {
+  const aIdx = indexEvents(a);
+  const bIdx = indexEvents(b);
+  const allKeys = new Set([...aIdx.keys(), ...bIdx.keys()]);
+
+  let enumMatched = 0, enumAOnly = 0, enumBOnly = 0;
+  // Distinct non-anchored keys seen (union across sides — window stubs are
+  // constants on both sides by construction, so this equals "max across
+  // sides" in practice).
+  const windowKeys = new Set<string>();
+  const kappaCells: KappaCell[] = [];
+
+  const byRule = new Map<string, { matched: KappaCell[]; a_only: number; b_only: number }>();
+  const ensureRule = (rid: string) => {
+    let r = byRule.get(rid);
+    if (!r) { r = { matched: [], a_only: 0, b_only: 0 }; byRule.set(rid, r); }
+    return r;
+  };
+  // Seed a per_rule row for every rule_id seen on either side, even one
+  // whose events are all window-scoped (zero anchored counts is still a
+  // row, not an absence).
+  for (const e of a) ensureRule(e.rule_id);
+  for (const e of b) ensureRule(e.rule_id);
+
+  for (const key of allKeys) {
+    const av = aIdx.get(key);
+    const bv = bIdx.get(key);
+    const ruleId = (av?.rule_id ?? bv?.rule_id)!;
+    const anchored = (av?.anchored ?? bv?.anchored) === true;
+
+    if (!anchored) {
+      // Window stub: counted only in window_rules, never in enumeration,
+      // per-rule matched/a_only/b_only, or the kappa population.
+      windowKeys.add(key);
+      continue;
+    }
+
+    if (av && bv) {
+      // Matched key on both sides — verdict comparison, never an
+      // enumeration miss regardless of label.
+      const aLabel = labelOf(av.side);
+      const bLabel = labelOf(bv.side);
+      kappaCells.push({ rater_a: aLabel, rater_b: bLabel });
+      ensureRule(ruleId).matched.push({ rater_a: aLabel, rater_b: bLabel });
+      enumMatched++;
+    } else if (av) {
+      ensureRule(ruleId).a_only++;
+      enumAOnly++;
+    } else if (bv) {
+      ensureRule(ruleId).b_only++;
+      enumBOnly++;
+    }
+  }
+
+  const per_rule: PerEventRuleMetrics[] = [...byRule.entries()]
+    .map(([rule_id, r]) => {
+      const nMatched = r.matched.length;
+      const agree = r.matched.filter((c) => c.rater_a === c.rater_b).length;
+      return {
+        rule_id,
+        n_matched: nMatched,
+        verdict_agreement: nMatched > 0 ? agree / nMatched : 0,
+        a_only: r.a_only,
+        b_only: r.b_only,
+      };
+    })
+    .sort((x, y) => (x.rule_id < y.rule_id ? -1 : x.rule_id > y.rule_id ? 1 : 0));
+
+  const enumDenom = enumMatched + enumAOnly + enumBOnly;
+
+  return {
+    per_rule,
+    verdict_kappa: cohensKappa(kappaCells),
+    enumeration: {
+      matched: enumMatched,
+      a_only: enumAOnly,
+      b_only: enumBOnly,
+      jaccard: enumDenom > 0 ? enumMatched / enumDenom : 0,
+    },
+    window_rules: windowKeys.size,
+  };
+}
