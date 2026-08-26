@@ -84,7 +84,7 @@ function setupMocks() {
   });
 }
 
-function renderPane() {
+function renderPane(opts: { blind?: boolean } = {}) {
   return render(
     <AdherenceReview
       patientId="p1"
@@ -92,7 +92,15 @@ function renderPane() {
       taskId="asthma-adherence"
       onBack={() => {}}
       activeSessionId="sess-1"
+      blind={opts.blind}
     />,
+  );
+}
+
+/** All authFetch calls whose URL contains `fragment`. */
+function callsTo(fragment: string): Array<[string, RequestInit?]> {
+  return (mockAuthFetch.mock.calls as Array<[string, RequestInit?]>).filter(
+    ([url]) => url.includes(fragment),
   );
 }
 
@@ -146,5 +154,92 @@ describe("AdherenceReview — un-adjudicated rule", () => {
     expect(acceptBtns.length).toBeGreaterThan(0);
     // The rule-row Accept button is disabled while the verdict is "".
     expect(acceptBtns.some((b) => (b as HTMLButtonElement).disabled)).toBe(true);
+  });
+});
+
+// review state used by the "no auto-import in blind mode" test: empty
+// question_answers AND no imported_from_run — the exact shape that makes
+// the non-blind seed-on-empty auto-import chain fire.
+const REVIEW_STATE_NEVER_IMPORTED = {
+  ...REVIEW_STATE,
+  question_answers: [],
+  agent_question_answers: {},
+};
+delete (REVIEW_STATE_NEVER_IMPORTED as { imported_from_run?: string }).imported_from_run;
+
+describe("AdherenceReview — blind mode (spec 2026-08-24 Task 5)", () => {
+  it("hides agent-sourced values (A/B column + '= A1' source hint) that ARE visible in non-blind mode", async () => {
+    setupMocks();
+    renderPane({ blind: true });
+
+    // Wait for the framework to load (same question as the non-blind test
+    // above, which asserts the "A1" column + "= A1" hint DO render for this
+    // exact fixture when blind is false/omitted).
+    await waitFor(() => {
+      expect(screen.getByText("ACT score band")).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText(/=\s*A1/)).not.toBeInTheDocument();
+    expect(screen.queryByText("A1")).not.toBeInTheDocument();
+  });
+
+  it("never calls the run-import endpoint, even with empty question_answers and no imported_from_run", async () => {
+    mockAuthFetch.mockImplementation((url: string) => {
+      if (url.includes("/adherence") && url.includes("/api/tasks/")) return okJson(FRAMEWORK);
+      if (url.includes("/api/reviews/")) return okJson(REVIEW_STATE_NEVER_IMPORTED);
+      if (url.includes("/api/runs")) return okJson([{ run_id: "run-1" }]);
+      return okJson(null);
+    });
+    renderPane({ blind: true });
+
+    await waitFor(() => {
+      expect(screen.getByText("ACT score band")).toBeInTheDocument();
+    });
+    // Give the blind seed-events chain (which DOES legitimately fire for
+    // this empty-rule_events fixture) time to settle, so we're asserting
+    // against the chain's steady state, not an in-flight snapshot.
+    await waitFor(() => {
+      expect(callsTo("/adherence/seed-events").length).toBeGreaterThan(0);
+    });
+
+    expect(callsTo("/import")).toHaveLength(0);
+    expect(callsTo("/api/runs")).toHaveLength(0);
+  });
+
+  it("with empty rule_events, calls /adherence/seed-events exactly once", async () => {
+    setupMocks(); // REVIEW_STATE has no rule_events key at all
+    renderPane({ blind: true });
+
+    await waitFor(() => {
+      expect(screen.getByText("ACT score band")).toBeInTheDocument();
+    });
+    await waitFor(() => {
+      expect(callsTo("/adherence/seed-events").length).toBe(1);
+    });
+    // The post-seed refresh must have landed too (a second /api/reviews/
+    // read), proving the guard ref — not a stalled request — is what caps
+    // the count at one.
+    await waitFor(() => {
+      expect(callsTo("/api/reviews/").length).toBeGreaterThanOrEqual(2);
+    });
+    expect(callsTo("/adherence/seed-events")).toHaveLength(1);
+  });
+
+  it("renders the blind-mode banner when blind, and never renders it otherwise", async () => {
+    setupMocks();
+    const { unmount } = renderPane({ blind: true });
+    await waitFor(() => {
+      expect(screen.getByText(/BLIND MODE/)).toBeInTheDocument();
+    });
+    expect(
+      screen.getByText(/agent output hidden; your answers become the gold standard/),
+    ).toBeInTheDocument();
+    unmount();
+
+    renderPane({ blind: false });
+    await waitFor(() => {
+      expect(screen.getByText("ACT score band")).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/BLIND MODE/)).not.toBeInTheDocument();
   });
 });

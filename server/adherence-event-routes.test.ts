@@ -531,3 +531,114 @@ describe("mergeAdherenceImport (import-merge carries rule_events)", () => {
     expect(rollups.find((r) => r.rule_id === "R-Other")).toEqual(draftOtherRollup);
   });
 });
+
+// ── seed-events (blind-annotation gold collection, spec 2026-08-24 Task 5) ──
+describe("POST .../adherence/seed-events", () => {
+  const seedEventsRoute = findRoute("/api/reviews/:patientId/:taskId/adherence/seed-events");
+  // A brand-new patient (never touched by the event-verdict tests above),
+  // so its review_state starts with rule_events genuinely empty.
+  const SEED_PID = "p_seedtest";
+
+  let patientsRoot: string;
+  let prevPatientsRoot: string | undefined;
+
+  function callSeed(patientId: string): Promise<unknown> {
+    return seedEventsRoute.handler(
+      {},
+      {} as unknown as IncomingMessage,
+      { patientId, taskId: TASK_ID },
+      query(),
+    );
+  }
+
+  async function readStateFor(pid: string): Promise<ReviewState> {
+    return withReviewsRoot(sessionReviewsRoot(SID), async () => loadOrCreate(pid, stubTask));
+  }
+
+  beforeAll(() => {
+    // A THIRD rule with event_anchor, additive to rubricRoot's rules dir
+    // (a separate file — R-Step/R-Other's rules.yaml above is untouched) so
+    // the 5 event-verdict tests above, which only reference R-Step/R-Other,
+    // are unaffected. This is what lets the seed-events test below exercise
+    // the REAL readAnchors → toAnchorEntries → expandEventWorklist plumbing
+    // instead of only the window-stub fallback.
+    fs.writeFileSync(
+      path.join(rubricRoot, "references", "rules", "rules-event-anchor.yaml"),
+      [
+        "rules:",
+        "  - rule_id: R-EventAnchor",
+        "    description: anchored on the visits anchor list (seed-events plumbing test)",
+        "    verdict_if: ControlLevel == \"well_controlled\"",
+        "    event_anchor: visits",
+      ].join("\n"),
+    );
+
+    // A real per-patient anchors/visits.json — readAnchors() requires the
+    // patient's directory to exist (patientDir() throws otherwise) and
+    // resolves relative to CHART_REVIEW_PATIENTS_ROOT at call time, so a
+    // temp dir set here is enough; no corpus fixture needed.
+    patientsRoot = fs.mkdtempSync(path.join(os.tmpdir(), "seed-patients-"));
+    fs.mkdirSync(path.join(patientsRoot, SEED_PID, "anchors"), { recursive: true });
+    fs.writeFileSync(
+      path.join(patientsRoot, SEED_PID, "anchors", "visits.json"),
+      JSON.stringify([{ date: "2025-01-10", ref: "encounters:99" }]),
+    );
+    prevPatientsRoot = process.env.CHART_REVIEW_PATIENTS_ROOT;
+    process.env.CHART_REVIEW_PATIENTS_ROOT = patientsRoot;
+  });
+
+  afterAll(() => {
+    if (prevPatientsRoot === undefined) delete process.env.CHART_REVIEW_PATIENTS_ROOT;
+    else process.env.CHART_REVIEW_PATIENTS_ROOT = prevPatientsRoot;
+    fs.rmSync(patientsRoot, { recursive: true, force: true });
+  });
+
+  it("seeds rule_events from the deterministic ETL work-list (real per-patient anchor lists + window-stub rules) — no agent output, rule_rollups/rule_verdicts left uncomputed", async () => {
+    const before = await readStateFor(SEED_PID);
+    expect(before.rule_events ?? []).toHaveLength(0);
+
+    const res = (await callSeed(SEED_PID)) as { ok: boolean; version: number; events: number };
+    expect(res.ok).toBe(true);
+    // R-Step@window + R-Other@window (no event_anchor → one window stub
+    // each) + R-EventAnchor's single "visits" anchor entry.
+    expect(res.events).toBe(3);
+    expect(res.version).toBe((before.version ?? 1) + 1);
+
+    const after = await readStateFor(SEED_PID);
+    expect(after.task_kind).toBe("adherence");
+    expect(after.rule_events).toHaveLength(3);
+
+    const anchored = after.rule_events!.find((e) => e.rule_id === "R-EventAnchor")!;
+    expect(anchored.event_id).toBe("R-EventAnchor@2025-01-10@encounters:99");
+    expect(anchored.anchor).toMatchObject({
+      type: "visits", date: "2025-01-10", origin: "omop", ref: "encounters:99",
+    });
+    // No agent output whatsoever — a bare stub, exactly like the window ones.
+    expect(anchored.answers).toBeUndefined();
+    expect(anchored.verdict).toBeUndefined();
+    expect(anchored.source).toBeUndefined();
+
+    expect(after.rule_events!.find((e) => e.event_id === "R-Step@window")?.anchor.type).toBe("window");
+    expect(after.rule_events!.find((e) => e.event_id === "R-Other@window")?.anchor.type).toBe("window");
+
+    // Deliberately NOT computed by this route — no answers exist yet to
+    // derive them from; they populate per-event via the event-verdict
+    // route as the annotator answers each event.
+    expect(after.rule_rollups ?? []).toHaveLength(0);
+    expect(after.rule_verdicts ?? []).toHaveLength(0);
+  });
+
+  it("409s and leaves state unchanged when rule_events is already non-empty (never overwrites existing — including in-progress reviewer — work)", async () => {
+    // PATIENT_ID's state already carries rule_events seeded in this file's
+    // top-level beforeAll and mutated by the event-verdict tests above —
+    // exactly the "existing work" this route must refuse to clobber.
+    const before = await readState();
+    expect(before.rule_events!.length).toBeGreaterThan(0);
+
+    await expect(callSeed(PATIENT_ID)).rejects.toMatchObject({ status: 409 });
+
+    const after = await readState();
+    expect(after.version).toBe(before.version);
+    expect(after.rule_events).toEqual(before.rule_events);
+  });
+});

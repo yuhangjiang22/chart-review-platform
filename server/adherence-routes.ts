@@ -30,6 +30,28 @@
 //     are NOT settable here — they are engine-derived; rule-verdict above
 //     remains the reviewer's explicit period-level override channel.
 //
+//   POST  /api/reviews/:patientId/:taskId/adherence/seed-events
+//     body: {}
+//     Blind-annotation mode (gold-standard collection, spec 2026-08-24
+//     Task 5): seeds state.rule_events with the SAME deterministic
+//     work-list the agent got (rules × the patient's ETL anchor lists via
+//     expandEventWorklist) — no agent output involved at all. 409s when
+//     rule_events is already non-empty (never overwrites in-progress or
+//     completed work). Deliberately does NOT compute rule_rollups /
+//     rule_verdicts — there is nothing to derive yet (no answers exist);
+//     those are computed later, per event, by the SAME event-verdict route
+//     above as the annotator answers each event, and the gold's own
+//     verdicts for IAA/compare purposes are derived downstream by Task 6/7
+//     tooling, not by this route.
+//
+//     Workflow this enables: create an isolated session (e.g.
+//     "blind-v06"), open #/patient/<taskId>/<patientId>?blind=1 with that
+//     session active, annotate every event (saves go through the existing
+//     event-verdict route above — no new write path needed) — the gold
+//     lives in that session's review_state. Task 6 adds a compare mode
+//     that reads a second session's events; Task 7 computes per-event IAA
+//     between them.
+//
 // DEFERRED (not ported): the two authoring PATCH routes (questions/rules
 // edits) and the stats/iaa/summary routes.
 
@@ -37,7 +59,10 @@ import type { RouteEntry } from "./router.js";
 import { mutate as mutateReviewState, withReviewsRoot } from "./lib/domain/review/index.js";
 import { sessionReviewsRoot } from "./lib/session-reviews.js";
 import { loadCompiledTask } from "./lib/tasks.js";
-import { loadAdherenceSkill } from "@chart-review/pipeline-extract-adherence";
+import { readAnchors } from "@chart-review/patients";
+import {
+  loadAdherenceSkill, expandEventWorklist, toAnchorEntries,
+} from "@chart-review/pipeline-extract-adherence";
 import { evaluateAllRuleEvents } from "@chart-review/rule-engine";
 import { deriveAdherenceReviewStatus } from "./lib/review-completion.js";
 import type {
@@ -293,6 +318,49 @@ export const adherenceRoutes: RouteEntry[] = [
           }
         });
         return { ok: true, version: result.version };
+      });
+    },
+  },
+
+  // POST /api/reviews/:patientId/:taskId/adherence/seed-events
+  //   body: {}
+  // Blind-annotation mode (spec 2026-08-24 Task 5): seeds rule_events with
+  // the deterministic ETL work-list (rules × the patient's anchor lists) —
+  // NO agent output. 409s if rule_events is already non-empty, so a
+  // reviewer's in-progress or completed work is never clobbered. See the
+  // route-list comment above for the full workflow this enables.
+  {
+    method: "POST",
+    pattern: "/api/reviews/:patientId/:taskId/adherence/seed-events",
+    handler: async (_body, _req, p, query) => {
+      const sid = sessionIdOf(query);
+      return withReviewsRoot(sessionReviewsRoot(sid), async () => {
+        const task = adherenceTaskOrFail(p.taskId);
+        const skill = loadAdherenceSkill(p.taskId);
+        let eventCount = 0;
+        const result = mutateReviewState(p.patientId, task, "reviewer", (state) => {
+          if ((state.rule_events ?? []).length > 0) {
+            throw httpErr(409, {
+              ok: false,
+              message: `rule_events already seeded for patient ${p.patientId} × task ${p.taskId}; refusing to overwrite`,
+            });
+          }
+          const anchorsRaw = readAnchors(p.patientId);
+          const anchors = Object.fromEntries(
+            Object.entries(anchorsRaw).map(([k, v]) => [k, toAnchorEntries(v)]),
+          );
+          const worklist = expandEventWorklist(skill.rules, anchors);
+          eventCount = worklist.length;
+          state.task_kind = "adherence";
+          state.rule_events = worklist;
+          // Deliberately NOT computing rule_rollups/rule_verdicts here — no
+          // answers exist yet to derive them from. Those populate
+          // per-event as the annotator saves each event through the
+          // existing event-verdict route above; the gold's own verdicts
+          // for cross-session IAA/compare are derived downstream by
+          // Task 6/7 tooling, not by this route.
+        });
+        return { ok: true, version: result.version, events: eventCount };
       });
     },
   },

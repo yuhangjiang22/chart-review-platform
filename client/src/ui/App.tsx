@@ -489,6 +489,7 @@ export function App() {
             patientDisplay={activePatient?.display_name ?? route.patientId}
             taskId={task.task_id}
             activeSessionId={activeSessionId}
+            blind={route.blind === true}
             onBack={() =>
               navigate(studioHash(task.task_id, lastStudioSubTabRef.current ?? "validate"))
             }

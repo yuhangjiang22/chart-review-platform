@@ -224,6 +224,14 @@ export interface AdherenceReviewProps {
    *  review-state reads and writes so they hit the session-scoped root.
    *  Required by the server — calls without it return 400. */
   activeSessionId?: string | null;
+  /** Blind-annotation mode (gold-standard collection, spec 2026-08-24
+   *  Task 5): NEVER auto-imports an agent draft, hides every agent-sourced
+   *  value (A/B columns, agreement chips, reasoning/evidence, engine
+   *  verdicts, attribution), and self-seeds `rule_events` from the
+   *  deterministic ETL work-list (no agent output) on first load. Set from
+   *  the `?blind=1` route flag; default false so all existing behavior is
+   *  byte-identical when omitted. */
+  blind?: boolean;
 }
 
 const TIER_LABELS: Record<number, string> = {
@@ -234,7 +242,7 @@ const TIER_LABELS: Record<number, string> = {
 };
 
 export function AdherenceReview(props: AdherenceReviewProps) {
-  const { patientId, patientDisplay, taskId, onBack, activeSessionId } = props;
+  const { patientId, patientDisplay, taskId, onBack, activeSessionId, blind = false } = props;
   const [meta, setMeta] = useState<AdherenceMeta | null>(null);
   const [state, setState] = useState<AdherenceReviewState | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -262,8 +270,14 @@ export function AdherenceReview(props: AdherenceReviewProps) {
   // Mirror SpanReview: self-seed once if the review fetch returns empty AND
   // the state was never imported. App.tsx's auto-import (list runs → import
   // → refresh) reliably loses the race to this pane's own review fetch, so
-  // on first open we'd render empty otherwise.
+  // on first open we'd render empty otherwise. NEVER runs in blind mode
+  // (guarded below) — blind annotation must never pull in agent output.
   const seedAttemptedRef = useRef(false);
+  // Blind mode's own one-shot seed guard (separate from seedAttemptedRef
+  // above, which guards the agent-import chain): self-seeds `rule_events`
+  // from the deterministic ETL work-list via the seed-events route, with
+  // NO agent output involved.
+  const blindSeedAttemptedRef = useRef(false);
   // Cancellation token for the refreshState seed chain. The driving effect
   // owns it: it bumps the token on (re)run and on cleanup, so a switch to
   // another patient mid-flight makes every captured token stale and every
@@ -276,6 +290,7 @@ export function AdherenceReview(props: AdherenceReviewProps) {
 
   useEffect(() => {
     seedAttemptedRef.current = false;
+    blindSeedAttemptedRef.current = false;
     setEventDrafts(new Map());
     setEventErrors(new Map());
     setSelectedEventId(null);
@@ -329,8 +344,14 @@ export function AdherenceReview(props: AdherenceReviewProps) {
       // run's draft in ourselves (once), then re-fetch. The import handler
       // (jobs-routes.ts) merges question_answers / rule_verdicts /
       // agent_question_answers / agent_rule_verdicts.
+      //
+      // NEVER runs in blind mode — that is the whole point of blind
+      // annotation: the annotator must never see (or trigger the fetch of)
+      // agent output. Blind mode gets its own seed chain below instead,
+      // seeded ONLY from the deterministic ETL work-list.
       if (
-        (!body.question_answers || body.question_answers.length === 0)
+        !blind
+        && (!body.question_answers || body.question_answers.length === 0)
         && !body.imported_from_run
         && activeSessionId
         && !seedAttemptedRef.current
@@ -356,13 +377,33 @@ export function AdherenceReview(props: AdherenceReviewProps) {
             return;
           }
         }
+      } else if (
+        blind
+        && (!body.rule_events || body.rule_events.length === 0)
+        && !blindSeedAttemptedRef.current
+      ) {
+        // Blind mode's own seed-on-empty: build the SAME deterministic
+        // work-list the agent got (rules × ETL anchor lists), with no agent
+        // output involved. One attempt per patient/task — the seed route
+        // itself also refuses to overwrite existing rule_events (409), so
+        // this is safe even if the guard ref were somehow reset.
+        blindSeedAttemptedRef.current = true;
+        const seedRes = await authFetch(
+          `/api/reviews/${encodeURIComponent(patientId)}/${encodeURIComponent(taskId)}/adherence/seed-events${sessionQs}`,
+          { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) },
+        );
+        if (!live()) return;
+        if (seedRes.ok) {
+          await refreshState(token);
+          return;
+        }
       }
     } catch (e) {
       if (!live()) return;
       setError(`review load error: ${(e as Error).message}`);
       setState(null);
     }
-  }, [patientId, taskId, sessionQs, activeSessionId]);
+  }, [patientId, taskId, sessionQs, activeSessionId, blind]);
 
   useEffect(() => {
     const token = ++refreshTokenRef.current;
@@ -624,6 +665,11 @@ export function AdherenceReview(props: AdherenceReviewProps) {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <Header patientDisplay={patientDisplay} taskId={taskId} onBack={onBack} />
+      {blind && (
+        <div className="px-4 py-1.5 border-b border-[hsl(var(--ochre))]/40 bg-[hsl(var(--ochre))]/10 text-[12px] font-medium text-[hsl(var(--ochre))] text-center">
+          BLIND MODE — agent output hidden; your answers become the gold standard
+        </div>
+      )}
       <div className="flex flex-1 min-h-0 overflow-hidden">
        <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
       <div className="px-4 py-2 border-b border-border bg-muted/30 text-[12px] text-muted-foreground flex gap-4">
@@ -649,7 +695,7 @@ export function AdherenceReview(props: AdherenceReviewProps) {
             events={ruleEvents}
             rollups={ruleRollups}
             validatedEvents={validatedEvents}
-            mode="review"
+            mode={blind ? "blind" : "review"}
             selectedEventId={selectedEventId}
             onSelectEvent={(id) => {
               setSelectedEventId(id);
@@ -706,6 +752,7 @@ export function AdherenceReview(props: AdherenceReviewProps) {
                         validated={validatedEvents.has(e.event_id)}
                         busy={busy === `e:${e.event_id}`}
                         error={eventErrors.get(e.event_id)}
+                        blind={blind}
                         onSave={saveEvent}
                         onJumpToSource={setNoteFocus}
                       />
@@ -746,6 +793,7 @@ export function AdherenceReview(props: AdherenceReviewProps) {
                         )}
                         validated={validatedQuestions.has(q.question_id)}
                         busy={busy === `q:${q.question_id}`}
+                        blind={blind}
                         onSave={(a) => saveAnswer(q.question_id, a)}
                         onJumpToSource={setNoteFocus}
                       />
@@ -774,6 +822,7 @@ export function AdherenceReview(props: AdherenceReviewProps) {
                   (id) => agentVerdictsByRid.get(id)?.get(r.rule_id),
                 )}
                 busy={busy === `r:${r.rule_id}`}
+                blind={blind}
                 onSave={(v, a, rationale) => saveVerdict(r.rule_id, v, a, rationale)}
               />
             ))}
@@ -906,7 +955,7 @@ function AnswerControl({
 }
 
 function QuestionRow({
-  q, answer, agentIds, agentAnswers, validated, busy, onSave, onJumpToSource,
+  q, answer, agentIds, agentAnswers, validated, busy, blind = false, onSave, onJumpToSource,
 }: {
   q: QuestionDefinition;
   answer: QuestionAnswer | undefined;
@@ -914,6 +963,10 @@ function QuestionRow({
   agentAnswers: Array<QuestionAnswer | undefined>;
   validated: boolean;
   busy: boolean;
+  /** Blind-annotation mode: no agent-sourced value may render (A/B columns,
+   *  agreement chip, "= A1" source hint, reasoning/evidence). Treated as if
+   *  agentIds/agentAnswers were empty — the reviewer control is unaffected. */
+  blind?: boolean;
   onSave: (a: QuestionAnswer["answer"]) => void;
   onJumpToSource?: (focus: NoteFocus) => void;
 }) {
@@ -922,10 +975,17 @@ function QuestionRow({
 
   const dirty = (answer?.answer ?? null) !== draft;
 
+  // Blind mode: treat as single-agent-with-nothing so every agent-derived
+  // value below (presentAgents, agreementChip, reviewerSourceLabel,
+  // reasoning/evidence) self-guards to empty/hidden without touching each
+  // render branch individually.
+  const effAgentIds = blind ? [] : agentIds;
+  const effAgentAnswers = blind ? [] : agentAnswers;
+
   // Inter-agent agreement: every present agent answer equal to the first →
   // "agree"; otherwise "disagree". Single-agent runs skip the chip.
-  const presentAgents = agentAnswers
-    .map((a, i) => ({ a, id: agentIds[i] }))
+  const presentAgents = effAgentAnswers
+    .map((a, i) => ({ a, id: effAgentIds[i] }))
     .filter((x): x is { a: QuestionAnswer; id: string } => Boolean(x.a));
   const allAgree = presentAgents.length >= 2 && (() => {
     const ref = JSON.stringify(presentAgents[0]!.a.answer);
@@ -993,11 +1053,12 @@ function QuestionRow({
       </div>
 
       {/* Per-agent columns. On disagreement rows each cell is a one-click
-       *  "use this agent's answer" button. */}
-      {agentIds.length > 0 ? (
-        <div className="col-span-3 text-[11.5px] grid gap-2" style={{ gridTemplateColumns: `repeat(${agentIds.length}, minmax(0, 1fr))` }}>
-          {agentIds.map((id, i) => {
-            const a = agentAnswers[i];
+       *  "use this agent's answer" button. Hidden entirely in blind mode —
+       *  the annotator must never see agent-sourced values. */}
+      {!blind && (effAgentIds.length > 0 ? (
+        <div className="col-span-3 text-[11.5px] grid gap-2" style={{ gridTemplateColumns: `repeat(${effAgentIds.length}, minmax(0, 1fr))` }}>
+          {effAgentIds.map((id, i) => {
+            const a = effAgentAnswers[i];
             const shortId = id.replace(/^agent_/, "A");
             const isCurrent = a !== undefined && JSON.stringify(a.answer) === JSON.stringify(draft);
             const cell = (
@@ -1051,7 +1112,7 @@ function QuestionRow({
             <div className="text-muted-foreground italic">no draft</div>
           )}
         </div>
-      )}
+      ))}
 
       {/* Reviewer column — editable control with a "= A1" / "= you" hint. */}
       <div className="col-span-3 text-[11.5px] min-w-0">
@@ -1122,7 +1183,7 @@ function QuestionRow({
 }
 
 function RuleRow({
-  rule, verdict, validated, categories, answersByQid, agentIds, agentVerdicts, busy, onSave,
+  rule, verdict, validated, categories, answersByQid, agentIds, agentVerdicts, busy, blind = false, onSave,
 }: {
   rule: RuleDefinition;
   verdict: RuleVerdict | undefined;
@@ -1132,6 +1193,10 @@ function RuleRow({
   agentIds: string[];
   agentVerdicts: Array<RuleVerdict | undefined>;
   busy: boolean;
+  /** Blind-annotation mode: render only the reviewer's own verdict control
+   *  (select/attribution/rationale/save) — no engine-computed "Engine:"
+   *  readout, no provenance breadcrumb, no per-agent verdict chips. */
+  blind?: boolean;
   onSave: (
     v: RuleVerdict["verdict"],
     a: AttributionCategory | undefined,
@@ -1173,7 +1238,7 @@ function RuleRow({
             {rule.nuanced && (
               <span className="text-[10px] uppercase tracking-wider px-1.5 py-0 rounded bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200">nuanced</span>
             )}
-            {verdict?.source && (
+            {!blind && verdict?.source && (
               <span className="text-[10px] text-muted-foreground">via {verdict.source}</span>
             )}
           </div>
@@ -1199,7 +1264,7 @@ function RuleRow({
               })}
             </div>
           )}
-          {verdict && (
+          {!blind && verdict && (
             <div className="mt-1 text-[11px] flex flex-wrap items-center gap-x-3 gap-y-0.5">
               <span className="text-muted-foreground">Engine:</span>
               <span className={cn(
@@ -1215,8 +1280,9 @@ function RuleRow({
               )}
             </div>
           )}
-          {/* Per-agent verdict chips (A/B provenance) for dual-agent runs. */}
-          {agentIds.length >= 2 && (
+          {/* Per-agent verdict chips (A/B provenance) for dual-agent runs.
+           *  Hidden entirely in blind mode — agent-sourced. */}
+          {!blind && agentIds.length >= 2 && (
             <div className="mt-1 text-[11px] flex flex-wrap items-center gap-x-3 gap-y-0.5">
               <span className="text-muted-foreground">Per agent:</span>
               {agentIds.map((id, i) => {
@@ -1328,7 +1394,7 @@ const ENGINE_GATED_REASON = "event_evaluable_if not met";
 
 function EventRowImpl({
   event, rule, questionDefsById, draft, onDraftChange, dirty, canSave,
-  selected, validated, busy, error, onSave, onJumpToSource,
+  selected, validated, busy, error, blind = false, onSave, onJumpToSource,
 }: {
   event: RuleEvent;
   rule: RuleDefinition | undefined;
@@ -1341,6 +1407,10 @@ function EventRowImpl({
   validated: boolean;
   busy: boolean;
   error?: string;
+  /** Blind-annotation mode: hide the engine verdict badge and its
+   *  attribution — both are agent/engine output the annotator must not see
+   *  before entering their own answers. */
+  blind?: boolean;
   onSave: (eventId: string, payload: EventSavePayload) => void;
   onJumpToSource?: (focus: NoteFocus) => void;
 }) {
@@ -1397,11 +1467,15 @@ function EventRowImpl({
             </span>
             {/* Engine verdict — READ-ONLY. The reviewer edits answers below;
              *  the server re-runs the deterministic engine and refreshes
-             *  this badge on the next fetch. */}
-            <span className={cn("text-[10px] uppercase tracking-wider px-1.5 py-0 rounded", verdictStyle)}>
-              {event.verdict ?? "—"}
-              {event.verdict === "NON_CONCORDANT" && event.attribution ? ` (${event.attribution})` : ""}
-            </span>
+             *  this badge on the next fetch. Hidden entirely in blind mode —
+             *  the annotator must not see the engine's derived verdict or
+             *  attribution before (or while) entering their own answers. */}
+            {!blind && (
+              <span className={cn("text-[10px] uppercase tracking-wider px-1.5 py-0 rounded", verdictStyle)}>
+                {event.verdict ?? "—"}
+                {event.verdict === "NON_CONCORDANT" && event.attribution ? ` (${event.attribution})` : ""}
+              </span>
+            )}
             {validated && (
               <span className="text-[10px] text-[hsl(var(--sage))] uppercase">validated</span>
             )}
