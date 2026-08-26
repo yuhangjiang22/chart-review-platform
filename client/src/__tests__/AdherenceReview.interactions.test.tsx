@@ -12,7 +12,7 @@
 // ../auth's authFetch, build per-test mock implementations, render the pane
 // with a fixed session id, and assert against mockAuthFetch.mock.calls.
 
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import {
   render, screen, cleanup, waitFor, fireEvent, within, act,
 } from "@testing-library/react";
@@ -50,13 +50,13 @@ function errJson(status: number, body: unknown) {
 // ── Parsing helpers over the mock call log ──────────────────────────────────
 type Call = [string, RequestInit?];
 
-/** All POSTs to a given write path (question-answer | rule-verdict). */
-function postsTo(kind: "question-answer" | "rule-verdict"): Array<{ url: string; body: any }> {
+/** All POSTs to a given write path (question-answer | rule-verdict | event-verdict). */
+function postsTo(kind: "question-answer" | "rule-verdict" | "event-verdict"): Array<{ url: string; body: any }> {
   return (mockAuthFetch.mock.calls as Call[])
     .filter(([url, init]) => url.includes(`/adherence/${kind}`) && init?.method === "POST")
     .map(([url, init]) => ({ url, body: JSON.parse((init!.body as string) ?? "{}") }));
 }
-function lastPost(kind: "question-answer" | "rule-verdict") {
+function lastPost(kind: "question-answer" | "rule-verdict" | "event-verdict") {
   const all = postsTo(kind);
   return all[all.length - 1];
 }
@@ -176,6 +176,53 @@ function baseState(overrides: Record<string, unknown> = {}) {
   };
 }
 
+// Rule-event fixture (event-concordance design): two anchored events (their
+// answers reference question_ids that exist in FRAMEWORK) + one window event,
+// with matching rollups. Layered onto baseState() only by tests that opt in
+// via stateWithEvents() — plain baseState() (used by the other 42 tests)
+// stays event-less, which doubles as the "legacy" fixture for parity test (d).
+const RULE_EVENTS = [
+  {
+    event_id: "ev_1",
+    rule_id: "r_concordant",
+    anchor: { type: "encounter", date: "2025-03-01", origin: "note", ref: "note_12" },
+    evaluable: true,
+    answers: [{ question_id: "q_act_band", tier: 1, answer: 2 }],
+    verdict: "CONCORDANT",
+    source: "rule_engine",
+  },
+  {
+    event_id: "ev_2",
+    rule_id: "r_excluded",
+    anchor: { type: "encounter", date: "2025-04-15", origin: "note", ref: "note_20" },
+    evaluable: false,
+    evaluable_reason: "no visit note found",
+    answers: [{ question_id: "q_visits", tier: 1, answer: null }],
+    verdict: "EXCLUDED",
+    source: "rule_engine",
+  },
+  {
+    event_id: "ev_window",
+    rule_id: "r_unadjudicated",
+    anchor: { type: "window", origin: "omop" },
+    verdict: "NON_CONCORDANT",
+    source: "rule_engine",
+  },
+];
+const RULE_ROLLUPS = [
+  { rule_id: "r_concordant", n_events: 1, n_evaluable: 1, n_concordant: 1, n_non_concordant: 0, n_excluded: 0, rate: 1, period_verdict: "CONCORDANT" },
+  { rule_id: "r_excluded", n_events: 1, n_evaluable: 0, n_concordant: 0, n_non_concordant: 0, n_excluded: 1, rate: null, period_verdict: "EXCLUDED" },
+  { rule_id: "r_unadjudicated", n_events: 1, n_evaluable: 1, n_concordant: 0, n_non_concordant: 1, n_excluded: 0, rate: 0, period_verdict: "NON_CONCORDANT" },
+];
+function stateWithEvents(overrides: Record<string, unknown> = {}) {
+  return baseState({
+    rule_events: RULE_EVENTS,
+    rule_rollups: RULE_ROLLUPS,
+    validated_events: [],
+    ...overrides,
+  });
+}
+
 // Build a mock impl. `state` is a function so callers can mutate between
 // refreshes; `postResult` lets a test make a POST fail.
 function setupMocks(opts: {
@@ -195,6 +242,9 @@ function setupMocks(opts: {
     }
     if (url.includes("/adherence/rule-verdict") && init?.method === "POST") {
       return opts.postResult?.("rule-verdict") ?? okJson({ ok: true });
+    }
+    if (url.includes("/adherence/event-verdict") && init?.method === "POST") {
+      return opts.postResult?.("event-verdict") ?? okJson({ ok: true, version: 2 });
     }
     if (url.includes("/api/reviews/")) {
       return opts.reviewResult ? opts.reviewResult() : okJson(getState());
@@ -1094,6 +1144,116 @@ describe("session_id threading", () => {
     const url = lastPost("question-answer").url;
     expect(url).toContain("/adherence/question-answer");
     expect(url).not.toContain("session_id=");
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// 11. Event timeline + per-event validation (Task 4, event-concordance design)
+// ────────────────────────────────────────────────────────────────────────────
+describe("Event timeline + per-event validation", () => {
+  beforeEach(() => {
+    // jsdom has no scrollIntoView implementation; EventTimeline's
+    // onSelectEvent handler calls it on the matching event-row element.
+    Element.prototype.scrollIntoView = vi.fn();
+  });
+
+  it("(a) timeline renders an anchored event card; clicking it selects + scrolls the matching row", async () => {
+    setupMocks({ state: () => stateWithEvents() });
+    renderPane();
+    await waitLoaded();
+
+    // "Adherence timeline" header confirms EventTimeline mounted.
+    expect(screen.getByText(/Adherence timeline/)).toBeInTheDocument();
+
+    // ev_1's event_id renders both as a timeline card AND as the Events
+    // section row header — find the one inside a <button> (the card).
+    const card = screen
+      .getAllByText("ev_1")
+      .map((el) => el.closest("button"))
+      .find((b): b is HTMLButtonElement => b !== null);
+    expect(card).toBeTruthy();
+
+    fireEvent.click(card!);
+
+    expect(card!.getAttribute("aria-current")).toBe("true");
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+  });
+
+  it("(b) EventRow Save POSTs event-verdict with edited answers, then refetches state", async () => {
+    setupMocks({ state: () => stateWithEvents() });
+    renderPane();
+    await waitLoaded();
+
+    const row = document.getElementById("event-row-ev_1")!;
+    expect(row).toBeTruthy();
+
+    // q_act_band is a number-enum ([1,2,3]) → renders as a <select>. Agent/
+    // event answer starts at 2; change it to 3.
+    const sel = within(row).getByRole("combobox") as HTMLSelectElement;
+    fireEvent.change(sel, { target: { value: "3" } });
+
+    const readsBefore = (mockAuthFetch.mock.calls as Call[]).filter(
+      ([url]) => url.includes("/api/reviews/"),
+    ).length;
+
+    fireEvent.click(within(row).getByRole("button"));
+
+    await waitFor(() => expect(postsTo("event-verdict").length).toBe(1));
+    const post = lastPost("event-verdict");
+    expect(post.url).toContain("/api/reviews/p1/asthma-adherence/adherence/event-verdict");
+    expect(post.url).toContain("session_id=sess-1");
+    expect(post.body.event_id).toBe("ev_1");
+    expect(post.body.answers).toEqual([{ question_id: "q_act_band", answer: 3 }]);
+
+    // refreshState() re-fetches review state after a successful save.
+    await waitFor(() => {
+      const readsAfter = (mockAuthFetch.mock.calls as Call[]).filter(
+        ([url]) => url.includes("/api/reviews/"),
+      ).length;
+      expect(readsAfter).toBeGreaterThan(readsBefore);
+    });
+  });
+
+  it("(c) 'Not evaluable' with an empty reason disables Save; filling it in enables Save and posts evaluable:false", async () => {
+    setupMocks({ state: () => stateWithEvents() });
+    renderPane();
+    await waitLoaded();
+
+    // ev_1 starts evaluable (no reason) so the checkbox starts unchecked.
+    const row = document.getElementById("event-row-ev_1")!;
+    const checkbox = within(row).getByRole("checkbox") as HTMLInputElement;
+    const saveBtn = within(row).getByRole("button") as HTMLButtonElement;
+
+    expect(checkbox.checked).toBe(false);
+    fireEvent.click(checkbox);
+    expect(checkbox.checked).toBe(true);
+    expect(saveBtn.disabled).toBe(true);
+    expect(within(row).getByText(/reason required/i)).toBeInTheDocument();
+
+    const reasonInput = within(row).getByPlaceholderText(/reason/i) as HTMLInputElement;
+    fireEvent.change(reasonInput, { target: { value: "chart unavailable for this encounter" } });
+    expect(saveBtn.disabled).toBe(false);
+
+    fireEvent.click(saveBtn);
+
+    await waitFor(() => expect(postsTo("event-verdict").length).toBe(1));
+    const post = lastPost("event-verdict");
+    expect(post.body.event_id).toBe("ev_1");
+    expect(post.body.evaluable).toBe(false);
+    expect(post.body.evaluable_reason).toBe("chart unavailable for this encounter");
+  });
+
+  it("(d) a state WITHOUT rule_events renders no timeline and no Events section (legacy parity)", async () => {
+    setupMocks(); // plain baseState() — no rule_events key
+    renderPane();
+    await waitLoaded();
+
+    expect(screen.queryByText(/Adherence timeline/)).not.toBeInTheDocument();
+    expect(screen.queryByText("Events")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Events:.*validated/)).not.toBeInTheDocument();
+    // Everything else renders exactly as before.
+    expect(screen.getByText("Question framework")).toBeInTheDocument();
+    expect(screen.getByText("Rule verdicts")).toBeInTheDocument();
   });
 });
 

@@ -47,6 +47,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { NoteViewer } from "../NoteViewer";
 import type { NoteFocus } from "../types";
+import { EventTimeline, type RuleEvent, type RuleRollup } from "./adherence/EventTimeline";
 
 // ── Local shapes (mirror @chart-review/platform-types field-for-field) ──────
 // Declared locally because concur's client `../types` does not export the
@@ -134,6 +135,15 @@ interface AdherenceReviewState {
    *  state. Guards seed-on-empty so a reviewer who cleared everything
    *  isn't re-seeded. */
   imported_from_run?: string;
+  /** Per-event stream from the deterministic rule engine (event-concordance
+   *  design). Anchored events (encounter/ed/burst/...) render as timeline
+   *  cards + Events-section rows; window events (anchor.type==="window")
+   *  render only as chips in EventTimeline's "Window rules" strip and in
+   *  the existing Rules section — they are NOT listed in the Events section. */
+  rule_events?: RuleEvent[];
+  rule_rollups?: RuleRollup[];
+  validated_events?: string[];
+  agent_rule_events?: Record<string, RuleEvent[]>;
 }
 
 export interface AdherenceReviewProps {
@@ -160,7 +170,9 @@ export function AdherenceReview(props: AdherenceReviewProps) {
   const [state, setState] = useState<AdherenceReviewState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [expandedTiers, setExpandedTiers] = useState<Set<number>>(new Set([0, 1, 2]));
+  const [eventsOpen, setEventsOpen] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   // Source pane: which note (+ optional highlight span) to show, driven by
   // clicking a citation. Gives adherence review the same notes access the
   // phenotype PatientReview pane has.
@@ -318,6 +330,22 @@ export function AdherenceReview(props: AdherenceReviewProps) {
     () => new Set(state?.validated_rules ?? []),
     [state],
   );
+  const validatedEvents = useMemo(() => new Set(state?.validated_events ?? []), [state]);
+  // Memoized so EventTimeline's internal memo chain (anchored/windowEvents/
+  // win/ticks/anchors/lanes) stays stable across unrelated re-renders.
+  const ruleEvents = useMemo(() => state?.rule_events ?? [], [state]);
+  const ruleRollups = useMemo(() => state?.rule_rollups ?? [], [state]);
+  // Anchored events only — window events (anchor.type==="window") stay
+  // represented in EventTimeline's window-rule chips and the existing Rules
+  // section, not in the Events list below.
+  const anchoredEvents = useMemo(
+    () => ruleEvents.filter((e) => e.anchor.type !== "window"),
+    [ruleEvents],
+  );
+  const validatedAnchoredCount = useMemo(
+    () => anchoredEvents.filter((e) => validatedEvents.has(e.event_id)).length,
+    [anchoredEvents, validatedEvents],
+  );
 
   const saveAnswer = useCallback(async (
     qid: string,
@@ -375,6 +403,25 @@ export function AdherenceReview(props: AdherenceReviewProps) {
     }
   }, [patientId, taskId, sessionQs, refreshState]);
 
+  const saveEvent = useCallback(async (
+    eventId: string,
+    payload: { answers?: Array<{ question_id: string; answer: QuestionAnswer["answer"] }>; evaluable?: boolean; evaluable_reason?: string },
+  ) => {
+    setBusy(`e:${eventId}`);
+    try {
+      const r = await authFetch(
+        `/api/reviews/${encodeURIComponent(patientId)}/${encodeURIComponent(taskId)}/adherence/event-verdict${sessionQs}`,
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ event_id: eventId, ...payload }) },
+      );
+      if (!r.ok) {
+        const b = (await r.json().catch(() => ({}))) as { message?: string; error?: string };
+        setError(b.message ?? b.error ?? `save failed: ${r.status}`);
+        return;
+      }
+      await refreshState();
+    } finally { setBusy(null); }
+  }, [patientId, taskId, sessionQs, refreshState]);
+
   function toggleTier(t: number) {
     setExpandedTiers((prev) => {
       const next = new Set(prev);
@@ -407,6 +454,12 @@ export function AdherenceReview(props: AdherenceReviewProps) {
   const validatedQuestionsInFramework = [...validatedQuestions].filter((qid) =>
     frameworkQids.has(qid),
   ).length;
+  // Looked up by EventRow to resolve the QuestionDefinition (and hence the
+  // answer_schema/control type) for each event.answers[] entry, across tiers.
+  const questionDefsById = new Map<string, QuestionDefinition>();
+  for (const t of tiers) {
+    for (const q of meta.questions_by_tier[t] ?? []) questionDefsById.set(q.question_id, q);
+  }
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -416,6 +469,9 @@ export function AdherenceReview(props: AdherenceReviewProps) {
       <div className="px-4 py-2 border-b border-border bg-muted/30 text-[12px] text-muted-foreground flex gap-4">
         <span>Questions: {validatedQuestionsInFramework} / {totalQuestions} validated</span>
         <span>Rules: {validatedRules.size} / {meta.rules.length} adjudicated</span>
+        {anchoredEvents.length > 0 && (
+          <span>Events: {validatedAnchoredCount} / {anchoredEvents.length} validated</span>
+        )}
       </div>
 
       {error && (
@@ -425,6 +481,55 @@ export function AdherenceReview(props: AdherenceReviewProps) {
       )}
 
       <div className="flex-1 overflow-y-auto p-3 space-y-4 min-w-0">
+        {/* Event timeline (event-concordance design). Rendered ONLY when the
+         *  review state carries rule_events — legacy states without them
+         *  (pre-event-engine tasks) must render identically to before. */}
+        {ruleEvents.length > 0 && (
+          <EventTimeline
+            events={ruleEvents}
+            rollups={ruleRollups}
+            validatedEvents={validatedEvents}
+            mode="review"
+            selectedEventId={selectedEventId}
+            onSelectEvent={(id) => {
+              setSelectedEventId(id);
+              document.getElementById(`event-row-${id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+            }}
+          />
+        )}
+
+        {/* Events section — anchored events only (encounter/ed/burst/...).
+         *  Window events stay represented in the Rules section below. */}
+        {anchoredEvents.length > 0 && (
+          <section>
+            <div className="border border-border rounded mb-2 bg-card">
+              <button
+                onClick={() => setEventsOpen((o) => !o)}
+                className="w-full px-3 py-2 text-left text-[12.5px] font-medium flex items-center gap-1.5 hover:bg-muted/50"
+              >
+                {eventsOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                Events
+                <span className="text-muted-foreground font-normal">({anchoredEvents.length})</span>
+              </button>
+              {eventsOpen && (
+                <div className="border-t border-border divide-y divide-border">
+                  {anchoredEvents.map((e) => (
+                    <EventRow
+                      key={e.event_id}
+                      event={e}
+                      questionDefsById={questionDefsById}
+                      selected={selectedEventId === e.event_id}
+                      validated={validatedEvents.has(e.event_id)}
+                      busy={busy === `e:${e.event_id}`}
+                      onSave={(payload) => saveEvent(e.event_id, payload)}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
         {/* Questions section, tier-grouped */}
         <section>
           <h2 className="text-[13px] font-semibold mb-1.5">Question framework</h2>
@@ -526,6 +631,93 @@ function Header(props: { patientDisplay: string; taskId: string; onBack: () => v
   );
 }
 
+// Shared answer control — schema-driven (boolean/enum/number/text), reused by
+// QuestionRow's Reviewer column AND EventRow's per-answer edit cells. Factored
+// out of QuestionRow's former inline `renderControl()`; the branch bodies are
+// unchanged verbatim (draft/setDraft renamed to value/onChange), so QuestionRow's
+// existing interaction tests keep passing unchanged.
+function AnswerControl({
+  q, value, onChange, disabled,
+}: {
+  q: QuestionDefinition;
+  value: QuestionAnswer["answer"];
+  onChange: (a: QuestionAnswer["answer"]) => void;
+  disabled?: boolean;
+}) {
+  const schema = q.answer_schema;
+  const isBoolean = schema?.type === "boolean";
+  const isEnum = Array.isArray(schema?.enum);
+  const isNumber = schema?.type === "number";
+
+  if (isBoolean) {
+    return (
+      <select
+        value={value === null ? "" : String(value)}
+        disabled={disabled}
+        onChange={(e) => {
+          const v = e.target.value;
+          onChange(v === "" ? null : v === "true");
+        }}
+        className="border border-border rounded px-1.5 py-0.5 text-[12px] bg-background w-full max-w-[140px]"
+      >
+        <option value="">—</option>
+        <option value="true">true</option>
+        <option value="false">false</option>
+      </select>
+    );
+  }
+  if (isEnum) {
+    const opts = schema!.enum!;
+    return (
+      <select
+        value={value === null ? "" : String(value)}
+        disabled={disabled}
+        onChange={(e) => {
+          // The <option> value is a string, but a numeric/boolean enum
+          // (answer_schema.enum:[1,2,3]) must keep its original type so it
+          // compares equal to the agent's typed answer — otherwise the
+          // agree-chip, "= Ax" source label, and isCurrent highlight all
+          // falsely show disagreement. Recover the original-typed option by
+          // matching String(opt) === the selected string.
+          const sel = e.target.value;
+          if (sel === "") { onChange(null); return; }
+          const orig = opts.find((opt) => String(opt) === sel);
+          onChange(orig === undefined ? sel : orig);
+        }}
+        className="border border-border rounded px-1.5 py-0.5 text-[12px] bg-background w-full max-w-[140px]"
+      >
+        <option value="">—</option>
+        {opts.map((opt) => (
+          <option key={String(opt)} value={String(opt)}>{String(opt)}</option>
+        ))}
+      </select>
+    );
+  }
+  if (isNumber) {
+    return (
+      <input
+        type="number"
+        value={value === null ? "" : String(value)}
+        disabled={disabled}
+        onChange={(e) => {
+          const v = e.target.value;
+          onChange(v === "" ? null : Number(v));
+        }}
+        className="border border-border rounded px-1.5 py-0.5 text-[12px] bg-background w-full max-w-[120px]"
+      />
+    );
+  }
+  return (
+    <input
+      type="text"
+      value={value === null ? "" : String(value)}
+      disabled={disabled}
+      onChange={(e) => onChange(e.target.value === "" ? null : e.target.value)}
+      className="border border-border rounded px-1.5 py-0.5 text-[12px] bg-background w-full max-w-[160px]"
+    />
+  );
+}
+
 function QuestionRow({
   q, answer, agentIds, agentAnswers, validated, busy, onSave, onJumpToSource,
 }: {
@@ -540,77 +732,6 @@ function QuestionRow({
 }) {
   const [draft, setDraft] = useState<QuestionAnswer["answer"]>(answer?.answer ?? null);
   useEffect(() => { setDraft(answer?.answer ?? null); }, [answer?.answer]);
-
-  const schema = q.answer_schema;
-  const isBoolean = schema?.type === "boolean";
-  const isEnum = Array.isArray(schema?.enum);
-  const isNumber = schema?.type === "number";
-
-  function renderControl() {
-    if (isBoolean) {
-      return (
-        <select
-          value={draft === null ? "" : String(draft)}
-          onChange={(e) => {
-            const v = e.target.value;
-            setDraft(v === "" ? null : v === "true");
-          }}
-          className="border border-border rounded px-1.5 py-0.5 text-[12px] bg-background w-full max-w-[140px]"
-        >
-          <option value="">—</option>
-          <option value="true">true</option>
-          <option value="false">false</option>
-        </select>
-      );
-    }
-    if (isEnum) {
-      const opts = schema!.enum!;
-      return (
-        <select
-          value={draft === null ? "" : String(draft)}
-          onChange={(e) => {
-            // The <option> value is a string, but a numeric/boolean enum
-            // (answer_schema.enum:[1,2,3]) must keep its original type so it
-            // compares equal to the agent's typed answer — otherwise the
-            // agree-chip, "= Ax" source label, and isCurrent highlight all
-            // falsely show disagreement. Recover the original-typed option by
-            // matching String(opt) === the selected string.
-            const sel = e.target.value;
-            if (sel === "") { setDraft(null); return; }
-            const orig = opts.find((opt) => String(opt) === sel);
-            setDraft(orig === undefined ? sel : orig);
-          }}
-          className="border border-border rounded px-1.5 py-0.5 text-[12px] bg-background w-full max-w-[140px]"
-        >
-          <option value="">—</option>
-          {opts.map((opt) => (
-            <option key={String(opt)} value={String(opt)}>{String(opt)}</option>
-          ))}
-        </select>
-      );
-    }
-    if (isNumber) {
-      return (
-        <input
-          type="number"
-          value={draft === null ? "" : String(draft)}
-          onChange={(e) => {
-            const v = e.target.value;
-            setDraft(v === "" ? null : Number(v));
-          }}
-          className="border border-border rounded px-1.5 py-0.5 text-[12px] bg-background w-full max-w-[120px]"
-        />
-      );
-    }
-    return (
-      <input
-        type="text"
-        value={draft === null ? "" : String(draft)}
-        onChange={(e) => setDraft(e.target.value === "" ? null : e.target.value)}
-        className="border border-border rounded px-1.5 py-0.5 text-[12px] bg-background w-full max-w-[160px]"
-      />
-    );
-  }
 
   const dirty = (answer?.answer ?? null) !== draft;
 
@@ -753,7 +874,7 @@ function QuestionRow({
             <span className="ml-1 normal-case tracking-normal opacity-70">{reviewerSourceLabel}</span>
           )}
         </div>
-        <div className="min-w-0">{renderControl()}</div>
+        <div className="min-w-0"><AnswerControl q={q} value={draft} onChange={setDraft} /></div>
       </div>
 
       <div className="col-span-2 flex flex-col items-end gap-1 min-w-0">
@@ -989,6 +1110,161 @@ function RuleRow({
         >
           {dirty ? "Save" : validated ? "✓ Accepted" : "Accept"}
         </Button>
+      </div>
+    </div>
+  );
+}
+
+// One anchored rule_event: shows the anchor + the READ-ONLY engine verdict
+// (the reviewer validates the underlying answers, never edits the verdict
+// directly — the server re-derives it), an editable control per answer, a
+// "not evaluable" override, and a Save that POSTs the whole event verdict.
+function EventRow({
+  event, questionDefsById, selected, validated, busy, onSave,
+}: {
+  event: RuleEvent;
+  questionDefsById: Map<string, QuestionDefinition>;
+  selected: boolean;
+  validated: boolean;
+  busy: boolean;
+  onSave: (payload: {
+    answers?: Array<{ question_id: string; answer: QuestionAnswer["answer"] }>;
+    evaluable?: boolean;
+    evaluable_reason?: string;
+  }) => void;
+}) {
+  const [draftAnswers, setDraftAnswers] = useState<Array<{ question_id: string; answer: QuestionAnswer["answer"] }>>(
+    () => (event.answers ?? []).map((a) => ({ question_id: a.question_id, answer: a.answer })),
+  );
+  useEffect(() => {
+    setDraftAnswers((event.answers ?? []).map((a) => ({ question_id: a.question_id, answer: a.answer })));
+  }, [event.answers]);
+
+  const [notEvaluable, setNotEvaluable] = useState(event.evaluable === false);
+  const [evaluableReason, setEvaluableReason] = useState(event.evaluable_reason ?? "");
+  useEffect(() => {
+    setNotEvaluable(event.evaluable === false);
+    setEvaluableReason(event.evaluable_reason ?? "");
+  }, [event.evaluable, event.evaluable_reason]);
+
+  function updateAnswer(qid: string, value: QuestionAnswer["answer"]) {
+    setDraftAnswers((prev) => {
+      const idx = prev.findIndex((a) => a.question_id === qid);
+      if (idx === -1) return [...prev, { question_id: qid, answer: value }];
+      const next = [...prev];
+      next[idx] = { question_id: qid, answer: value };
+      return next;
+    });
+  }
+
+  // Reason required whenever "not evaluable" is checked — Save stays disabled
+  // (with a hint) until one is entered, so the server never receives
+  // evaluable:false without an attributable reason.
+  const reasonMissing = notEvaluable && evaluableReason.trim().length === 0;
+  const canSave = !reasonMissing;
+
+  const anchorMetaEntries = event.anchor.meta ? Object.entries(event.anchor.meta) : [];
+  const verdictStyle =
+    event.verdict === "CONCORDANT" ? "bg-[hsl(var(--sage))]/15 text-[hsl(var(--sage))]"
+    : event.verdict === "NON_CONCORDANT" ? "bg-[hsl(var(--oxblood))]/12 text-[hsl(var(--oxblood))]"
+    : "bg-muted text-muted-foreground";
+
+  return (
+    <div
+      id={`event-row-${event.event_id}`}
+      className={cn("px-3 py-2 text-[12px] space-y-1.5", selected && "bg-[hsl(var(--oxblood)/0.06)]")}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-mono text-[11px] text-muted-foreground">{event.event_id}</span>
+            <span className="text-[11px] text-muted-foreground">
+              {event.anchor.date ?? "—"} · {event.anchor.type}
+              {event.anchor.ref ? ` · ${event.anchor.ref}` : ""}
+              {anchorMetaEntries.length > 0 && (
+                <> · {anchorMetaEntries.map(([k, v]) => `${k}=${String(v)}`).join(", ")}</>
+              )}
+            </span>
+            {/* Engine verdict — READ-ONLY. The reviewer edits answers below;
+             *  the server re-runs the deterministic engine and refreshes
+             *  this badge on the next fetch. */}
+            <span className={cn("text-[10px] uppercase tracking-wider px-1.5 py-0 rounded", verdictStyle)}>
+              {event.verdict ?? "—"}
+              {event.verdict === "NON_CONCORDANT" && event.attribution ? ` (${event.attribution})` : ""}
+            </span>
+            {validated && (
+              <span className="text-[10px] text-[hsl(var(--sage))] uppercase">validated</span>
+            )}
+          </div>
+          {event.evaluable === false && event.evaluable_reason && (
+            <div className="text-[11px] text-muted-foreground italic mt-0.5">
+              not evaluable: {event.evaluable_reason}
+            </div>
+          )}
+
+          {/* Per-answer editable controls, one per event.answers[] entry. */}
+          {(event.answers ?? []).length > 0 && (
+            <div
+              className="mt-1.5 grid gap-2"
+              style={{ gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))" }}
+            >
+              {(event.answers ?? []).map((a) => {
+                const q = questionDefsById.get(a.question_id);
+                const draft = draftAnswers.find((d) => d.question_id === a.question_id)?.answer ?? null;
+                return (
+                  <div key={a.question_id} className="min-w-0">
+                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground truncate font-mono">
+                      {a.question_id}
+                    </div>
+                    {q ? (
+                      <AnswerControl q={q} value={draft} onChange={(v) => updateAnswer(a.question_id, v)} />
+                    ) : (
+                      <div className="text-[11px] text-muted-foreground italic">unknown question</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Not-evaluable override. */}
+          <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+            <label className="flex items-center gap-1.5 text-[11px]">
+              <input
+                type="checkbox"
+                checked={notEvaluable}
+                onChange={(e) => setNotEvaluable(e.target.checked)}
+              />
+              Not evaluable
+            </label>
+            {notEvaluable && (
+              <input
+                type="text"
+                value={evaluableReason}
+                onChange={(e) => setEvaluableReason(e.target.value)}
+                placeholder="Reason (required)"
+                className="flex-1 min-w-[160px] border border-border rounded px-1.5 py-0.5 bg-background text-[12px]"
+              />
+            )}
+            {reasonMissing && (
+              <span className="text-[10.5px] text-[hsl(var(--oxblood))]">reason required to save</span>
+            )}
+          </div>
+        </div>
+
+        <div className="flex flex-col items-end gap-1 min-w-[6rem]">
+          <Button
+            size="sm"
+            disabled={busy || !canSave}
+            onClick={() => onSave({
+              answers: draftAnswers,
+              evaluable: notEvaluable ? false : undefined,
+              evaluable_reason: notEvaluable ? evaluableReason : undefined,
+            })}
+          >
+            {validated ? "✓ Validated" : "Save"}
+          </Button>
+        </div>
       </div>
     </div>
   );
