@@ -84,7 +84,7 @@ function setupMocks() {
   });
 }
 
-function renderPane(opts: { blind?: boolean } = {}) {
+function renderPane(opts: { blind?: boolean; activeSessionName?: string | null } = {}) {
   return render(
     <AdherenceReview
       patientId="p1"
@@ -92,6 +92,7 @@ function renderPane(opts: { blind?: boolean } = {}) {
       taskId="asthma-adherence"
       onBack={() => {}}
       activeSessionId="sess-1"
+      activeSessionName={opts.activeSessionName}
       blind={opts.blind}
     />,
   );
@@ -157,9 +158,12 @@ describe("AdherenceReview — un-adjudicated rule", () => {
   });
 });
 
-// review state used by the "no auto-import in blind mode" test: empty
-// question_answers AND no imported_from_run — the exact shape that makes
-// the non-blind seed-on-empty auto-import chain fire.
+// review state used by the "no auto-import in blind mode" and "seed-events
+// exactly once" tests: empty question_answers, no rule_events, AND no
+// imported_from_run/agent shadow — the exact shape that makes the non-blind
+// seed-on-empty auto-import chain fire (were it not blind-guarded) while
+// staying UNCONTAMINATED per isBlindContaminated (so the pane renders
+// normally instead of the refusal panel).
 const REVIEW_STATE_NEVER_IMPORTED = {
   ...REVIEW_STATE,
   question_answers: [],
@@ -167,20 +171,99 @@ const REVIEW_STATE_NEVER_IMPORTED = {
 };
 delete (REVIEW_STATE_NEVER_IMPORTED as { imported_from_run?: string }).imported_from_run;
 
-describe("AdherenceReview — blind mode (spec 2026-08-24 Task 5)", () => {
-  it("hides agent-sourced values (A/B column + '= A1' source hint) that ARE visible in non-blind mode", async () => {
-    setupMocks();
+// Fixture for the "key test" (defense-in-depth, no contamination-refusal):
+// question_answers + rule_verdicts carry source:"agent" DIRECTLY on the
+// canonical arrays, and the one rule_event carries an agent-sourced answer
+// too — but imported_from_run is unset and the agent shadow maps
+// (agent_question_answers/agent_rule_verdicts/agent_rule_events) are absent,
+// so isBlindContaminated does NOT trip and the pane renders its normal
+// controls. This isolates the per-control reviewer-only filter (Critical 2b)
+// from the hard contamination-refusal gate (Critical 2a, tested separately
+// below by adding imported_from_run to this SAME fixture).
+const AGENT_POPULATED_UNCONTAMINATED_STATE = {
+  patient_id: "p1",
+  task_id: "asthma-adherence",
+  version: 1,
+  task_kind: "adherence",
+  question_answers: [
+    { question_id: "act_score_band", tier: 1, answer: 2, source: "agent" },
+  ],
+  rule_verdicts: [
+    { rule_id: "r_controller_use", verdict: "CONCORDANT", source: "rule_engine" },
+  ],
+  validated_questions: [],
+  validated_rules: [],
+  rule_events: [
+    {
+      event_id: "ev_1",
+      rule_id: "r_controller_use",
+      anchor: { type: "encounter", date: "2025-03-01", origin: "note", ref: "note_1" },
+      evaluable: true,
+      answers: [{ question_id: "act_score_band", tier: 1, answer: 2, source: "agent" }],
+      verdict: "CONCORDANT",
+      source: "agent",
+    },
+  ],
+  rule_rollups: [],
+  validated_events: [],
+};
+
+function setupMocksWith(state: unknown) {
+  mockAuthFetch.mockImplementation((url: string) => {
+    if (url.includes("/adherence") && url.includes("/api/tasks/")) return okJson(FRAMEWORK);
+    if (url.includes("/api/reviews/")) return okJson(state);
+    if (url.includes("/api/runs")) return okJson([]);
+    return okJson(null);
+  });
+}
+
+describe("AdherenceReview — blind mode (spec 2026-08-24 Task 5 review)", () => {
+  it("KEY: no agent value reaches the DOM — form values are empty, not just text-hidden (defense-in-depth, Critical 2b)", async () => {
+    setupMocksWith(AGENT_POPULATED_UNCONTAMINATED_STATE);
     renderPane({ blind: true });
 
-    // Wait for the framework to load (same question as the non-blind test
-    // above, which asserts the "A1" column + "= A1" hint DO render for this
-    // exact fixture when blind is false/omitted).
     await waitFor(() => {
       expect(screen.getByText("ACT score band")).toBeInTheDocument();
     });
 
+    // Every <select> on the page — the question's Reviewer control, the
+    // rule's verdict control, AND the event row's per-answer control (all
+    // three use the same enum-typed act_score_band question, so all three
+    // render as comboboxes here) — must sit at its neutral/empty value.
+    // None may leak the agent's answer (2) or the agent's rule verdict
+    // (CONCORDANT). Checking the ACTUAL FORM VALUE, not text presence, is
+    // the point: a text query alone can't see this leak — that's exactly
+    // how it survived the first pass.
+    const comboboxes = screen.getAllByRole("combobox") as HTMLSelectElement[];
+    expect(comboboxes.length).toBeGreaterThanOrEqual(3); // question + rule-verdict + event-answer
+    expect(comboboxes.every((cb) => cb.value === "")).toBe(true);
+
+    // No "(A)" agent-provenance tag anywhere (RuleRow's Inputs: line).
+    expect(screen.queryByText(/\(A\)/)).not.toBeInTheDocument();
+    // No "= A1" agent-source hint on the Reviewer column either.
     expect(screen.queryByText(/=\s*A1/)).not.toBeInTheDocument();
-    expect(screen.queryByText("A1")).not.toBeInTheDocument();
+  });
+
+  it("contamination refusal: the SAME fixture + imported_from_run set → hard error panel, no controls (Critical 2a)", async () => {
+    setupMocksWith({ ...AGENT_POPULATED_UNCONTAMINATED_STATE, imported_from_run: "run-1" });
+    renderPane({ blind: true });
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/This session contains agent output — it cannot be used for blind gold collection/),
+      ).toBeInTheDocument();
+    });
+
+    // The banner still shows (spec: "Keep the banner visible; no controls").
+    expect(screen.getByText(/BLIND MODE/)).toBeInTheDocument();
+    // But NOTHING reviewer-editable renders — no comboboxes, no text
+    // inputs, and no Accept/Save buttons (the Header's own "Back"
+    // navigation button is the only button left — it isn't part of the
+    // annotation surface this gate is protecting).
+    expect(screen.queryAllByRole("combobox")).toHaveLength(0);
+    expect(screen.queryAllByRole("textbox")).toHaveLength(0);
+    expect(screen.queryByRole("button", { name: /accept|save/i })).not.toBeInTheDocument();
+    expect(screen.queryByText("ACT score band")).not.toBeInTheDocument();
   });
 
   it("never calls the run-import endpoint, even with empty question_answers and no imported_from_run", async () => {
@@ -207,7 +290,7 @@ describe("AdherenceReview — blind mode (spec 2026-08-24 Task 5)", () => {
   });
 
   it("with empty rule_events, calls /adherence/seed-events exactly once", async () => {
-    setupMocks(); // REVIEW_STATE has no rule_events key at all
+    setupMocksWith(REVIEW_STATE_NEVER_IMPORTED);
     renderPane({ blind: true });
 
     await waitFor(() => {
@@ -225,17 +308,28 @@ describe("AdherenceReview — blind mode (spec 2026-08-24 Task 5)", () => {
     expect(callsTo("/adherence/seed-events")).toHaveLength(1);
   });
 
-  it("renders the blind-mode banner when blind, and never renders it otherwise", async () => {
-    setupMocks();
-    const { unmount } = renderPane({ blind: true });
+  it("renders the blind-mode banner (with the session name) when blind, and never renders it otherwise (Critical 3)", async () => {
+    setupMocksWith(REVIEW_STATE_NEVER_IMPORTED);
+    const { unmount } = renderPane({ blind: true, activeSessionName: "blind-v06" });
     await waitFor(() => {
       expect(screen.getByText(/BLIND MODE/)).toBeInTheDocument();
     });
     expect(
-      screen.getByText(/agent output hidden; your answers become the gold standard/),
+      screen.getByText('BLIND MODE — writing gold to session "blind-v06" — agent output hidden'),
     ).toBeInTheDocument();
     unmount();
 
+    // No session name known yet → generic banner text (not blank/broken).
+    setupMocksWith(REVIEW_STATE_NEVER_IMPORTED);
+    const { unmount: unmount2 } = renderPane({ blind: true, activeSessionName: null });
+    await waitFor(() => {
+      expect(
+        screen.getByText(/BLIND MODE — agent output hidden; your answers become the gold standard/),
+      ).toBeInTheDocument();
+    });
+    unmount2();
+
+    setupMocks();
     renderPane({ blind: false });
     await waitFor(() => {
       expect(screen.getByText("ACT score band")).toBeInTheDocument();

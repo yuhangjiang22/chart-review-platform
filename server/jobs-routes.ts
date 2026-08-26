@@ -30,9 +30,10 @@ import {
   getRunManifest,
 } from "./lib/infra/batch-run/index.js";
 import { sessionIdForRun } from "./lib/session-reviews.js";
+import { getSessionManifest } from "./lib/domain/iter/index.js";
 import { deriveNerReviewStatus } from "./lib/review-completion.js";
 import { pathFor } from "@chart-review/storage";
-import type { RuleEvent, RuleRollup } from "@chart-review/platform-types";
+import type { RuleEvent, RuleRollup, RuleEventsProvenance } from "@chart-review/platform-types";
 
 // Path resolution — uses the canonical PLATFORM_ROOT from
 // @chart-review/patients (v2's directory), not this file's old default
@@ -119,6 +120,11 @@ export function mergeAdherenceImport(
     ruleVerdicts: unknown[];
     ruleEvents: RuleEvent[];
     ruleRollups: RuleRollup[];
+    /** Provenance stamped at seed time (spec 2026-08-24 Task 5 review,
+     *  Important 2) — first-agent-wins, mirroring ruleEvents/ruleRollups.
+     *  Undefined for a legacy/period-only draft (predates the stamp) or a
+     *  draft whose runner predates this field. */
+    ruleEventsProvenance?: RuleEventsProvenance;
     adherenceExcluded?: boolean;
     adherenceExclusionReason?: string;
     agentQuestionAnswers: Record<string, unknown[]>;
@@ -127,7 +133,7 @@ export function mergeAdherenceImport(
   },
 ): Record<string, unknown> {
   const {
-    questionAnswers, ruleVerdicts, ruleEvents, ruleRollups,
+    questionAnswers, ruleVerdicts, ruleEvents, ruleRollups, ruleEventsProvenance,
     adherenceExcluded, adherenceExclusionReason,
     agentQuestionAnswers, agentRuleVerdicts, agentRuleEvents,
   } = input;
@@ -187,6 +193,10 @@ export function mergeAdherenceImport(
   // instead of replacing it with an empty list. Only an event-bearing
   // draft may rewrite the event arrays.
   if (ruleEvents.length > 0) {
+    // Fresh work-list this import → fresh provenance stamp (or, if this
+    // draft predates the stamp, fall through to whatever the state already
+    // had rather than dropping it to undefined).
+    out.rule_events_provenance = ruleEventsProvenance ?? existing.rule_events_provenance;
     const existingEvents = (existing.rule_events as RuleEvent[] | undefined) ?? [];
     const reviewerEvents = new Map(
       existingEvents.filter((e) => e.source === "reviewer").map((e) => [e.event_id, e]),
@@ -231,6 +241,7 @@ export function mergeAdherenceImport(
     out.rule_events = existing.rule_events;
     out.rule_rollups = existing.rule_rollups;
     out.agent_rule_events = existing.agent_rule_events;
+    out.rule_events_provenance = existing.rule_events_provenance;
   }
   out.validated_events = (existing.validated_events as string[] | undefined) ?? [];
 
@@ -325,7 +336,11 @@ export const jobsRoutes: RouteEntry[] = [
   // Copies the agent draft (phenotype field_assessments OR NER span_labels)
   // into reviews/<patient>/<task>/review_state.json so the reviewer has
   // something to validate against. Refuses to overwrite an existing
-  // review_state unless force:true.
+  // review_state unless force:true. Also refuses (409) when the run's
+  // owning session is BLIND (spec 2026-08-24 Task 5 review, Critical 1) —
+  // the last line of defense behind the client's own blind-mode guards, so
+  // a curl/API call or a stale UI can't overwrite a blind gold session's
+  // review_state with agent output.
   //
   // Three on-disk shapes:
   //   1. per_patient/<pid>/agent_draft.json — legacy single-agent
@@ -370,6 +385,15 @@ export const jobsRoutes: RouteEntry[] = [
       if (!sid) {
         throw httpErr(409, `run ${p.runId} has no owning session; cannot import`);
       }
+      // Blind gold-collection sessions (adherence spec 2026-08-24 Task 5)
+      // must NEVER receive an agent draft, regardless of how the request
+      // was made — this is the last line of defense behind the client's
+      // own blind-mode guards, so a curl/API call or a stale UI can't
+      // silently overwrite the gold arm with agent output.
+      const owningSession = getSessionManifest(taskId, sid);
+      if (owningSession?.blind) {
+        throw httpErr(409, `session ${sid} is a blind gold-collection session; agent import is refused`);
+      }
       const reviewStatePath = pathFor.reviewState(sid, p.patientId, taskId);
       if (fs.existsSync(reviewStatePath) && !force) {
         const err = httpErr(409, "review_state already exists for this patient×task; pass force:true to overwrite");
@@ -384,6 +408,7 @@ export const jobsRoutes: RouteEntry[] = [
         rule_verdicts?: unknown[];
         rule_events?: RuleEvent[];
         rule_rollups?: RuleRollup[];
+        rule_events_provenance?: RuleEventsProvenance;
         excluded?: boolean;
         exclusion_reason?: string;
         task_kind?: string;
@@ -401,6 +426,7 @@ export const jobsRoutes: RouteEntry[] = [
       let ruleVerdicts: unknown[] = [];
       let ruleEvents: RuleEvent[] = [];
       let ruleRollups: RuleRollup[] = [];
+      let ruleEventsProvenance: RuleEventsProvenance | undefined;
       let adherenceExcluded: boolean | undefined;
       let adherenceExclusionReason: string | undefined;
       // Per-agent shadow drafts for adherence so the UI can render A/B
@@ -429,7 +455,10 @@ export const jobsRoutes: RouteEntry[] = [
           agentRuleVerdicts[id] = draft.rule_verdicts;
         }
         if (Array.isArray(draft.rule_events)) {
-          if (ruleEvents.length === 0) ruleEvents = draft.rule_events;
+          if (ruleEvents.length === 0) {
+            ruleEvents = draft.rule_events;
+            ruleEventsProvenance = draft.rule_events_provenance;
+          }
           // Present-but-empty carries no event-level information (a
           // period-only rule set, or an agent that committed zero events
           // this run) — recording it as this agent's shadow would erase
@@ -534,7 +563,7 @@ export const jobsRoutes: RouteEntry[] = [
         Object.assign(
           reviewState,
           mergeAdherenceImport(existing, {
-            questionAnswers, ruleVerdicts, ruleEvents, ruleRollups,
+            questionAnswers, ruleVerdicts, ruleEvents, ruleRollups, ruleEventsProvenance,
             adherenceExcluded, adherenceExclusionReason,
             agentQuestionAnswers, agentRuleVerdicts, agentRuleEvents,
           }),

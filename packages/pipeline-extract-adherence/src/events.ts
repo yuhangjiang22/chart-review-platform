@@ -1,6 +1,7 @@
 // Event work-list expansion (spec 2026-08-24): rules × ETL anchor lists →
 // RuleEvent stubs the agent fills via set_event_answer. Deterministic —
 // the denominator must be reproducible across runs, models, and sites.
+import { createHash } from "node:crypto";
 import type { RuleEvent } from "@chart-review/platform-types";
 import { windowEventStub, type RuleDefinition } from "@chart-review/rule-engine";
 
@@ -63,4 +64,16 @@ export function expandEventWorklist(
     }
   }
   return out;
+}
+
+/** Stable hash of a work-list's sorted event_ids — the cheap "did the two
+ *  seeds land on the same denominator" signal stamped into
+ *  RuleEventsProvenance.worklist_hash by both seed sites (the agent
+ *  runner and the blind-annotation seed-events route). Sorted so seed
+ *  order (which `expandEventWorklist` deliberately does NOT normalize)
+ *  doesn't produce spurious hash drift between two runs over an
+ *  identical set of events. */
+export function computeWorklistHash(events: Pick<RuleEvent, "event_id">[]): string {
+  const ids = events.map((e) => e.event_id).sort();
+  return createHash("sha256").update(ids.join("\n")).digest("hex");
 }

@@ -1199,14 +1199,33 @@ async function runOneAgent(
       // with no anchored rules — legacy prompt unchanged). `skill` and
       // `scratchStateFp` are reused by the post-agent engine pass below —
       // same lexical scope, no need to re-load/re-derive.
-      const { loadAdherenceSkill, expandEventWorklist, toAnchorEntries, buildEventWorklistBlock } =
-        await import("@chart-review/pipeline-extract-adherence");
+      const {
+        loadAdherenceSkill, expandEventWorklist, toAnchorEntries, buildEventWorklistBlock,
+        computeWorklistHash,
+      } = await import("@chart-review/pipeline-extract-adherence");
       const skill = loadAdherenceSkill(taskId);
       const rawAnchors = readAnchors(patientId);
-      const eventWorklist = expandEventWorklist(
-        skill.rules,
-        Object.fromEntries(Object.entries(rawAnchors).map(([k, v]) => [k, toAnchorEntries(v)])),
+      const anchorEntries = Object.fromEntries(
+        Object.entries(rawAnchors).map(([k, v]) => [k, toAnchorEntries(v)]),
       );
+      const eventWorklist = expandEventWorklist(skill.rules, anchorEntries);
+      // Provenance stamp (spec 2026-08-24 Task 5 review, Important 2): an
+      // ETL re-run or rubric bump between THIS agent seed and a later
+      // blind-gold seed (server/adherence-routes.ts seed-events route)
+      // would otherwise silently shift the denominator, and Task 7's
+      // enumeration axis would misreport the shift as human-vs-agent
+      // disagreement instead of a seed mismatch. Reuses manifest's own
+      // guideline_sha (computed once at run-start) rather than re-hashing
+      // the guideline bundle per patient/agent.
+      const rule_events_provenance = {
+        seeded_by: "runner" as const,
+        ts: new Date().toISOString(),
+        guideline_sha: manifest.guideline_sha,
+        anchor_lists: Object.fromEntries(
+          Object.entries(anchorEntries).map(([name, entries]) => [name, entries.length]),
+        ),
+        worklist_hash: computeWorklistHash(eventWorklist),
+      };
       const scratchStateFp = path.join(scratchRoot, patientId, taskId, "review_state.json");
       {
         // Seed stubs into the scratch state BEFORE the agent subprocess
@@ -1225,6 +1244,7 @@ async function runOneAgent(
           updated_by: "system",
           field_assessments: [],
           rule_events: eventWorklist,
+          rule_events_provenance,
         } satisfies ReviewState;
         if (!fs.existsSync(scratchStateFp)) {
           fs.mkdirSync(path.dirname(scratchStateFp), { recursive: true });
@@ -1240,6 +1260,7 @@ async function runOneAgent(
             st = freshSeed;
           }
           st.rule_events = eventWorklist;
+          st.rule_events_provenance = rule_events_provenance;
           atomicWriteJson(scratchStateFp, st);
         }
       }
@@ -1470,6 +1491,16 @@ async function runOneAgent(
         rule_verdicts: ruleVerdicts,
         rule_events: ruleEvents,
         rule_rollups: ruleRollups,
+        // Reuses the SAME provenance object stamped into the scratch state
+        // before the agent ran (spec 2026-08-24 Task 5 review, Important
+        // 2) — deliberately NOT recomputed from `ruleEvents` here, since
+        // worklist_hash must reflect the deterministic ETL-seeded
+        // denominator this agent was GIVEN, not whatever it may have
+        // supplemented (note-origin events) or answered. Without this line
+        // the stamp would live only in the scratch dir (cleaned up after
+        // the run) and never reach the persisted draft or the committed
+        // review_state /import merges into.
+        rule_events_provenance,
         events_unanswered: unansweredAnchored || undefined,
         adherence_excluded: auditExcluded || undefined,
         lock_task_sha: manifest.guideline_sha,

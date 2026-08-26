@@ -9,6 +9,14 @@
 //   GET  /api/sessions/:taskId/:sessionId            — one session manifest + its iters
 //   POST /api/sessions/:taskId                       — create new session
 //   POST /api/sessions/:taskId/:sessionId/archive    — archive (close) a session
+//
+// `blind` (spec 2026-08-24 Task 5 review, Important 1): a session-level
+// flag for blind gold-collection sessions, mirroring `per_note`. Rejects
+// import_run_id (a blind session must never seed from an agent run). The
+// GET routes need no special handling — they already return the full
+// manifest, so `blind` rides along automatically once createSession sets
+// it. server/jobs-routes.ts's /import route reads it back to refuse
+// importing an agent draft into a blind session even via a direct API call.
 
 import type { RouteEntry } from "./router.js";
 import { isMethodologist, readReviewerFromRequest } from "./auth.js";
@@ -145,7 +153,7 @@ export const sessionRoutes: RouteEntry[] = [
       // Accept either `agent_specs` (canonical) or `default_agent_specs`
       // (legacy alias from the pre-strict-lock era). Drop the alias once
       // all callers update.
-      const { name, patient_ids, notes, agent_specs, default_agent_specs, import_run_id, per_note } = (body ?? {}) as {
+      const { name, patient_ids, notes, agent_specs, default_agent_specs, import_run_id, per_note, blind } = (body ?? {}) as {
         name?: string;
         patient_ids?: string[];
         notes?: string;
@@ -157,11 +165,23 @@ export const sessionRoutes: RouteEntry[] = [
          *  validate). This is TRY's "import" path — no agent work is re-run. */
         import_run_id?: string;
         per_note?: boolean;
+        /** Blind gold-collection session (adherence spec 2026-08-24 Task 5).
+         *  Rejects import_run_id below — a blind session must never seed
+         *  from an agent run. */
+        blind?: boolean;
       };
       let specs = agent_specs ?? default_agent_specs;
       let resolvedPatientIds = patient_ids;
       if (!name || typeof name !== "string" || name.trim().length === 0) {
         const err = new Error("name is required") as Error & { status: number };
+        err.status = 400;
+        throw err;
+      }
+
+      if (blind === true && import_run_id) {
+        const err = new Error(
+          "a blind session cannot be created with import_run_id — blind sessions must never seed from an agent run",
+        ) as Error & { status: number };
         err.status = 400;
         throw err;
       }
@@ -219,6 +239,7 @@ export const sessionRoutes: RouteEntry[] = [
           notes,
           agent_specs: specs,
           per_note: per_note === true,
+          blind: blind === true,
         });
         // Attach the existing run as this session's first iter so VALIDATE /
         // Performance light up immediately with no agent re-run.

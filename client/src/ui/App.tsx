@@ -127,19 +127,72 @@ export function App() {
   // "empty" reads as "wrong session" rather than "no draft" (the silent-wrong-
   // session footgun). Null when no session is active.
   const [activeSessionName, setActiveSessionName] = useState<string | null>(null);
+  // Whether the ACTIVE SESSION (not just the URL) is a blind gold-collection
+  // session (spec 2026-08-24 Task 5 review). A URL `?blind=1` flag alone is
+  // bypassable — an emailed link missing it, or a cleared browser profile,
+  // would silently annotate into whatever session happens to auto-point next
+  // (see the auto-point effect above). Reading it off the session manifest
+  // makes blindness a property of WHERE the writes land, not how the page
+  // was opened; `effectiveBlind` below ORs it with the URL flag so either
+  // source is sufficient to activate blind behavior.
+  //
+  // TRI-STATE, deliberately: `null` means "not yet resolved" (or no active
+  // session), distinct from `false` ("resolved — confirmed not blind").
+  // activeSessionId can become non-null SYNCHRONOUSLY on the very first
+  // render (read straight from localStorage), while this manifest fetch is
+  // still a network round-trip away — a plain boolean defaulting to `false`
+  // would let the auto-import effect below read "not blind" on that first
+  // render and race ahead of the real answer. `sessionBlindPending` below
+  // is what the auto-import effect actually gates on.
+  const [activeSessionBlind, setActiveSessionBlind] = useState<boolean | null>(null);
   useEffect(() => {
-    if (!task || !activeSessionId) { setActivePerNote(false); setActiveSessionName(null); return; }
+    if (!task || !activeSessionId) {
+      setActivePerNote(false);
+      setActiveSessionName(null);
+      setActiveSessionBlind(null);
+      return;
+    }
+    // Reset to "pending" for the new session BEFORE the fetch starts —
+    // otherwise a session switch would keep showing the PRIOR session's
+    // resolved blind value (stale, possibly wrongly "not blind") for the
+    // duration of this fetch.
+    setActiveSessionBlind(null);
     let cancelled = false;
     authFetch(`/api/sessions/${encodeURIComponent(task.task_id)}/${encodeURIComponent(activeSessionId)}`)
       .then((r) => (r.ok ? r.json() : null))
-      .then((d: { session?: { per_note?: boolean; name?: string } } | null) => {
+      .then((d: { session?: { per_note?: boolean; name?: string; blind?: boolean } } | null) => {
         if (cancelled) return;
         setActivePerNote(!!d?.session?.per_note);
         setActiveSessionName(d?.session?.name ?? null);
+        setActiveSessionBlind(!!d?.session?.blind);
       })
-      .catch(() => { if (!cancelled) { setActivePerNote(false); setActiveSessionName(null); } });
+      .catch(() => {
+        if (!cancelled) {
+          setActivePerNote(false);
+          setActiveSessionName(null);
+          // Best-effort fallback, matching activePerNote/activeSessionName's
+          // existing failure behavior above — a fetch error can't block a
+          // genuinely non-blind session forever. The auto-import effect's
+          // OWN `?blind=1` URL check still applies independently either way.
+          setActiveSessionBlind(false);
+        }
+      });
     return () => { cancelled = true; };
   }, [task, activeSessionId]);
+  // Effective blind state for the active patient page: either the SESSION
+  // itself is marked blind, or the URL carries `?blind=1` (a methodologist
+  // typing/bookmarking a blind link before the session-level flag exists on
+  // older sessions). Either signal is sufficient — this is the single
+  // source of truth both the auto-import guard below and AdherenceReview
+  // read, so a URL edit alone can't turn blind off for an actually-blind
+  // session, and a session-level flag alone is enough even if the URL
+  // wasn't typed with the flag.
+  const effectiveBlind = activeSessionBlind === true || route.blind === true;
+  // True while there's an active session whose blindness hasn't resolved
+  // yet AND the URL itself doesn't already say blind. The auto-import
+  // effect below must NOT proceed while this is true — proceeding would
+  // mean treating "haven't checked yet" as "definitely not blind".
+  const sessionBlindPending = !!activeSessionId && activeSessionBlind === null && route.blind !== true;
 
   // Auto-point: when NO session is active for this task, default the pointer to
   // the most-recent session (highest session_num) instead of leaving the
@@ -263,7 +316,26 @@ export function App() {
   //       merge in /import preserves source=reviewer rows + validated_*
   //       arrays, so the reviewer's prior accept/override answers carry
   //       forward as the gold standard against iter 2+'s new drafts.
+  //
+  // NEVER runs for a blind gold-collection session (spec 2026-08-24 Task 5
+  // review, Critical 1) — this effect is task-kind-agnostic and its
+  // "already has work" short-circuit below checks field_assessments.length,
+  // which is always 0 for adherence review_state, so without this guard it
+  // would import an agent draft straight into the gold the moment a run
+  // exists for the session, even though AdherenceReview's OWN seed-on-empty
+  // chain is separately blind-guarded. Checks effectiveBlind (session-level
+  // OR URL), not just the URL flag, per Important 1 — a bookmarked/emailed
+  // link missing `?blind=1` must not defeat this on an actually-blind session.
+  //
+  // ALSO waits on sessionBlindPending: activeSessionId can resolve
+  // synchronously (straight from localStorage) on the render BEFORE the
+  // session-manifest fetch that determines activeSessionBlind lands. Without
+  // this, THIS effect could read a not-yet-updated effectiveBlind===false
+  // and race the manifest fetch to /import — confirmed by an App-level test
+  // (App.blind-import.test.tsx) that failed on session-only blindness
+  // (no ?blind=1 URL flag) before this guard was added.
   useEffect(() => {
+    if (effectiveBlind || sessionBlindPending) return;
     if (!authReady || !activePatient || !task?.task_id) return;
     const reviewState = sock.reviewState;
     if (!reviewState) return;
@@ -336,7 +408,7 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [authReady, activePatient, task?.task_id, sock, activeSessionId]);
+  }, [authReady, activePatient, task?.task_id, sock, activeSessionId, effectiveBlind, sessionBlindPending]);
 
   const reviewer = readAuth().reviewer_id ?? (authInfo?.mode === "optional" ? "anonymous" : null);
 
@@ -489,7 +561,17 @@ export function App() {
             patientDisplay={activePatient?.display_name ?? route.patientId}
             taskId={task.task_id}
             activeSessionId={activeSessionId}
-            blind={route.blind === true}
+            activeSessionName={activeSessionName}
+            // While sessionBlindPending is true, AdherenceReview doesn't yet
+            // know whether the session is blind — its OWN seed-on-empty
+            // agent-import chain fires as soon as it mounts and would race
+            // the SAME way App's own effect above would without
+            // sessionBlindPending's guard. Treating "not yet confirmed" as
+            // blind here closes that: worst case is one render's flash of
+            // blind styling on an ordinary (non-blind) session while the
+            // manifest fetch is in flight, never a race that could import
+            // an agent draft into an actually-blind session.
+            blind={effectiveBlind || sessionBlindPending}
             onBack={() =>
               navigate(studioHash(task.task_id, lastStudioSubTabRef.current ?? "validate"))
             }

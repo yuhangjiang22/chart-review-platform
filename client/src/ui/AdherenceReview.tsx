@@ -130,18 +130,29 @@ interface EventDraft {
 // NO committed answers (exactly what the runner flags as events_unanswered)
 // still gets an (empty, editable) control per relevant question instead of
 // rendering zero controls. Missing values seed to null.
-function seedEventDraft(event: RuleEvent, rule: RuleDefinition | undefined): EventDraft {
+//
+// `blind` (defense-in-depth, spec 2026-08-24 Task 5 review Critical 2): in
+// blind mode, an existing answer is only used to seed the draft when it is
+// reviewer-sourced — an agent-sourced (or provenance-less legacy) answer on
+// the event is treated as absent, so the control renders empty rather than
+// silently pre-filling the annotator's "own" answer with the agent's.
+function seedEventDraft(event: RuleEvent, rule: RuleDefinition | undefined, blind = false): EventDraft {
   const qids = new Set<string>();
   for (const a of event.answers ?? []) qids.add(a.question_id);
   for (const qid of rule?.supporting_questions ?? []) qids.add(qid);
   const answers = [...qids].map((qid) => {
     const existing = (event.answers ?? []).find((a) => a.question_id === qid);
-    return { question_id: qid, answer: existing ? existing.answer : null };
+    const usable = existing && (!blind || existing.source === "reviewer");
+    return { question_id: qid, answer: usable ? existing!.answer : null };
   });
   return {
     answers,
-    notEvaluable: event.evaluable === false,
-    reason: event.evaluable_reason ?? "",
+    // Blind mode: only trust a reviewer-authored not-evaluable marking.
+    // event.evaluable can be agent-set (or engine-derived from an
+    // agent-sourced answer) — surfacing that in a blind control would leak
+    // agent judgment through the checkbox, not just the value.
+    notEvaluable: blind ? event.source === "reviewer" && event.evaluable === false : event.evaluable === false,
+    reason: (!blind || event.source === "reviewer") ? (event.evaluable_reason ?? "") : "",
   };
 }
 
@@ -215,6 +226,34 @@ interface AdherenceReviewState {
   agent_rule_events?: Record<string, RuleEvent[]>;
 }
 
+/** Blind-mode contamination check (spec 2026-08-24 Task 5 review, Critical
+ *  2a): a blind session must NEVER render agent output — concealing
+ *  provenance markers while still pre-filling agent VALUES into the
+ *  annotator's own controls silently produces a contaminated gold. Rather
+ *  than trust a single flag, this checks two independent signals that a
+ *  REAL `/import` always sets together (either is sufficient):
+ *    - `imported_from_run` — the explicit "this state went through /import" marker.
+ *    - non-empty per-agent shadow maps — agent_question_answers /
+ *      agent_rule_verdicts / agent_rule_events are populated ONLY by
+ *      import; a hand-built or bugged state that cleared
+ *      imported_from_run but left a shadow map behind still trips this.
+ *  When contaminated, AdherenceReview replaces the WHOLE annotation
+ *  surface with a hard error panel — this is the primary gate; the
+ *  per-control reviewer-only filters elsewhere (answersByQid, verdictsByRid,
+ *  seedEventDraft) are the independent defense-in-depth layer that also
+ *  applies unconditionally in blind mode, contaminated or not. */
+function isBlindContaminated(state: AdherenceReviewState | null): boolean {
+  if (!state) return false;
+  if (state.imported_from_run) return true;
+  const hasEntries = (m?: Record<string, unknown[]>) =>
+    Object.values(m ?? {}).some((arr) => (arr ?? []).length > 0);
+  return (
+    hasEntries(state.agent_question_answers) ||
+    hasEntries(state.agent_rule_verdicts) ||
+    hasEntries(state.agent_rule_events)
+  );
+}
+
 export interface AdherenceReviewProps {
   patientId: string;
   patientDisplay: string;
@@ -224,12 +263,20 @@ export interface AdherenceReviewProps {
    *  review-state reads and writes so they hit the session-scoped root.
    *  Required by the server — calls without it return 400. */
   activeSessionId?: string | null;
+  /** Human-facing name of the active session (App's own session-manifest
+   *  fetch). Rendered inside the blind banner so the annotator can SEE
+   *  which session their answers are landing in — `activeSessionId` alone
+   *  is a localStorage-derived id the reviewer never typed and might not
+   *  recognize (spec 2026-08-24 Task 5 review, Critical 3). */
+  activeSessionName?: string | null;
   /** Blind-annotation mode (gold-standard collection, spec 2026-08-24
    *  Task 5): NEVER auto-imports an agent draft, hides every agent-sourced
    *  value (A/B columns, agreement chips, reasoning/evidence, engine
    *  verdicts, attribution), and self-seeds `rule_events` from the
    *  deterministic ETL work-list (no agent output) on first load. Set from
-   *  the `?blind=1` route flag; default false so all existing behavior is
+   *  `activeSessionBlind || route.blind` upstream (App.tsx) — a SESSION
+   *  property, not just a URL flag, so a bookmarked/emailed link missing
+   *  `?blind=1` can't defeat it. Default false so all existing behavior is
    *  byte-identical when omitted. */
   blind?: boolean;
 }
@@ -242,7 +289,7 @@ const TIER_LABELS: Record<number, string> = {
 };
 
 export function AdherenceReview(props: AdherenceReviewProps) {
-  const { patientId, patientDisplay, taskId, onBack, activeSessionId, blind = false } = props;
+  const { patientId, patientDisplay, taskId, onBack, activeSessionId, activeSessionName, blind = false } = props;
   const [meta, setMeta] = useState<AdherenceMeta | null>(null);
   const [state, setState] = useState<AdherenceReviewState | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -393,10 +440,18 @@ export function AdherenceReview(props: AdherenceReviewProps) {
           { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) },
         );
         if (!live()) return;
-        if (seedRes.ok) {
+        // 409 means another tab/request already seeded rule_events —
+        // refresh to pick that up rather than getting stuck. Any OTHER
+        // failure resets the guard so a later refresh can retry, and
+        // surfaces the error instead of silently leaving the pane empty
+        // forever (MINOR 1, spec 2026-08-24 Task 5 review).
+        if (seedRes.ok || seedRes.status === 409) {
           await refreshState(token);
           return;
         }
+        blindSeedAttemptedRef.current = false;
+        const seedBody = (await seedRes.json().catch(() => ({}))) as { message?: string; error?: string };
+        setError(`blind seed failed: ${seedBody.message ?? seedBody.error ?? seedRes.status}`);
       }
     } catch (e) {
       if (!live()) return;
@@ -413,11 +468,20 @@ export function AdherenceReview(props: AdherenceReviewProps) {
     return () => { refreshTokenRef.current++; };
   }, [refreshState]);
 
+  // Defense-in-depth (spec 2026-08-24 Task 5 review, Critical 2b): in blind
+  // mode, ONLY reviewer-sourced canonical answers ever seed a control — an
+  // agent-sourced (or provenance-less) entry is treated as absent rather
+  // than rendered, independent of whether the contamination-refusal panel
+  // below fires. This is what keeps a hand-built or partially-contaminated
+  // state from ever pre-filling the annotator's "own" answer.
   const answersByQid = useMemo(() => {
     const m = new Map<string, QuestionAnswer>();
-    for (const a of state?.question_answers ?? []) m.set(a.question_id, a);
+    for (const a of state?.question_answers ?? []) {
+      if (blind && a.source !== "reviewer") continue;
+      m.set(a.question_id, a);
+    }
     return m;
-  }, [state]);
+  }, [state, blind]);
 
   // Per-agent shadow drafts (read-only) keyed by question_id, for the A/B
   // agent columns. Empty map (no A/B chips) when the run was single-agent.
@@ -432,11 +496,15 @@ export function AdherenceReview(props: AdherenceReviewProps) {
   }, [state]);
   const agentIds = useMemo(() => [...agentAnswersByQid.keys()].sort(), [agentAnswersByQid]);
 
+  // Same defense-in-depth as answersByQid above, for rule verdicts.
   const verdictsByRid = useMemo(() => {
     const m = new Map<string, RuleVerdict>();
-    for (const v of state?.rule_verdicts ?? []) m.set(v.rule_id, v);
+    for (const v of state?.rule_verdicts ?? []) {
+      if (blind && v.source !== "reviewer") continue;
+      m.set(v.rule_id, v);
+    }
     return m;
-  }, [state]);
+  }, [state, blind]);
 
   const agentVerdictsByRid = useMemo(() => {
     const out = new Map<string, Map<string, RuleVerdict>>();
@@ -650,6 +718,36 @@ export function AdherenceReview(props: AdherenceReviewProps) {
     );
   }
 
+  // Contamination refusal (spec 2026-08-24 Task 5 review, Critical 2a) —
+  // checked BEFORE anything else renders, so a contaminated blind session
+  // never mounts a single reviewer control. See isBlindContaminated's doc
+  // comment for what counts as contaminated and why this is the primary
+  // gate, not just the per-control filters below.
+  if (blind && isBlindContaminated(state)) {
+    return (
+      <div className="flex flex-col h-full overflow-hidden">
+        <Header patientDisplay={patientDisplay} taskId={taskId} onBack={onBack} />
+        <div className="px-4 py-1.5 border-b border-[hsl(var(--ochre))]/40 bg-[hsl(var(--ochre))]/10 text-[12px] font-medium text-[hsl(var(--ochre))] text-center">
+          {activeSessionName
+            ? `BLIND MODE — writing gold to session "${activeSessionName}" — agent output hidden`
+            : "BLIND MODE — agent output hidden; your answers become the gold standard"}
+        </div>
+        <div className="flex-1 flex items-start justify-center overflow-y-auto p-8">
+          <div className="max-w-md text-center space-y-2">
+            <div className="text-[13px] font-semibold text-[hsl(var(--oxblood))]">
+              This session contains agent output — it cannot be used for blind gold collection.
+            </div>
+            <div className="text-[12px] text-muted-foreground">
+              This review_state was imported from an agent run (or still carries an agent
+              shadow draft), so it can no longer serve as an unbiased blind annotation.
+              Start a fresh, never-imported session for blind gold collection.
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const tiers = Object.keys(meta.questions_by_tier).map(Number).sort((a, b) => a - b);
   const totalQuestions = tiers.reduce((s, t) => s + (meta.questions_by_tier[t]?.length ?? 0), 0);
   // Clamp the validated numerator to questions that actually exist in the
@@ -667,7 +765,9 @@ export function AdherenceReview(props: AdherenceReviewProps) {
       <Header patientDisplay={patientDisplay} taskId={taskId} onBack={onBack} />
       {blind && (
         <div className="px-4 py-1.5 border-b border-[hsl(var(--ochre))]/40 bg-[hsl(var(--ochre))]/10 text-[12px] font-medium text-[hsl(var(--ochre))] text-center">
-          BLIND MODE — agent output hidden; your answers become the gold standard
+          {activeSessionName
+            ? `BLIND MODE — writing gold to session "${activeSessionName}" — agent output hidden`
+            : "BLIND MODE — agent output hidden; your answers become the gold standard"}
         </div>
       )}
       <div className="flex flex-1 min-h-0 overflow-hidden">
@@ -729,7 +829,7 @@ export function AdherenceReview(props: AdherenceReviewProps) {
                     // Lazily seeded — NOT committed to eventDrafts until the
                     // reviewer's first edit calls onDraftChange, so a
                     // never-touched row always reflects the latest event.
-                    const draft = eventDrafts.get(e.event_id) ?? seedEventDraft(e, rule);
+                    const draft = eventDrafts.get(e.event_id) ?? seedEventDraft(e, rule, blind);
                     return (
                       <EventRow
                         key={e.event_id}
@@ -1020,8 +1120,11 @@ function QuestionRow({
   // Verifier chip — surfaces the post-pass OMOP cross-check on the canonical
   // answer. Reviewer-sourced answers don't get a chip. (In concur's MVP the
   // verifier is deferred so verifier_status is "no_check" and no chip shows.)
+  // Explicitly `!blind`-gated (belt-and-suspenders on top of answersByQid's
+  // own reviewer-only filter upstream) — it is agent/engine output and must
+  // never render in blind mode regardless of caller.
   const verifierChip = (() => {
-    if (!answer || answer.source === "reviewer") return null;
+    if (blind || !answer || answer.source === "reviewer") return null;
     const status = answer.verifier_status;
     if (!status || status === "no_check") return null;
     const cls = status === "confirmed"
@@ -1245,8 +1348,11 @@ function RuleRow({
           <div className="text-foreground">{rule.description}</div>
           <code className="text-[11px] text-muted-foreground">{rule.verdict_if}</code>
           {/* Inputs feeding the rule — current value of each supporting
-           *  question with provenance (agent vs reviewer). */}
-          {rule.supporting_questions && rule.supporting_questions.length > 0 && (
+           *  question with provenance (agent vs reviewer). Hidden in blind
+           *  mode: answersByQid is already reviewer-only there, but this is
+           *  explicitly gated too (spec 2026-08-24 Task 5 review, Critical
+           *  2) rather than relying solely on the upstream filter. */}
+          {!blind && rule.supporting_questions && rule.supporting_questions.length > 0 && (
             <div className="mt-1 text-[11px] flex flex-wrap gap-x-3 gap-y-0.5">
               <span className="text-muted-foreground">Inputs:</span>
               {rule.supporting_questions.map((qid) => {

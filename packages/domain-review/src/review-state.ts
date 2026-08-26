@@ -32,6 +32,7 @@ import { verifyEvidence } from "@chart-review/faithfulness";
 import type { CompiledTask } from "@chart-review/tasks";
 import type {
   CrossCriterionAlert, SpanLabel, QuestionAnswer, RuleVerdict, RuleEvent, RuleRollup,
+  RuleEventsProvenance,
 } from "@chart-review/platform-types";
 import { recomputeLiveAlerts } from "@chart-review/live-alerts";
 import { evalDerivation } from "@chart-review/contract-eval";
@@ -250,6 +251,9 @@ export interface ReviewState {
   agent_rule_verdicts?: Record<string, RuleVerdict[]>;
   /** Adherence-only: per-agent shadow rule events at import time. */
   agent_rule_events?: Record<string, RuleEvent[]>;
+  /** Adherence-only: provenance of the LAST rule_events seed (agent runner
+   *  or the blind-annotation seed-events route). See RuleEventsProvenance. */
+  rule_events_provenance?: RuleEventsProvenance;
 }
 
 function reviewDir(patientId: string, taskId: string): string {

@@ -17,6 +17,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import type { IncomingMessage } from "node:http";
 
 import { adherenceRoutes } from "./adherence-routes.js";
@@ -626,6 +627,32 @@ describe("POST .../adherence/seed-events", () => {
     // route as the annotator answers each event.
     expect(after.rule_rollups ?? []).toHaveLength(0);
     expect(after.rule_verdicts ?? []).toHaveLength(0);
+
+    // Provenance stamp (spec 2026-08-24 Task 5 review, Important 2): lets
+    // Task 6/7 IAA/compare tooling detect an ETL re-run or rubric bump
+    // between an agent seed and this gold seed instead of misreporting the
+    // shift as human-vs-agent disagreement.
+    const prov = after.rule_events_provenance!;
+    expect(prov).toBeDefined();
+    expect(prov.seeded_by).toBe("blind-seed-route");
+    expect(typeof prov.ts).toBe("string");
+    expect(new Date(prov.ts).toString()).not.toBe("Invalid Date");
+    // The guideline bundle set up in beforeAll (meta.yaml + SKILL.md, plus
+    // the rules-event-anchor.yaml added in this describe's own beforeAll)
+    // hashes to SOME non-empty content sha via computeTaskSha.
+    expect(typeof prov.guideline_sha).toBe("string");
+    expect(prov.guideline_sha.length).toBeGreaterThan(0);
+    // Anchor-list counts reflect the raw per-patient anchor entries BEFORE
+    // rule expansion — one "visits" entry, matching the fixture above.
+    expect(prov.anchor_lists).toEqual({ visits: 1 });
+    // A stable hash of the sorted event_ids — recomputing it independently
+    // over the seeded work-list must match exactly (determinism check).
+    expect(typeof prov.worklist_hash).toBe("string");
+    expect(prov.worklist_hash.length).toBeGreaterThan(0);
+    const recomputed = createHash("sha256")
+      .update(after.rule_events!.map((e) => e.event_id).sort().join("\n"))
+      .digest("hex");
+    expect(prov.worklist_hash).toBe(recomputed);
   });
 
   it("409s and leaves state unchanged when rule_events is already non-empty (never overwrites existing — including in-progress reviewer — work)", async () => {

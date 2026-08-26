@@ -72,6 +72,15 @@ export interface SessionManifest {
    *  task's leaf fields (encounter-scoped assessments, encounter_id = note_id)
    *  instead of one patient-wide answer per field. Phenotype tasks only. */
   per_note?: boolean;
+  /** When true, this session is a BLIND gold-collection session (adherence
+   *  event-concordance spec 2026-08-24 Task 5) — the annotator must never
+   *  see agent output. A session-level flag, not just a URL query param, so
+   *  it survives a bookmarked/emailed link missing `?blind=1`, a cleared
+   *  browser profile, or a direct API/curl call: BOTH the client's
+   *  auto-import effects AND the server's `/import` route refuse to pull
+   *  an agent draft into a blind session's review_state, regardless of how
+   *  the request was made. */
+  blind?: boolean;
 }
 
 export interface SessionListing extends SessionManifest {
@@ -166,6 +175,7 @@ export interface CreateSessionInput {
   notes?: string;
   agent_specs?: AgentSpec[];
   per_note?: boolean;
+  blind?: boolean;
 }
 
 export function createSession(input: CreateSessionInput): SessionManifest {
@@ -187,6 +197,7 @@ export function createSession(input: CreateSessionInput): SessionManifest {
     state: "active",
     cohort: { patient_ids: [...input.patient_ids] },
     ...(input.per_note ? { per_note: true } : {}),
+    ...(input.blind ? { blind: true } : {}),
     agent_specs: input.agent_specs,
     skill_snapshot_sha: computeTaskSha(guidelineDir(input.task_id)),
   };

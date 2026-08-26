@@ -19,7 +19,15 @@ export interface RuleEventAnchor {
 export interface RuleEvent {
   event_id: string; rule_id: string; anchor: RuleEventAnchor;
   evaluable?: boolean; evaluable_reason?: string;
-  answers?: Array<{ question_id: string; tier: number; answer: string | number | boolean | null }>;
+  answers?: Array<{
+    question_id: string; tier: number; answer: string | number | boolean | null;
+    /** "agent" | "reviewer" — needed by AdherenceReview's blind-mode
+     *  defense-in-depth filter (spec 2026-08-24 Task 5 review, Critical 2)
+     *  so a reviewer-facing event control is never seeded from an
+     *  agent-sourced answer. Optional: legacy/period-only events predate
+     *  per-answer provenance. */
+    source?: "agent" | "reviewer";
+  }>;
   verdict?: "CONCORDANT" | "NON_CONCORDANT" | "EXCLUDED";
   attribution?: string; source?: string; ts?: string;
 }

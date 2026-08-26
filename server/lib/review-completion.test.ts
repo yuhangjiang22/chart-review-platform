@@ -58,4 +58,63 @@ describe("deriveAdherenceReviewStatus", () => {
       { validated_questions: ["q1", "q2"] }, { questionIds: ["q1", "q2"], ruleIds: [] },
     )).toBe("reviewer_validated");
   });
+
+  // Events axis (spec 2026-08-24 Task 5 review, Important 5): a blind
+  // gold-collection session answers ONLY events, never touching
+  // validated_questions/validated_rules — without this axis it could never
+  // reach reviewer_validated, which also means App.tsx's anti-clobber
+  // "never re-import over an already-validated patient" guard would never
+  // engage for it.
+  const anchoredEvents = [
+    { event_id: "ev1", anchor: { type: "encounter", date: "2025-01-01" } },
+    { event_id: "ev2", anchor: { type: "encounter", date: "2025-02-01" } },
+  ];
+  it("all anchored events validated (+ questions/rules validated) → reviewer_validated", () => {
+    expect(deriveAdherenceReviewStatus(
+      {
+        validated_questions: ["q1", "q2"],
+        validated_rules: ["r1"],
+        rule_events: anchoredEvents,
+        validated_events: ["ev1", "ev2"],
+      },
+      fw,
+    )).toBe("reviewer_validated");
+  });
+  it("questions/rules done but an anchored event still pending → in_progress", () => {
+    expect(deriveAdherenceReviewStatus(
+      {
+        validated_questions: ["q1", "q2"],
+        validated_rules: ["r1"],
+        rule_events: anchoredEvents,
+        validated_events: ["ev1"],
+      },
+      fw,
+    )).toBe("in_progress");
+  });
+  it("a state with NO anchored events (rule_events absent, or window-only) completes on questions+rules alone — the events axis doesn't block legacy/period-only states", () => {
+    expect(deriveAdherenceReviewStatus(
+      { validated_questions: ["q1", "q2"], validated_rules: ["r1"] }, fw,
+    )).toBe("reviewer_validated");
+    expect(deriveAdherenceReviewStatus(
+      {
+        validated_questions: ["q1", "q2"],
+        validated_rules: ["r1"],
+        rule_events: [{ event_id: "r1@window", anchor: { type: "window" } }], // no date → not anchored
+        validated_events: [],
+      },
+      fw,
+    )).toBe("reviewer_validated");
+  });
+  it("a BLIND gold session answering ONLY events (no validated_questions/validated_rules at all) still reaches reviewer_validated once every anchored event is validated", () => {
+    expect(deriveAdherenceReviewStatus(
+      { rule_events: anchoredEvents, validated_events: ["ev1", "ev2"] },
+      { questionIds: [], ruleIds: [] },
+    )).toBe("reviewer_validated");
+  });
+  it("only some events validated, nothing else touched → in_progress (not undefined)", () => {
+    expect(deriveAdherenceReviewStatus(
+      { rule_events: anchoredEvents, validated_events: ["ev1"] },
+      { questionIds: [], ruleIds: [] },
+    )).toBe("in_progress");
+  });
 });

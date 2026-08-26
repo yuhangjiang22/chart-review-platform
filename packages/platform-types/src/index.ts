@@ -297,3 +297,22 @@ export interface RuleRollup {
    *  is NON_CONCORDANT. */
   period_attribution?: AttributionCategory;
 }
+
+/** Stamped alongside rule_events every time the deterministic work-list is
+ *  seeded (agent runner OR the blind-annotation seed-events route) — spec
+ *  2026-08-24 Task 5 review. Lets Task 6/7 IAA/compare tooling detect an
+ *  ETL re-run or rubric bump between the agent's seed and a blind gold
+ *  seed that silently shifted the denominator, instead of misreporting the
+ *  shift as human-vs-agent disagreement. */
+export interface RuleEventsProvenance {
+  seeded_by: "blind-seed-route" | "runner";
+  ts: string;
+  /** Guideline bundle content-hash at seed time (computeTaskSha). */
+  guideline_sha: string;
+  /** Per-anchor-list entry counts read from the patient's anchors/*.json,
+   *  BEFORE rule expansion — the raw denominator inputs. */
+  anchor_lists: Record<string, number>;
+  /** Stable hash of the seeded work-list's sorted event_ids — the
+   *  cheapest signal that two seeds produced the identical denominator. */
+  worklist_hash: string;
+}

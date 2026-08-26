@@ -61,10 +61,12 @@ import { sessionReviewsRoot } from "./lib/session-reviews.js";
 import { loadCompiledTask } from "./lib/tasks.js";
 import { readAnchors } from "@chart-review/patients";
 import {
-  loadAdherenceSkill, expandEventWorklist, toAnchorEntries,
+  loadAdherenceSkill, expandEventWorklist, toAnchorEntries, computeWorklistHash,
 } from "@chart-review/pipeline-extract-adherence";
 import { evaluateAllRuleEvents } from "@chart-review/rule-engine";
 import { deriveAdherenceReviewStatus } from "./lib/review-completion.js";
+import { guidelineDir } from "@chart-review/rubric";
+import { computeTaskSha } from "./lib/lock.js";
 import type {
   QuestionAnswer, RuleVerdict, AttributionCategory,
 } from "@chart-review/platform-types";
@@ -353,6 +355,22 @@ export const adherenceRoutes: RouteEntry[] = [
           eventCount = worklist.length;
           state.task_kind = "adherence";
           state.rule_events = worklist;
+          // Provenance stamp (spec 2026-08-24 Task 5 review, Important 2):
+          // an ETL re-run or rubric bump between the agent's seed and this
+          // gold seed would otherwise silently shift the denominator, and
+          // Task 7's enumeration axis would misreport the shift as
+          // human-vs-agent disagreement instead of a seed mismatch. The
+          // runner (packages/infra-batch-run/src/runs.ts) stamps the same
+          // shape at its own seed site.
+          state.rule_events_provenance = {
+            seeded_by: "blind-seed-route",
+            ts: new Date().toISOString(),
+            guideline_sha: computeTaskSha(guidelineDir(p.taskId)),
+            anchor_lists: Object.fromEntries(
+              Object.entries(anchors).map(([name, entries]) => [name, entries.length]),
+            ),
+            worklist_hash: computeWorklistHash(worklist),
+          };
           // Deliberately NOT computing rule_rollups/rule_verdicts here — no
           // answers exist yet to derive them from. Those populate
           // per-event as the annotator saves each event through the
