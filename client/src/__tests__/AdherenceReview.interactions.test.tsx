@@ -35,8 +35,17 @@ afterEach(() => {
 });
 
 // ── Response helpers ────────────────────────────────────────────────────────
+// Real `fetch().json()` deserializes fresh objects/arrays from response
+// bytes on every call — no fixture, however deeply nested, ever survives a
+// round trip with its identity intact. A mock that hands back `body` BY
+// REFERENCE breaks that: a fixture reused across refetches (e.g. a
+// module-level constant) would hand the SAME array/object back every time,
+// silently hiding any bug whose root cause is "code assumed object identity
+// is stable across a refetch" (see the C2 regression test below, which was
+// vacuous before this clone was added). structuredClone reproduces the
+// real "fresh graph every call" semantics.
 function okJson(body: unknown) {
-  return Promise.resolve({ ok: true, json: () => Promise.resolve(body) } as Response);
+  return Promise.resolve({ ok: true, json: () => Promise.resolve(structuredClone(body)) } as Response);
 }
 function errJson(status: number, body: unknown) {
   return Promise.resolve({
@@ -1398,9 +1407,24 @@ describe("Event timeline + per-event validation", () => {
   });
 
   it("a failed event save preserves the draft and shows a row-scoped error, not the page banner (I12)", async () => {
-    setupMocks({
-      state: () => stateWithEvents(),
-      postResult: (k) => (k === "event-verdict" ? errJson(500, { message: "event save blew up" }) : undefined),
+    // Bespoke mock (not setupMocks' postResult) so ONLY ev_1's save fails —
+    // ev_2's succeeds below to force a REAL refresh (fresh object identities
+    // throughout `state`, thanks to okJson's clone) while ev_1's failed
+    // draft + error are still pending. THAT is the assertion that actually
+    // discriminates "draft preserved" from the old child-local pattern: a
+    // single-row failure with no other activity preserves the draft either
+    // way (no refetch ever happens), so it proves nothing on its own.
+    const state = stateWithEvents();
+    mockAuthFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (url.includes("/api/tasks/") && url.includes("/adherence")) return okJson(FRAMEWORK);
+      if (url.includes("/adherence/event-verdict") && init?.method === "POST") {
+        const body = JSON.parse((init!.body as string) ?? "{}");
+        if (body.event_id === "ev_1") return errJson(500, { message: "event save blew up" });
+        return okJson({ ok: true, version: 2 });
+      }
+      if (url.includes("/api/reviews/")) return okJson(state);
+      if (url.includes("/api/runs")) return okJson([]);
+      return okJson(null);
     });
     renderPane();
     await waitLoaded();
@@ -1414,15 +1438,34 @@ describe("Event timeline + per-event validation", () => {
     // Draft preserved — the select still shows the edited value, not reverted.
     expect((within(eventRowFor("ev_1")).getByRole("combobox") as HTMLSelectElement).value).toBe("3");
     // Row-scoped only — the page-level banner never shows this message.
-    const outsideRow = screen
+    let outsideRow = screen
       .queryAllByText("event save blew up")
       .filter((el) => !eventRowFor("ev_1").contains(el));
     expect(outsideRow.length).toBe(0);
 
-    // Retrying clears the row error even before the (still-failing) result
-    // lands — the disabled-briefly busy state confirms the click registered.
-    fireEvent.click(eventSaveBtn(eventRowFor("ev_1")));
-    await waitFor(() => expect(postsTo("event-verdict").length).toBe(2));
+    // Now successfully save a DIFFERENT row (ev_2) — this is the forced
+    // refresh. Under the old pattern this would (a) revert ev_1's draft
+    // back to "2" (child-local state re-syncing off the now-different
+    // `event.answers` identity) and (b) wipe the page-level error via
+    // refreshState's own `setError(null)`, even though ev_1's failure was
+    // never resolved.
+    const row2 = eventRowFor("ev_2");
+    const visitsInput = row2.querySelector('input[type="number"]') as HTMLInputElement;
+    fireEvent.change(visitsInput, { target: { value: "4" } });
+    fireEvent.click(eventSaveBtn(row2));
+    await waitFor(() => expect(
+      postsTo("event-verdict").filter((p) => p.body.event_id === "ev_2").length,
+    ).toBe(1));
+
+    await waitFor(() => {
+      const freshRow1 = eventRowFor("ev_1");
+      expect(within(freshRow1).getByText("event save blew up")).toBeInTheDocument();
+      expect((within(freshRow1).getByRole("combobox") as HTMLSelectElement).value).toBe("3");
+    });
+    outsideRow = screen
+      .queryAllByText("event save blew up")
+      .filter((el) => !eventRowFor("ev_1").contains(el));
+    expect(outsideRow.length).toBe(0);
   });
 
   it("'Events: N / M validated' counts only anchored events, excluding the window event", async () => {

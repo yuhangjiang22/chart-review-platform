@@ -40,7 +40,7 @@
 //     SpanReview's local SpanLabel/SpanReviewState) the shapes are declared
 //     locally here, matching @chart-review/platform-types field-for-field.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ChevronRight, ChevronDown } from "lucide-react";
 import { authFetch } from "../auth";
 import { Button } from "@/components/ui/button";
@@ -167,11 +167,13 @@ function canSaveEventDraft(draft: EventDraft): boolean {
 // against future re-imports), and an EXPLICIT `evaluable` boolean every time
 // (never omitted) so unchecking "not evaluable" can undo a prior mis-marking
 // instead of leaving the server's evaluable:false stuck.
-function buildEventSavePayload(event: RuleEvent, draft: EventDraft): {
+interface EventSavePayload {
   answers?: Array<{ question_id: string; answer: QuestionAnswer["answer"] }>;
-  evaluable: boolean;
+  evaluable?: boolean;
   evaluable_reason?: string;
-} {
+}
+
+function buildEventSavePayload(event: RuleEvent, draft: EventDraft): EventSavePayload {
   const changedAnswers = draft.answers.filter((a) => {
     const original = (event.answers ?? []).find((o) => o.question_id === a.question_id)?.answer ?? null;
     return a.answer !== original;
@@ -446,6 +448,16 @@ export function AdherenceReview(props: AdherenceReviewProps) {
     }
     return m;
   }, [meta]);
+  // Looked up by EventRow for I9's clinical-context header (rule_id +
+  // description, mirroring RuleRow's own presentation). Memoized on [meta]
+  // (was a plain per-render `new Map(...)` before) so it doesn't allocate on
+  // every keystroke in an EventRow — and so the individual rule VALUES it
+  // hands out stay referentially stable, which matters for EventRow's
+  // React.memo below to actually skip unaffected rows.
+  const ruleById = useMemo(
+    () => new Map((meta?.rules ?? []).map((r) => [r.rule_id, r] as const)),
+    [meta],
+  );
 
   const saveAnswer = useCallback(async (
     qid: string,
@@ -505,7 +517,7 @@ export function AdherenceReview(props: AdherenceReviewProps) {
 
   const saveEvent = useCallback(async (
     eventId: string,
-    payload: { answers?: Array<{ question_id: string; answer: QuestionAnswer["answer"] }>; evaluable?: boolean; evaluable_reason?: string },
+    payload: EventSavePayload,
   ) => {
     setBusy(`e:${eventId}`);
     // Clear any previous error for this row on a new attempt (retry).
@@ -529,16 +541,25 @@ export function AdherenceReview(props: AdherenceReviewProps) {
         setEventErrors((prev) => new Map(prev).set(eventId, msg));
         return;
       }
-      // Success: this row's edits are now the server's canonical state — drop
-      // the local draft so the next render re-seeds straight off the
-      // refreshed event. Other rows' drafts are untouched.
+      // Success: refresh FIRST, delete the local draft SECOND — not the
+      // reverse. Deleting before the refresh resolves would re-seed this row
+      // off the STALE pre-save event for one paint (values flicker back to
+      // the old canonical value, then forward again once the fresh state
+      // lands), and if refreshState itself failed after a successful POST,
+      // the row would silently fall back to pre-save values with no error
+      // at all. Deleting only after refreshState settles means the row is
+      // never displayed without either the draft OR the freshly-saved
+      // canonical value backing it.
+      await refreshState();
+      // This row's edits are now the server's canonical state — drop the
+      // local draft so the next render re-seeds straight off the refreshed
+      // event. Other rows' drafts are untouched.
       setEventDrafts((prev) => {
         if (!prev.has(eventId)) return prev;
         const next = new Map(prev);
         next.delete(eventId);
         return next;
       });
-      await refreshState();
     } finally { setBusy(null); }
   }, [patientId, taskId, sessionQs, refreshState]);
 
@@ -599,9 +620,6 @@ export function AdherenceReview(props: AdherenceReviewProps) {
   const validatedQuestionsInFramework = [...validatedQuestions].filter((qid) =>
     frameworkQids.has(qid),
   ).length;
-  // Looked up by EventRow for I9's clinical-context header (rule_id +
-  // description, mirroring RuleRow's own presentation).
-  const ruleById = new Map(meta.rules.map((r) => [r.rule_id, r] as const));
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -673,14 +691,22 @@ export function AdherenceReview(props: AdherenceReviewProps) {
                         rule={rule}
                         questionDefsById={questionDefsById}
                         draft={draft}
-                        onDraftChange={(next) => updateEventDraft(e.event_id, next)}
+                        // Stable function identities (updateEventDraft/saveEvent
+                        // are useCallback with fixed deps) rather than inline
+                        // arrows — an inline `(next) => updateEventDraft(id, next)`
+                        // would recreate on EVERY parent render, defeating
+                        // EventRow's React.memo for every OTHER row whenever any
+                        // one row's draft changes (e.g. every reason-input
+                        // keystroke). EventRow calls these with its own
+                        // event_id/payload instead.
+                        onDraftChange={updateEventDraft}
                         dirty={isEventDraftDirty(e, draft)}
                         canSave={canSaveEventDraft(draft)}
                         selected={selectedEventId === e.event_id}
                         validated={validatedEvents.has(e.event_id)}
                         busy={busy === `e:${e.event_id}`}
                         error={eventErrors.get(e.event_id)}
-                        onSave={() => saveEvent(e.event_id, buildEventSavePayload(e, draft))}
+                        onSave={saveEvent}
                         onJumpToSource={setNoteFocus}
                       />
                     );
@@ -1291,7 +1317,16 @@ function RuleRow({
 // identity changes on every fetch — and (b) the Events section collapsing
 // and reopening, which used to unmount/remount this component and wipe
 // local state along with it.
-function EventRow({
+//
+// Wrapped in React.memo below. `onDraftChange`/`onSave` take the event_id as
+// an explicit first argument (rather than being pre-bound per-row closures)
+// so the PARENT can pass its own stable useCallback references
+// (updateEventDraft/saveEvent) straight through — an inline arrow rebuilt on
+// every parent render would defeat memo for every row whenever ANY row's
+// draft changes (e.g. every reason-input keystroke).
+const ENGINE_GATED_REASON = "event_evaluable_if not met";
+
+function EventRowImpl({
   event, rule, questionDefsById, draft, onDraftChange, dirty, canSave,
   selected, validated, busy, error, onSave, onJumpToSource,
 }: {
@@ -1299,18 +1334,18 @@ function EventRow({
   rule: RuleDefinition | undefined;
   questionDefsById: Map<string, QuestionDefinition>;
   draft: EventDraft;
-  onDraftChange: (next: EventDraft) => void;
+  onDraftChange: (eventId: string, next: EventDraft) => void;
   dirty: boolean;
   canSave: boolean;
   selected: boolean;
   validated: boolean;
   busy: boolean;
   error?: string;
-  onSave: () => void;
+  onSave: (eventId: string, payload: EventSavePayload) => void;
   onJumpToSource?: (focus: NoteFocus) => void;
 }) {
   function updateAnswer(qid: string, value: QuestionAnswer["answer"]) {
-    onDraftChange({
+    onDraftChange(event.event_id, {
       ...draft,
       answers: draft.answers.map((a) => (a.question_id === qid ? { ...a, answer: value } : a)),
     });
@@ -1373,9 +1408,21 @@ function EventRow({
           </div>
           {rule?.description && <div className="text-foreground">{rule.description}</div>}
           {event.evaluable === false && event.evaluable_reason && (
-            <div className="text-[11px] text-muted-foreground italic mt-0.5">
-              not evaluable: {event.evaluable_reason}
-            </div>
+            event.evaluable_reason === ENGINE_GATED_REASON ? (
+              // The engine itself re-derives evaluable:false from this
+              // event's gating question on every run — sending
+              // evaluable:true here will look like it "didn't take" once
+              // the engine re-marks it, unless the reviewer actually
+              // answers the gating question. Explain that instead of the
+              // raw internal sentinel string.
+              <div className="text-[11px] text-muted-foreground italic mt-0.5">
+                engine-gated: this event is not evaluable until its gating question is answered
+              </div>
+            ) : (
+              <div className="text-[11px] text-muted-foreground italic mt-0.5">
+                not evaluable: {event.evaluable_reason}
+              </div>
+            )
           )}
           {!hasCommittedAnswers && (
             <div className="text-[11px] text-muted-foreground italic mt-0.5">
@@ -1417,7 +1464,7 @@ function EventRow({
               <input
                 type="checkbox"
                 checked={draft.notEvaluable}
-                onChange={(e) => onDraftChange({ ...draft, notEvaluable: e.target.checked })}
+                onChange={(e) => onDraftChange(event.event_id, { ...draft, notEvaluable: e.target.checked })}
               />
               Not evaluable
             </label>
@@ -1425,7 +1472,7 @@ function EventRow({
               <input
                 type="text"
                 value={draft.reason}
-                onChange={(e) => onDraftChange({ ...draft, reason: e.target.value })}
+                onChange={(e) => onDraftChange(event.event_id, { ...draft, reason: e.target.value })}
                 placeholder="Reason (required)"
                 aria-label="Not evaluable reason"
                 className="flex-1 min-w-[160px] border border-border rounded px-1.5 py-0.5 bg-background text-[12px]"
@@ -1446,7 +1493,7 @@ function EventRow({
             size="sm"
             variant={dirty ? "default" : "outline"}
             disabled={busy || !canSave}
-            onClick={onSave}
+            onClick={() => onSave(event.event_id, buildEventSavePayload(event, draft))}
           >
             {dirty ? "Save" : validated ? "✓ Validated" : "Save"}
           </Button>
@@ -1455,3 +1502,5 @@ function EventRow({
     </div>
   );
 }
+
+const EventRow = memo(EventRowImpl);
