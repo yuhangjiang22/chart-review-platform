@@ -4,7 +4,7 @@
 //   blind   — same geometry, NO verdicts/rates anywhere (gold collection)
 //   compare — per-event agent-vs-human verdict chip pairs + enumeration flags
 // ALL user-facing text is English (multi-site team; spec decision 7).
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import {
   deriveWindow, datePercent, monthTicks, clinicalAnchors, assignLanes,
@@ -46,18 +46,51 @@ const VERDICT_STYLE: Record<string, string> = {
 };
 const verdictLabel = (v?: string) =>
   v === "NON_CONCORDANT" ? "NON-CONCORDANT" : v ?? "—";
+const verdictAbbrev = (v?: string) =>
+  v === "CONCORDANT" ? "C" : v === "NON_CONCORDANT" ? "NC" : v === "EXCLUDED" ? "EXCL" : "—";
 const ANCHOR_GLYPH: Record<string, string> = { encounter: "●", ed: "▲", burst: "◆" };
-const CARD_HALF_PCT = 6;
+// px — must match the card button's rendered width (Tailwind w-[150px] below).
+const CARD_W = 150;
 const LANE_PX = 64;
 
 export function EventTimeline(props: EventTimelineProps) {
   const { events, rollups, validatedEvents, mode, compareEvents, selectedEventId, onSelectEvent } = props;
-  const anchored = useMemo(() => events.filter((e) => e.anchor.type !== "window" && e.anchor.date), [events]);
+  const anchored = useMemo(
+    () => events
+      .filter((e) => e.anchor.type !== "window" && e.anchor.date)
+      .sort((a, b) => (a.anchor.date ?? "").localeCompare(b.anchor.date ?? "")),
+    [events],
+  );
   const windowEvents = useMemo(() => events.filter((e) => e.anchor.type === "window"), [events]);
   const win = useMemo(() => deriveWindow(anchored), [anchored]);
   const ticks = useMemo(() => monthTicks(win), [win]);
   const anchors = useMemo(() => clinicalAnchors(anchored), [anchored]);
-  const lanes = useMemo(() => assignLanes(anchored, win, CARD_HALF_PCT), [anchored, win]);
+
+  // The lane-collision half-width must always equal half the card's
+  // RENDERED width, expressed as a percent of the track — hardcoding a
+  // fixed percent decouples the collision test from the real card and lets
+  // cards overlap at narrow widths (measured: 8 encounters at 7-week
+  // spacing overlapped ~58px at a 700px track under the old fixed 6%).
+  // We measure the track and derive the percent live instead.
+  const trackRef = useRef<HTMLDivElement>(null);
+  const [trackW, setTrackW] = useState(0);
+  useEffect(() => {
+    const el = trackRef.current;
+    if (!el) return;
+    if (typeof ResizeObserver === "undefined") {
+      // jsdom (tests) / very old browsers have no ResizeObserver — fall
+      // back to a representative desktop track width so lane packing still
+      // runs deterministically.
+      setTrackW(1250);
+      return;
+    }
+    const ro = new ResizeObserver(([entry]) => setTrackW(entry.contentRect.width));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const cardHalfPct = trackW > 0 ? (CARD_W / trackW) * 50 : 6;
+  const lanes = useMemo(() => assignLanes(anchored, win, cardHalfPct), [anchored, win, cardHalfPct]);
+
   const humanById = useMemo(() => new Map((compareEvents ?? []).map((e) => [e.event_id, e])), [compareEvents]);
   const humanOnly = useMemo(
     () => (compareEvents ?? []).filter((h) => !events.some((e) => e.event_id === h.event_id)),
@@ -66,6 +99,7 @@ export function EventTimeline(props: EventTimelineProps) {
   const showVerdicts = mode !== "blind";
   const maxLane = { above: 0, below: 0 };
   for (const l of lanes.values()) maxLane[l.side] = Math.max(maxLane[l.side], l.lane);
+  const axisTop = (maxLane.above + 1) * LANE_PX;
   const totals = useMemo(() => {
     let c = 0, n = 0;
     for (const r of rollups) { c += r.n_concordant; n += r.n_evaluable; }
@@ -78,7 +112,7 @@ export function EventTimeline(props: EventTimelineProps) {
         <span className="uppercase tracking-wider text-muted-foreground">Adherence timeline · {win.start} → {win.end}</span>
         {showVerdicts && (
           <span>
-            Composite: <b>{totals.c}/{totals.n} concordant{totals.n > 0 ? ` (${Math.round((totals.c / totals.n) * 100)}%)` : ""}</b>
+            {mode === "compare" ? "Agent composite" : "Composite"}: <b>{totals.c}/{totals.n} concordant{totals.n > 0 ? ` (${Math.round((totals.c / totals.n) * 100)}%)` : ""}</b>
           </span>
         )}
       </div>
@@ -86,58 +120,86 @@ export function EventTimeline(props: EventTimelineProps) {
       <div className="relative px-4 overflow-x-auto">
         <div
           className="relative min-w-[640px]"
-          style={{ height: (maxLane.above + 1) * LANE_PX + (maxLane.below + 1) * LANE_PX + 56 }}
+          style={{ height: axisTop + 56 + (maxLane.below + 1) * LANE_PX + 8 }}
         >
-          {/* axis */}
-          <div className="absolute left-0 right-0 border-t-2 border-border" style={{ top: (maxLane.above + 1) * LANE_PX + 20 }} />
-          {ticks.map((t, i) => (
-            <span key={i} className="absolute text-[9px] text-muted-foreground" style={{ left: `${t.percent}%`, top: (maxLane.above + 1) * LANE_PX + 24 }}>{t.label}</span>
-          ))}
-          {anchors.map((a, i) => (
-            <span key={i} title={`${a.date}${a.ref ? ` (${a.ref})` : ""}`} className="absolute text-[11px]" style={{ left: `${datePercent(a.date, win)}%`, top: (maxLane.above + 1) * LANE_PX + 8 }}>
-              {ANCHOR_GLYPH[a.kind]}
-            </span>
-          ))}
-          {/* event cards */}
-          {anchored.map((e) => {
-            const pos = lanes.get(e.event_id);
-            if (!pos) return null;
-            const top = pos.side === "above"
-              ? (maxLane.above - pos.lane) * LANE_PX
-              : (maxLane.above + 1) * LANE_PX + 40 + pos.lane * LANE_PX;
-            const human = humanById.get(e.event_id);
-            return (
-              <button
-                key={e.event_id}
-                type="button"
-                onClick={() => onSelectEvent(e.event_id)}
-                className={cn(
-                  "absolute w-[150px] -translate-x-1/2 text-left border rounded-md px-2 py-1 text-[10px] leading-snug bg-card hover:border-foreground/40",
-                  selectedEventId === e.event_id ? "ring-2 ring-[hsl(var(--oxblood))]" : "border-border",
-                )}
-                style={{ left: `${pos.percent}%`, top }}
+          {/* Inset track: 0%..100% maps to THIS div, inset by half a card
+              width on each side, so a card centered at 0% or 100% stays
+              fully inside the container instead of being clipped. */}
+          <div
+            ref={trackRef}
+            className="absolute inset-0"
+            style={{ marginLeft: CARD_W / 2, marginRight: CARD_W / 2 }}
+          >
+            {/* axis */}
+            <div className="absolute left-0 right-0 border-t-2 border-border" style={{ top: axisTop + 20 }} />
+            {/* Ticks stay left-aligned (not centered like glyphs/cards) — a
+                tick marks a month BOUNDARY, a single point in time, not a
+                range with a visual width to center against. */}
+            {ticks.map((t) => (
+              <span key={t.date} className="absolute text-[9px] text-muted-foreground" style={{ left: `${t.percent}%`, top: axisTop + 24 }}>{t.label}</span>
+            ))}
+            {anchors.map((a) => (
+              <span
+                key={`${a.date}|${a.ref ?? ""}|${a.kind}`}
+                title={`${a.date}${a.ref ? ` (${a.ref})` : ""}`}
+                aria-hidden="true"
+                className="absolute text-[11px] -translate-x-1/2"
+                style={{ left: `${datePercent(a.date, win)}%`, top: axisTop + 8 }}
               >
-                <div className="font-mono text-[9px] truncate text-muted-foreground">{e.event_id}</div>
-                <div className="uppercase tracking-wider text-[9px]">{e.rule_id.replace(/^R-T\d-/, "")}</div>
-                {showVerdicts && mode === "review" && (
-                  <span className={cn("inline-block rounded px-1", VERDICT_STYLE[e.verdict ?? "EXCLUDED"])}>
-                    {e.evaluable === false ? "NOT EVALUABLE" : verdictLabel(e.verdict)}
-                  </span>
-                )}
-                {mode === "compare" && (
-                  <div className="flex gap-1">
-                    <span className={cn("rounded px-1", VERDICT_STYLE[e.verdict ?? "EXCLUDED"])}>agent {verdictLabel(e.verdict)}</span>
-                    <span className={cn("rounded px-1", human ? VERDICT_STYLE[human.verdict ?? "EXCLUDED"] : "bg-[hsl(var(--ochre))]/20 text-[hsl(var(--ochre))]")}>
-                      {human ? `human ${verdictLabel(human.verdict)}` : "agent only"}
+                {ANCHOR_GLYPH[a.kind]}
+              </span>
+            ))}
+            {/* event cards */}
+            {anchored.map((e) => {
+              const pos = lanes.get(e.event_id);
+              if (!pos) return null;
+              const top = pos.side === "above"
+                ? (maxLane.above - pos.lane) * LANE_PX
+                : axisTop + 56 + pos.lane * LANE_PX;
+              const human = humanById.get(e.event_id);
+              const notEvaluable = e.evaluable === false;
+              return (
+                <button
+                  key={e.event_id}
+                  type="button"
+                  onClick={() => onSelectEvent(e.event_id)}
+                  aria-current={selectedEventId === e.event_id}
+                  className={cn(
+                    "absolute w-[150px] -translate-x-1/2 text-left border rounded-md px-2 py-1 text-[10px] leading-snug bg-card hover:border-foreground/40",
+                    selectedEventId === e.event_id ? "ring-2 ring-[hsl(var(--oxblood))]" : "border-border",
+                  )}
+                  style={{ left: `${pos.percent}%`, top }}
+                >
+                  <div className="font-mono text-[9px] truncate text-muted-foreground">{e.event_id}</div>
+                  <div className="uppercase tracking-wider text-[9px]">{e.rule_id.replace(/^R-T\d-/, "")}</div>
+                  {showVerdicts && mode === "review" && (
+                    <span className={cn("inline-block rounded px-1", VERDICT_STYLE[notEvaluable ? "EXCLUDED" : (e.verdict ?? "EXCLUDED")])}>
+                      {notEvaluable ? "NOT EVALUABLE" : verdictLabel(e.verdict)}
                     </span>
-                  </div>
-                )}
-                {validatedEvents.has(e.event_id) && (
-                  <span className="text-[9px] text-[hsl(var(--sage))] uppercase">validated</span>
-                )}
-              </button>
-            );
-          })}
+                  )}
+                  {mode === "compare" && (
+                    <div className="flex flex-wrap gap-1">
+                      <span
+                        className={cn("rounded px-1 whitespace-nowrap", VERDICT_STYLE[e.verdict ?? "EXCLUDED"])}
+                        title={`agent ${verdictLabel(e.verdict)}`}
+                      >
+                        A: {verdictAbbrev(e.verdict)}
+                      </span>
+                      <span
+                        className={cn("rounded px-1 whitespace-nowrap", human ? VERDICT_STYLE[human.verdict ?? "EXCLUDED"] : "bg-[hsl(var(--ochre))]/20 text-[hsl(var(--ochre))]")}
+                        title={human ? `human ${verdictLabel(human.verdict)}` : "human: not observed"}
+                      >
+                        H: {human ? verdictAbbrev(human.verdict) : "—"}
+                      </span>
+                    </div>
+                  )}
+                  {mode !== "blind" && validatedEvents.has(e.event_id) && (
+                    <span className="text-[9px] text-[hsl(var(--sage))] uppercase">validated</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
@@ -157,12 +219,17 @@ export function EventTimeline(props: EventTimelineProps) {
                 key={e.event_id}
                 type="button"
                 onClick={() => onSelectEvent(e.event_id)}
+                aria-current={selectedEventId === e.event_id}
+                title={showVerdicts ? verdictLabel(e.verdict) : undefined}
                 className={cn("border border-border rounded-full px-2 py-0.5 text-[10px] flex items-center gap-1",
                   selectedEventId === e.event_id && "ring-2 ring-[hsl(var(--oxblood))]")}
               >
                 {showVerdicts && (
-                  <span className={cn("w-2 h-2 rounded-full inline-block",
-                    e.verdict === "CONCORDANT" ? "bg-[hsl(var(--sage))]" : e.verdict === "NON_CONCORDANT" ? "bg-[hsl(var(--oxblood))]" : "bg-muted-foreground")} />
+                  <>
+                    <span className={cn("w-2 h-2 rounded-full inline-block",
+                      e.verdict === "CONCORDANT" ? "bg-[hsl(var(--sage))]" : e.verdict === "NON_CONCORDANT" ? "bg-[hsl(var(--oxblood))]" : "bg-muted-foreground")} />
+                    <span className="sr-only">{verdictLabel(e.verdict)}</span>
+                  </>
                 )}
                 <span>{e.rule_id.replace(/^R-T\d-/, "")}</span>
                 {showVerdicts && roll && <span className="text-muted-foreground">· {roll.n_concordant}/{roll.n_evaluable}</span>}

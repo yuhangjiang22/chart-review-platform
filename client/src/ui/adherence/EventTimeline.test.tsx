@@ -70,3 +70,35 @@ describe("EventTimeline (compare mode)", () => {
     expect(screen.getByText(/human only/i)).toBeInTheDocument();
   });
 });
+
+describe("EventTimeline (not-evaluable styling)", () => {
+  it("shows NOT EVALUABLE with the muted/excluded style, not the oxblood non-concordant style", () => {
+    const events: RuleEvent[] = [
+      { event_id: "R-NE@2025-11-04@encounters:1", rule_id: "R-T2-StepTherapyMatches",
+        anchor: { type: "asthma_encounters", date: "2025-11-04", origin: "omop", ref: "encounters:1" },
+        evaluable: false, evaluable_reason: "no qualifying encounter in window", verdict: "NON_CONCORDANT" },
+    ];
+    render(<EventTimeline events={events} rollups={[]} validatedEvents={new Set()} mode="review" onSelectEvent={() => {}} />);
+    const badge = screen.getByText(/NOT EVALUABLE/);
+    expect(badge).toBeInTheDocument();
+    expect(badge.className).toMatch(/text-muted-foreground/);
+    expect(badge.className).not.toMatch(/oxblood/);
+    expect(screen.queryByText(/NON-CONCORDANT/i)).toBeNull();
+  });
+});
+
+describe("EventTimeline (blind mode validated leak)", () => {
+  it("does not render validated badges even when validatedEvents is non-empty", () => {
+    render(<EventTimeline events={EVENTS} rollups={ROLLUPS} validatedEvents={new Set(["R-Step@2025-12-16@encounters:2"])} mode="blind" onSelectEvent={() => {}} />);
+    expect(screen.queryByText(/validated/i)).toBeNull();
+  });
+});
+
+describe("EventTimeline (window chip interaction)", () => {
+  it("clicking a window-rule chip fires onSelectEvent with the window event's id", () => {
+    const onSelect = vi.fn();
+    render(<EventTimeline events={EVENTS} rollups={ROLLUPS} validatedEvents={new Set()} mode="review" onSelectEvent={onSelect} />);
+    fireEvent.click(screen.getByText(/SpirometryWithin24mo/));
+    expect(onSelect).toHaveBeenCalledWith("R-Spiro@window");
+  });
+});
