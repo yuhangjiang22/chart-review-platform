@@ -14,6 +14,7 @@ vi.mock("@chart-review/faithfulness", () => ({
 import {
   setEventAnswer,
   getEventState,
+  setEventAnswerArgsSchema,
   type AdherenceMcpSession,
 } from "./index.js";
 import { loadOrCreate, writeReviewState } from "@chart-review/domain-review";
@@ -222,5 +223,17 @@ describe("setEventAnswer", () => {
     expect(body.count).toBeGreaterThanOrEqual(2);
     expect(body.events[0]).toHaveProperty("event_id");
     expect(body.events[0]).toHaveProperty("answered");
+  });
+
+  it("new_event with invalid date format is rejected at schema boundary", () => {
+    const result = setEventAnswerArgsSchema.safeParse({
+      new_event: { rule_id: "R-Step", anchor_type: "asthma_encounters", date: "Nov 15, 2025", note_id: "n.txt" },
+      answers: [],
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const msg = result.error.issues.map((i) => i.message).join("; ");
+      expect(msg).toContain("YYYY-MM-DD");
+    }
   });
 });

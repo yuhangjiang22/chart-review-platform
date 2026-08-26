@@ -359,7 +359,7 @@ export const setEventAnswerArgsSchema = z.object({
   new_event: z.object({
     rule_id: z.string(),
     anchor_type: z.string(),
-    date: z.string(),
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "date must be YYYY-MM-DD"),
     note_id: z.string(),
   }).optional(),
 });
