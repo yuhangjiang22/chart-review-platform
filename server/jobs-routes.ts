@@ -173,20 +173,37 @@ export function mergeAdherenceImport(
   // Event-level concordance (spec 2026-08-24): reviewer-sourced events win
   // by event_id on reimport; agent shadows always refresh; rollups are
   // derived data — keep the reviewer's recomputed rollups when the
-  // reviewer has edited any event, else take the draft's.
-  const existingEvents = (existing.rule_events as RuleEvent[] | undefined) ?? [];
-  const reviewerEvents = new Map(
-    existingEvents.filter((e) => e.source === "reviewer").map((e) => [e.event_id, e]),
-  );
-  const mergedEvents = ruleEvents.map((e) => reviewerEvents.get(e.event_id) ?? e);
-  for (const [id, ev] of reviewerEvents) {
-    if (!mergedEvents.some((e) => e.event_id === id)) mergedEvents.push(ev);
+  // reviewer has edited any event, else take the draft's. A draft with no
+  // rule_events carries no event-level information at all (legacy or
+  // period-only pipeline output — reachable here because the outer merge
+  // guard fires on ruleVerdicts.length alone) — preserve whatever the
+  // state already has instead of replacing it with an empty list. Only an
+  // event-bearing draft may rewrite the event arrays.
+  if (ruleEvents.length > 0) {
+    const existingEvents = (existing.rule_events as RuleEvent[] | undefined) ?? [];
+    const reviewerEvents = new Map(
+      existingEvents.filter((e) => e.source === "reviewer").map((e) => [e.event_id, e]),
+    );
+    const mergedEvents = ruleEvents.map((e) => reviewerEvents.get(e.event_id) ?? e);
+    for (const [id, ev] of reviewerEvents) {
+      if (!mergedEvents.some((e) => e.event_id === id)) mergedEvents.push(ev);
+    }
+    out.rule_events = mergedEvents;
+    out.rule_rollups = reviewerEvents.size > 0
+      ? ((existing.rule_rollups as RuleRollup[] | undefined) ?? ruleRollups)
+      : ruleRollups;
+    // Merge (not replace) the per-agent shadow map — a single re-import only
+    // carries the agent(s) enumerated THIS time; other agents' prior shadows
+    // must survive.
+    out.agent_rule_events = {
+      ...((existing.agent_rule_events as Record<string, RuleEvent[]> | undefined) ?? {}),
+      ...agentRuleEvents,
+    };
+  } else {
+    out.rule_events = existing.rule_events;
+    out.rule_rollups = existing.rule_rollups;
+    out.agent_rule_events = existing.agent_rule_events;
   }
-  out.rule_events = mergedEvents;
-  out.rule_rollups = reviewerEvents.size > 0
-    ? ((existing.rule_rollups as RuleRollup[] | undefined) ?? ruleRollups)
-    : ruleRollups;
-  if (Object.keys(agentRuleEvents).length > 0) out.agent_rule_events = agentRuleEvents;
   out.validated_events = (existing.validated_events as string[] | undefined) ?? [];
 
   return out;

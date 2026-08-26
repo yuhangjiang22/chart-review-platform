@@ -377,4 +377,69 @@ describe("mergeAdherenceImport (import-merge carries rule_events)", () => {
     expect(out.rule_rollups).toEqual(draftRuleRollups);
     expect(out.validated_events).toEqual([]);
   });
+
+  it("a legacy/period-only draft (no rule_events) does NOT clobber previously-imported events, rollups, or validated_events", () => {
+    const existingRuleEvents: RuleEvent[] = [
+      { event_id: "A", rule_id: "R-Step", anchor: { type: "encounter", date: "2024-11-14", origin: "omop", ref: "encounters:18" }, verdict: "CONCORDANT", source: "agent", ts: "2024-11-14T00:00:00.000Z" },
+      { event_id: "B", rule_id: "R-Step", anchor: { type: "encounter", date: "2024-12-01", origin: "omop", ref: "encounters:19" }, verdict: "NON_CONCORDANT", source: "reviewer", ts: "2025-01-01T00:00:00.000Z" },
+    ];
+    const existingRuleRollups: RuleRollup[] = [
+      { rule_id: "R-Step", n_events: 2, n_evaluable: 2, n_concordant: 1, n_non_concordant: 1, n_excluded: 0, rate: 0.5, period_verdict: "NON_CONCORDANT" },
+    ];
+    const existingAgentRuleEvents = { agent_1: existingRuleEvents };
+    const existing: Record<string, unknown> = {
+      question_answers: [],
+      rule_verdicts: [{ rule_id: "R-Step", verdict: "NON_CONCORDANT", source: "reviewer" }],
+      rule_events: existingRuleEvents,
+      rule_rollups: existingRuleRollups,
+      agent_rule_events: existingAgentRuleEvents,
+      validated_events: ["B"],
+    };
+
+    // Re-import: a draft that carries question_answers/rule_verdicts (so the
+    // handler's merge guard fires) but NO rule_events at all — the legacy /
+    // period-only pipeline shape.
+    const out = mergeAdherenceImport(existing, {
+      questionAnswers: [{ question_id: "q1", tier: 1, answer: true, source: "agent" }],
+      ruleVerdicts: [{ rule_id: "R-Step", verdict: "NON_CONCORDANT", source: "rule_engine" }],
+      ruleEvents: [],
+      ruleRollups: [],
+      agentQuestionAnswers: { agent_1: [] },
+      agentRuleVerdicts: { agent_1: [] },
+      agentRuleEvents: {},
+    });
+
+    // All three event-level fields survive UNCHANGED — A (agent) is still
+    // present, not silently dropped.
+    expect(out.rule_events).toEqual(existingRuleEvents);
+    expect((out.rule_events as RuleEvent[]).some((e) => e.event_id === "A")).toBe(true);
+    expect(out.rule_rollups).toEqual(existingRuleRollups);
+    expect(out.agent_rule_events).toEqual(existingAgentRuleEvents);
+    expect(out.validated_events).toEqual(["B"]);
+  });
+
+  it("multi-agent shadow map MERGES per-agent keys instead of replacing the whole map", () => {
+    const agent1Events: RuleEvent[] = [
+      { event_id: "A1-EV", rule_id: "R-Step", anchor: { type: "window", origin: "omop" }, verdict: "CONCORDANT", source: "agent" },
+    ];
+    const existing: Record<string, unknown> = {
+      rule_events: [],
+      agent_rule_events: { agent_1: agent1Events },
+    };
+    const agent2Events: RuleEvent[] = [
+      { event_id: "A2-EV", rule_id: "R-Step", anchor: { type: "window", origin: "omop" }, verdict: "NON_CONCORDANT", source: "agent" },
+    ];
+    const out = mergeAdherenceImport(existing, {
+      questionAnswers: [],
+      ruleVerdicts: [],
+      ruleEvents: agent2Events,
+      ruleRollups: [],
+      agentQuestionAnswers: {},
+      agentRuleVerdicts: {},
+      agentRuleEvents: { agent_2: agent2Events },
+    });
+    // BOTH agent_1 (preserved from the existing state) and agent_2 (freshly
+    // imported this time) are present in the merged shadow map.
+    expect(out.agent_rule_events).toEqual({ agent_1: agent1Events, agent_2: agent2Events });
+  });
 });
