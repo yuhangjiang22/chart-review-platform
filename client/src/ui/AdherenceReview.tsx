@@ -48,6 +48,11 @@ import { cn } from "@/lib/utils";
 import { NoteViewer } from "../NoteViewer";
 import type { NoteFocus } from "../types";
 import { EventTimeline, isAnchoredEvent, type RuleEvent, type RuleRollup } from "./adherence/EventTimeline";
+// Reused ONLY for its type shape + the GET /api/sessions/:taskId endpoint —
+// same listing SessionSwitcher/Workspace's refreshSessions() uses (Task 6,
+// agent-vs-human compare mode). AdherenceReview renders its own plain
+// <select> rather than importing the SessionSwitcher component.
+import type { SessionListItem } from "./Workspace/SessionSwitcher";
 
 // ── Local shapes (mirror @chart-review/platform-types field-for-field) ──────
 // Declared locally because concur's client `../types` does not export the
@@ -332,6 +337,22 @@ export function AdherenceReview(props: AdherenceReviewProps) {
   // the new patient's state being clobbered by the old fetch resolving late.
   const refreshTokenRef = useRef(0);
 
+  // Compare mode (Task 6, agent-vs-human — spec 2026-08-24 event-concordance
+  // design): the reviewer optionally picks a SECOND session (typically a
+  // blind-gold session) and sees, per event, agent-vs-human verdict chips +
+  // enumeration mismatches (EventTimeline's mode="compare", already built).
+  // This state is strictly READ-ONLY — no write path may ever target
+  // compareSessionId; only activeSessionId feeds saveAnswer/saveVerdict/saveEvent.
+  const [sessions, setSessions] = useState<SessionListItem[]>([]);
+  const [compareSessionId, setCompareSessionId] = useState<string | null>(null);
+  const [compareState, setCompareState] = useState<AdherenceReviewState | null>(null);
+  const [compareError, setCompareError] = useState<string | null>(null);
+  // Cancellation token for the compare-session fetch, mirroring
+  // refreshTokenRef above — a late response for a superseded
+  // (compareSessionId, patientId, taskId) combination must never clobber a
+  // newer selection.
+  const compareTokenRef = useRef(0);
+
   // session_id is required on every review call; build the query suffix once.
   const sessionQs = activeSessionId ? `?session_id=${encodeURIComponent(activeSessionId)}` : "";
 
@@ -478,6 +499,64 @@ export function AdherenceReview(props: AdherenceReviewProps) {
     return () => { refreshTokenRef.current++; };
   }, [refreshState]);
 
+  // Compare-session picker: fetch this task's sessions via the SAME
+  // endpoint + response shape Workspace's own refreshSessions() uses
+  // (GET /api/sessions/:taskId → { sessions: SessionListItem[] }) — see
+  // client/src/ui/Workspace/index.tsx. Runs unconditionally (blind mode just
+  // never renders the picker that would consume this list); a failed/empty
+  // fetch is non-fatal — the picker simply stays at "—" with no options.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await authFetch(`/api/sessions/${encodeURIComponent(taskId)}`);
+        if (!r.ok || cancelled) return;
+        const body = (await r.json()) as { sessions: SessionListItem[] } | null;
+        if (!cancelled && body?.sessions) setSessions(body.sessions);
+      } catch {
+        // Non-fatal — this only feeds an optional picker, not the main pane.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [taskId]);
+
+  // Compare-session state: a READ-ONLY fetch of a SECOND session's review
+  // state via the exact same endpoint the active session's own refreshState
+  // uses above, differing only in ?session_id=. Re-runs on every
+  // (compareSessionId, patientId, taskId) change; each run clears
+  // compareState/compareError SYNCHRONOUSLY first — this is what satisfies
+  // both "picker set back to '—' clears compare mode" (compareSessionId
+  // becomes null, effect returns right after the clear) and "patient switch
+  // clears the stale compare view" (a new run always clears before its own
+  // fetch, even if compareSessionId itself didn't change) — before the
+  // (possibly slow) fetch resolves. Token-guarded exactly like
+  // refreshTokenRef so a late response for a superseded selection can never
+  // clobber a newer one.
+  useEffect(() => {
+    const token = ++compareTokenRef.current;
+    setCompareState(null);
+    setCompareError(null);
+    if (!compareSessionId) return;
+    (async () => {
+      try {
+        const r = await authFetch(
+          `/api/reviews/${encodeURIComponent(patientId)}/${encodeURIComponent(taskId)}?session_id=${encodeURIComponent(compareSessionId)}`,
+        );
+        if (compareTokenRef.current !== token) return;
+        if (!r.ok) {
+          setCompareError(`compare session load failed: ${r.status}`);
+          return;
+        }
+        const body = (await r.json()) as AdherenceReviewState;
+        if (compareTokenRef.current !== token) return;
+        setCompareState(body);
+      } catch (e) {
+        if (compareTokenRef.current !== token) return;
+        setCompareError(`compare session load error: ${(e as Error).message}`);
+      }
+    })();
+  }, [compareSessionId, patientId, taskId]);
+
   // Defense-in-depth (spec 2026-08-24 Task 5 review, Critical 2b): in blind
   // mode, ONLY reviewer-sourced canonical answers ever seed a control — an
   // agent-sourced (or provenance-less) entry is treated as absent rather
@@ -539,6 +618,28 @@ export function AdherenceReview(props: AdherenceReviewProps) {
   // win/ticks/anchors/lanes) stays stable across unrelated re-renders.
   const ruleEvents = useMemo(() => state?.rule_events ?? [], [state]);
   const ruleRollups = useMemo(() => state?.rule_rollups ?? [], [state]);
+  // Compare summary (Task 6): the enumeration axis, keyed on event_id —
+  // matched = present in both sides; agent only = active-session-only;
+  // human only = compare-session-only. Mirrors EventTimeline's own
+  // `humanOnly` computation (full rule_events, not just anchored ones) so
+  // this count and the timeline's "human only: <ids>" strip can never
+  // disagree. Task 7 (per-event IAA between the same two sessions) keys off
+  // this identical event_id axis — keep these definitions in lockstep with it.
+  const compareSummary = useMemo(() => {
+    if (!compareState) return null;
+    const activeIds = new Set(ruleEvents.map((e) => e.event_id));
+    const compareIds = new Set((compareState.rule_events ?? []).map((e) => e.event_id));
+    let matched = 0;
+    let agentOnly = 0;
+    for (const id of activeIds) {
+      if (compareIds.has(id)) matched++; else agentOnly++;
+    }
+    let humanOnly = 0;
+    for (const id of compareIds) {
+      if (!activeIds.has(id)) humanOnly++;
+    }
+    return { matched, agentOnly, humanOnly };
+  }, [ruleEvents, compareState]);
   // Anchored events only, sorted left-to-right by date to match the
   // timeline's order — window events (anchor.type==="window") stay
   // represented in EventTimeline's window-rule chips and the existing Rules
@@ -783,6 +884,38 @@ export function AdherenceReview(props: AdherenceReviewProps) {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <Header patientDisplay={patientDisplay} taskId={taskId} onBack={onBack} />
+      {/* Compare mode picker (Task 6): NEVER rendered in blind mode — blind
+       *  is a gold-collection session and must never be compared against
+       *  another session while annotating it (blind wins, unconditionally). */}
+      {!blind && (
+        <div className="px-4 py-1.5 border-b border-border flex items-center gap-3 text-[12px] flex-wrap">
+          <label className="flex items-center gap-1.5">
+            <span className="text-muted-foreground">Compare with session</span>
+            <select
+              value={compareSessionId ?? ""}
+              onChange={(e) => setCompareSessionId(e.target.value === "" ? null : e.target.value)}
+              className="text-[12px] border border-border rounded bg-card px-1.5 py-0.5"
+            >
+              <option value="">—</option>
+              {sessions
+                .filter((s) => s.session.session_id !== activeSessionId)
+                .map((s) => (
+                  <option key={s.session.session_id} value={s.session.session_id}>
+                    {s.session.name}
+                  </option>
+                ))}
+            </select>
+          </label>
+          {compareSummary && (
+            <span className="text-muted-foreground">
+              matched: {compareSummary.matched} · agent only: {compareSummary.agentOnly} · human only: {compareSummary.humanOnly}
+            </span>
+          )}
+          {compareError && (
+            <span className="text-[hsl(var(--oxblood))]">{compareError}</span>
+          )}
+        </div>
+      )}
       {blind && (
         <div className="px-4 py-1.5 border-b border-[hsl(var(--ochre))]/40 bg-[hsl(var(--ochre))]/10 text-[12px] font-medium text-[hsl(var(--ochre))] text-center">
           {activeSessionName
@@ -815,7 +948,8 @@ export function AdherenceReview(props: AdherenceReviewProps) {
             events={ruleEvents}
             rollups={ruleRollups}
             validatedEvents={validatedEvents}
-            mode={blind ? "blind" : "review"}
+            mode={blind ? "blind" : compareState ? "compare" : "review"}
+            compareEvents={!blind && compareState ? compareState.rule_events ?? undefined : undefined}
             selectedEventId={selectedEventId}
             onSelectEvent={(id) => {
               setSelectedEventId(id);

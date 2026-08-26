@@ -1519,6 +1519,219 @@ describe("Event timeline + per-event validation", () => {
   });
 });
 
+// ────────────────────────────────────────────────────────────────────────────
+// 12. Compare mode (Task 6, agent-vs-human — spec 2026-08-24 event-concordance
+//     design). EventTimeline's mode="compare" chip pairs / human-only strip
+//     were already built and tested (see block 11 above) — this exercises
+//     ONLY the host wiring: the session picker, the read-only compare fetch,
+//     and the matched/agent-only/human-only summary.
+// ────────────────────────────────────────────────────────────────────────────
+describe("Compare mode (Task 6)", () => {
+  // Two sessions for the picker: the ACTIVE one (sess-1, must be excluded)
+  // and a second session (sess-2) to compare against. Same response shape
+  // GET /api/sessions/:taskId returns — { sessions: SessionListItem[] } —
+  // see server/session-routes.ts buildSessionListing / SessionSwitcher.tsx.
+  const SESSIONS_LIST = {
+    sessions: [
+      {
+        session: {
+          session_id: "sess-1", session_num: 1, name: "Main session", state: "active",
+          started_at: "2025-01-01T00:00:00Z", cohort: { patient_ids: ["p1"] },
+        },
+        iter_count: 1, iter_ids: ["iter-1"],
+      },
+      {
+        session: {
+          session_id: "sess-2", session_num: 2, name: "Blind gold v1", state: "active",
+          started_at: "2025-02-01T00:00:00Z", cohort: { patient_ids: ["p1"] },
+        },
+        iter_count: 1, iter_ids: ["iter-2"],
+      },
+    ],
+  };
+
+  // Compare-session review state: rule_events deliberately diverges from the
+  // active session's RULE_EVENTS (ev_1, ev_2, ev_window) —
+  //   - ev_1: present on BOTH sides but with a DIFFERENT verdict, so the
+  //     A:/H: chips can only be right if each side renders its OWN verdict
+  //     (not the same card's data shown twice).
+  //   - ev_2, ev_window: agent-only (compare side lacks them).
+  //   - ev_human_only: compare-only (agent side lacks it).
+  // → matched=1 (ev_1), agent only=2 (ev_2, ev_window), human only=1 (ev_human_only).
+  const COMPARE_STATE = {
+    ...stateWithEvents(),
+    rule_events: [
+      { ...RULE_EVENTS[0], verdict: "NON_CONCORDANT" },
+      {
+        event_id: "ev_human_only",
+        rule_id: "r_concordant",
+        anchor: { type: "encounter", date: "2025-05-01", origin: "note", ref: "note_30" },
+        evaluable: true,
+        answers: [],
+        verdict: "NON_CONCORDANT",
+        source: "reviewer",
+      },
+    ],
+  };
+
+  function setupCompareMocks() {
+    mockAuthFetch.mockImplementation((url: string) => {
+      if (url.includes("/api/tasks/") && url.includes("/adherence")) return okJson(FRAMEWORK);
+      if (url.includes("/api/sessions/")) return okJson(SESSIONS_LIST);
+      if (url.includes("/api/reviews/") && url.includes("session_id=sess-2")) return okJson(COMPARE_STATE);
+      if (url.includes("/api/reviews/")) return okJson(stateWithEvents());
+      if (url.includes("/api/runs")) return okJson([]);
+      return okJson(null);
+    });
+  }
+
+  function optionTexts(select: HTMLSelectElement): string[] {
+    return Array.from(select.querySelectorAll("option")).map((o) => o.textContent ?? "");
+  }
+
+  /** The picker <select>, waiting for a specific session's <option> to have
+   *  arrived (the sessions-list fetch is async — this avoids racing a
+   *  fireEvent.change against an <option> that doesn't exist in the DOM
+   *  yet, which jsdom silently no-ops instead of erroring on). */
+  async function selectCompareSession(sessionId: string): Promise<HTMLSelectElement> {
+    const picker = (await screen.findByLabelText(/compare with session/i)) as HTMLSelectElement;
+    await waitFor(() => expect(picker.querySelector(`option[value="${sessionId}"]`)).toBeTruthy());
+    fireEvent.change(picker, { target: { value: sessionId } });
+    return picker;
+  }
+
+  /** The timeline card <button> for a given event_id (present in both review
+   *  and compare mode — only its CONTENTS differ). */
+  function eventCard(eventId: string): HTMLButtonElement {
+    const card = screen
+      .getAllByText(eventId)
+      .map((el) => el.closest("button"))
+      .find((b): b is HTMLButtonElement => b !== null);
+    if (!card) throw new Error(`timeline card not found for ${eventId}`);
+    return card;
+  }
+
+  it("choosing a session issues the second review fetch (?session_id=<that id>) and renders compare chips", async () => {
+    setupCompareMocks();
+    renderPane();
+    await waitLoaded();
+
+    const picker = (await screen.findByLabelText(/compare with session/i)) as HTMLSelectElement;
+    await waitFor(() => expect(optionTexts(picker)).toContain("Blind gold v1"));
+    // The ACTIVE session (sess-1) must never appear as a compare target.
+    expect(optionTexts(picker)).not.toContain("Main session");
+
+    await selectCompareSession("sess-2");
+
+    await waitFor(() => {
+      expect(
+        (mockAuthFetch.mock.calls as Call[]).some(
+          ([url]) => url.includes("/api/reviews/p1/asthma-adherence") && url.includes("session_id=sess-2"),
+        ),
+      ).toBe(true);
+    });
+
+    // Compare chips render INSIDE ev_1's card — the agent's own CONCORDANT
+    // ("A: C") next to the human session's own NON_CONCORDANT ("H: NC"),
+    // proving each chip reflects its OWN session's verdict.
+    await waitFor(() => {
+      const card = eventCard("ev_1");
+      expect(within(card).getByText("A: C")).toBeInTheDocument();
+      expect(within(card).getByText("H: NC")).toBeInTheDocument();
+    });
+  });
+
+  it("the compare summary renders correct matched / agent-only / human-only counts", async () => {
+    setupCompareMocks();
+    renderPane();
+    await waitLoaded();
+
+    await selectCompareSession("sess-2");
+
+    await waitFor(() => {
+      expect(screen.getByText("matched: 1 · agent only: 2 · human only: 1")).toBeInTheDocument();
+    });
+  });
+
+  it("setting the picker back to '—' clears compare mode (chips gone, back to the plain review-mode badge)", async () => {
+    setupCompareMocks();
+    renderPane();
+    await waitLoaded();
+
+    const picker = await selectCompareSession("sess-2");
+    await waitFor(() => expect(within(eventCard("ev_1")).getByText("A: C")).toBeInTheDocument());
+
+    fireEvent.change(picker, { target: { value: "" } });
+
+    await waitFor(() => {
+      const card = eventCard("ev_1");
+      // No compare chips left...
+      expect(within(card).queryByText(/^A:/)).not.toBeInTheDocument();
+      expect(within(card).queryByText(/^H:/)).not.toBeInTheDocument();
+      // ...and the plain review-mode verdict badge is back (ev_1 is
+      // evaluable:true, verdict CONCORDANT on the active session).
+      expect(within(card).getByText("CONCORDANT")).toBeInTheDocument();
+    });
+    // The summary disappears along with compare mode.
+    expect(screen.queryByText(/matched:/)).not.toBeInTheDocument();
+  });
+
+  it("blind mode never renders the compare picker", async () => {
+    // A blind-safe (non-contaminated) fixture — reviewer-sourced rule_events,
+    // no imported_from_run, no agent shadow maps — so this exercises the
+    // REAL blind main-render path, not the contamination-refusal early
+    // return (which trivially has no picker either way).
+    const blindSafeState = {
+      patient_id: "p1", task_id: "asthma-adherence", version: 1, task_kind: "adherence",
+      question_answers: [], rule_verdicts: [], validated_questions: [], validated_rules: [],
+      rule_events: RULE_EVENTS.map((e) => ({ ...e, source: "reviewer" as const })),
+      rule_rollups: RULE_ROLLUPS, validated_events: [],
+    };
+    mockAuthFetch.mockImplementation((url: string) => {
+      if (url.includes("/api/tasks/") && url.includes("/adherence")) return okJson(FRAMEWORK);
+      if (url.includes("/api/sessions/")) return okJson(SESSIONS_LIST);
+      if (url.includes("/api/reviews/")) return okJson(blindSafeState);
+      if (url.includes("/api/runs")) return okJson([]);
+      return okJson(null);
+    });
+    renderPane({ blind: true });
+
+    await waitFor(() => expect(screen.getByText(/BLIND MODE/)).toBeInTheDocument());
+    // Sanity: this really is the normal (non-refusal) blind render path.
+    expect(screen.getByText(/Adherence timeline/)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/compare with session/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/matched:/)).not.toBeInTheDocument();
+  });
+
+  it("a failed compare fetch shows a non-fatal message near the picker and leaves the main pane rendered", async () => {
+    mockAuthFetch.mockImplementation((url: string) => {
+      if (url.includes("/api/tasks/") && url.includes("/adherence")) return okJson(FRAMEWORK);
+      if (url.includes("/api/sessions/")) return okJson(SESSIONS_LIST);
+      if (url.includes("/api/reviews/") && url.includes("session_id=sess-2")) {
+        return errJson(500, { message: "compare session blew up" });
+      }
+      if (url.includes("/api/reviews/")) return okJson(stateWithEvents());
+      if (url.includes("/api/runs")) return okJson([]);
+      return okJson(null);
+    });
+    renderPane();
+    await waitLoaded();
+
+    await selectCompareSession("sess-2");
+
+    await waitFor(() => {
+      expect(screen.getByText(/compare session load failed: 500/)).toBeInTheDocument();
+    });
+    // Non-fatal: the main pane (framework, timeline, rules) stays rendered —
+    // the compare fetch's failure doesn't blow it away.
+    expect(screen.getByText("Question framework")).toBeInTheDocument();
+    expect(screen.getByText("Rule verdicts")).toBeInTheDocument();
+    expect(screen.getByText(/Adherence timeline/)).toBeInTheDocument();
+    // Compare mode never activated — no chips, timeline stayed in review mode.
+    expect(within(eventCard("ev_1")).queryByText(/^A:/)).not.toBeInTheDocument();
+  });
+});
+
 // Keep `act` imported-but-explicitly-referenced to avoid unused-import lint in
 // strict TS configs (it is used implicitly by RTL but we reference it here).
 void act;
