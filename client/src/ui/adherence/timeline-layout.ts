@@ -73,6 +73,16 @@ export function clinicalAnchors(events: TimelineEventLite[]): Array<{ date: stri
   return [...seen.values()].sort((a, b) => a.date.localeCompare(b.date));
 }
 
+/** Half the card width as a PERCENT OF THE TRACK — the invariant assignLanes'
+ *  collision test depends on. A hardcoded percent decouples it from the real
+ *  card and makes cards overlap at narrow panes (regressed once: 150px cards
+ *  at a 700px track need ~10.7%, not 6%). trackW <= 0 (pre-measure / hidden
+ *  pane) falls back to the 1250px-track value. */
+export function cardHalfPct(trackW: number, cardW: number): number {
+  if (!(trackW > 0)) return (cardW / 1250) * 50;
+  return (cardW / trackW) * 50;
+}
+
 export interface LanePos { side: "above" | "below"; lane: number; percent: number }
 
 /** Card placement: rules are assigned above/below deterministically by

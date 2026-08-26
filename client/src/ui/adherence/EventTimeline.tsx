@@ -4,10 +4,10 @@
 //   blind   — same geometry, NO verdicts/rates anywhere (gold collection)
 //   compare — per-event agent-vs-human verdict chip pairs + enumeration flags
 // ALL user-facing text is English (multi-site team; spec decision 7).
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import {
-  deriveWindow, datePercent, monthTicks, clinicalAnchors, assignLanes,
+  deriveWindow, datePercent, monthTicks, clinicalAnchors, assignLanes, cardHalfPct,
 } from "./timeline-layout";
 
 // Local mirrors of @chart-review/platform-types (client convention — see
@@ -69,14 +69,18 @@ export function EventTimeline(props: EventTimelineProps) {
   // The lane-collision half-width must always equal half the card's
   // RENDERED width, expressed as a percent of the track — hardcoding a
   // fixed percent decouples the collision test from the real card and lets
-  // cards overlap at narrow widths (measured: 8 encounters at 7-week
-  // spacing overlapped ~58px at a 700px track under the old fixed 6%).
-  // We measure the track and derive the percent live instead.
+  // cards overlap at narrow widths (see cardHalfPct's doc comment in
+  // timeline-layout.ts). We measure the track and derive the percent live.
   const trackRef = useRef<HTMLDivElement>(null);
   const [trackW, setTrackW] = useState(0);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = trackRef.current;
     if (!el) return;
+    // Seed synchronously from the current layout (before paint) so the
+    // first frame already uses the real width instead of the fallback —
+    // avoids a visible re-pack flash once ResizeObserver's first callback
+    // would otherwise fire.
+    setTrackW(Math.round(el.getBoundingClientRect().width));
     if (typeof ResizeObserver === "undefined") {
       // jsdom (tests) / very old browsers have no ResizeObserver — fall
       // back to a representative desktop track width so lane packing still
@@ -84,12 +88,17 @@ export function EventTimeline(props: EventTimelineProps) {
       setTrackW(1250);
       return;
     }
-    const ro = new ResizeObserver(([entry]) => setTrackW(entry.contentRect.width));
+    const ro = new ResizeObserver((entries) => {
+      // Guard the read: a missing entry can't throw, and rounding avoids
+      // re-render churn on every sub-pixel drag during a live resize.
+      const w = entries[0]?.contentRect.width;
+      if (w != null) setTrackW(Math.round(w));
+    });
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  const cardHalfPct = trackW > 0 ? (CARD_W / trackW) * 50 : 6;
-  const lanes = useMemo(() => assignLanes(anchored, win, cardHalfPct), [anchored, win, cardHalfPct]);
+  const halfPct = cardHalfPct(trackW, CARD_W);
+  const lanes = useMemo(() => assignLanes(anchored, win, halfPct), [anchored, win, halfPct]);
 
   const humanById = useMemo(() => new Map((compareEvents ?? []).map((e) => [e.event_id, e])), [compareEvents]);
   const humanOnly = useMemo(

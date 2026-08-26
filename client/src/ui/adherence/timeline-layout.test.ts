@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  deriveWindow, datePercent, monthTicks, clinicalAnchors, assignLanes,
+  deriveWindow, datePercent, monthTicks, clinicalAnchors, assignLanes, cardHalfPct,
   type TimelineEventLite,
   type TimelineWindow,
 } from "./timeline-layout";
@@ -115,5 +115,59 @@ describe("assignLanes", () => {
     ], { start: "2025-01-01", end: "2026-01-01" }, 12);
     expect(lanes.size).toBe(1);
     expect(lanes.get("R1@2025-11-15@e1")).toBeDefined();
+  });
+});
+
+describe("cardHalfPct", () => {
+  it("150px card at a 1250px track → exactly 6%", () => {
+    expect(cardHalfPct(1250, 150)).toBe(6);
+  });
+  it("150px card at a 700px track → ~10.714% (150/700*50)", () => {
+    // (150 / 700) * 50 = 10.714285714285714 — computed independently, not
+    // re-derived from the function under test.
+    expect(cardHalfPct(700, 150)).toBeCloseTo(10.714285714285714, 9);
+  });
+  it("non-positive trackW (pre-measure / hidden pane) falls back to the 1250px-track value", () => {
+    expect(cardHalfPct(0, 150)).toBe(6);
+    expect(cardHalfPct(-5, 150)).toBe(6);
+  });
+});
+
+describe("cardHalfPct × assignLanes — a narrow track bumps overlapping cards, a wide one doesn't", () => {
+  // 371-day window, two same-rule events 49 days apart.
+  //   p1 = 100/371*100 = 26.954177897574123
+  //   p2 = 149/371*100 = 40.16172506738545
+  //   diff = 49/371*100 = 13.207547169811324 (percent-of-track separation)
+  // At a 700px track, cardHalfPct(700,150) ≈ 10.714 → 2×halfPct ≈ 21.429,
+  //   which is > the 13.21 separation, so the cards' spans overlap and
+  //   assignLanes must bump the second card to a new sub-lane.
+  // At a 1250px track, cardHalfPct(1250,150) = 6 → 2×halfPct = 12, which is
+  //   < the 13.21 separation, so the spans do NOT overlap and both cards
+  //   land in the same sub-lane.
+  const DAY = 86400000;
+  const isoDate = (t: number) => new Date(t).toISOString().slice(0, 10);
+  const winStartMs = new Date("2025-01-01T00:00:00.000Z").getTime();
+  const win: TimelineWindow = { start: "2025-01-01", end: isoDate(winStartMs + 371 * DAY) };
+  const d1 = isoDate(winStartMs + 100 * DAY); // 2025-04-11
+  const d2 = isoDate(winStartMs + 149 * DAY); // 2025-05-30 — 49 days after d1
+  const events: TimelineEventLite[] = [
+    ev("e1", "R-X", d1),
+    ev("e2", "R-X", d2),
+  ];
+
+  it("at a 700px track, the two events collide into different lanes", () => {
+    const lanes = assignLanes(events, win, cardHalfPct(700, 150));
+    const l1 = lanes.get("e1")!;
+    const l2 = lanes.get("e2")!;
+    expect(l1.side).toBe(l2.side);
+    expect(l1.lane).not.toBe(l2.lane);
+  });
+
+  it("at a 1250px track, the two events fit in the same lane", () => {
+    const lanes = assignLanes(events, win, cardHalfPct(1250, 150));
+    const l1 = lanes.get("e1")!;
+    const l2 = lanes.get("e2")!;
+    expect(l1.side).toBe(l2.side);
+    expect(l1.lane).toBe(l2.lane);
   });
 });

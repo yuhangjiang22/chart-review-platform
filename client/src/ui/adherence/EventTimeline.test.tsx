@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, within } from "@testing-library/react";
 import * as matchers from "@testing-library/jest-dom/matchers";
 import { EventTimeline, type RuleEvent, type RuleRollup } from "./EventTimeline";
 expect.extend(matchers);
@@ -65,8 +65,13 @@ describe("EventTimeline (compare mode)", () => {
         anchor: { type: "asthma_encounters", date: "2026-02-01", origin: "note", ref: "note:extra.txt" }, verdict: "NON_CONCORDANT" },
     ];
     render(<EventTimeline events={EVENTS} rollups={ROLLUPS} validatedEvents={new Set()} mode="compare" compareEvents={human} onSelectEvent={() => {}} />);
-    expect(screen.getAllByText(/agent/i).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText(/human/i).length).toBeGreaterThanOrEqual(1);
+    // Scope to the first card: agent verdict is NON_CONCORDANT (EVENTS[0]),
+    // human verdict is overridden to CONCORDANT above — abbreviated chips
+    // must read "A: NC" / "H: C", not just contain the words "agent"/"human"
+    // (those also appear in the header/footer, which would pass vacuously).
+    const card = screen.getByText(/R-Step@2025-11-04@encounters:1/).closest("button")!;
+    expect(within(card).getByText(/A:\s*NC/)).toBeInTheDocument();
+    expect(within(card).getByText(/H:\s*C\b/)).toBeInTheDocument();
     expect(screen.getByText(/human only/i)).toBeInTheDocument();
   });
 });
