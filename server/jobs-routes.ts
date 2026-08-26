@@ -101,11 +101,16 @@ export function buildImportedReviewState(
  * a row the reviewer already edited (source==="reviewer") on the EXISTING
  * review_state survives a re-import by its stable id (question_id / rule_id
  * / event_id); everything else comes from the new draft. Agent-map shadow
- * fields (agent_question_answers / agent_rule_verdicts / agent_rule_events)
- * always refresh to the new iter's per-agent drafts so the UI's A/B columns
- * show current data. rule_rollups are derived (not reviewer-editable
- * directly) — keep the EXISTING (reviewer-recomputed) rollups when the
- * reviewer has edited any event, else take the new draft's.
+ * fields: agent_question_answers / agent_rule_verdicts REPLACE wholesale on
+ * every re-import (deliberate, pre-existing — this iter's per-agent drafts
+ * are the only ones kept; do NOT "fix" this to merge). agent_rule_events
+ * instead MERGES per-agent key — existing shadows spread first, this
+ * import's non-empty per-agent drafts spread on top — so an agent absent
+ * from, or reporting zero events in, THIS import doesn't erase its
+ * previously-recorded shadow. rule_rollups are derived (not
+ * reviewer-editable directly) — per rule_id, keep the EXISTING
+ * (reviewer-recomputed) rollup for rules that have a reviewer-sourced
+ * event, else take the new draft's.
  */
 export function mergeAdherenceImport(
   existing: Record<string, unknown>,
@@ -171,14 +176,16 @@ export function mergeAdherenceImport(
   if (adherenceExclusionReason) out.adherence_exclusion_reason = adherenceExclusionReason;
 
   // Event-level concordance (spec 2026-08-24): reviewer-sourced events win
-  // by event_id on reimport; agent shadows always refresh; rollups are
-  // derived data — keep the reviewer's recomputed rollups when the
-  // reviewer has edited any event, else take the draft's. A draft with no
-  // rule_events carries no event-level information at all (legacy or
-  // period-only pipeline output — reachable here because the outer merge
-  // guard fires on ruleVerdicts.length alone) — preserve whatever the
-  // state already has instead of replacing it with an empty list. Only an
-  // event-bearing draft may rewrite the event arrays.
+  // by event_id on reimport; agent_rule_events MERGES per-agent key (see
+  // below) — unlike agent_question_answers / agent_rule_verdicts above,
+  // which replace wholesale; rollups are derived data — per rule_id, keep
+  // the reviewer's recomputed rollup for rules that have a reviewer-sourced
+  // event, else take the draft's. A draft with no rule_events carries no
+  // event-level information at all (legacy or period-only pipeline output
+  // — reachable here because the outer merge guard fires on
+  // ruleVerdicts.length alone) — preserve whatever the state already has
+  // instead of replacing it with an empty list. Only an event-bearing
+  // draft may rewrite the event arrays.
   if (ruleEvents.length > 0) {
     const existingEvents = (existing.rule_events as RuleEvent[] | undefined) ?? [];
     const reviewerEvents = new Map(
@@ -189,15 +196,36 @@ export function mergeAdherenceImport(
       if (!mergedEvents.some((e) => e.event_id === id)) mergedEvents.push(ev);
     }
     out.rule_events = mergedEvents;
-    out.rule_rollups = reviewerEvents.size > 0
-      ? ((existing.rule_rollups as RuleRollup[] | undefined) ?? ruleRollups)
-      : ruleRollups;
+
+    // Per-rule rollup merge: a rule with a reviewer-sourced event keeps the
+    // EXISTING (reviewer-consistent) rollup; every other rule takes the
+    // fresh draft's — so later imports keep updating rollups for rules the
+    // reviewer never touched, instead of freezing the whole array the
+    // moment ANY rule gets a reviewer event (Task 3 re-review B6).
+    const reviewerRuleIds = new Set([...reviewerEvents.values()].map((e) => e.rule_id));
+    const existingRollupsByRule = new Map(
+      ((existing.rule_rollups as RuleRollup[] | undefined) ?? []).map((r) => [r.rule_id, r]),
+    );
+    const draftRollupsByRule = new Map(ruleRollups.map((r) => [r.rule_id, r]));
+    const allRuleIds = new Set([...existingRollupsByRule.keys(), ...draftRollupsByRule.keys()]);
+    out.rule_rollups = [...allRuleIds].map((rid) =>
+      reviewerRuleIds.has(rid)
+        ? (existingRollupsByRule.get(rid) ?? draftRollupsByRule.get(rid)!)
+        : (draftRollupsByRule.get(rid) ?? existingRollupsByRule.get(rid)!),
+    );
+
     // Merge (not replace) the per-agent shadow map — a single re-import only
     // carries the agent(s) enumerated THIS time; other agents' prior shadows
-    // must survive.
+    // must survive. Defense in depth (Task 3 re-review A1): drop any
+    // present-but-empty entries before spreading, so this site agrees with
+    // the ingest loop's "empty carries no information" guard even if an
+    // empty array ever slips through here.
+    const nonEmptyAgentRuleEvents = Object.fromEntries(
+      Object.entries(agentRuleEvents).filter(([, evs]) => evs.length > 0),
+    );
     out.agent_rule_events = {
       ...((existing.agent_rule_events as Record<string, RuleEvent[]> | undefined) ?? {}),
-      ...agentRuleEvents,
+      ...nonEmptyAgentRuleEvents,
     };
   } else {
     out.rule_events = existing.rule_events;
@@ -402,7 +430,13 @@ export const jobsRoutes: RouteEntry[] = [
         }
         if (Array.isArray(draft.rule_events)) {
           if (ruleEvents.length === 0) ruleEvents = draft.rule_events;
-          agentRuleEvents[id] = draft.rule_events;
+          // Present-but-empty carries no event-level information (a
+          // period-only rule set, or an agent that committed zero events
+          // this run) — recording it as this agent's shadow would erase
+          // that agent's previously-imported shadow at the merge spread in
+          // mergeAdherenceImport below (Task 3 re-review A1). Only record
+          // a shadow when non-empty.
+          if (draft.rule_events.length > 0) agentRuleEvents[id] = draft.rule_events;
         }
         if (Array.isArray(draft.rule_rollups) && ruleRollups.length === 0) {
           ruleRollups = draft.rule_rollups;

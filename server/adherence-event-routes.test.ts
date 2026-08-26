@@ -442,4 +442,92 @@ describe("mergeAdherenceImport (import-merge carries rule_events)", () => {
     // imported this time) are present in the merged shadow map.
     expect(out.agent_rule_events).toEqual({ agent_1: agent1Events, agent_2: agent2Events });
   });
+
+  it("an agent's empty rule_events draft does not erase its previously-imported shadow (Task 3 re-review A1)", () => {
+    const agent1PriorEvents: RuleEvent[] = [
+      { event_id: "X", rule_id: "R-Step", anchor: { type: "window", origin: "omop" }, verdict: "CONCORDANT", source: "agent" },
+    ];
+    const existing: Record<string, unknown> = {
+      rule_events: [],
+      agent_rule_events: { agent_1: agent1PriorEvents },
+    };
+    const agent2Events: RuleEvent[] = [
+      { event_id: "Y", rule_id: "R-Step", anchor: { type: "window", origin: "omop" }, verdict: "NON_CONCORDANT", source: "agent" },
+    ];
+    // Simulates a re-import where agent_1's fresh draft carried rule_events: []
+    // (a period-only rule set this run, or the agent committed no events) and
+    // agent_2's carried rule_events: [Y]. ruleEvents (the canonical
+    // first-agent-wins array) is agent_2's since agent_1's was empty; per the
+    // ingest-loop fix, agentRuleEvents only records NON-empty per-agent
+    // drafts, so agent_1 is absent here — but even if it slipped through as
+    // agent_1: [], the merge below is robust to it (defense in depth).
+    const out = mergeAdherenceImport(existing, {
+      questionAnswers: [],
+      ruleVerdicts: [],
+      ruleEvents: agent2Events,
+      ruleRollups: [],
+      agentQuestionAnswers: {},
+      agentRuleVerdicts: {},
+      agentRuleEvents: { agent_1: [], agent_2: agent2Events },
+    });
+    // agent_1's PRIOR shadow ([X]) survives untouched, AND agent_2's fresh
+    // shadow ([Y]) is added — neither is lost.
+    expect(out.agent_rule_events).toEqual({ agent_1: agent1PriorEvents, agent_2: agent2Events });
+  });
+
+  it("rule_rollups merges PER RULE: a rule with a reviewer event keeps the existing rollup, other rules keep taking fresh draft rollups (Task 3 re-review B6)", () => {
+    const reviewerStepEvent: RuleEvent = {
+      event_id: STUB_ID,
+      rule_id: "R-Step",
+      anchor: { type: "encounter", date: "2024-11-14", origin: "omop", ref: "encounters:18" },
+      verdict: "CONCORDANT",
+      source: "reviewer",
+      ts: "2025-01-01T00:00:00.000Z",
+    };
+    const otherAgentEvent: RuleEvent = {
+      event_id: OTHER_ID, rule_id: "R-Other", anchor: { type: "window", origin: "omop" }, verdict: "CONCORDANT", source: "agent",
+    };
+    const existingStepRollup: RuleRollup = {
+      rule_id: "R-Step", n_events: 1, n_evaluable: 1, n_concordant: 1, n_non_concordant: 0, n_excluded: 0, rate: 1, period_verdict: "CONCORDANT",
+    };
+    // Existing R-Other rollup is STALE — a later import must refresh it since
+    // the reviewer never touched an R-Other event.
+    const existingOtherRollup: RuleRollup = {
+      rule_id: "R-Other", n_events: 1, n_evaluable: 1, n_concordant: 0, n_non_concordant: 1, n_excluded: 0, rate: 0, period_verdict: "NON_CONCORDANT",
+    };
+    const existing: Record<string, unknown> = {
+      rule_events: [reviewerStepEvent, otherAgentEvent],
+      rule_rollups: [existingStepRollup, existingOtherRollup],
+    };
+
+    const draftOtherRollup: RuleRollup = {
+      rule_id: "R-Other", n_events: 1, n_evaluable: 1, n_concordant: 1, n_non_concordant: 0, n_excluded: 0, rate: 1, period_verdict: "CONCORDANT",
+    };
+    // The re-import's draft carries a stale R-Step rollup (agent doesn't
+    // know about the reviewer's edit yet) plus a FRESH R-Other rollup.
+    const draftStepRollup: RuleRollup = {
+      rule_id: "R-Step", n_events: 1, n_evaluable: 1, n_concordant: 0, n_non_concordant: 1, n_excluded: 0, rate: 0, period_verdict: "NON_CONCORDANT",
+    };
+
+    const out = mergeAdherenceImport(existing, {
+      questionAnswers: [],
+      ruleVerdicts: [],
+      ruleEvents: [
+        { ...reviewerStepEvent, source: "agent", verdict: "NON_CONCORDANT" }, // stale agent copy of the reviewer-edited event
+        otherAgentEvent,
+      ],
+      ruleRollups: [draftStepRollup, draftOtherRollup],
+      agentQuestionAnswers: {},
+      agentRuleVerdicts: {},
+      agentRuleEvents: {},
+    });
+
+    const rollups = out.rule_rollups as RuleRollup[];
+    // R-Step has a reviewer-sourced event → keeps the EXISTING (reviewer-
+    // consistent) rollup, not the stale draft's.
+    expect(rollups.find((r) => r.rule_id === "R-Step")).toEqual(existingStepRollup);
+    // R-Other has NO reviewer-sourced event → takes the FRESH draft's
+    // rollup, not the stale existing one.
+    expect(rollups.find((r) => r.rule_id === "R-Other")).toEqual(draftOtherRollup);
+  });
 });
