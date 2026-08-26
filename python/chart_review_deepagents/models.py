@@ -1,5 +1,23 @@
 # chart_review_deepagents/models.py
 from . import registry
+from .llm_retry import call_with_retry, call_with_retry_sync
+
+
+class _RetryingModelMixin:
+    """Wrap the per-call LLM invocation with the bounded transient-error
+    retry policy in llm_retry.py. Composed with a LangChain chat model class
+    (see the Azure/vLLM classes below) so ONLY the individual `_generate` /
+    `_agenerate` call is retried — never the whole agent turn, never a tool
+    call. `super()._agenerate`/`super()._generate` is the same method the
+    unwrapped class would have run; wrapping it here just re-issues that
+    exact call on a transient failure (see llm_retry.py for why this layer,
+    not the SDK's own max_retries, has to catch the gateway-504 case)."""
+
+    async def _agenerate(self, *args, **kwargs):
+        return await call_with_retry(super()._agenerate, *args, **kwargs)
+
+    def _generate(self, *args, **kwargs):
+        return call_with_retry_sync(super()._generate, *args, **kwargs)
 
 
 def make_model(model_key=None, serial_tool_calls=True):
@@ -28,14 +46,19 @@ def make_model(model_key=None, serial_tool_calls=True):
         # rejected with a 400, aborting the patient. parallel_tool_calls is a
         # bind_tools-time param (no constructor field), and create_deep_agent
         # binds tools internally — so we override bind_tools to inject it.
-        class _SerialToolCallsAzure(AzureChatOpenAI):
+        class _SerialToolCallsAzure(_RetryingModelMixin, AzureChatOpenAI):
             def bind_tools(self, tools, **kwargs):
                 kwargs.setdefault("parallel_tool_calls", False)
                 return super().bind_tools(tools, **kwargs)
 
-        # serial -> the override above; parallel -> stock AzureChatOpenAI (the
-        # client batches tool calls per turn, far fewer round-trips).
-        cls = _SerialToolCallsAzure if serial_tool_calls else AzureChatOpenAI
+        # Parallel path also gets the retry mixin (transient errors aren't
+        # specific to serial mode) but skips the tool-call-batching override.
+        class _RetryingAzure(_RetryingModelMixin, AzureChatOpenAI):
+            pass
+
+        # serial -> the override above; parallel -> retrying AzureChatOpenAI
+        # (the client batches tool calls per turn, far fewer round-trips).
+        cls = _SerialToolCallsAzure if serial_tool_calls else _RetryingAzure
         kwargs = dict(
             azure_endpoint=conn["azure_endpoint"],
             api_key=conn["api_key"],
@@ -69,7 +92,10 @@ def make_model(model_key=None, serial_tool_calls=True):
         return cls(**kwargs)
     from langchain_openai import ChatOpenAI
 
-    return ChatOpenAI(
+    class _RetryingChatOpenAI(_RetryingModelMixin, ChatOpenAI):
+        pass
+
+    return _RetryingChatOpenAI(
         base_url=conn["base_url"],
         api_key=conn["api_key"],
         model=conn["model"],
