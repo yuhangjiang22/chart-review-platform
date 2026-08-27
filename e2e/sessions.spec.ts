@@ -103,6 +103,13 @@ test.describe("session workflow", () => {
     // Phenotype → "Agents" in BOTH the main pane and the sidebar. No
     // mismatch like the earlier bug where main said REVIEWERS but
     // sidebar said AGENTS for the same task.
+    // Wait for the label BEFORE counting: locator.count() resolves
+    // immediately with no auto-wait, so it races the session fetch that the
+    // pane needs before it can render any agent specs at all. The race is
+    // reliably lost once a task has accumulated many sessions (the listing
+    // for a long-lived task runs to hundreds of KB), which is what made this
+    // read as a UI regression rather than a missing await.
+    await expect(page.getByText(/Agents \(/).first()).toBeVisible();
     const agentsLabels = await page.getByText(/Agents \(/).count();
     expect(agentsLabels, "expected ≥1 'Agents' label").toBeGreaterThan(0);
     // And the "Reviewers (" label should NOT appear for phenotype tasks.
