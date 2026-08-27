@@ -129,6 +129,7 @@ export async function listQuestions(
     const questions: Array<{
       question_id: string; tier: number; text: string;
       answer_schema?: unknown; depends_on?: string[]; retrieval_hints?: string;
+      event_scoped?: boolean;
     }> = [];
     for (const t of tiers) {
       if (args.tier !== undefined && t !== args.tier) continue;
@@ -140,6 +141,10 @@ export async function listQuestions(
           answer_schema: q.answer_schema,
           depends_on: q.depends_on,
           retrieval_hints: q.retrieval_hints,
+          // True → this question describes ONE EVENT, not the window. Commit it
+          // through set_event_answer, once per event; set_question_answer
+          // rejects it.
+          ...(q.event_scoped ? { event_scoped: true } : {}),
         });
       }
     }
@@ -236,6 +241,21 @@ export async function setQuestionAnswer(
   }
   const q = findQuestion(skill, args.question_id);
   if (!q) return err(`question_id '${args.question_id}' not found`);
+  // An event-scoped question describes ONE event, so a single period-level
+  // answer to it is meaningless — and worse than meaningless: the engine no
+  // longer inherits it into events, so nothing reads it, while the reviewer's
+  // Questions pane would show it next to the real per-event answers with
+  // nothing to say which governs. Rejected rather than stored dead.
+  if (q.event_scoped) {
+    return err(
+      `question_id '${args.question_id}' is answered PER EVENT, not for the period`,
+      {
+        hint: "Commit it through set_event_answer for each event in the EVENT "
+          + "WORK-LIST that names it. The period-level value is derived from "
+          + "those events, never extracted separately.",
+      },
+    );
+  }
 
   const coerced = coerce(args.answer, q);
   // Coerce-to-null is OK (means "I couldn't determine") — agents are

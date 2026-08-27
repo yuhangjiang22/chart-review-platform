@@ -15,6 +15,8 @@ import {
   setEventAnswer,
   getEventState,
   setEventAnswerArgsSchema,
+  setQuestionAnswer,
+  listQuestions,
   type AdherenceMcpSession,
 } from "./index.js";
 import { loadOrCreate, writeReviewState } from "@chart-review/domain-review";
@@ -47,6 +49,7 @@ beforeAll(() => {
       "questions:",
       "  - question_id: ControlLevel",
       "    tier: 1",
+      "    event_scoped: true",
       "    text: control level at the event date",
       "    answer_schema: { type: string, enum: [well_controlled, not_well_controlled] }",
       "  - question_id: Followup",
@@ -285,5 +288,38 @@ describe("out-of-scope question rejection", () => {
     }));
     expect(body.ok).toBe(false);
     expect(loadOrCreate(session.patientId, session.task).version).toBe(before);
+  });
+});
+
+describe("set_question_answer rejects a period answer to an event-scoped question", () => {
+  // An event-scoped question describes ONE event. Since the engine stopped
+  // inheriting patient-level answers into events, a period answer to one of
+  // these feeds nothing — while the reviewer's Questions pane would show it
+  // beside the real per-event answers with nothing to say which governs. So it
+  // is refused rather than stored dead.
+  it("refuses it and points at set_event_answer", async () => {
+    const body = parse(await setQuestionAnswer(session, {
+      question_id: "ControlLevel", answer: "well_controlled",
+    }));
+    expect(body.ok).toBe(false);
+    expect(body.error).toContain("answered PER EVENT");
+    expect(body.hint).toContain("set_event_answer");
+  });
+
+  it("still accepts a genuinely period-level question", async () => {
+    const body = parse(await setQuestionAnswer(session, {
+      question_id: "Followup", answer: true,
+    }));
+    expect(body.ok).toBe(true);
+  });
+
+  it("list_questions marks which questions are per-event", async () => {
+    const body = parse(await listQuestions(session, {}));
+    const byId = new Map(
+      (body.questions as Array<{ question_id: string; event_scoped?: boolean }>)
+        .map((q) => [q.question_id, q.event_scoped]),
+    );
+    expect(byId.get("ControlLevel")).toBe(true);
+    expect(byId.get("Followup")).toBeUndefined();
   });
 });

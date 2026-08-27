@@ -108,7 +108,17 @@ function isAnchoredEvent(e: AdherenceStateViewRuleEvent): boolean {
  */
 export function deriveAdherenceReviewStatus(
   state: AdherenceStateView,
-  framework: { questionIds: string[]; ruleIds: string[] },
+  framework: {
+    questionIds: string[];
+    ruleIds: string[];
+    /** question_ids answered PER EVENT rather than for the period. These have
+     *  no period-level answer to validate — their work IS the per-event
+     *  annotation — so they count as done exactly when every anchored event
+     *  does, instead of blocking completion forever waiting for a
+     *  validated_questions entry that can never be written (the MCP write path
+     *  rejects a period-level answer to them). */
+    eventScopedQuestionIds?: string[];
+  },
 ): DerivedReviewStatus {
   const vq = new Set(state.validated_questions ?? []);
   const vr = new Set(state.validated_rules ?? []);
@@ -128,8 +138,10 @@ export function deriveAdherenceReviewStatus(
 
   const hasFramework =
     framework.questionIds.length > 0 || framework.ruleIds.length > 0 || anchoredEventIds.length > 0;
+  const eventScoped = new Set(framework.eventScopedQuestionIds ?? []);
   const questionsDone =
-    framework.questionIds.length === 0 || framework.questionIds.every((q) => vq.has(q));
+    framework.questionIds.length === 0
+    || framework.questionIds.every((q) => (eventScoped.has(q) ? eventsDone : vq.has(q)));
   const rulesDone =
     framework.ruleIds.length === 0 || framework.ruleIds.every((r) => vr.has(r));
   if (hasFramework && questionsDone && rulesDone && eventsDone) return "reviewer_validated";

@@ -88,11 +88,12 @@ async function openSourceTimeline(page: Page) {
   await page.getByRole("button", { name: /^events$/i }).click();
 }
 
-/** Every adherence rule line in the chronology. Each carries its event_id as
+/** Every adherence rule line in the Events tab. Each carries its event_id as
  *  the button's title, which is the stable handle — the visible text is the
- *  rule name, which repeats across days. */
+ *  rule name, which repeats across days. Scoped to the tab: the review pane's
+ *  per-event question rows title their date chips with event_ids too. */
 function ruleLines(page: Page) {
-  return page.locator('button[title^="R-"]');
+  return page.getByTestId("events-tab").locator('button[title^="R-"]');
 }
 
 test.describe("adherence event timeline", () => {

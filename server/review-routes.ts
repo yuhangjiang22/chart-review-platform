@@ -473,10 +473,17 @@ export const reviewRoutes: RouteEntry[] = [
         } else if (task.task_kind === "adherence") {
           const skill = loadAdherenceSkill(p.taskId);
           const questionIds: string[] = [];
-          for (const [, qs] of skill.questions_by_tier) for (const q of qs) questionIds.push(q.question_id);
+          const eventScopedIds: string[] = [];
+          for (const [, qs] of skill.questions_by_tier) for (const q of qs) {
+            questionIds.push(q.question_id);
+            if (q.event_scoped) eventScopedIds.push(q.question_id);
+          }
           const ruleIds = skill.rules.map((r) => r.rule_id);
           const adherence_units_complete =
-            deriveAdherenceReviewStatus(state, { questionIds, ruleIds }) === "reviewer_validated";
+            deriveAdherenceReviewStatus(state, {
+              questionIds, ruleIds,
+              eventScopedQuestionIds: eventScopedIds,
+            }) === "reviewer_validated";
           gate_results = { adherence_units_complete };
           if (!adherence_units_complete) return { ok: false, gate_results };
         } else {

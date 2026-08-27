@@ -146,7 +146,11 @@ export const adherenceRoutes: RouteEntry[] = [
           });
         }
         const questionIds: string[] = [];
-        for (const [, qs] of skill.questions_by_tier) for (const q of qs) questionIds.push(q.question_id);
+        const eventScopedQuestionIds: string[] = [];
+        for (const [, qs] of skill.questions_by_tier) for (const q of qs) {
+          questionIds.push(q.question_id);
+          if (q.event_scoped) eventScopedQuestionIds.push(q.question_id);
+        }
         const ruleIds = skill.rules.map((r) => r.rule_id);
         const result = mutateReviewState(p.patientId, task, "reviewer", (state) => {
           state.task_kind = "adherence";
@@ -172,7 +176,7 @@ export const adherenceRoutes: RouteEntry[] = [
           // Maintain review_status so the patient shows validated OUTSIDE this
           // pane once every question + rule is validated (see review-completion).
           if (state.review_status !== "locked") {
-            const derived = deriveAdherenceReviewStatus(state, { questionIds, ruleIds });
+            const derived = deriveAdherenceReviewStatus(state, { questionIds, ruleIds, eventScopedQuestionIds });
             if (derived) state.review_status = derived;
           }
         });
@@ -200,7 +204,11 @@ export const adherenceRoutes: RouteEntry[] = [
         }
         const skill = loadAdherenceSkill(p.taskId);
         const questionIds: string[] = [];
-        for (const [, qs] of skill.questions_by_tier) for (const q of qs) questionIds.push(q.question_id);
+        const eventScopedQuestionIds: string[] = [];
+        for (const [, qs] of skill.questions_by_tier) for (const q of qs) {
+          questionIds.push(q.question_id);
+          if (q.event_scoped) eventScopedQuestionIds.push(q.question_id);
+        }
         const ruleIds = skill.rules.map((r) => r.rule_id);
         const result = mutateReviewState(p.patientId, task, "reviewer", (state) => {
           state.task_kind = "adherence";
@@ -221,7 +229,7 @@ export const adherenceRoutes: RouteEntry[] = [
           validated.add(b.rule_id!);
           state.validated_rules = [...validated];
           if (state.review_status !== "locked") {
-            const derived = deriveAdherenceReviewStatus(state, { questionIds, ruleIds });
+            const derived = deriveAdherenceReviewStatus(state, { questionIds, ruleIds, eventScopedQuestionIds });
             if (derived) state.review_status = derived;
           }
         });
@@ -264,6 +272,10 @@ export const adherenceRoutes: RouteEntry[] = [
           }
         }
         const questionIds = [...qTier.keys()];
+        const eventScopedQuestionIds: string[] = [];
+        for (const [, qs] of skill.questions_by_tier) for (const q of qs) {
+          if (q.event_scoped) eventScopedQuestionIds.push(q.question_id);
+        }
         const ruleIds = skill.rules.map((r) => r.rule_id);
         const result = mutateReviewState(p.patientId, task, "reviewer", (state) => {
           state.task_kind = "adherence";
@@ -325,7 +337,7 @@ export const adherenceRoutes: RouteEntry[] = [
           validated.add(b.event_id!);
           state.validated_events = [...validated];
           if (state.review_status !== "locked") {
-            const derived = deriveAdherenceReviewStatus(state, { questionIds, ruleIds });
+            const derived = deriveAdherenceReviewStatus(state, { questionIds, ruleIds, eventScopedQuestionIds });
             if (derived) state.review_status = derived;
           }
         });

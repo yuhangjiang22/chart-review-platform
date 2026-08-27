@@ -69,7 +69,7 @@ export function EventsTab({ days, indexDate, selectedEventId, onSelectEvent }: P
 
   if (days.length === 0) {
     return (
-      <div className="px-4 py-6 text-[12px] text-muted-foreground">
+      <div className="px-4 py-6 text-[12px] text-muted-foreground" data-testid="events-tab">
         No dated events. Per-encounter rules produce events from the patient's
         asthma visits, steroid courses and controller obligations; a patient with
         none is judged on the whole-window rules alone.
@@ -78,7 +78,7 @@ export function EventsTab({ days, indexDate, selectedEventId, onSelectEvent }: P
   }
 
   return (
-    <div className="px-4 py-3">
+    <div className="px-4 py-3" data-testid="events-tab">
       <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Events</div>
       <div className="text-[12px] text-muted-foreground mt-0.5">
         {indexDate && <>Index date: {indexDate} · </>}
