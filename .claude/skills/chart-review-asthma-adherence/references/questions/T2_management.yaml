@@ -116,8 +116,12 @@ questions:
 
   - question_id: T2-FollowupScheduled
     text: >-
-      Is a follow-up visit (in person or telehealth) scheduled within 3
-      months of this event (the visit or exacerbation being evaluated)?
+      Is an ASTHMA-RELATED follow-up visit (in person or telehealth)
+      scheduled within 3 months of this event (the visit or exacerbation
+      being evaluated)? The follow-up must be for asthma — an asthma
+      recheck, a pulmonology/allergy follow-up, or "return to discuss
+      asthma". Unrelated follow-ups (well-child in 1 year, orthopedics,
+      endocrine recheck) do NOT count, and "RTC PRN" is false.
 
       EVENT SCOPE: when this question is answered inside a rule event
       (set_event_answer), answer it AS OF THE EVENT DATE — the control

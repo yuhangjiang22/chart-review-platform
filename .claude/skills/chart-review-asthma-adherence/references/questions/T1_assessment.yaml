@@ -138,6 +138,12 @@ questions:
       Answer false only after BOTH structured and note sweeps find nothing.
       Albuterol-only is NOT a controller; NASAL fluticasone (Flonase) is NOT
       an asthma controller.
+      STALE-LIST RISK (annotator SOP v0.5): if the ONLY evidence is a
+      medication-list entry carried forward from BEFORE the lookback window,
+      with no in-window mention of the controller, still answer true — but say
+      so explicitly in your rationale ("stale-list risk: entry predates the
+      window, no in-window confirmation") so the case is flagged for
+      adjudication rather than silently counted as an active controller.
 
   - question_id: T1-SABAOveruse
     text: >-
@@ -150,6 +156,20 @@ questions:
       the patient is on ICS-formoterol SMART — the reliever IS the controller
       inhaler, so separate SABA canister counts are meaningless. Cite the fill
       rows.
+
+      FALSE vs NULL (annotator SOP v0.5): answer "false" when you were able to
+      review medication documentation — the structured drugs table and/or note
+      medication lists — and found fewer than 3 canisters, INCLUDING when none
+      is documented at all. Answer null ONLY when the chart carries no
+      reviewable medication documentation whatsoever, so the dispensing fact
+      cannot be judged either way. The two are NOT interchangeable: "false"
+      counts in the rule's denominator, null is excluded from it.
+
+      AGES 2-5: rescue therapy at these ages is usually NEBULIZED solution,
+      which has no agreed canister equivalence. Answer from whatever is
+      documented and state the nebulizer caveat explicitly in your rationale
+      (team decision 2026-08-27) — these patients are flagged for adjudication,
+      never forced into a canister count.
     tier: 1
     answer_schema:
       type: string
@@ -157,8 +177,10 @@ questions:
         - "true"
         - "false"
         - not_applicable
-      description: '"true"/"false" from dispensing records when ascertainable;
-        not_applicable for ICS-formoterol SMART patients; null when unknown.'
+      description: '"true"/"false" from dispensing records whenever medication
+        documentation was reviewable — "false" includes "no SABA documented";
+        not_applicable for ICS-formoterol SMART patients; null ONLY when the
+        chart has no reviewable medication documentation at all.'
     naepp_source: "EPR-3 Section 3, Component 1, Figure 3-5 (Classifying
       Asthma Severity, p.71-74 in body) — SABA use >2 days/week (not for
       EIB prevention) classifies as 'not well controlled'. The ≥3
@@ -272,10 +294,20 @@ questions:
       reports, spirometry results in narrative.
 
   - question_id: T1-ComorbidityAssessed
-    text: Has the chart documented assessment of at least one comorbid condition
+    text: >-
+      Has the chart documented assessment of at least one comorbid condition
       that affects asthma (allergic rhinitis/sinusitis, GERD, obesity, OSA,
       chronic stress/depression, or tobacco/environmental exposure) when the
       patient is not well-controlled?
+
+      APPLICABILITY (annotator SOP v0.5): answer "not_applicable" ONLY when
+      T1-ControlLevel == well_controlled — EPR-3 indicates comorbidity workup
+      for asthma that cannot be well controlled, so a well-controlled patient
+      is not expected to have one. When T1-ControlLevel is `undetermined`, do
+      NOT answer not_applicable: still record what the chart documents
+      (assessed_and_addressed / assessed_not_addressed / not_assessed).
+      Assessment means some documented clinician attention to the condition —
+      not merely its presence on the problem list.
     tier: 1
     answer_schema:
       type: string
