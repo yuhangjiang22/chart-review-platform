@@ -110,6 +110,33 @@ export interface RunStatus {
   n_error: number;
   n_running: number;
   per_patient: Record<string, PerPatientStatus>;
+  /** pid of the process driving this run. Absent on runs written before
+   *  owner-liveness landed; see reconcileOrphanedRunsOnStartup. */
+  owner_pid?: number;
+  /** Written on a timer while the run is live (NOT on state transitions —
+   *  a single patient takes minutes, so transitions are too sparse to prove
+   *  liveness). Absent on legacy runs. */
+  heartbeat_at?: string;
+}
+
+/** Heartbeat cadence while a run is live. */
+const HEARTBEAT_MS = 30_000;
+/** A heartbeat older than this is not trusted even if the pid is alive —
+ *  guards against the recorded pid having been recycled by an unrelated
+ *  process. Generous: over-reaping destroys live work, under-reaping only
+ *  leaves a stale RUNNING badge. */
+const HEARTBEAT_STALE_MS = 10 * 60_000;
+
+/** Is the process that owns this run still running? */
+function ownerAlive(pid: number | undefined): boolean {
+  if (!pid || pid <= 0) return false;
+  try {
+    process.kill(pid, 0); // signal 0 = existence check, delivers nothing
+    return true;
+  } catch (e) {
+    // EPERM means the pid exists but belongs to another user — still alive.
+    return (e as NodeJS.ErrnoException).code === "EPERM";
+  }
 }
 
 export interface RunListing {
@@ -315,6 +342,17 @@ export function reconcileOrphanedRunsOnStartup(now: Date = new Date()): string[]
     if (name.startsWith("_") || name.startsWith(".")) continue;
     const status = getRunStatus(name);
     if (!status || status.state !== "running") continue;
+
+    // A "running" run at boot is NOT necessarily a phantom: standalone
+    // drivers (scripts/*-realtest/run.ts) own their own process and keep
+    // running across server restarts. Reaping one kills live work — it cost
+    // five LCN/asthma runs before this check existed. Only reap when the
+    // owning process is demonstrably gone.
+    if (status.owner_pid !== undefined) {
+      const beat = status.heartbeat_at ? Date.parse(status.heartbeat_at) : NaN;
+      const fresh = Number.isFinite(beat) && now.getTime() - beat < HEARTBEAT_STALE_MS;
+      if (ownerAlive(status.owner_pid) && fresh) continue; // live run — hands off
+    }
 
     const perPatient: Record<string, PerPatientStatus> = {};
     for (const [pid, pp] of Object.entries(status.per_patient)) {
@@ -759,6 +797,8 @@ export function startBatchRun(opts: StartBatchRunOptions): StartBatchRunResult {
     per_patient: Object.fromEntries(
       opts.patient_ids.map((pid) => [pid, { state: "pending" } as PerPatientStatus]),
     ),
+    owner_pid: process.pid,
+    heartbeat_at: manifest.started_at,
   };
   atomicWriteJson(statusPath(runId), status);
   opts.onStatus?.(status);
@@ -792,9 +832,30 @@ async function driveRun(
   const mutate = (fn: (s: RunStatus) => void) => {
     fn(status);
     status.updated_at = new Date().toISOString();
+    status.heartbeat_at = status.updated_at;
     atomicWriteJson(statusPath(runId), status);
     opts.onStatus?.(status);
   };
+
+  // Liveness heartbeat. State transitions are minutes apart (one patient can
+  // take 25 min), so they cannot carry liveness on their own — a startup
+  // reconciler needs a signal that ticks while the run is merely working.
+  // unref'd so it never holds the process open.
+  const heartbeat: ReturnType<typeof setInterval> = setInterval(() => {
+    // Self-terminating: if driveRun exits abnormally the explicit
+    // clearInterval below is skipped, so the beat must stop itself once the
+    // run is no longer running (an unref'd stray beat would otherwise keep
+    // refreshing liveness for a finished run).
+    if (status.state !== "running") {
+      clearInterval(heartbeat);
+      return;
+    }
+    try {
+      status.heartbeat_at = new Date().toISOString();
+      atomicWriteJson(statusPath(runId), status);
+    } catch { /* best-effort — a missed beat only risks a stale badge */ }
+  }, HEARTBEAT_MS);
+  heartbeat.unref?.();
 
   await Promise.all(
     manifest.patient_ids.map(async (pid) => {
@@ -865,6 +926,8 @@ async function driveRun(
       }
     }),
   );
+
+  clearInterval(heartbeat);
 
   // Finalize
   // If every patient failed (n_complete === 0 and n_error > 0), the run is

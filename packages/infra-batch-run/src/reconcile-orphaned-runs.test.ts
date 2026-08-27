@@ -125,3 +125,58 @@ describe("reconcileOrphanedRunsOnStartup", () => {
     expect(reconcileOrphanedRunsOnStartup(NOW)).toEqual([]);
   });
 });
+
+// ── owner liveness ────────────────────────────────────────────────────────
+// A "running" run at boot is only a phantom when its OWNING PROCESS is gone.
+// Standalone drivers (scripts/*-realtest/run.ts) survive server restarts, and
+// reaping one destroys live work — five LCN/asthma runs were lost that way
+// before this guard existed (2026-08-27).
+describe("reconcileOrphanedRunsOnStartup — owner liveness", () => {
+  it("does NOT reap a run whose owner process is alive and beating", () => {
+    writeStatus(
+      "run_live",
+      baseStatus("run_live", {
+        owner_pid: process.pid, // this test process is, definitionally, alive
+        heartbeat_at: new Date(NOW.getTime() - 5_000).toISOString(),
+      }),
+    );
+
+    expect(reconcileOrphanedRunsOnStartup(NOW)).toEqual([]);
+    const s = getRunStatus("run_live")!;
+    expect(s.state).toBe("running");
+    expect(s.per_patient.p1.state).toBe("running");
+  });
+
+  it("reaps a run whose owner pid is gone", () => {
+    // pid 2^22 is above the default pid_max on macOS/Linux, so it cannot exist
+    writeStatus(
+      "run_dead",
+      baseStatus("run_dead", {
+        owner_pid: 4194304,
+        heartbeat_at: new Date(NOW.getTime() - 5_000).toISOString(),
+      }),
+    );
+
+    expect(reconcileOrphanedRunsOnStartup(NOW)).toEqual(["run_dead"]);
+    expect(getRunStatus("run_dead")!.state).toBe("failed");
+  });
+
+  it("reaps a live pid whose heartbeat is stale (guards against pid reuse)", () => {
+    writeStatus(
+      "run_stale",
+      baseStatus("run_stale", {
+        owner_pid: process.pid,
+        heartbeat_at: new Date(NOW.getTime() - 60 * 60_000).toISOString(),
+      }),
+    );
+
+    expect(reconcileOrphanedRunsOnStartup(NOW)).toEqual(["run_stale"]);
+    expect(getRunStatus("run_stale")!.state).toBe("failed");
+  });
+
+  it("still reaps legacy runs that carry no owner_pid", () => {
+    writeStatus("run_legacy", baseStatus("run_legacy"));
+    expect(reconcileOrphanedRunsOnStartup(NOW)).toEqual(["run_legacy"]);
+    expect(getRunStatus("run_legacy")!.state).toBe("failed");
+  });
+});
