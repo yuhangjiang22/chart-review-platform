@@ -29,10 +29,30 @@ export function toAnchorEntries(rows: unknown[]): AnchorEntry[] {
  *  - no `event_anchor` → one `<rule_id>@window` stub (legacy behavior).
  *  - missing anchor list → zero stubs for that rule (its rollup will be
  *    EXCLUDED unless the agent supplements note-origin events).
- *  - duplicate event_ids (e.g. a rule anchored on two lists where one is a
- *    slice of the other) are deduped first-wins across the whole rule —
- *    set_event_answer upserts by event_id, so a duplicate would silently
- *    double-count the denominator.
+ *  - ONE EVENT PER (rule, DATE), first-wins in the order the rule declares its
+ *    lists. This is a work-list of POTENTIAL events — the agent and the engine
+ *    can still exclude any of them downstream — but a same-day duplicate is the
+ *    one defect exclusion cannot repair: two events for one occasion carry the
+ *    same question, get the same answer, are both evaluable, and are both
+ *    counted. Nothing downstream knows they are one occasion.
+ *
+ *    Deduping by event_id (which embeds `ref`) was the earlier reading and was
+ *    circular: the dedup key WAS the identity, so it only ever collapsed
+ *    entries that were already identical. In the real data they are not — an
+ *    OCS course written at an asthma ED visit appears as `encounters:<id>` in
+ *    asthma_encounters and `drugs:<id>` in ocs_bursts, same date, different ref,
+ *    so R-T2-FollowupScheduled asked "was follow-up arranged" twice for that
+ *    one day. The existing test missed it because its fixture put the SAME
+ *    AnchorEntry object in both lists, the friendliest possible case.
+ *
+ *    Identity and occasion are different requirements: event_ids must be
+ *    unique, and a rule must be judged at most once per date. Only the second
+ *    protects the denominator.
+ *
+ *  Declaration order is therefore load-bearing. R-T2-FollowupScheduled lists
+ *  `[asthma_encounters, ocs_bursts]` in that order because the VISIT is where a
+ *  follow-up gets arranged; the steroid course on the same day is the same
+ *  occasion seen from the pharmacy side.
  *
  *  Anchor-list on-disk order is part of the identity contract: the
  *  `${name}:${i}` fallback id embeds the list index, and downstream rollup
@@ -53,8 +73,12 @@ export function expandEventWorklist(
     for (const name of lists) {
       for (const [i, a] of (anchors[name] ?? []).entries()) {
         const event_id = `${rule.rule_id}@${a.date}@${a.ref ?? `${name}:${i}`}`;
-        if (seen.has(event_id)) continue;
-        seen.add(event_id);
+        // A dateless entry has no occasion to collide on, so it falls back to
+        // identity — otherwise every dateless entry in a rule would collapse
+        // into one.
+        const occasion = a.date ? `${rule.rule_id}@${a.date}` : event_id;
+        if (seen.has(occasion)) continue;
+        seen.add(occasion);
         out.push({
           event_id,
           rule_id: rule.rule_id,
