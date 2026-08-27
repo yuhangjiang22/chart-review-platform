@@ -185,11 +185,19 @@ questions:
 
   - question_id: T2-SpecialtyReferral
     text: >-
-      For a patient who is NOT well-controlled (T1-ControlLevel in
-      not_well_controlled / very_poorly_controlled) OR who requires Step 4+
-      therapy, is a referral to asthma specialty care (allergy/immunology or
-      pulmonology) documented in the window? Answer `not_indicated` when the
-      patient is well-controlled and below Step 4 (referral not expected).
+      For a patient who is NOT well-controlled OR who requires Step 4+ therapy,
+      is a referral to asthma specialty care (allergy/immunology or pulmonology)
+      documented in the window?
+
+      CONTROL LEVEL IS NOT YOURS TO WEIGH (v0.6): control is judged per visit
+      and a patient can be well controlled at some visits and not at others.
+      The engine reduces those to T1-WorstControlLevel — the worst level at any
+      visit in the period — and reads it directly, so do not re-derive it from
+      the individual visits. Answer `not_indicated` ONLY for the one case the
+      engine cannot decide: T1-WorstControlLevel is well_controlled AND the
+      patient is below Step 4 (no question records the step, which is why this
+      arm is still yours). Otherwise answer `referred` / `not_referred` from
+      what the chart documents.
     tier: 2
     answer_schema:
       type: string
@@ -198,7 +206,7 @@ questions:
         - not_referred
         - not_indicated
     depends_on:
-      - T1-ControlLevel
+      - T1-WorstControlLevel
       - T2-StepTherapyMatch
     naepp_source: "EPR-3 Section 4, p.373 (Referral to an Asthma Specialist)
       — 'Referral for consultation or care to a specialist is recommended when
@@ -214,11 +222,13 @@ questions:
       Step-4+ therapy. Failure to refer such a patient is a documented management
       gap; a well-controlled, low-step patient needs no referral (not_indicated).
     retrieval_hints: >-
-      Predicate on T1-ControlLevel and step level. Scan notes for referral
+      Read T1-WorstControlLevel (engine-computed; do NOT recompute it from the
+      per-visit answers) and judge the step level. Scan notes for referral
       orders / consult notes to allergy-immunology or pulmonology, and the
-      encounters table for specialty visits. If well-controlled and below Step 4,
-      return 'not_indicated'. If uncontrolled / Step 4+ and a referral or
-      specialty visit is documented -> 'referred'; if none -> 'not_referred'.
+      encounters table for specialty visits. If T1-WorstControlLevel is
+      well_controlled AND below Step 4, return 'not_indicated'. Otherwise, if a
+      referral or specialty visit is documented -> 'referred'; if none ->
+      'not_referred'.
 
   - question_id: T2-ComorbidityAddressed
     text: For patients with documented asthma-relevant comorbidities (from
@@ -249,8 +259,11 @@ questions:
       vaccination all count as 'addressed'.
     retrieval_hints: >-
       Predicate on T1-ComorbidityAssessed.
-      If T1-ComorbidityAssessed = 'not_assessed' OR 'not_applicable' →
-          return 'not_applicable'.
+      If T1-ComorbidityAssessed = 'not_assessed' → return 'not_applicable'
+          (nothing was found, so there is nothing to address). v0.6: that
+          question no longer has a 'not_applicable' option — whether the
+          workup was indicated is now decided by the engine from the
+          per-visit control levels, not recorded in the answer.
       Otherwise check notes: plan sections for referrals (allergy, ENT,
       GI, sleep, behavioral health, dietitian), medications (PPIs for
       GERD, antihistamines/intranasal steroids for rhinitis), counseling

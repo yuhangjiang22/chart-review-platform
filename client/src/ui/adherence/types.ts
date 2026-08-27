@@ -21,7 +21,7 @@ export interface RuleEvent {
      *  defense-in-depth filter so a reviewer-facing event control is never
      *  seeded from an agent-sourced answer. Optional: legacy/period-only
      *  events predate per-answer provenance. */
-    source?: "agent" | "reviewer";
+    source?: "agent" | "reviewer" | "derived";
     /** Verbatim quotes (or OMOP row refs) the answer was determined from, as
      *  stored by set_event_answer after the faithfulness gate. The reviewer
      *  reads these to check the answer without re-searching the chart. */

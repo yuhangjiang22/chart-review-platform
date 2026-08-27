@@ -1462,6 +1462,17 @@ async function runOneAgent(
         ruleVerdicts = res.rule_verdicts;
         ruleEvents = res.rule_events;
         ruleRollups = res.rule_rollups;
+        // Values the engine computed from the events (worst control level) —
+        // persisted with the extracted answers so the reviewer can see what a
+        // rule's applicability gate actually read. Stale copies from an earlier
+        // pass are dropped rather than duplicated.
+        if (res.derived_answers.length > 0) {
+          const derivedIds = new Set(res.derived_answers.map((a) => a.question_id));
+          questionAnswers = [
+            ...questionAnswers.filter((a) => !derivedIds.has(a.question_id)),
+            ...res.derived_answers,
+          ];
+        }
         unansweredAnchored = ruleEvents.filter((e) =>
           e.anchor.type !== WINDOW_ANCHOR_TYPE &&
           e.anchor.origin === "omop" &&

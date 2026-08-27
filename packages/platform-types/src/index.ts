@@ -214,8 +214,12 @@ export interface QuestionAnswer {
    *  "no LOINC 75827-3 measurement; can't verify ACT score". Empty
    *  when verifier_status is unset. */
   verifier_note?: string;
-  /** "agent" (extractor wrote it) or "reviewer" (human override). */
-  source?: "agent" | "reviewer";
+  /** "agent" (extractor wrote it), "reviewer" (human override), or "derived"
+   *  (the rule engine computed it from other answers — nobody extracted it and
+   *  nobody may overwrite it; see DERIVED_WORST_CONTROL_QID in
+   *  @chart-review/rule-engine). Matches the phenotype FieldAssessment's
+   *  three-way source. */
+  source?: "agent" | "reviewer" | "derived";
   /** When this answer was committed. */
   ts?: string;
 }

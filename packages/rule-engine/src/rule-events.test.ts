@@ -6,6 +6,10 @@ import {
   ENGINE_NOT_EVALUABLE_REASON,
   ENGINE_UNANSWERED_REASON,
   eventScopedQuestionsFor,
+  deriveWorstControlLevel,
+  withDerivedAnswers,
+  rulesReadingQid,
+  DERIVED_WORST_CONTROL_QID,
   type RuleDefinition,
 } from "./index.js";
 
@@ -398,5 +402,90 @@ describe("eventScopedQuestionsFor", () => {
       event_scoped_questions: ["StepMatch"],
     };
     expect(eventScopedQuestionsFor(rule).verdict).toEqual(["StepMatch"]);
+  });
+});
+
+describe("derived patient-level answers (worst control level)", () => {
+  // A rule with an EVENT-LEVEL TRIGGER but a WINDOW-LEVEL ACTION: the workup is
+  // indicated by how controlled the asthma was (judged per visit), but is done
+  // once and covers the period. Its gate therefore reads the derived value.
+  const COMORBID_RULE: RuleDefinition = {
+    rule_id: "R-Comorbid",
+    description: "comorbidity workup when asthma cannot be well controlled",
+    verdict_if: 'Comorbid in ["assessed_and_addressed", "assessed_not_addressed"]',
+    excluded_if: `${DERIVED_WORST_CONTROL_QID} == "well_controlled"`,
+    attribution: "DOCUMENTATION_GAP",
+  };
+  const visit = (id: string, level: string): RuleEvent =>
+    ev("R-Step", id, { answers: [qa("T1-ControlLevel", level), qa("StepMatch", "matches")] });
+
+  it("takes the WORST level across events, not the most recent", () => {
+    // March well, July uncontrolled, November well — the shape the old
+    // instruction ("not_applicable when T1-ControlLevel == well_controlled")
+    // had no answer for.
+    expect(deriveWorstControlLevel([
+      visit("e1", "well_controlled"),
+      visit("e2", "not_well_controlled"),
+      visit("e3", "well_controlled"),
+    ])).toBe("not_well_controlled");
+    expect(deriveWorstControlLevel([
+      visit("e1", "not_well_controlled"),
+      visit("e2", "very_poorly_controlled"),
+    ])).toBe("very_poorly_controlled");
+  });
+
+  it("ignores undetermined — it is not a degree of control", () => {
+    expect(deriveWorstControlLevel([
+      visit("e1", "undetermined"),
+      visit("e2", "well_controlled"),
+    ])).toBe("well_controlled");
+    expect(deriveWorstControlLevel([visit("e1", "undetermined")])).toBeNull();
+    expect(deriveWorstControlLevel([])).toBeNull();
+  });
+
+  it("EXCLUDES a patient well controlled at EVERY visit", () => {
+    const res = evaluateAllRuleEvents(
+      [COMORBID_RULE],
+      [qa("Comorbid", "not_assessed")],
+      [visit("e1", "well_controlled"), visit("e2", "well_controlled")],
+    );
+    expect(res.rule_verdicts[0]!.verdict).toBe("EXCLUDED");
+    expect(res.derived_answers).toEqual([expect.objectContaining({
+      question_id: DERIVED_WORST_CONTROL_QID, answer: "well_controlled", source: "derived",
+    })]);
+  });
+
+  it("COUNTS a patient uncontrolled at any visit, even if the last visit was fine", () => {
+    // The whole point of "worst": under a most-recent rule this patient would be
+    // excluded, and the excluded patients are the ones most likely to have no
+    // workup — the reported rate would rise for a reason that isn't care.
+    const res = evaluateAllRuleEvents(
+      [COMORBID_RULE],
+      [qa("Comorbid", "not_assessed")],
+      [visit("e1", "not_well_controlled"), visit("e2", "well_controlled")],
+    );
+    expect(res.rule_verdicts[0]!.verdict).toBe("NON_CONCORDANT");
+  });
+
+  it("keeps the patient IN when no visit established a control level", () => {
+    // Fails toward measuring rather than toward silently dropping patients —
+    // matches v0.5's "when undetermined, do NOT answer not_applicable".
+    const res = evaluateAllRuleEvents(
+      [COMORBID_RULE], [qa("Comorbid", "assessed_and_addressed")], [visit("e1", "undetermined")],
+    );
+    expect(res.rule_verdicts[0]!.verdict).toBe("CONCORDANT");
+    expect(res.derived_answers).toEqual([]);
+  });
+
+  it("drops a stale derived answer instead of reading the pre-edit value", () => {
+    const stale = { ...qa(DERIVED_WORST_CONTROL_QID, "very_poorly_controlled"), source: "derived" as const };
+    const out = withDerivedAnswers([stale, qa("Comorbid", "not_assessed")], [visit("e1", "well_controlled")]);
+    expect(out.filter((a) => a.question_id === DERIVED_WORST_CONTROL_QID))
+      .toEqual([expect.objectContaining({ answer: "well_controlled" })]);
+  });
+
+  it("rulesReadingQid finds the rules a derived-input change invalidates", () => {
+    expect(rulesReadingQid([COMORBID_RULE, STEP_RULE, WINDOW_RULE], DERIVED_WORST_CONTROL_QID)
+      .map((r) => r.rule_id)).toEqual(["R-Comorbid"]);
   });
 });

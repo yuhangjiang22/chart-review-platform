@@ -299,17 +299,16 @@ questions:
     text: >-
       Has the chart documented assessment of at least one comorbid condition
       that affects asthma (allergic rhinitis/sinusitis, GERD, obesity, OSA,
-      chronic stress/depression, or tobacco/environmental exposure) when the
-      patient is not well-controlled?
+      chronic stress/depression, or tobacco/environmental exposure) anywhere in
+      the lookback window?
 
-      APPLICABILITY (annotator SOP v0.5): answer "not_applicable" ONLY when
-      T1-ControlLevel == well_controlled — EPR-3 indicates comorbidity workup
-      for asthma that cannot be well controlled, so a well-controlled patient
-      is not expected to have one. When T1-ControlLevel is `undetermined`, do
-      NOT answer not_applicable: still record what the chart documents
-      (assessed_and_addressed / assessed_not_addressed / not_assessed).
-      Assessment means some documented clinician attention to the condition —
-      not merely its presence on the problem list.
+      RECORD WHAT THE CHART SHOWS — do not judge whether the workup was
+      indicated. Whether this patient is expected to have one is decided by the
+      engine from the per-visit control levels (v0.6: a patient well controlled
+      at every visit is excluded from the rule), so there is no
+      "not_applicable" option to pick and no control level for you to weigh
+      here. Assessment means some documented clinician attention to the
+      condition — not merely its presence on the problem list.
     tier: 1
     answer_schema:
       type: string
@@ -317,9 +316,6 @@ questions:
         - assessed_and_addressed
         - assessed_not_addressed
         - not_assessed
-        - not_applicable
-    depends_on:
-      - T1-ControlLevel
     naepp_source: "EPR-3 Section 3, Component 3, p.166 (Key Points) —
       'Clinicians should evaluate a patient for the presence of a chronic
       comorbid condition when the patient's asthma cannot be well

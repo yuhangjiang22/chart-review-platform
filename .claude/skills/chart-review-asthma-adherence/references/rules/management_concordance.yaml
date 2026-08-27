@@ -123,12 +123,16 @@ rules:
 
   - rule_id: R-T2-SpecialtyReferralWhenIndicated
     description: >-
-      Not-well-controlled (T1-ControlLevel in not_well_controlled /
-      very_poorly_controlled) or Step 4+ patients have a documented specialty
-      referral OR are already receiving specialty care (an actual
-      pulmonology / allergy-immunology visit in the encounters data counts).
-      Well-controlled, sub-Step-4 patients are excluded (referral not
-      indicated).
+      Not-well-controlled (T1-WorstControlLevel — the worst level at any visit
+      in the period — in not_well_controlled / very_poorly_controlled) or
+      Step 4+ patients have a documented specialty referral OR are already
+      receiving specialty care (an actual pulmonology / allergy-immunology
+      visit in the encounters data counts). Well-controlled, sub-Step-4
+      patients are excluded (referral not indicated). Unlike the comorbidity
+      rule, the exclusion stays on the ANSWER here rather than moving into
+      excluded_if: the Step-4+ arm of the indication has no question backing
+      it (nothing records the patient's step), so the engine cannot decide
+      applicability on its own.
     naepp_source: >-
       EPR-3 Section 4 p.373 (Referral to an Asthma Specialist) — referral is
       recommended for a life-threatening exacerbation, failure to meet therapy
@@ -136,9 +140,16 @@ rules:
       testing, or when the patient requires Step 4 care or higher (Step 3 for
       children 0-4). Design domain E ('referral to specialist if indicated').
     evidence_grade: D
-    verdict_if: "T2-SpecialtyReferral in [\"referred\", \"not_indicated\"]"
+    # `not_indicated` is caught by excluded_if first, so listing it in
+    # verdict_if was a dead arm — dropped.
+    verdict_if: "T2-SpecialtyReferral == \"referred\""
     excluded_if: "T2-SpecialtyReferral == \"not_indicated\""
     attribution: DOCUMENTATION_GAP
     nuanced: true
     judge_can_override: false
-    supporting_questions: [T1-ControlLevel, T2-StepTherapyMatch, T2-SpecialtyReferral]
+    # T2-StepTherapyMatch is deliberately NOT listed: it is answered per event,
+    # so it has no patient-level value this period rule could read, and listing
+    # it made the reviewer's "Inputs:" row show a permanently blank input. The
+    # step level that feeds the Step-4+ arm reaches the rule through the
+    # annotator's `not_indicated` choice, not as an answer.
+    supporting_questions: [T1-WorstControlLevel, T2-SpecialtyReferral]

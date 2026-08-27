@@ -63,7 +63,9 @@ import { readAnchors } from "@chart-review/patients";
 import {
   loadAdherenceSkill, expandEventWorklist, toAnchorEntries, computeWorklistHash,
 } from "@chart-review/pipeline-extract-adherence";
-import { evaluateAllRuleEvents } from "@chart-review/rule-engine";
+import {
+  evaluateAllRuleEvents, rulesReadingQid, DERIVED_WORST_CONTROL_QID,
+} from "@chart-review/rule-engine";
 import { deriveAdherenceReviewStatus } from "./lib/review-completion.js";
 import { guidelineDir } from "@chart-review/rubric";
 import { computeTaskSha } from "./lib/lock.js";
@@ -314,22 +316,42 @@ export const adherenceRoutes: RouteEntry[] = [
           // the coordinator to schedule.
           const rule = skill.rules.find((r) => r.rule_id === ev.rule_id);
           if (rule) {
-            const ruleEvents = events.filter((e) => e.rule_id === rule.rule_id);
-            const res = evaluateAllRuleEvents([rule], state.question_answers ?? [], ruleEvents);
+            // Rules to recompute: the edited one, PLUS any rule whose gate reads
+            // an engine-derived value. Editing one event's control level changes
+            // the patient's worst control level, which decides whether the
+            // comorbidity / referral rules count this patient at all — leaving
+            // them on the pre-edit value would report an applicability decision
+            // the current annotations no longer support.
+            const affected = [
+              rule,
+              ...rulesReadingQid(skill.rules, DERIVED_WORST_CONTROL_QID)
+                .filter((r) => r.rule_id !== rule.rule_id),
+            ];
+            const affectedIds = new Set(affected.map((r) => r.rule_id));
+            // The FULL event list, not just this rule's: the derived value is
+            // reduced from every event the patient has.
+            const res = evaluateAllRuleEvents(affected, state.question_answers ?? [], events);
             const byId = new Map(res.rule_events.map((e) => [e.event_id, e]));
             state.rule_events = events.map((e) =>
-              e.rule_id === rule.rule_id
+              affectedIds.has(e.rule_id)
                 ? { ...(byId.get(e.event_id) ?? e), source: e.source, ts: e.ts }
                 : e,
             );
             state.rule_rollups = [
-              ...(state.rule_rollups ?? []).filter((r) => r.rule_id !== rule.rule_id),
+              ...(state.rule_rollups ?? []).filter((r) => !affectedIds.has(r.rule_id)),
               ...res.rule_rollups,
             ];
             state.rule_verdicts = [
-              ...(state.rule_verdicts ?? []).filter((v) => v.rule_id !== rule.rule_id),
+              ...(state.rule_verdicts ?? []).filter((v) => !affectedIds.has(v.rule_id)),
               ...res.rule_verdicts,
             ];
+            if (res.derived_answers.length > 0) {
+              const derivedIds = new Set(res.derived_answers.map((a) => a.question_id));
+              state.question_answers = [
+                ...(state.question_answers ?? []).filter((a) => !derivedIds.has(a.question_id)),
+                ...res.derived_answers,
+              ];
+            }
           } else {
             state.rule_events = events;
           }

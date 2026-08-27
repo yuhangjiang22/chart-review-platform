@@ -73,7 +73,13 @@ rules:
       When asthma is not well-controlled, the chart documents
       assessment of at least one comorbidity that affects asthma
       (rhinitis/sinusitis, GERD, obesity, OSA, depression/stress,
-      tobacco/environmental exposure).
+      tobacco/environmental exposure). Applicability is decided by the
+      engine from T1-WorstControlLevel (the worst level at any visit in
+      the period): a patient well controlled at EVERY visit is excluded,
+      because EPR-3 indicates the workup for asthma that cannot be well
+      controlled. Taking the most recent visit instead would excuse a
+      patient who spent mid-year uncontrolled — and those are the
+      patients most likely to have no workup.
     naepp_source: >-
       EPR-3 Component 3 p.166 (Key Points) — 'Clinicians should
       evaluate a patient for the presence of a chronic comorbid
@@ -83,8 +89,16 @@ rules:
       OSA (D), rhinitis/sinusitis (B), depression (D).
     evidence_grade: B
     verdict_if: "T1-ComorbidityAssessed in [\"assessed_and_addressed\", \"assessed_not_addressed\"]"
-    excluded_if: "T1-ComorbidityAssessed == \"not_applicable\""
+    # v0.6: the gate moved OFF the answer and INTO the rule. It used to read
+    # T1-ComorbidityAssessed == "not_applicable", i.e. the annotator decided
+    # applicability by comparing against T1-ControlLevel — which after the event
+    # split has one answer PER VISIT, so there was nothing single to compare
+    # against and two annotators could disagree on whether the patient counted
+    # at all. A missing derived value (no visit established a control level)
+    # leaves the patient IN, matching v0.5's "when undetermined, do NOT answer
+    # not_applicable".
+    excluded_if: "T1-WorstControlLevel == \"well_controlled\""
     attribution: DOCUMENTATION_GAP
     nuanced: true
     judge_can_override: false
-    supporting_questions: [T1-ControlLevel, T1-ComorbidityAssessed]
+    supporting_questions: [T1-WorstControlLevel, T1-ComorbidityAssessed]

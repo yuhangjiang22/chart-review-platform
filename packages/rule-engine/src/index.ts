@@ -587,6 +587,12 @@ export interface RuleEventsResult {
   /** Period verdicts mirrored from the rollups — same shape existing
    *  consumers (AdherenceReview, compare.py, IAA) already read. */
   rule_verdicts: RuleVerdict[];
+  /** Patient-level answers the engine COMPUTED from the events this pass (see
+   *  `withDerivedAnswers`). Returned so the caller can persist them alongside
+   *  the extracted answers: the reviewer needs to see the value a rule's
+   *  applicability gate actually read, and recomputing it in the client would
+   *  be a second implementation of the same reduction. */
+  derived_answers: QuestionAnswer[];
 }
 
 /** Reason stamped on an event the engine itself marked not evaluable (via
@@ -610,6 +616,117 @@ export function windowEventStub(ruleId: string): RuleEvent {
     rule_id: ruleId,
     anchor: { type: WINDOW_ANCHOR_TYPE, origin: "omop" as const },
   };
+}
+
+// ── Derived patient-level answers ────────────────────────────────────────────
+//
+// Some requirements have an EVENT-LEVEL TRIGGER but a WINDOW-LEVEL ACTION:
+// comorbidity workup and specialty referral are indicated by how controlled
+// the asthma was (which is judged per visit, and can differ across visits),
+// yet the action itself is done once and covers the whole period — you don't
+// redo an allergy workup at every uncontrolled visit.
+//
+// Those rules therefore stay patient-level, but their applicability gate can no
+// longer read `T1-ControlLevel`: after the event split that question has one
+// answer PER VISIT, and a patient can be well controlled in March, uncontrolled
+// in July and well controlled again in November. The old instruction ("answer
+// not_applicable when T1-ControlLevel == well_controlled") had nothing to say
+// about which of the three governs, so two annotators would legitimately
+// disagree on whether the patient counts at all — an inter-rater split on the
+// DENOMINATOR, the most expensive kind.
+//
+// The engine reduces the per-event answers to one value instead of asking a
+// human to do it: the WORST control level seen at any event in the period.
+// EPR-3's own wording is the reason — comorbidity workup is indicated for
+// "asthma that CANNOT be well controlled", and a year with an uncontrolled
+// stretch is a year where it could not be. Taking the most recent event
+// instead would let a patient who spent mid-year uncontrolled escape the
+// requirement because the last visit happened to look fine, and the patients
+// excused that way are exactly the ones most likely to have failed — the
+// reported adherence rate would rise for a reason that isn't care.
+
+/** question_id of the engine-computed worst-control-level value. Not a question
+ *  in references/questions/*.yaml: nobody extracts it, `list_questions` never
+ *  offers it, and `set_question_answer` rejects it as unknown. Rules read it
+ *  from `excluded_if` like any other id. */
+export const DERIVED_WORST_CONTROL_QID = "T1-WorstControlLevel";
+
+/** The per-event question the derived value is computed from. */
+const CONTROL_LEVEL_QID = "T1-ControlLevel";
+
+/** Ordering for "worst". `undetermined` is deliberately absent — it is not a
+ *  degree of control, it means the chart could not establish one, so it never
+ *  wins the max and never masks a real level recorded elsewhere. */
+const CONTROL_LEVEL_SEVERITY: Record<string, number> = {
+  well_controlled: 1,
+  not_well_controlled: 2,
+  very_poorly_controlled: 3,
+};
+
+/** Worst control level committed at any event, or null when no event carries a
+ *  determinable one.
+ *
+ *  Null (rather than a defaulted "well_controlled") is load-bearing: the gates
+ *  are written `excluded_if: <derived> == "well_controlled"`, so null leaves the
+ *  patient IN the denominator and the requirement in force. That matches the
+ *  v0.5 instruction it replaces ("when T1-ControlLevel is undetermined, do NOT
+ *  answer not_applicable — still record what the chart documents"), and it fails
+ *  toward measuring rather than toward silently dropping patients. */
+export function deriveWorstControlLevel(events: RuleEvent[]): string | null {
+  let worst: string | null = null;
+  let severity = 0;
+  for (const e of events) {
+    for (const a of e.answers ?? []) {
+      if (a.question_id !== CONTROL_LEVEL_QID) continue;
+      const s = CONTROL_LEVEL_SEVERITY[String(a.answer)];
+      if (s !== undefined && s > severity) { severity = s; worst = String(a.answer); }
+    }
+  }
+  return worst;
+}
+
+/** `patientAnswers` plus the derived answers computed from `events`.
+ *
+ *  Any stale derived entry already in `patientAnswers` is dropped first, so a
+ *  re-evaluation after a reviewer edits an event's control level cannot read a
+ *  value computed from the pre-edit events. */
+export function withDerivedAnswers(
+  patientAnswers: QuestionAnswer[],
+  events: RuleEvent[],
+): QuestionAnswer[] {
+  const out = patientAnswers.filter((a) => a.question_id !== DERIVED_WORST_CONTROL_QID);
+  const worst = deriveWorstControlLevel(events);
+  if (worst !== null) {
+    out.push({
+      question_id: DERIVED_WORST_CONTROL_QID,
+      tier: 1,
+      answer: worst,
+      source: "derived",
+      reasoning: `worst T1-ControlLevel across ${events.filter((e) =>
+        (e.answers ?? []).some((a) => a.question_id === CONTROL_LEVEL_QID)).length} event(s)`,
+      ts: new Date().toISOString(),
+    });
+  }
+  return out;
+}
+
+/** The rules whose expressions read `qid` — used by the incremental
+ *  re-evaluation path to find which rules a derived-input change invalidates,
+ *  rather than hard-coding the dependency at the call site. Rules that fail to
+ *  compile are skipped (they get their own compile-error containment during
+ *  evaluation). */
+export function rulesReadingQid(
+  rules: RuleDefinition[],
+  qid: string,
+): RuleDefinition[] {
+  return rules.filter((r) => {
+    try {
+      if (compileRule(r).qids.includes(qid)) return true;
+      return r.event_evaluable_if
+        ? compileRule({ ...r, verdict_if: r.event_evaluable_if }).qids.includes(qid)
+        : false;
+    } catch { return false; }
+  });
 }
 
 /** Evaluate one rule over its events; also compute the rollup.
@@ -721,6 +838,12 @@ export function evaluateAllRuleEvents(
   patientAnswers: QuestionAnswer[],
   events: RuleEvent[],
 ): RuleEventsResult {
+  // Derived patient-level values first: a rule's applicability gate may read
+  // one (see DERIVED_WORST_CONTROL_QID), and it is computed from ALL the events
+  // in this pass — so a caller re-evaluating a single rule must still hand in
+  // the patient's full event list, not just that rule's.
+  const answers = withDerivedAnswers(patientAnswers, events);
+  const derivedAnswers = answers.filter((a) => a.source === "derived");
   const byRule = new Map<string, RuleEvent[]>();
   for (const e of events) {
     const arr = byRule.get(e.rule_id) ?? [];
@@ -742,7 +865,7 @@ export function evaluateAllRuleEvents(
     const ruleEvents = byRule.get(rule.rule_id)
       ?? (rule.event_anchor ? [] : [windowEventStub(rule.rule_id)]);
     try {
-      const { events: evs, rollup, qids } = evaluateRuleEvents(rule, patientAnswers, ruleEvents);
+      const { events: evs, rollup, qids } = evaluateRuleEvents(rule, answers, ruleEvents);
       allEvents.push(...evs);
       rollups.push(rollup);
       verdicts.push({
@@ -787,5 +910,8 @@ export function evaluateAllRuleEvents(
   for (const [ruleId, evs] of byRule) {
     if (!knownRuleIds.has(ruleId)) allEvents.push(...evs);
   }
-  return { rule_events: allEvents, rule_rollups: rollups, rule_verdicts: verdicts };
+  return {
+    rule_events: allEvents, rule_rollups: rollups, rule_verdicts: verdicts,
+    derived_answers: derivedAnswers,
+  };
 }

@@ -79,7 +79,12 @@ interface QuestionAnswer {
   reasoning?: string;
   verifier_status?: "confirmed" | "contradicted" | "no_check";
   verifier_note?: string;
-  source?: "agent" | "reviewer";
+  /** "derived" = the rule engine computed it from other answers (see
+   *  DERIVED_WORST_CONTROL_QID). Not extractable and not overridable — it has
+   *  no question in the framework, so it never gets a QuestionRow; it surfaces
+   *  as the read-only line below the framework heading and in a rule's
+   *  "Inputs:" row. */
+  source?: "agent" | "reviewer" | "derived";
   ts?: string;
 }
 
@@ -1225,6 +1230,11 @@ export function AdherenceReview(props: AdherenceReviewProps) {
   // questions that feed it rather than carrying a badge in a mixed list.
   const patientLevelRules = (meta.rules ?? []).filter((r) => !r.event_anchor);
   const eventLevelRules = (meta.rules ?? []).filter((r) => r.event_anchor);
+  // Values the ENGINE computed from the per-event answers (currently the worst
+  // control level in the period). They live in question_answers but have no
+  // question in the framework — answersByQid is already blind-filtered, so a
+  // blind session shows none of them.
+  const derivedAnswers = [...answersByQid.values()].filter((a) => a.source === "derived");
 
   const validatedQuestionsInFramework = [...frameworkQids].filter(
     (qid) => !eventScopedQids.has(qid) && validatedQuestions.has(qid),
@@ -1384,6 +1394,25 @@ export function AdherenceReview(props: AdherenceReviewProps) {
         {/* Questions section, tier-grouped */}
         <section>
           <h2 className="text-[13px] font-semibold mb-1.5">Question framework</h2>
+          {/* Engine-computed inputs. Shown here rather than as a QuestionRow
+           *  because there is nothing to answer: the reviewer's job is to know
+           *  what a rule's applicability gate READ, since it decides whether
+           *  this patient counts toward that rule at all. Hidden in blind mode
+           *  along with every other non-reviewer answer. */}
+          {derivedAnswers.length > 0 && (
+            <div className="mb-2 px-3 py-1.5 border border-dashed border-border rounded bg-muted/30 text-[11.5px] flex flex-wrap gap-x-4 gap-y-1">
+              {derivedAnswers.map((a) => (
+                <span key={a.question_id} className="text-muted-foreground">
+                  <span className="font-mono">{a.question_id}</span>
+                  {" = "}
+                  <span className="text-foreground font-medium">{String(a.answer)}</span>
+                  <span className="ml-1.5 text-[10.5px]">
+                    computed{a.reasoning ? ` · ${a.reasoning}` : ""}
+                  </span>
+                </span>
+              ))}
+            </div>
+          )}
           {tiers.map((t) => {
             // Event-scoped questions are answered in the Events section, once
             // per event, with the span they are judged over. They are not listed
