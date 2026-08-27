@@ -2122,3 +2122,65 @@ describe("Compare mode (Task 6)", () => {
 // Keep `act` imported-but-explicitly-referenced to avoid unused-import lint in
 // strict TS configs (it is used implicitly by RTL but we reference it here).
 void act;
+
+describe("per-event evidence", () => {
+  const withEvidence = () => stateWithEvents({
+    rule_events: RULE_EVENTS.map((e) => (e.event_id === "ev_1" ? {
+      ...e,
+      answers: [
+        {
+          question_id: "q_act_band", tier: 1, answer: 2, source: "agent",
+          evidence: [{ source: "note", note_id: "note_12", quote: "ACT 18", start: 40, end: 46 }],
+          reasoning: "charted at this visit",
+        },
+      ],
+    } : e)),
+  });
+
+  it("shows the quote the answer was determined from, and opens the note at its offsets", async () => {
+    setupMocks({ state: withEvidence });
+    renderPane();
+    await waitLoaded();
+
+    const row = eventRowFor("ev_1");
+    const cite = within(row).getByRole("button", { name: /note_12.*ACT 18/s });
+    expect(cite).toBeInTheDocument();
+    fireEvent.click(cite);
+    // The source pane receives the note AND the cited span, so the reviewer
+    // lands on the text rather than the top of the file.
+    await waitFor(() => {
+      expect(noteViewerProps.current?.noteFocus).toMatchObject({
+        filename: "note_12", highlight: { start: 40, end: 46 },
+      });
+    });
+  });
+
+  it("calls out an answer committed with NO evidence instead of leaving it blank", async () => {
+    // An unevidenced answer is exactly what a reviewer needs to notice; silence
+    // reads like there was nothing to show.
+    setupMocks({ state: () => stateWithEvents({
+      rule_events: RULE_EVENTS.map((e) => (e.event_id === "ev_1" ? {
+        ...e,
+        answers: [{ question_id: "q_act_band", tier: 1, answer: 2, source: "agent" }],
+      } : e)),
+    }) });
+    renderPane();
+    await waitLoaded();
+
+    expect(within(eventRowFor("ev_1")).getByText("no evidence")).toBeInTheDocument();
+  });
+
+  it("shows NO agent evidence in blind mode — the cited line steers as much as the answer", async () => {
+    setupMocks({ state: withEvidence });
+    renderPane({ blind: true });
+    // waitLoaded() keys on the framework heading, which the blind render does
+    // not show; the blind banner is this path's ready signal.
+    await waitFor(() => expect(screen.getByText(/BLIND MODE/)).toBeInTheDocument());
+
+    // Asserted page-wide rather than through the event row: the blind path
+    // auto-seeds its own events, so the row set is not the fixture's. What
+    // matters is that the agent's cited line appears NOWHERE.
+    expect(screen.queryByText(/ACT 18/)).toBeNull();
+    expect(screen.queryByText("no evidence")).toBeNull();
+  });
+});

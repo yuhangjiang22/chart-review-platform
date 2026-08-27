@@ -22,6 +22,15 @@ export interface RuleEvent {
      *  seeded from an agent-sourced answer. Optional: legacy/period-only
      *  events predate per-answer provenance. */
     source?: "agent" | "reviewer";
+    /** Verbatim quotes (or OMOP row refs) the answer was determined from, as
+     *  stored by set_event_answer after the faithfulness gate. The reviewer
+     *  reads these to check the answer without re-searching the chart. */
+    evidence?: Array<{
+      source?: "note" | "omop";
+      note_id?: string; quote?: string; start?: number; end?: number;
+      table?: string; row_id?: string; concept_name?: string;
+    }>;
+    reasoning?: string;
   }>;
   verdict?: "CONCORDANT" | "NON_CONCORDANT" | "EXCLUDED";
   attribution?: string; source?: string; ts?: string;

@@ -174,6 +174,58 @@ const EVENT_KIND_HEADLINE: Record<string, string> = {
   obligation_points: "Controller obligation",
 };
 
+/** Per-question evidence inside an event card. Mirrors QuestionRow's citation
+ *  block: a note quote is a button that opens the note at the cited offsets in
+ *  the source pane; an OMOP row names its table. */
+function EventAnswerEvidence({ evidence, reasoning, onJumpToSource }: {
+  evidence?: NonNullable<RuleEvent["answers"]>[number]["evidence"];
+  reasoning?: string;
+  onJumpToSource?: (focus: NoteFocus | null) => void;
+}) {
+  if (!evidence || evidence.length === 0) {
+    return (
+      <div className="mt-0.5 text-[10px] text-[hsl(var(--ochre))]" title="Answered with no evidence cited">
+        no evidence
+      </div>
+    );
+  }
+  return (
+    <div className="mt-0.5 space-y-0.5">
+      {evidence.map((ev, i) => (
+        ev.note_id ? (
+          <button
+            key={i}
+            type="button"
+            onClick={() => onJumpToSource?.({
+              filename: ev.note_id!,
+              highlight: ev.start != null && ev.end != null
+                ? { start: ev.start, end: ev.end }
+                : undefined,
+            })}
+            className="block text-left w-full rounded px-0.5 -mx-0.5 text-[10px] leading-snug hover:bg-[hsl(var(--sage))]/10"
+            title="Open this note in the source pane"
+          >
+            <span className="font-mono text-[hsl(var(--oxblood))] underline-offset-2 hover:underline">
+              {ev.note_id}:{" "}
+            </span>
+            <span className="italic">&ldquo;{ev.quote}&rdquo;</span>
+          </button>
+        ) : (
+          <div key={i} className="text-[10px] text-muted-foreground">
+            structured: {ev.table}{ev.concept_name ? ` · ${ev.concept_name}` : ""}
+          </div>
+        )
+      ))}
+      {reasoning && (
+        <details className="text-[10px] text-muted-foreground">
+          <summary className="cursor-pointer hover:text-foreground">why</summary>
+          <div className="whitespace-pre-wrap leading-snug">{reasoning}</div>
+        </details>
+      )}
+    </div>
+  );
+}
+
 function seedEventDraft(event: RuleEvent, rule: RuleDefinition | undefined, blind = false): EventDraft {
   const qids = new Set<string>(eventQuestionIds(rule));
   // Keep anything already committed on the event even if the rule no longer
@@ -2168,6 +2220,7 @@ function EventRowImpl({
             >
               {draft.answers.map((a) => {
                 const q = questionDefsById.get(a.question_id);
+                const committed = (event.answers ?? []).find((x) => x.question_id === a.question_id);
                 return (
                   <div key={a.question_id} className="min-w-0">
                     <div className="text-[10px] uppercase tracking-wider text-muted-foreground truncate font-mono">
@@ -2177,6 +2230,24 @@ function EventRowImpl({
                       <AnswerControl q={q} value={a.answer} onChange={(v) => updateAnswer(a.question_id, v)} />
                     ) : (
                       <div className="text-[11px] text-muted-foreground italic">unknown question</div>
+                    )}
+                    {/* What the answer was determined FROM, per question, the
+                     *  same way QuestionRow shows it — the reviewer checks the
+                     *  answer against the quote instead of re-searching the
+                     *  chart. Hidden in blind mode: agent evidence is agent
+                     *  output, and seeing which line it keyed on would steer
+                     *  the annotator as much as seeing its answer.
+                     *
+                     *  A committed answer with NO evidence is called out rather
+                     *  than left blank: an unevidenced answer is exactly what a
+                     *  reviewer needs to notice, and silence reads like there
+                     *  was nothing to show. */}
+                    {!blind && committed && (
+                      <EventAnswerEvidence
+                        evidence={committed.evidence}
+                        reasoning={committed.reasoning}
+                        onJumpToSource={onJumpToSource}
+                      />
                     )}
                   </div>
                 );

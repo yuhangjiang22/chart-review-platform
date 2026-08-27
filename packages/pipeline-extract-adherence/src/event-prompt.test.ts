@@ -73,3 +73,24 @@ describe("per-event required questions", () => {
     expect(block).not.toMatch(/^ {6}answer: /m);
   });
 });
+
+describe("evidence discipline", () => {
+  const RULE = {
+    rule_id: "R-Step", description: "d", event_anchor: "visits",
+    verdict_if: 'StepMatch == "matches"',
+    event_scoped_questions: ["StepMatch"],
+  };
+  it("requires evidence on every event answer and names both source shapes", () => {
+    const block = buildEventWorklistBlock([anchored], [RULE as never]);
+    expect(block).toMatch(/EVERY answer needs evidence/);
+    expect(block).toMatch(/VERBATIM/);
+    expect(block).toMatch(/source:'omop'/);
+  });
+  it("says what happens when evidence is omitted, rather than only forbidding it", () => {
+    // A bare prohibition invites the agent to null the answer to escape the
+    // gate — the phenotype path learned that the hard way. Committing the
+    // answer and flagging it is the behaviour, so the prompt says so.
+    const block = buildEventWorklistBlock([anchored], [RULE as never]);
+    expect(block).toMatch(/stored but shown to the reviewer as unevidenced/);
+  });
+});
