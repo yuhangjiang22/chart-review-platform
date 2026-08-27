@@ -560,12 +560,12 @@ function marginalsAndConfusion(cells: KappaCell[]): Pick<PerEventReport, "label_
   for (const c of cells) {
     a[c.rater_a] = (a[c.rater_a] ?? 0) + 1;
     b[c.rater_b] = (b[c.rater_b] ?? 0) + 1;
-    const k = `${c.rater_a} ${c.rater_b}`;
+    const k = JSON.stringify([c.rater_a, c.rater_b]);
     confCounts.set(k, (confCounts.get(k) ?? 0) + 1);
   }
   const confusion = [...confCounts.entries()]
     .map(([k, n]) => {
-      const [ca, cb] = k.split(" ");
+      const [ca, cb] = JSON.parse(k) as [string, string];
       return { a: ca!, b: cb!, n };
     })
     .sort((x, y) => (x.a === y.a ? (x.b < y.b ? -1 : x.b > y.b ? 1 : 0) : x.a < y.a ? -1 : 1));
