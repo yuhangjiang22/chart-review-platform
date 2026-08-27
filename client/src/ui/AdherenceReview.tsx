@@ -326,10 +326,6 @@ export function AdherenceReview(props: AdherenceReviewProps) {
   // a patient/task switch — so it survives other rows' saves AND the Events
   // section collapsing/reopening (which used to unmount/remount EventRow).
   const [eventDrafts, setEventDrafts] = useState<Map<string, EventDraft>>(new Map());
-  // Add-a-missed-event form (see addEvent below).
-  const [addEventOpen, setAddEventOpen] = useState(false);
-  const [addEventForm, setAddEventForm] = useState({ rule_id: "", date: "", note_id: "" });
-  const [addEventError, setAddEventError] = useState<string | null>(null);
   // Row-scoped save errors, so a failed event-verdict POST doesn't compete
   // with the page-level banner and stays next to the row + edits it belongs to.
   const [eventErrors, setEventErrors] = useState<Map<string, string>>(new Map());
@@ -838,14 +834,6 @@ export function AdherenceReview(props: AdherenceReviewProps) {
     [meta],
   );
 
-  // Rules a reviewer may supplement from a note. Window-scoped rules are
-  // excluded: they already carry one stub covering the whole period, so a
-  // dated event added to them would be counted alongside it.
-  const anchoredRules = useMemo(
-    () => (meta?.rules ?? []).filter((r) => r.event_anchor),
-    [meta],
-  );
-
   const saveAnswer = useCallback(async (
     qid: string,
     answer: QuestionAnswer["answer"],
@@ -901,40 +889,6 @@ export function AdherenceReview(props: AdherenceReviewProps) {
       setBusy(null);
     }
   }, [patientId, taskId, sessionQs, refreshState]);
-
-  // Add a note-documented event the structured enumeration missed. The
-  // counterpart of the agent's set_event_answer(new_event): without it the
-  // per-event enumeration comparison could only ever read "the agent found an
-  // extra event", never the reverse, which is not a difference an agreement
-  // statistic can be computed from. Created unanswered — the reviewer then
-  // answers it through the normal EventRow save path.
-  const addEvent = useCallback(async () => {
-    const { rule_id, date, note_id } = addEventForm;
-    if (!rule_id || !date || !note_id) {
-      setAddEventError("Pick a rule, a date, and the note that documents it.");
-      return;
-    }
-    setBusy("e:add");
-    setAddEventError(null);
-    try {
-      const r = await authFetch(
-        `/api/reviews/${encodeURIComponent(patientId)}/${encodeURIComponent(taskId)}/adherence/add-event${sessionQs}`,
-        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rule_id, date, note_id }) },
-      );
-      if (!r.ok) {
-        const b = (await r.json().catch(() => ({}))) as { message?: string; error?: string };
-        setAddEventError(b.message ?? b.error ?? `add failed: ${r.status}`);
-        return;
-      }
-      await refreshState();
-      setAddEventForm({ rule_id: "", date: "", note_id: "" });
-      setAddEventOpen(false);
-    } catch (e) {
-      setAddEventError((e as Error).message);
-    } finally {
-      setBusy(null);
-    }
-  }, [addEventForm, patientId, taskId, sessionQs, refreshState]);
 
   const saveEvent = useCallback(async (
     eventId: string,
@@ -1226,7 +1180,7 @@ export function AdherenceReview(props: AdherenceReviewProps) {
 
         {/* Events section — anchored events only (encounter/ed/burst/...).
          *  Window events stay represented in the Rules section below. */}
-        {(anchoredEvents.length > 0 || anchoredRules.length > 0) && (
+        {anchoredEvents.length > 0 && (
           <section>
             <div className="border border-border rounded mb-2 bg-card">
               <button
@@ -1273,71 +1227,6 @@ export function AdherenceReview(props: AdherenceReviewProps) {
                       />
                     );
                   })}
-                  {/* Supplement the structured enumeration. Anchors come from
-                   *  OMOP, which misses events the chart documents only in
-                   *  prose (an outside urgent-care visit, a steroid course
-                   *  started elsewhere). Without this the enumeration
-                   *  comparison is one-directional — see addEvent. */}
-                  {anchoredRules.length > 0 && (
-                    <div className="px-3 py-2 bg-muted/20">
-                      {!addEventOpen ? (
-                        <button
-                          onClick={() => { setAddEventOpen(true); setAddEventError(null); }}
-                          className="text-[11.5px] text-muted-foreground hover:text-foreground hover:underline"
-                        >
-                          + Add an event documented in the notes but missing here
-                        </button>
-                      ) : (
-                        <div className="space-y-1.5">
-                          <div className="text-[11.5px] font-medium">Add a note-documented event</div>
-                          <div className="flex flex-wrap gap-1.5 items-center">
-                            <select
-                              value={addEventForm.rule_id}
-                              onChange={(e) => setAddEventForm((f) => ({ ...f, rule_id: e.target.value }))}
-                              className="text-[11.5px] border border-border rounded px-1.5 py-1 bg-background"
-                            >
-                              <option value="">— requirement —</option>
-                              {anchoredRules.map((r) => (
-                                <option key={r.rule_id} value={r.rule_id}>{r.rule_id}</option>
-                              ))}
-                            </select>
-                            <input
-                              type="date"
-                              value={addEventForm.date}
-                              onChange={(e) => setAddEventForm((f) => ({ ...f, date: e.target.value }))}
-                              className="text-[11.5px] border border-border rounded px-1.5 py-1 bg-background"
-                            />
-                            <input
-                              type="text"
-                              value={addEventForm.note_id}
-                              onChange={(e) => setAddEventForm((f) => ({ ...f, note_id: e.target.value }))}
-                              placeholder="note that documents it"
-                              className="text-[11.5px] border border-border rounded px-1.5 py-1 bg-background min-w-[14rem]"
-                            />
-                            <button
-                              onClick={addEvent}
-                              disabled={busy === "e:add"}
-                              className="text-[11.5px] border border-border rounded px-2 py-1 hover:bg-muted disabled:opacity-50"
-                            >
-                              {busy === "e:add" ? "Adding…" : "Add"}
-                            </button>
-                            <button
-                              onClick={() => { setAddEventOpen(false); setAddEventError(null); }}
-                              className="text-[11.5px] text-muted-foreground hover:text-foreground"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                          <div className="text-[11px] text-muted-foreground">
-                            Added unanswered — answer it below like any other event.
-                          </div>
-                          {addEventError && (
-                            <div className="text-[11px] text-destructive">{addEventError}</div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
                 </div>
               )}
             </div>

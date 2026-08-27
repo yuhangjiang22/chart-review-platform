@@ -115,40 +115,16 @@ describe("setEventAnswer", () => {
     expect(withReason.ok).toBe(true);
   });
 
-  it("new_event creates a note-origin event whose id is rule+date, NOT the cited note", async () => {
-    // Per-event IAA matches the two sides on `${patient_id}|${event_id}`, and
-    // the reviewer can supplement the same episode through
-    // POST .../adherence/add-event. If the id carried the note_id, an agent
-    // citing the ED discharge summary and an annotator citing the follow-up
-    // progress note would mint two ids for one clinical episode and the
-    // enumeration metric would report disagreement where there is none. Rule
-    // + date is the clinical identity — the same one-event-per-visit-day rule
-    // the OMOP anchors use. The cited note survives on anchor.ref.
+  it("new_event creates a note-origin event with a generated id", async () => {
     const body = parse(await setEventAnswer(session, {
       new_event: { rule_id: "R-Step", anchor_type: "asthma_encounters", date: "2025-01-10", note_id: "note_07.txt" },
       answers: [{ question_id: "StepMatch", answer: "matches" }],
     }));
     expect(body.ok).toBe(true);
-    expect(body.event_id).toBe("R-Step@2025-01-10@note");
-    expect(body.event_id).not.toContain("note_07.txt");
+    expect(body.event_id).toBe("R-Step@2025-01-10@note:note_07.txt");
     const st = loadOrCreate(session.patientId, session.task);
     const ev = st.rule_events!.find((e) => e.event_id === body.event_id)!;
     expect(ev.anchor.origin).toBe("note");
-    expect(ev.anchor.ref).toBe("note:note_07.txt");
-  });
-
-  it("the same episode cited from a different note upserts onto ONE event", async () => {
-    const first = parse(await setEventAnswer(session, {
-      new_event: { rule_id: "R-Step", anchor_type: "asthma_encounters", date: "2025-02-11", note_id: "ed_summary.txt" },
-      answers: [{ question_id: "StepMatch", answer: "matches" }],
-    }));
-    const second = parse(await setEventAnswer(session, {
-      new_event: { rule_id: "R-Step", anchor_type: "asthma_encounters", date: "2025-02-11", note_id: "followup.txt" },
-      answers: [{ question_id: "StepMatch", answer: "under_treated" }],
-    }));
-    expect(second.event_id).toBe(first.event_id);
-    const st = loadOrCreate(session.patientId, session.task);
-    expect(st.rule_events!.filter((e) => e.anchor.date === "2025-02-11")).toHaveLength(1);
   });
 
   it("new_event with a rule_id not in the skill's rules is rejected", async () => {

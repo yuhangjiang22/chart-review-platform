@@ -390,16 +390,7 @@ export async function setEventAnswer(
     if (!skill.rules.some((r) => r.rule_id === ne.rule_id)) {
       return err(`unknown rule_id '${ne.rule_id}'`);
     }
-    // The note_id is deliberately NOT part of the event_id. Per-event IAA
-    // matches the two sides on `${patient_id}|${event_id}`, so a
-    // note-documented event must get the same id whichever note it was cited
-    // from — otherwise an agent citing the ED discharge summary and an
-    // annotator citing the follow-up progress note produce two one-sided
-    // events for one clinical episode, and the enumeration metric reports
-    // disagreement where there is none. Rule + date is the clinical identity
-    // (the same one-event-per-visit-day rule the OMOP anchors use); the cited
-    // note is preserved on anchor.ref.
-    eventId = `${ne.rule_id}@${ne.date}@note`;
+    eventId = `${ne.rule_id}@${ne.date}@note:${ne.note_id}`;
     idx = events.findIndex((e) => e.event_id === eventId);
     if (idx < 0) {
       events.push({
