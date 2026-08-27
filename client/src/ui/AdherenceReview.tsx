@@ -47,7 +47,8 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { NoteViewer } from "../NoteViewer";
 import type { NoteFocus } from "../types";
-import { EventTimeline, isAnchoredEvent, type RuleEvent, type RuleRollup } from "./adherence/EventTimeline";
+import { isAnchoredEvent, type RuleEvent, type RuleRollup } from "./adherence/types";
+import { buildAdherenceDays } from "./adherence/build-days";
 // Reused ONLY for its type shape + the GET /api/sessions/:taskId endpoint —
 // same listing SessionSwitcher/Workspace's refreshSessions() uses (Task 6,
 // agent-vs-human compare mode). AdherenceReview renders its own plain
@@ -673,6 +674,18 @@ export function AdherenceReview(props: AdherenceReviewProps) {
     () => ruleEvents.filter(isAnchoredEvent).sort((a, b) => (a.anchor.date ?? "").localeCompare(b.anchor.date ?? "")),
     [ruleEvents],
   );
+  const windowEvents = useMemo(() => ruleEvents.filter((e) => e.anchor.type === "window"), [ruleEvents]);
+  const compositeTotals = useMemo(() => {
+    let c = 0, n = 0;
+    for (const r of ruleRollups) { c += r.n_concordant; n += r.n_evaluable; }
+    return { c, n };
+  }, [ruleRollups]);
+  const compareHumanOnly = useMemo(() => {
+    if (!compareActive || blind) return [];
+    const activeIds = new Set(ruleEvents.filter(isAnchoredEvent).map((e) => e.event_id));
+    return (compareState?.rule_events ?? []).filter((h) => isAnchoredEvent(h) && !activeIds.has(h.event_id));
+  }, [compareActive, blind, compareState, ruleEvents]);
+
   const validatedAnchoredCount = useMemo(
     () => anchoredEvents.filter((e) => validatedEvents.has(e.event_id)).length,
     [anchoredEvents, validatedEvents],
@@ -736,6 +749,19 @@ export function AdherenceReview(props: AdherenceReviewProps) {
     return { covered, total: anchoredEvents.length };
   }, [agentSideAgentId, agentSideEvents, anchoredEvents]);
   const agentShadowStale = !!agentCoverage && agentCoverage.covered * 2 < agentCoverage.total;
+
+  // Mode-dependent mapping is extracted so blind-mode isolation can be tested
+  // as a pure function rather than by driving a rendered pane.
+  const adherenceDays = useMemo(
+    () => buildAdherenceDays({
+      events: ruleEvents,
+      mode: blind ? "blind" : compareActive ? "compare" : "review",
+      validatedEvents,
+      compareEvents: !blind && compareActive ? compareState?.rule_events ?? undefined : undefined,
+      agentEvents: !blind ? agentSideEvents : undefined,
+    }),
+    [ruleEvents, blind, compareActive, validatedEvents, compareState, agentSideEvents],
+  );
 
   // Compare summary (Task 6 review, Important 2): ANCHORED events only —
   // matched = event_id present on both sides; agent only = active-only;
@@ -1154,28 +1180,71 @@ export function AdherenceReview(props: AdherenceReviewProps) {
       )}
 
       <div className="flex-1 overflow-y-auto p-3 space-y-4 min-w-0">
-        {/* Event timeline (event-concordance design). Rendered ONLY when the
-         *  review state carries rule_events — legacy states without them
-         *  (pre-event-engine tasks) must render identically to before. */}
+        {/* The chronology itself lives in the source pane's Timeline tab, where
+         *  the adherence days interleave with the notes, encounters and labs
+         *  they were judged from — one axis instead of two to correlate by eye.
+         *  What stays here is the period-level readout: the window, the
+         *  composite, and the whole-window rules, which have no date and so no
+         *  place on a chronology. */}
         {ruleEvents.length > 0 && (
-          <EventTimeline
-            events={ruleEvents}
-            rollups={ruleRollups}
-            validatedEvents={validatedEvents}
-            mode={blind ? "blind" : compareActive ? "compare" : "review"}
-            compareEvents={!blind && compareActive ? compareState!.rule_events ?? undefined : undefined}
-            agentEvents={!blind ? agentSideEvents : undefined}
-            selectedEventId={selectedEventId}
-            onSelectEvent={(id) => {
-              setSelectedEventId(id);
-              const ev = ruleEvents.find((e) => e.event_id === id);
-              // Window-rule chips have no EventRow (I7) — nothing to open;
-              // the scroll effect above resolves them straight to their
-              // rule-row. Anchored events live in the (possibly collapsed)
-              // Events section — open it (I6) so the scroll target exists.
-              if (!ev || ev.anchor.type !== "window") setEventsOpen(true);
-            }}
-          />
+          <section className="border border-border rounded-md bg-card">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-border text-[12px]">
+              <span className="uppercase tracking-wider text-muted-foreground">
+                Adherence · {adherenceDays.length} {adherenceDays.length === 1 ? "day" : "days"} of care
+                <span className="normal-case tracking-normal"> — see the Timeline tab</span>
+              </span>
+              {!blind && (
+                <span>
+                  {compareActive ? "Agent composite" : "Composite"}: <b>
+                    {compositeTotals.c}/{compositeTotals.n} concordant
+                    {compositeTotals.n > 0 ? ` (${Math.round((compositeTotals.c / compositeTotals.n) * 100)}%)` : ""}
+                  </b>
+                </span>
+              )}
+            </div>
+            {compareActive && compareHumanOnly.length > 0 && (
+              <div className="px-3 py-1 text-[11px] text-[hsl(var(--ochre))]">
+                human only: {compareHumanOnly.map((h) => h.event_id).join(", ")}
+              </div>
+            )}
+            <div className="px-3 py-2">
+              <div className="uppercase tracking-wider text-[10px] text-muted-foreground mb-1">
+                Window rules (whole observation window)
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {windowEvents.map((e) => {
+                  const roll = ruleRollups.find((r) => r.rule_id === e.rule_id);
+                  return (
+                    <button
+                      key={e.event_id}
+                      type="button"
+                      onClick={() => setSelectedEventId(e.event_id)}
+                      aria-current={selectedEventId === e.event_id}
+                      title={blind ? undefined : (e.verdict ?? "not scored")}
+                      className={cn(
+                        "border border-border rounded-full px-2 py-0.5 text-[10px] flex items-center gap-1",
+                        selectedEventId === e.event_id && "ring-2 ring-[hsl(var(--oxblood))]",
+                      )}
+                    >
+                      {!blind && (
+                        <>
+                          <span className={cn("w-2 h-2 rounded-full inline-block",
+                            e.verdict === "CONCORDANT" ? "bg-[hsl(var(--sage))]"
+                              : e.verdict === "NON_CONCORDANT" ? "bg-[hsl(var(--oxblood))]"
+                                : "bg-muted-foreground")} />
+                          <span className="sr-only">{e.verdict ?? "not scored"}</span>
+                        </>
+                      )}
+                      <span>{e.rule_id.replace(/^R-T\d-/, "")}</span>
+                      {!blind && roll && (
+                        <span className="text-muted-foreground">· {roll.n_concordant}/{roll.n_evaluable}</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </section>
         )}
 
         {/* Events section — anchored events only (encounter/ed/burst/...).
@@ -1313,6 +1382,9 @@ export function AdherenceReview(props: AdherenceReviewProps) {
              reviewState={null}
              noteFocus={noteFocus}
              onJumpToSource={setNoteFocus}
+             adherenceDays={adherenceDays}
+             onSelectAdherenceEvent={(id) => { setSelectedEventId(id); setEventsOpen(true); }}
+             selectedAdherenceEventId={selectedEventId}
            />
          </div>
        </aside>

@@ -10,7 +10,7 @@ import type {
 } from "./types";
 import { authFetch } from "./auth";
 import { StructuredTab, type StructuredData } from "./StructuredTab";
-import { TimelineTab } from "./TimelineTab";
+import { TimelineTab, type AdherenceDay } from "./TimelineTab";
 import type { Citer } from "./citers";
 import { citerKey, citerLabel, buildCitersByNoteSpan, buildCitersByRowKey } from "./citers";
 import { CiterChip } from "./atoms/CiterChip";
@@ -27,6 +27,12 @@ interface Props {
   selectedField?: CompiledField | null;
   /** Assessment for the active criterion (current answer + cited evidence). */
   selectedAssessment?: FieldAssessment | null;
+  /** Adherence days to interleave into the Timeline tab's chronology, already
+   *  reduced to display text by the caller (adherence tasks only — see
+   *  TimelineTab's AdherenceDay). Passed straight through. */
+  adherenceDays?: AdherenceDay[];
+  onSelectAdherenceEvent?: (eventId: string) => void;
+  selectedAdherenceEventId?: string | null;
   /** Index date for relative-offset display in Structured/Timeline. */
   indexDate?: string;
   /** Optional label for the evidence-summary card when the displayed
@@ -245,6 +251,9 @@ export function NoteViewer({
   softFocusCiter,
   citerEvidence,
   onSoftFocusClear,
+  adherenceDays,
+  onSelectAdherenceEvent,
+  selectedAdherenceEventId,
 }: Props) {
   const [notes, setNotes] = useState<NoteListing[]>([]);
   const [active, setActive] = useState<ActiveView | null>(null);
@@ -1112,6 +1121,9 @@ export function NoteViewer({
             activeFieldId={selectedField?.id ?? null}
             citedKeys={citedStructuredKeys}
             citersByRowKey={citersByRowKey}
+            adherenceDays={adherenceDays}
+            onSelectAdherenceEvent={onSelectAdherenceEvent}
+            selectedAdherenceEventId={selectedAdherenceEventId}
             // Only narrow to cited rows when this criterion actually cited
             // structured evidence. Otherwise (e.g. a note-only item) show the
             // full structured browser rather than an empty filtered list.
@@ -1139,6 +1151,9 @@ export function NoteViewer({
             activeFieldId={selectedField?.id ?? null}
             citedKeys={citedStructuredKeys}
             citersByRowKey={citersByRowKey}
+            adherenceDays={adherenceDays}
+            onSelectAdherenceEvent={onSelectAdherenceEvent}
+            selectedAdherenceEventId={selectedAdherenceEventId}
             citedNoteIds={citedNoteIds}
             showOnlyCited={showOnlyCited && hasCitedAny}
             onOpenNote={(noteId) => {

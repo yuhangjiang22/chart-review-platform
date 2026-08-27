@@ -29,6 +29,34 @@ export interface TimelineEvent {
   concept_id?: number;
   value?: unknown;
   raw?: StructuredRow;
+  /** Set only on kind==="adherence" events — the rules judged that day. */
+  rules?: AdherenceRuleLine[];
+}
+
+/** One rule judged at a day of care, already reduced to display text by the
+ *  caller. The caller owns every mode-dependent decision — blind mode passes no
+ *  `verdict` at all, compare mode puts its A/H pair in `verdict` — so this
+ *  component never has to know what blind or compare mean, and there is exactly
+ *  one place where an agent verdict can leak into a blind view. */
+export interface AdherenceRuleLine {
+  event_id: string;
+  label: string;
+  /** Display text for the right-hand chip. Omitted → no chip (blind mode). */
+  verdict?: string;
+  /** Muted styling for "not evaluable" / "not yet scored" rather than a verdict. */
+  muted?: boolean;
+  validated?: boolean;
+}
+
+/** A day of care with the adherence rules judged at it. Interleaves into the
+ *  same chronology as notes/encounters/labs, so a reviewer reads what the chart
+ *  recorded and what the instrument concluded on one axis instead of
+ *  correlating two timelines by eye. */
+export interface AdherenceDay {
+  date: string;
+  /** What happened that day, already in clinical words ("Clinic visit"). */
+  kinds: string[];
+  rules: AdherenceRuleLine[];
 }
 
 interface MonthGroup {
@@ -53,6 +81,11 @@ interface Props {
   citersByRowKey?: Map<string, Citer[]>;
   /** Note filenames cited by the active criterion (note_id with .txt). */
   citedNoteIds?: Set<string>;
+  /** Adherence days to interleave into the chronology. Omitted for phenotype
+   *  and NER tasks, which have no per-encounter rules. */
+  adherenceDays?: AdherenceDay[];
+  onSelectAdherenceEvent?: (eventId: string) => void;
+  selectedAdherenceEventId?: string | null;
   /** When true, filter timeline events to only those cited for the active criterion. */
   showOnlyCited?: boolean;
 }
@@ -81,6 +114,7 @@ function colorForKind(kind: string): string {
     drugs: "#047857",
     observations: "#475569",
     encounters: "#be185d",
+    adherence: "#7f1d1d",
   };
   return map[kind] ?? "#94a3b8";
 }
@@ -100,6 +134,7 @@ function kindMeta(kind: string): KindMeta {
     drugs: { label: "rx", cls: "bg-[hsl(var(--sage)/0.15)] text-[hsl(var(--sage))]" },
     observations: { label: "obs", cls: "bg-muted text-foreground" },
     encounters: { label: "enc", cls: "bg-pink-100 text-pink-800" },
+    adherence: { label: "rule", cls: "bg-[hsl(var(--oxblood)/0.12)] text-[hsl(var(--oxblood))]" },
   };
   return map[kind] ?? { label: kind, cls: "bg-muted text-foreground" };
 }
@@ -269,9 +304,14 @@ interface RowProps {
   /** Citers for this event row. When supplied, replaces the legacy "cited"
    *  ribbon with one chip per citer. */
   rowCiters?: Citer[];
+  onSelectAdherenceEvent?: (eventId: string) => void;
+  selectedAdherenceEventId?: string | null;
 }
 
-function TimelineRow({ ev, indexDate, activeFieldId, onOpenNote, onCite, cited, rowCiters }: RowProps) {
+function TimelineRow({
+  ev, indexDate, activeFieldId, onOpenNote, onCite, cited, rowCiters,
+  onSelectAdherenceEvent, selectedAdherenceEventId,
+}: RowProps) {
   const offset = relativeToIndex(ev.date, indexDate);
   const dotColor = cited ? "hsl(var(--oxblood))" : colorForKind(ev.kind);
   const isNote = !!ev.note_id;
@@ -316,6 +356,36 @@ function TimelineRow({ ev, indexDate, activeFieldId, onOpenNote, onCite, cited, 
           {ev.detail && (
             <div className="text-[11px] text-muted-foreground mt-0.5">{ev.detail}</div>
           )}
+          {/* One selectable line per rule judged that day. Verdict text is
+              supplied by the caller, so a blind view simply has none. */}
+          {ev.rules?.map((r) => (
+            <button
+              key={r.event_id}
+              type="button"
+              onClick={() => onSelectAdherenceEvent?.(r.event_id)}
+              aria-current={selectedAdherenceEventId === r.event_id}
+              title={r.event_id}
+              className={`mt-0.5 w-full text-left flex items-center gap-2 rounded px-1 py-0.5 text-[11.5px] hover:bg-muted ${
+                selectedAdherenceEventId === r.event_id ? "bg-muted ring-1 ring-[hsl(var(--oxblood))]" : ""
+              }`}
+            >
+              <span className="flex-1 truncate">{r.label}</span>
+              {r.validated && (
+                <span className="shrink-0 text-[9px] uppercase text-[hsl(var(--sage))]">validated</span>
+              )}
+              {r.verdict && (
+                <span className={`shrink-0 rounded px-1 text-[10px] ${
+                  r.muted
+                    ? "bg-muted text-muted-foreground"
+                    : r.verdict === "CONCORDANT"
+                      ? "bg-[hsl(var(--sage))]/15 text-[hsl(var(--sage))]"
+                      : "bg-[hsl(var(--oxblood))]/12 text-[hsl(var(--oxblood))]"
+                }`}>
+                  {r.verdict}
+                </span>
+              )}
+            </button>
+          ))}
           {(!rowCiters || rowCiters.length === 0) && cited && (
             <div className="mt-0.5 inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.14em] text-[hsl(var(--oxblood))]">
               <Icon name="quote" size={9} />
@@ -385,11 +455,23 @@ export function TimelineTab({
   citersByRowKey,
   citedNoteIds,
   showOnlyCited,
+  adherenceDays,
+  onSelectAdherenceEvent,
+  selectedAdherenceEventId,
 }: Props) {
-  const allEvents = useMemo(
-    () => (data ? buildEvents(data, notesMeta) : []),
-    [data, notesMeta],
-  );
+  const allEvents = useMemo(() => {
+    const base = data ? buildEvents(data, notesMeta) : [];
+    if (!adherenceDays?.length) return base;
+    const adh: TimelineEvent[] = adherenceDays.map((d) => ({
+      uid: `adherence:${d.date}`,
+      kind: "adherence",
+      date: d.date,
+      label: d.kinds.join(" · ") || "Day of care",
+      detail: d.rules.length > 1 ? `${d.rules.length} rules judged` : null,
+      rules: d.rules,
+    }));
+    return [...base, ...adh];
+  }, [data, notesMeta, adherenceDays]);
   const events = useMemo(() => {
     if (!showOnlyCited) return allEvents;
     return allEvents.filter((ev) => isCitedEvent(ev, citedKeys, citedNoteIds));
@@ -458,6 +540,8 @@ export function TimelineTab({
                       ? citersByRowKey?.get(`${ev.kind}:${String(ev.row_id)}`)
                       : undefined
                   }
+                  onSelectAdherenceEvent={onSelectAdherenceEvent}
+                  selectedAdherenceEventId={selectedAdherenceEventId}
                 />
               ))}
             </div>

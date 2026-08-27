@@ -75,22 +75,24 @@ async function seedRuleEvents(page: Page, token: string, sid: string): Promise<{
   ) as Promise<{ events: number }>;
 }
 
-// EventTimeline's own root — `border border-border rounded-md bg-card`.
-// Distinct from the per-card button (`border rounded-md ... bg-card`, no
-// `border-border`) and from every other bordered section on this page
-// (Events/Questions/Rules use plain `rounded`, not `rounded-md`) — see
-// client/src/ui/adherence/EventTimeline.tsx line ~201.
-function timelineRoot(page: Page) {
-  return page.locator("div.border.border-border.rounded-md.bg-card");
+// The review pane's period-level strip (window rules + composite). The
+// chronology itself renders in the SOURCE pane's Timeline tab — see
+// openSourceTimeline.
+function periodStrip(page: Page) {
+  return page.locator("div.border.border-border.rounded-md.bg-card").first();
 }
 
-// The scrollable track that holds the anchored event cards — a class combo
-// (`relative px-4 overflow-x-auto`) unique to EventTimeline.tsx in the whole
-// client tree, so `.locator("button")` here can only match anchored-event
-// cards, never the "Window rules" chips (a later sibling of this div) or any
-// Save/verdict button elsewhere on the page.
-function timelineTrack(page: Page) {
-  return page.locator("div.relative.px-4.overflow-x-auto");
+/** Open the source pane's Timeline tab, where the adherence days interleave
+ *  with the notes and encounters they were judged from. */
+async function openSourceTimeline(page: Page) {
+  await page.getByRole("button", { name: /^timeline$/i }).click();
+}
+
+/** Every adherence rule line in the chronology. Each carries its event_id as
+ *  the button's title, which is the stable handle — the visible text is the
+ *  rule name, which repeats across days. */
+function ruleLines(page: Page) {
+  return page.locator('button[title^="R-"]');
 }
 
 test.describe("adherence event timeline", () => {
@@ -124,20 +126,21 @@ test.describe("adherence event timeline", () => {
     await setActiveSession(page, TASK_ID, sid);
     await gotoPatient(page, TASK_ID, PATIENT_ID);
 
-    await expect(page.getByText(/Adherence timeline/i)).toBeVisible();
+    await expect(page.getByText(/Adherence ·/i)).toBeVisible();
     await expect(page.getByText(/Window rules \(whole observation window\)/i)).toBeVisible();
 
-    const firstCard = timelineTrack(page).locator("button").first();
-    await expect(firstCard).toBeVisible();
-    const eventId = (await firstCard.locator("div").first().textContent())?.trim();
-    expect(eventId, "first card should carry its event_id").toBeTruthy();
+    await openSourceTimeline(page);
+    const firstLine = ruleLines(page).first();
+    await expect(firstLine).toBeVisible();
+    const eventId = await firstLine.getAttribute("title");
+    expect(eventId, "a rule line should carry its event_id as its title").toBeTruthy();
 
-    // Not yet selected.
-    await expect(firstCard).toHaveAttribute("aria-current", "false");
+    await expect(firstLine).toHaveAttribute("aria-current", "false");
+    await firstLine.click();
+    await expect(firstLine).toHaveAttribute("aria-current", "true");
 
-    await firstCard.click();
-    await expect(firstCard).toHaveAttribute("aria-current", "true");
-
+    // Selecting in the chronology reopens (if collapsed) and scrolls to the
+    // reviewer's row for that event in the review pane.
     const row = page.locator(`[id="event-row-${eventId}"]`);
     await expect(row).toBeInViewport();
   });
@@ -163,9 +166,10 @@ test.describe("adherence event timeline", () => {
     expect(beforeMatch, "events counter should parse").toBeTruthy();
     const beforeN = parseInt(beforeMatch![1]!, 10);
 
-    const firstCard = timelineTrack(page).locator("button").first();
-    await firstCard.click();
-    const eventId = (await firstCard.locator("div").first().textContent())?.trim();
+    await openSourceTimeline(page);
+    const firstLine = ruleLines(page).first();
+    await firstLine.click();
+    const eventId = await firstLine.getAttribute("title");
     const row = page.locator(`[id="event-row-${eventId}"]`);
     await expect(row).toBeVisible();
 
@@ -212,13 +216,17 @@ test.describe("adherence event timeline", () => {
     // AdherenceReview's own blind auto-seed effect calls the deterministic
     // seed-events route on first load (no agent run, no import) — give it a
     // moment to land before asserting cards are present.
-    await expect(timelineTrack(page).locator("button").first()).toBeVisible({ timeout: 10_000 });
+    await openSourceTimeline(page);
+    await expect(ruleLines(page).first()).toBeVisible({ timeout: 10_000 });
 
-    // No engine/agent verdict output anywhere in the timeline — EventTimeline's
-    // showVerdicts (mode==="blind") gates both the composite summary and each
-    // card's verdict chip.
-    await expect(timelineRoot(page).getByText(/Composite:/i)).toHaveCount(0);
-    await expect(timelineRoot(page).getByText(/CONCORDANT/)).toHaveCount(0);
+    // No engine/agent verdict output anywhere. In blind mode buildAdherenceDays
+    // never BUILDS verdict text (it is not merely hidden by styling), and the
+    // review pane's composite is gated too.
+    await expect(periodStrip(page).getByText(/Composite:/i)).toHaveCount(0);
+    // Scoped to the chronology's rule lines: elsewhere on the page the
+    // annotator's OWN verdict dropdown legitimately offers "CONCORDANT" as an
+    // option, which is not a leak.
+    await expect(ruleLines(page).getByText(/CONCORDANT|NOT EVALUABLE|NOT SCORED/)).toHaveCount(0);
     // No agent-vs-human compare surface — the whole picker bar is `{!blind && (...)}`.
     await expect(page.getByText(/Compare with session/i)).toHaveCount(0);
   });

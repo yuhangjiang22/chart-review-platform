@@ -23,6 +23,32 @@ vi.mock("../auth", () => ({
   authFetch: vi.fn(),
 }));
 
+// The event chronology renders in the SOURCE pane's Timeline tab now, not in
+// this pane. Stubbing NoteViewer lets these tests assert on the contract
+// AdherenceReview actually owns — the `adherenceDays` it hands over — instead
+// of driving a tab in a component under test for other reasons. The shape of
+// those days (blind emits no verdict, compare pairs A/H, not-evaluable stays
+// distinct) is covered directly in ui/adherence/build-days.test.ts.
+const noteViewerProps: { current: Record<string, unknown> | null } = { current: null };
+vi.mock("../NoteViewer", () => ({
+  NoteViewer: (props: Record<string, unknown>) => {
+    noteViewerProps.current = props;
+    return null;
+  },
+}));
+
+/** The rule line the chronology would render for an event_id. */
+function chronologyLine(eventId: string): { verdict?: string; muted?: boolean; validated?: boolean; label?: string } {
+  const days = (noteViewerProps.current?.adherenceDays ?? []) as Array<{
+    rules: Array<{ event_id: string; label: string; verdict?: string; muted?: boolean; validated?: boolean }>;
+  }>;
+  for (const d of days) {
+    const hit = d.rules.find((r) => r.event_id === eventId);
+    if (hit) return hit;
+  }
+  throw new Error(`no chronology line for ${eventId}`);
+}
+
 import { authFetch } from "../auth";
 import { AdherenceReview } from "../ui/AdherenceReview";
 
@@ -1195,28 +1221,18 @@ function eventSaveBtn(row: HTMLElement): HTMLButtonElement {
 // 11. Event timeline + per-event validation (Task 4, event-concordance design)
 // ────────────────────────────────────────────────────────────────────────────
 describe("Event timeline + per-event validation", () => {
-  it("(a) timeline renders an anchored event card; clicking it selects the row and scrolls to it", async () => {
-    const scrollSpy = vi.spyOn(Element.prototype, "scrollIntoView").mockImplementation(() => {});
+  it("(a) the period strip reports the days of care", async () => {
     setupMocks({ state: () => stateWithEvents() });
     renderPane();
     await waitLoaded();
 
-    // "Adherence timeline" header confirms EventTimeline mounted.
-    expect(screen.getByText(/Adherence timeline/)).toBeInTheDocument();
-
-    // The timeline groups by day of care, so the event_id is no longer on the
-    // card face — it is the rule row's title. getByTitle returns that button.
-    const card = screen.getByTitle("ev_1") as HTMLButtonElement;
-    expect(card).toBeTruthy();
-
-    fireEvent.click(card!);
-    expect(card!.getAttribute("aria-current")).toBe("true");
-
-    // Scrolling now happens in a useEffect (after paint), not synchronously
-    // in the click handler — see fix I6 — so it must be awaited.
-    await waitFor(() => expect(scrollSpy).toHaveBeenCalled());
-    const scrolledEl = scrollSpy.mock.instances[0] as HTMLElement;
-    expect(scrolledEl.id).toBe("event-row-ev_1");
+    // The chronology itself renders in the SOURCE pane's Timeline tab now (the
+    // adherence days interleave with the notes and encounters they were judged
+    // from). What the review pane keeps is the period-level readout, and the
+    // day/rule mapping that feeds the chronology is covered directly in
+    // client/src/ui/adherence/build-days.test.ts.
+    expect(screen.getByText(/Adherence ·/)).toBeInTheDocument();
+    expect(screen.getByText(/2 days of care/)).toBeInTheDocument();
   });
 
   it("(b) EventRow Save posts ONLY the CHANGED answer, never a re-stamp of the untouched one (I8)", async () => {
@@ -1293,7 +1309,7 @@ describe("Event timeline + per-event validation", () => {
     renderPane();
     await waitLoaded();
 
-    expect(screen.queryByText(/Adherence timeline/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Adherence ·/)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Events/ })).not.toBeInTheDocument();
     expect(screen.queryByText(/Events:.*validated/)).not.toBeInTheDocument();
     // Everything else renders exactly as before.
@@ -1347,7 +1363,7 @@ describe("Event timeline + per-event validation", () => {
     expect(freshSel1.value).toBe("3");
   });
 
-  it("clicking a timeline card while the Events section is collapsed opens it and scrolls to the row (I6)", async () => {
+  it("selecting an event while the Events section is collapsed opens it and scrolls to the row (I6)", async () => {
     const scrollSpy = vi.spyOn(Element.prototype, "scrollIntoView").mockImplementation(() => {});
     setupMocks({ state: () => stateWithEvents() });
     renderPane();
@@ -1356,9 +1372,13 @@ describe("Event timeline + per-event validation", () => {
     fireEvent.click(screen.getByRole("button", { name: /^Events/ })); // collapse
     await waitFor(() => expect(document.getElementById("event-row-ev_1")).not.toBeInTheDocument());
 
-    const card = screen.getByTitle("ev_1") as HTMLButtonElement;
-    expect(card).toBeTruthy();
-    fireEvent.click(card!);
+    // The chronology now lives in the source pane and reports a selection
+    // through onSelectAdherenceEvent. Invoking the prop this pane hands over
+    // IS the contract under test — a window-rule chip would not do, since
+    // window rules deliberately do not open the section (they have no
+    // EventRow to scroll to).
+    const onSelect = noteViewerProps.current!.onSelectAdherenceEvent as (id: string) => void;
+    await act(async () => { onSelect("ev_1"); });
 
     // The section reopens (the row exists again)...
     await waitFor(() => expect(document.getElementById("event-row-ev_1")).toBeInTheDocument());
@@ -1637,18 +1657,6 @@ describe("Compare mode (Task 6)", () => {
     return picker;
   }
 
-  /** The timeline row <button> for a given event_id (present in both review
-   *  and compare mode — only its CONTENTS differ).
-   *
-   *  The timeline groups by DAY OF CARE, so a day's card carries one row per
-   *  rule judged there and the event_id is the row's title rather than its
-   *  visible text. */
-  function eventCard(eventId: string): HTMLButtonElement {
-    const card = screen.queryByTitle(eventId) as HTMLButtonElement | null;
-    if (!card) throw new Error(`timeline row not found for ${eventId}`);
-    return card;
-  }
-
   it("choosing a session issues the second review fetch (?session_id=<that id>), renders compare chips sourced from the agent draft (Critical 1), and excludes patient-uncovered sessions (Critical 2)", async () => {
     setupCompareMocks();
     renderPane();
@@ -1681,9 +1689,7 @@ describe("Compare mode (Task 6)", () => {
     // This is the assertion that fails against the pre-fix code (which read
     // canonical rule_events and would show "A: NC" here instead).
     await waitFor(() => {
-      const card = eventCard("ev_1");
-      expect(within(card).getByText("A: C")).toBeInTheDocument();
-      expect(within(card).getByText("H: NC")).toBeInTheDocument();
+      expect(chronologyLine("ev_1").verdict).toBe("A: C · H: NC");
     });
     // The axis-naming row names which agent draft is in use — proves the
     // shadow-map path (not the fallback) was taken.
@@ -1743,22 +1749,23 @@ describe("Compare mode (Task 6)", () => {
     await waitLoaded();
 
     const picker = await selectCompareSession("sess-2");
-    await waitFor(() => expect(within(eventCard("ev_1")).getByText("A: C")).toBeInTheDocument());
+    await waitFor(() => expect(chronologyLine("ev_1").verdict).toContain("A: C"));
 
     fireEvent.change(picker, { target: { value: "" } });
 
     await waitFor(() => {
-      const card = eventCard("ev_1");
-      // No compare chips left...
-      expect(within(card).queryByText(/^A:/)).not.toBeInTheDocument();
-      expect(within(card).queryByText(/^H:/)).not.toBeInTheDocument();
+      // No compare pair left...
+      expect(chronologyLine("ev_1").verdict ?? "").not.toContain("A:");
       // ...and the plain review-mode verdict badge is back, reading the
       // CANONICAL (reviewer-edited) verdict — NON_CONCORDANT on
       // ACTIVE_STATE_REVIEWER_EDITED — not the agent draft the compare
       // chip used a moment ago. Review mode was never in scope for the
       // Critical-1 fix; it's correct for it to show the current, edited
       // truth.
-      expect(within(card).getByText("NON-CONCORDANT")).toBeInTheDocument();
+      // ...and the plain review verdict is back, reading the CANONICAL
+      // (reviewer-edited) value rather than the agent draft the compare pair
+      // showed a moment ago.
+      expect(chronologyLine("ev_1").verdict).toBe("NON_CONCORDANT");
     });
     // The summary disappears along with compare mode.
     expect(screen.queryByText(/matched:/)).not.toBeInTheDocument();
@@ -1784,8 +1791,7 @@ describe("Compare mode (Task 6)", () => {
       expect(screen.getByText("this session has no state for p1")).toBeInTheDocument();
     });
     // NOT total disagreement — no chips, no summary at all.
-    expect(within(eventCard("ev_1")).queryByText(/^A:/)).not.toBeInTheDocument();
-    expect(within(eventCard("ev_1")).queryByText(/^H:/)).not.toBeInTheDocument();
+    expect(chronologyLine("ev_1").verdict ?? "").not.toContain("A:");
     expect(screen.queryByText(/matched:/)).not.toBeInTheDocument();
   });
 
@@ -1795,7 +1801,7 @@ describe("Compare mode (Task 6)", () => {
     await waitLoaded();
 
     await selectCompareSession("sess-2");
-    await waitFor(() => expect(within(eventCard("ev_1")).getByText("A: C")).toBeInTheDocument());
+    await waitFor(() => expect(chronologyLine("ev_1").verdict).toContain("A: C"));
 
     // App can auto-select the EXACT session the reviewer picked as compare,
     // without remounting AdherenceReview — just a changed activeSessionId prop.
@@ -1810,9 +1816,7 @@ describe("Compare mode (Task 6)", () => {
     );
 
     await waitFor(() => {
-      const card = eventCard("ev_1");
-      expect(within(card).queryByText(/^A:/)).not.toBeInTheDocument();
-      expect(within(card).queryByText(/^H:/)).not.toBeInTheDocument();
+      expect(chronologyLine("ev_1").verdict ?? "").not.toContain("A:");
     });
     expect(screen.queryByText(/matched:/)).not.toBeInTheDocument();
   });
@@ -1850,7 +1854,7 @@ describe("Compare mode (Task 6)", () => {
     await waitLoaded();
     await selectCompareSession("sess-2");
 
-    await waitFor(() => expect(within(eventCard("ev_1")).getByText("A: C")).toBeInTheDocument());
+    await waitFor(() => expect(chronologyLine("ev_1").verdict).toContain("A: C"));
 
     const row = eventRowFor("ev_1");
     const sel = within(row).getByRole("combobox") as HTMLSelectElement;
@@ -1858,7 +1862,7 @@ describe("Compare mode (Task 6)", () => {
     fireEvent.click(eventSaveBtn(row));
 
     await waitFor(() => {
-      expect(within(eventCard("ev_1")).getByText("A: NC")).toBeInTheDocument();
+      expect(chronologyLine("ev_1").verdict).toContain("A: NC");
     });
     // The summary survives the refresh too — not blown away by the identity
     // change in `state` a successful save always triggers.
@@ -1903,13 +1907,9 @@ describe("Compare mode (Task 6)", () => {
     await selectCompareSession("sess-2");
 
     await waitFor(() => {
-      const card = eventCard("ev_ne");
-      expect(within(card).getByText("A: NE")).toBeInTheDocument();
-      expect(within(card).getByText("H: NE")).toBeInTheDocument();
+      expect(chronologyLine("ev_ne").verdict).toBe("A: NE · H: NE");
     });
-    const agentOnlyCard = eventCard("ev_agent_only");
-    expect(within(agentOnlyCard).getByText("A: C")).toBeInTheDocument();
-    expect(within(agentOnlyCard).getByText("H: —")).toBeInTheDocument();
+    expect(chronologyLine("ev_agent_only").verdict).toBe("A: C · H: —");
   });
 
   it("shows a work-list mismatch warning when the two sessions' rule_events_provenance hashes differ (Important 4)", async () => {
@@ -2016,7 +2016,7 @@ describe("Compare mode (Task 6)", () => {
     // warning is IN ADDITION to that, not a replacement for it.
     expect(screen.getByText(/agent draft: agent_1/)).toBeInTheDocument();
     // Every "A:" chip reads absent — never a fabricated verdict.
-    expect(within(eventCard("ev_1")).getByText("A: —")).toBeInTheDocument();
+    expect(chronologyLine("ev_1").verdict).toContain("A: —");
   });
 
   it("an empty array under one agent key is skipped in favor of a non-empty one (Important 4, filter-before-pick)", async () => {
@@ -2049,7 +2049,7 @@ describe("Compare mode (Task 6)", () => {
     // Full coverage from agent_2's shadow — no stale-shadow warning.
     expect(screen.queryByText(/stale shadow/)).not.toBeInTheDocument();
     // ev_1's chip correctly reflects agent_2's CONCORDANT draft.
-    expect(within(eventCard("ev_1")).getByText("A: C")).toBeInTheDocument();
+    expect(chronologyLine("ev_1").verdict).toContain("A: C");
   });
 
   it("blind mode never renders the compare picker", async () => {
@@ -2074,7 +2074,7 @@ describe("Compare mode (Task 6)", () => {
 
     await waitFor(() => expect(screen.getByText(/BLIND MODE/)).toBeInTheDocument());
     // Sanity: this really is the normal (non-refusal) blind render path.
-    expect(screen.getByText(/Adherence timeline/)).toBeInTheDocument();
+    expect(screen.getByText(/Adherence ·/)).toBeInTheDocument();
     expect(screen.queryByLabelText(/compare with session/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/matched:/)).not.toBeInTheDocument();
   });
@@ -2102,9 +2102,9 @@ describe("Compare mode (Task 6)", () => {
     // the compare fetch's failure doesn't blow it away.
     expect(screen.getByText("Question framework")).toBeInTheDocument();
     expect(screen.getByText("Rule verdicts")).toBeInTheDocument();
-    expect(screen.getByText(/Adherence timeline/)).toBeInTheDocument();
+    expect(screen.getByText(/Adherence ·/)).toBeInTheDocument();
     // Compare mode never activated — no chips, timeline stayed in review mode.
-    expect(within(eventCard("ev_1")).queryByText(/^A:/)).not.toBeInTheDocument();
+    expect(chronologyLine("ev_1").verdict ?? "").not.toContain("A:");
   });
 });
 
