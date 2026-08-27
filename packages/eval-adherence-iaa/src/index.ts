@@ -356,6 +356,26 @@ export function computeAdherenceIaa(input: AdherenceIaaInput): AdherenceIaaRepor
 //      distinct from "NONE" and DOES enter the scored population against a
 //      counterpart that carries an actual verdict.
 //
+// (Important 5, Task 7 re-review) The SAME exclusion applies when only ONE
+// side is "NONE" — not just the NONE/NONE both-unscored case above. If side
+// A already committed a real verdict for a matched-anchored event but side
+// B (the gold) hasn't reached it yet, that pair is excluded from
+// `verdict_n`/`verdict_agreement` entirely — it is not counted as a
+// disagreement even though a real, uncontradicted verdict exists on one
+// side. This is UNDOCUMENTED-BY-DESIGN behavior, not a bug: scoring a
+// one-sided verdict as a disagreement would penalize incompleteness twice
+// (once via the completeness fractions, once via a manufactured
+// disagreement against a stub). But it has the identical externally-visible
+// failure mode the both-unscored fix above was raised to kill: measured,
+// dropping ONE gold verdict out of three moved verdict_agreement from
+// 33.3% (n=3) to 50.0% (n=2) — the incomplete pass reads BETTER than the
+// complete one. The CLI's completeness gate (scripts/asthma-annotate/
+// iaa-events.ts) is the ONLY thing standing between this function and that
+// outcome reaching a report: it refuses to print the headline kappa/
+// agreement whenever completeness_a or completeness_b < 1, and
+// `--allow-incomplete` is what releases it. Anyone calling this function
+// directly (bypassing the CLI) gets no such protection.
+//
 // (C3) `cohensKappa` returns 1 for a no-variance population (a documented
 // convention of the shared helper, harmless where it's already used) but
 // that reads as "perfect agreement" for what is really "nothing to
@@ -410,13 +430,20 @@ export interface PerEventReport {
    *  coerced to 1 for a no-variance population (C3) or to 0 for no data. */
   verdict_kappa: number;
   /** Present iff verdict_kappa is NaN, so a consumer can't mistake NaN
-   *  (which JSON serializes to null) for "no data" vs "no variance". */
-  verdict_kappa_reason?: "insufficient_pairs" | "no_label_variance";
+   *  (which JSON serializes to null) for "no data" vs "no variance" vs one
+   *  rater being degenerate (Critical 2, Task 7 re-review). */
+  verdict_kappa_reason?: "insufficient_pairs" | "no_label_variance" | "constant_rater_a" | "constant_rater_b";
   /** Matched-anchored pairs where BOTH sides are scored — the population
    *  feeding verdict_kappa and verdict_agreement. */
   verdict_n: number;
   /** Raw fraction of verdict_n pairs where labels agree. NaN when
-   *  verdict_n === 0. Distinct from verdict_kappa (chance-corrected). */
+   *  verdict_n === 0. Distinct from verdict_kappa (chance-corrected).
+   *  KNOWN GAP (Task 7 re-review #2): this field, completeness_a/b, and
+   *  enumeration.jaccard (+ its by_origin copies) can all be NaN with no
+   *  accompanying "_reason" field — only verdict_kappa carries one. A
+   *  consumer has to infer which of "no data" / "n=0 denominator" applies
+   *  from context (verdict_n, enumeration.matched, etc.) rather than
+   *  reading it off a dedicated field the way verdict_kappa_reason lets it. */
   verdict_agreement: number;
   /** Observed label counts over the verdict_n population — surfaces
    *  prevalence skew that can make a low kappa look like a bug when it
@@ -491,12 +518,38 @@ function indexEvents(events: EventSide[], side: "a" | "b"): Map<string, EventKey
 
 /** cohensKappa returns 1 for <2 pairs or <2 distinct labels — a documented
  *  convention that's misleading for this surface (C3, see file header).
- *  Returns NaN with a reason instead of delegating to that convention. */
-function eventKappa(cells: KappaCell[]): { kappa: number; reason?: "insufficient_pairs" | "no_label_variance" } {
+ *  Returns NaN with a reason instead of delegating to that convention.
+ *
+ *  (Critical 2, Task 7 re-review) The union-of-both-raters check above only
+ *  catches the case where every pair shares the SAME single label across
+ *  BOTH sides at once (e.g. every pair is CONCORDANT/CONCORDANT). It does
+ *  NOT catch the more common real-world regime: only ONE rater's marginal
+ *  is constant while the other varies — a CONCORDANT-heavy blind gold that
+ *  never once used NON_CONCORDANT, paired against an agent whose verdicts
+ *  do vary. Whenever one rater's marginal has a single value, pExp for that
+ *  label collapses to exactly the same value as pObs (P(both=label) =
+ *  P(other rater=label) since the constant rater contributes probability 1
+ *  to every one of those pairs), forcing kappa to identically 0 —
+ *  regardless of whether the other rater agreed 99% of the time or 1% of
+ *  the time. Measured: a constant-CONCORDANT gold against a varying agent
+ *  returns kappa=0.0000 at 50%, 90%, 10%, AND 99% raw agreement. Asthma
+ *  golds are CONCORDANT-heavy, so this is the expected regime, and
+ *  "kappa=0.000" in a Methods section reads as "no better than chance" when
+ *  the true problem is just that the math is undefined here. Check each
+ *  rater's own marginal independently and refuse with a dedicated reason
+ *  before that math ever runs. */
+function eventKappa(cells: KappaCell[]): {
+  kappa: number;
+  reason?: "insufficient_pairs" | "no_label_variance" | "constant_rater_a" | "constant_rater_b";
+} {
   if (cells.length < 2) return { kappa: Number.NaN, reason: "insufficient_pairs" };
   const labels = new Set<string>();
   for (const c of cells) { labels.add(c.rater_a); labels.add(c.rater_b); }
   if (labels.size < 2) return { kappa: Number.NaN, reason: "no_label_variance" };
+  const aLabels = new Set(cells.map((c) => c.rater_a));
+  if (aLabels.size < 2) return { kappa: Number.NaN, reason: "constant_rater_a" };
+  const bLabels = new Set(cells.map((c) => c.rater_b));
+  if (bLabels.size < 2) return { kappa: Number.NaN, reason: "constant_rater_b" };
   return { kappa: cohensKappa(cells) };
 }
 
@@ -581,6 +634,17 @@ export function computePerEventMetrics(a: EventSide[], b: EventSide[]): PerEvent
       if (av.rule_id !== bv.rule_id) {
         throw new Error(
           `computePerEventMetrics: key ${key} disagrees on rule_id (a=${av.rule_id}, b=${bv.rule_id})`,
+        );
+      }
+      // (Important 3, Task 7 re-review) origin used to fall through to the
+      // `(av?.origin ?? bv?.origin)!` silent-A-wins line below, miscategorizing
+      // any disagreement into whichever origin side A happened to carry — the
+      // tautological omop stratum, most of the time. anchored and rule_id
+      // already throw on the same kind of disagreement; origin gets the same
+      // treatment instead of being silently resolved.
+      if (av.origin !== bv.origin) {
+        throw new Error(
+          `computePerEventMetrics: key ${key} disagrees on origin (a=${av.origin}, b=${bv.origin})`,
         );
       }
     }
