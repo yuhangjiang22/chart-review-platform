@@ -82,10 +82,10 @@ function periodStrip(page: Page) {
   return page.locator("div.border.border-border.rounded-md.bg-card").first();
 }
 
-/** Open the source pane's Timeline tab, where the adherence days interleave
- *  with the notes and encounters they were judged from. */
+/** Open the source pane's Events tab — the adherence chronology. Kept separate
+ *  from the Timeline tab, which shows only what the chart records. */
 async function openSourceTimeline(page: Page) {
-  await page.getByRole("button", { name: /^timeline$/i }).click();
+  await page.getByRole("button", { name: /^events$/i }).click();
 }
 
 /** Every adherence rule line in the chronology. Each carries its event_id as

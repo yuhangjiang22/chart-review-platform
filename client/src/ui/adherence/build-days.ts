@@ -1,13 +1,33 @@
-// Reduce rule_events to the display shape the source pane's Timeline tab
-// renders (TimelineTab's AdherenceDay).
+// Reduce rule_events to the display shape the source pane's Events tab renders.
 //
 // EVERY mode-dependent decision lives here, deliberately: blind mode emits no
 // verdict text at all, so there is exactly one place an agent verdict could
 // leak into a gold-collection view, and it is a pure function that can be
 // tested exhaustively rather than a rendered pane that has to be driven.
-// TimelineTab never learns what blind or compare mean.
-import type { AdherenceDay, AdherenceRuleLine } from "../../TimelineTab";
+// EventsTab never learns what blind or compare mean.
 import { isAnchoredEvent, type RuleEvent } from "./types";
+
+/** One rule judged at a day of care, already reduced to display text. The
+ *  caller owns every mode-dependent decision — blind mode produces no
+ *  `verdict` at all — so the rendering component has nothing to gate and there
+ *  is exactly one place an agent verdict could leak into a blind view. */
+export interface AdherenceRuleLine {
+  event_id: string;
+  label: string;
+  /** Display text for the verdict chip. Omitted → no chip (blind mode). */
+  verdict?: string;
+  /** Muted styling for "not evaluable" / "not yet scored" rather than a verdict. */
+  muted?: boolean;
+  validated?: boolean;
+}
+
+/** A day of care with the adherence rules judged at it. */
+export interface AdherenceDay {
+  date: string;
+  /** What happened that day, already in clinical words ("Clinic visit"). */
+  kinds: string[];
+  rules: AdherenceRuleLine[];
+}
 
 /** What happened, in clinical words — the day's headline. */
 const ANCHOR_KIND_LABEL: Record<string, string> = {
@@ -64,7 +84,8 @@ export function buildAdherenceDays(input: BuildDaysInput): AdherenceDay[] {
   }
 
   return [...byDate.entries()]
-    // Newest first, matching the chronology it merges into.
+    // Newest first, matching the source pane's Timeline tab so the two
+    // chronologies read the same way when a reviewer flips between them.
     .sort(([a], [b]) => b.localeCompare(a))
     .map(([date, evs]) => ({
       date,

@@ -10,7 +10,9 @@ import type {
 } from "./types";
 import { authFetch } from "./auth";
 import { StructuredTab, type StructuredData } from "./StructuredTab";
-import { TimelineTab, type AdherenceDay } from "./TimelineTab";
+import { TimelineTab } from "./TimelineTab";
+import { EventsTab } from "./ui/adherence/EventsTab";
+import type { AdherenceDay } from "./ui/adherence/build-days";
 import type { Citer } from "./citers";
 import { citerKey, citerLabel, buildCitersByNoteSpan, buildCitersByRowKey } from "./citers";
 import { CiterChip } from "./atoms/CiterChip";
@@ -27,9 +29,10 @@ interface Props {
   selectedField?: CompiledField | null;
   /** Assessment for the active criterion (current answer + cited evidence). */
   selectedAssessment?: FieldAssessment | null;
-  /** Adherence days to interleave into the Timeline tab's chronology, already
-   *  reduced to display text by the caller (adherence tasks only — see
-   *  TimelineTab's AdherenceDay). Passed straight through. */
+  /** Adherence days for the Events tab, already reduced to display text by the
+   *  caller (adherence tasks only — see build-days' AdherenceDay). Supplying a
+   *  non-empty list is what makes the tab appear; phenotype and NER tasks pass
+   *  nothing and see the tab strip unchanged. */
   adherenceDays?: AdherenceDay[];
   onSelectAdherenceEvent?: (eventId: string) => void;
   selectedAdherenceEventId?: string | null;
@@ -61,7 +64,7 @@ interface Props {
 
 type ActiveView = { kind: "note"; filename: string };
 
-type MainTab = "notes" | "structured" | "timeline";
+type MainTab = "notes" | "structured" | "timeline" | "events";
 
 /** Map OMOP-canonical table names → the simplified plurals the UI tabs use.
  *  Agents emit canonical names in evidence; tabs are keyed by the plurals.
@@ -571,9 +574,16 @@ export function NoteViewer({
       ([k, v]) => k !== "index_date" && Array.isArray(v) && v.length > 0,
     );
   }, [structured]);
-  const mainTabs: MainTab[] = hasStructured
-    ? ["notes", "structured", "timeline"]
-    : ["notes", "timeline"];
+  // The Events tab appears only for adherence tasks (the caller supplies days).
+  // It is kept OUT of the Timeline tab on purpose: Timeline is a view of what
+  // the chart records, Events of what the instrument judged, and mixing them
+  // made both harder to read.
+  const mainTabs: MainTab[] = [
+    "notes",
+    ...(hasStructured ? ["structured" as const] : []),
+    "timeline",
+    ...(adherenceDays?.length ? ["events" as const] : []),
+  ];
   const { citedNotes, otherNotes } = useMemo(() => {
     const cited: NoteListing[] = [];
     const other: NoteListing[] = [];
@@ -1121,9 +1131,6 @@ export function NoteViewer({
             activeFieldId={selectedField?.id ?? null}
             citedKeys={citedStructuredKeys}
             citersByRowKey={citersByRowKey}
-            adherenceDays={adherenceDays}
-            onSelectAdherenceEvent={onSelectAdherenceEvent}
-            selectedAdherenceEventId={selectedAdherenceEventId}
             // Only narrow to cited rows when this criterion actually cited
             // structured evidence. Otherwise (e.g. a note-only item) show the
             // full structured browser rather than an empty filtered list.
@@ -1138,6 +1145,16 @@ export function NoteViewer({
         </div>
       )}
 
+      {mainTab === "events" && (
+        <div className="flex-1 min-h-0 overflow-auto">
+          <EventsTab
+            days={adherenceDays ?? []}
+            indexDate={effectiveIndexDate}
+            selectedEventId={selectedAdherenceEventId}
+            onSelectEvent={onSelectAdherenceEvent}
+          />
+        </div>
+      )}
       {mainTab === "timeline" && (
         <div className="flex-1 min-h-0 overflow-auto">
           <TimelineTab
@@ -1151,9 +1168,6 @@ export function NoteViewer({
             activeFieldId={selectedField?.id ?? null}
             citedKeys={citedStructuredKeys}
             citersByRowKey={citersByRowKey}
-            adherenceDays={adherenceDays}
-            onSelectAdherenceEvent={onSelectAdherenceEvent}
-            selectedAdherenceEventId={selectedAdherenceEventId}
             citedNoteIds={citedNoteIds}
             showOnlyCited={showOnlyCited && hasCitedAny}
             onOpenNote={(noteId) => {
