@@ -4,15 +4,17 @@
   "ref": "encounters:12102",
   "meta": {
    "kind": "outpatient",
-   "n_encounters": 1
+   "n_encounters": 1,
+   "kind_from": "linked_dx"
   }
  },
  {
   "date": "2025-11-15",
-  "ref": "encounters:12201",
+  "ref": "encounters:12106",
   "meta": {
    "kind": "ed",
-   "n_encounters": 1
+   "n_encounters": 2,
+   "kind_from": "linked_dx"
   }
  },
  {
@@ -20,7 +22,8 @@
   "ref": "encounters:12103",
   "meta": {
    "kind": "outpatient",
-   "n_encounters": 1
+   "n_encounters": 1,
+   "kind_from": "linked_dx"
   }
  },
  {
@@ -28,7 +31,8 @@
   "ref": "encounters:12104",
   "meta": {
    "kind": "outpatient",
-   "n_encounters": 1
+   "n_encounters": 1,
+   "kind_from": "linked_dx"
   }
  }
 ]

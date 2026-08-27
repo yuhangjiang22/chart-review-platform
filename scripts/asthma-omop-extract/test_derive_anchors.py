@@ -421,3 +421,66 @@ def test_two_real_asthma_courses_still_establish_the_obligation():
     assert [e["date"] for e in exac] == ["2025-02-10", "2025-09-03"]
     assert [o["date"] for o in obligation] == ["2025-09-03"]
     assert obligation[0]["meta"]["deadline"] == "2025-11-20"
+
+
+# --- (g) decision 6: the setting is decided from LINKED encounters only ------
+#
+# `asthma_related` is a DAY-level flag by design (8.0% of J45 condition rows have
+# no visit_occurrence_id), so every unrelated visit sharing a day with an asthma
+# diagnosis inherits it. Same-day collapsing absorbs that into one anchor, but the
+# anchor's OUTPATIENT-vs-ED label was computed over all of them: an asthma ED
+# visit sharing a date with an orthopedics appointment came out OUTPATIENT.
+# 6,322 of the 30,257 ED-only asthma days in the real extract (21%).
+
+
+def _linked(row, linked=True):
+    row["asthma_dx_linked"] = linked
+    return row
+
+
+def test_ed_asthma_day_is_not_relabelled_by_an_unrelated_same_day_clinic_visit():
+    encounters = [
+        _linked(_ed("e1", "2025-06-12")),                       # the asthma ED visit
+        _linked(_enc("e2", "2025-06-12"), linked=False),        # orthopedics, flag inherited
+    ]
+    a = asthma_encounter_anchors(encounters, WIN, {})
+    assert len(a) == 1
+    assert a[0]["meta"]["kind"] == "ed"
+    assert a[0]["meta"]["kind_from"] == "linked_dx"
+    assert a[0]["meta"]["n_encounters"] == 2       # both still collapse into the day
+
+
+def test_a_genuinely_linked_clinic_visit_still_makes_the_day_outpatient():
+    encounters = [
+        _linked(_ed("e1", "2025-06-12")),
+        _linked(_enc("e2", "2025-06-12")),          # a real asthma clinic visit
+    ]
+    a = asthma_encounter_anchors(encounters, WIN, {})
+    assert a[0]["meta"]["kind"] == "outpatient"
+    assert a[0]["meta"]["kind_from"] == "linked_dx"
+
+
+def test_no_linked_encounter_falls_back_to_every_flagged_one():
+    # The 5.7% of asthma-dx days whose diagnosis row had no visit link at all.
+    # Discarding the day would throw away a real asthma visit, so the fallback
+    # decides the setting — and says so.
+    encounters = [
+        _linked(_ed("e1", "2025-06-12"), linked=False),
+        _linked(_enc("e2", "2025-06-12"), linked=False),
+    ]
+    a = asthma_encounter_anchors(encounters, WIN, {})
+    assert a[0]["meta"]["kind"] == "outpatient"
+    assert a[0]["meta"]["kind_from"] == "date_fallback"
+
+
+def test_extract_predating_the_field_keeps_the_old_behaviour():
+    # No asthma_dx_linked key at all: read as not-linked, so the fallback applies
+    # and nothing changes silently for an un-regenerated extract.
+    a = asthma_encounter_anchors([_ed("e1", "2025-06-12"), _enc("e2", "2025-06-12")], WIN, {})
+    assert a[0]["meta"]["kind"] == "outpatient"
+    assert a[0]["meta"]["kind_from"] == "date_fallback"
+
+
+def test_linked_ed_only_day_stays_ed():
+    a = asthma_encounter_anchors([_linked(_ed("e1", "2025-06-12"))], WIN, {})
+    assert a[0]["meta"] == {"kind": "ed", "n_encounters": 1, "kind_from": "linked_dx"}

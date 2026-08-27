@@ -182,6 +182,29 @@ def main():
             enc.append({"row_id": r["row_id"], "encounter_id": r["row_id"], "type": typ,
                         "is_ed": r["visit_concept_id"] == 9203,
                         "asthma_related": (str(r["row_id"]) in avid) or (sd in adate),
+                        # PROVENANCE of the flag above, which is otherwise
+                        # unrecoverable downstream (conditions.json drops
+                        # visit_occurrence_id when it dedups by concept).
+                        #
+                        # `asthma_related` is deliberately permissive: 8.0% of
+                        # J45 condition rows in this extract carry no
+                        # visit_occurrence_id, so a visit-link-only test would
+                        # discard real asthma visits. The date fallback rescues
+                        # them — and also flags every OTHER visit that day, which
+                        # in this extract is 331,596 encounters that had nothing
+                        # to do with asthma.
+                        #
+                        # derive_anchors collapses same-day encounters, so the
+                        # noise costs no extra anchors. It DID cost the anchor's
+                        # setting label: `meta.kind` was decided over every
+                        # flagged encounter that day, so an asthma ED visit
+                        # sharing a date with an unrelated clinic appointment was
+                        # labelled OUTPATIENT — 6,322 of the 30,257 ED-only
+                        # asthma days (21%). That label carries the study's
+                        # per-setting stratification. This field lets the setting
+                        # be decided from the encounters that actually carry the
+                        # diagnosis.
+                        "asthma_dx_linked": str(r["row_id"]) in avid,
                         "start_date": sd, "end_date": str(r["end_date"])[:10] if r["end_date"] else None})
         enc.sort(key=lambda x: x["start_date"])
         measurements = sorted([{"row_id":r["row_id"],"concept_id":r["concept_id"],"concept_name":r["concept_name"],

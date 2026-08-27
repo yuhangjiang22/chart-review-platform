@@ -5,7 +5,7 @@ Reads corpus/patients/<pid>/omop/{demographics,encounters,drugs}.json and
 writes corpus/patients/<pid>/anchors/{asthma_encounters,ocs_bursts,
 exacerbations,obligation_points}.json (spec 2026-08-24, revised 2026-08-27).
 
-Five decisions are baked in here; all five were audit findings against the
+Six decisions are baked in here; all six were audit findings against the
 study documents, so each carries its source:
 
 1. OBSERVATION WINDOW. Every anchor list is restricted to the 12 months
@@ -81,6 +81,22 @@ study documents, so each carries its source:
    both ends — single-dose dexamethasone is used for asthma too, and 3-week
    tapers exist. Asthma attribution is the load-bearing test; duration would
    only add false negatives on top of it.
+
+6. THE ANCHOR'S SETTING (meta.kind) IS DECIDED FROM LINKED ENCOUNTERS ONLY.
+   See asthma_encounter_anchors' docstring. Short version: `asthma_related` is
+   a DAY-level flag by design (8.0% of J45 condition rows have no
+   visit_occurrence_id, so a link-only test would discard real asthma visits),
+   which means every unrelated visit sharing a day with an asthma diagnosis
+   inherits it — 331,596 encounters in this extract. Same-day collapsing
+   already absorbs that into one anchor, but the anchor's OUTPATIENT-vs-ED
+   label was still computed over all of them, so an asthma ED visit sharing a
+   date with an orthopedics appointment came out labelled outpatient: 6,322 of
+   the 30,257 ED-only asthma days (21%). That label carries the study's
+   per-setting stratification. Encounters whose diagnosis genuinely points at
+   them (`asthma_dx_linked`, added to etl.py's encounter rows for this) now
+   decide the setting; the date fallback decides it only when no encounter that
+   day is linked, which is what the fallback exists for. `meta.kind_from`
+   records which of the two applied.
 
 Every date is normalized through parse_date().isoformat() before it becomes
 part of an anchor's identity; rows/fills whose date can't be parsed are
@@ -187,11 +203,28 @@ def asthma_encounter_anchors(encounters, win, stats=None):
 
     Same-day rows collapse into one anchor (decision 2 in the module
     docstring). The surviving `ref` is the lexicographically first row_id on
-    that day, so the choice is deterministic and reproducible. `meta.kind` is
-    "outpatient" when ANY qualifying encounter that day was non-ED, else
-    "ed" — a day carrying both an ED visit and a clinic visit is an
-    outpatient decision point, and the ED/outpatient stratification of the
+    that day, so the choice is deterministic and reproducible.
+
+    `meta.kind` is "outpatient" when any qualifying encounter that day was
+    non-ED, else "ed" — a day carrying both an ED visit and a clinic visit IS an
+    outpatient decision point. The ED/outpatient stratification of the
     step-therapy results reads this field.
+
+    THE SETTING IS DECIDED FROM LINKED ENCOUNTERS ONLY (decision 6). `asthma_related`
+    is permissive by design: 8.0% of J45 condition rows carry no
+    visit_occurrence_id, so the flag falls back to "any visit on a day with an
+    asthma diagnosis", which also flags every unrelated visit that day
+    (331,596 encounters in this extract). Same-day collapsing means that costs
+    no extra anchors — but it did cost the LABEL: an asthma ED visit sharing a
+    date with an orthopedics appointment was called OUTPATIENT, because the
+    orthopedics row is non-ED and had inherited the flag. 6,322 of the 30,257
+    ED-only asthma days (21%). So when any encounter that day carries
+    `asthma_dx_linked` (etl.py: the diagnosis genuinely points at that visit),
+    only those decide the setting. When none does — the 5.7% of asthma-dx days
+    whose diagnosis row had no visit link at all — every flagged encounter
+    decides it, which is the fallback's whole purpose. A row omitting the key
+    reads as not-linked, so an extract predating the field keeps the old
+    behaviour rather than silently changing.
 
     If `stats` (a dict) is given, each qualifying row whose start_date fails
     to parse increments stats["skipped"] and is excluded (not defaulted to
@@ -215,19 +248,28 @@ def asthma_encounter_anchors(encounters, win, stats=None):
             stats["out_of_window"] = stats.get("out_of_window", 0) + 1
             continue
         key = d.isoformat()
-        slot = by_day.setdefault(key, {"refs": [], "any_outpatient": False})
+        slot = by_day.setdefault(key, {"refs": [], "linked": [], "all": []})
         slot["refs"].append(str(r.get("row_id")))
-        if not _is_ed(r, typ):
-            slot["any_outpatient"] = True
+        is_ed = _is_ed(r, typ)
+        slot["all"].append(is_ed)
+        if r.get("asthma_dx_linked") is True:
+            slot["linked"].append(is_ed)
     out = []
     for day in sorted(by_day):
         slot = by_day[day]
+        # Linked encounters decide the setting when there are any; otherwise
+        # every flagged encounter does (see the docstring).
+        basis = slot["linked"] or slot["all"]
         out.append({
             "date": day,
             "ref": f"encounters:{sorted(slot['refs'])[0]}",
             "meta": {
-                "kind": "outpatient" if slot["any_outpatient"] else "ed",
+                "kind": "outpatient" if any(not ed for ed in basis) else "ed",
                 "n_encounters": len(slot["refs"]),
+                # How the setting above was decided, so a reviewer reading a
+                # surprising label can tell whether it rests on a linked
+                # diagnosis or on the date fallback.
+                "kind_from": "linked_dx" if slot["linked"] else "date_fallback",
             },
         })
     return out

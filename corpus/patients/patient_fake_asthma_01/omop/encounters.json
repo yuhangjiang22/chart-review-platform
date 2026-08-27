@@ -9,7 +9,8 @@
   "end_date": "2025-03-10",
   "chief_complaint": "cough, wheeze after URI",
   "is_ed": false,
-  "asthma_related": true
+  "asthma_related": true,
+  "asthma_dx_linked": true
  },
  {
   "row_id": 12101,
@@ -20,7 +21,8 @@
   "start_date": "2025-05-12",
   "end_date": "2025-05-12",
   "is_ed": false,
-  "asthma_related": false
+  "asthma_related": false,
+  "asthma_dx_linked": false
  },
  {
   "row_id": 12102,
@@ -31,7 +33,21 @@
   "start_date": "2025-11-04",
   "end_date": "2025-11-04",
   "is_ed": false,
-  "asthma_related": true
+  "asthma_related": true,
+  "asthma_dx_linked": true
+ },
+ {
+  "row_id": 12106,
+  "encounter_id": "enc_e8106",
+  "type": "Outpatient",
+  "department": "Orthopedics",
+  "primary_provider": "S. Iyer, MD",
+  "start_date": "2025-11-15",
+  "end_date": "2025-11-15",
+  "chief_complaint": "wrist injury, follow-up cast check",
+  "is_ed": false,
+  "asthma_related": true,
+  "asthma_dx_linked": false
  },
  {
   "row_id": 12201,
@@ -44,7 +60,8 @@
   "chief_complaint": "wheezing, shortness of breath",
   "discharge_disposition": "Home",
   "is_ed": true,
-  "asthma_related": true
+  "asthma_related": true,
+  "asthma_dx_linked": true
  },
  {
   "row_id": 12103,
@@ -55,7 +72,8 @@
   "start_date": "2025-12-16",
   "end_date": "2025-12-16",
   "is_ed": false,
-  "asthma_related": true
+  "asthma_related": true,
+  "asthma_dx_linked": true
  },
  {
   "row_id": 12104,
@@ -66,6 +84,7 @@
   "start_date": "2026-04-12",
   "end_date": "2026-04-12",
   "is_ed": false,
-  "asthma_related": true
+  "asthma_related": true,
+  "asthma_dx_linked": true
  }
 ]
