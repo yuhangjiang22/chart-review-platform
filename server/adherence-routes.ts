@@ -30,6 +30,15 @@
 //     are NOT settable here — they are engine-derived; rule-verdict above
 //     remains the reviewer's explicit period-level override channel.
 //
+//   POST  /api/reviews/:patientId/:taskId/adherence/add-event
+//     body: { rule_id, anchor_type?, date, note_id }
+//     Reviewer-side counterpart to the agent's set_event_answer(new_event):
+//     adds a note-documented event the structured enumeration missed, so the
+//     per-event enumeration metric can differ in BOTH directions. Created
+//     with no answers — answer it through event-verdict. Same event_id
+//     format as the agent's supplement, so one clinical episode found by
+//     both sides is one key. 409 when the id already exists.
+//
 //   POST  /api/reviews/:patientId/:taskId/adherence/seed-events
 //     body: {}
 //     Blind-annotation mode (gold-standard collection, spec 2026-08-24
@@ -330,6 +339,96 @@ export const adherenceRoutes: RouteEntry[] = [
           }
         });
         return { ok: true, version: result.version };
+      });
+    },
+  },
+
+  // POST /api/reviews/:patientId/:taskId/adherence/add-event
+  //   body: { rule_id, anchor_type, date, note_id }
+  //
+  // Reviewer-side counterpart to the agent's set_event_answer(new_event):
+  // adds a NOTE-DOCUMENTED event the structured enumeration missed. Without
+  // it only the agent could supplement, so the per-event enumeration metric
+  // was structurally one-sided — every difference could only ever read
+  // "agent found an extra event", never the reverse, which is not something
+  // an agreement statistic can be computed from.
+  //
+  // The event is created with no answers; the annotator then answers it
+  // through the event-verdict route like any enumerated event. Verdicts are
+  // therefore not computed here — there is nothing yet to derive them from.
+  //
+  // event_id matches the agent's format exactly (rule@date@note, note_id NOT
+  // included) so the same clinical episode found by both sides collapses to
+  // one key instead of two one-sided ones. Adding an event necessarily makes
+  // rule_events diverge from the seeded work-list, so `worklist_hash` stops
+  // being recomputable for this patient — the same documented consequence the
+  // agent's supplement path already carries.
+  {
+    method: "POST",
+    pattern: "/api/reviews/:patientId/:taskId/adherence/add-event",
+    handler: async (body, _req, p, query) => {
+      const sid = sessionIdOf(query);
+      return withReviewsRoot(sessionReviewsRoot(sid), async () => {
+        const task = adherenceTaskOrFail(p.taskId);
+        const b = (body ?? {}) as {
+          rule_id?: string; anchor_type?: string; date?: string; note_id?: string;
+        };
+        if (!b.rule_id) throw httpErr(400, { ok: false, message: "rule_id required" });
+        if (!b.date || !/^\d{4}-\d{2}-\d{2}$/.test(b.date)) {
+          throw httpErr(400, { ok: false, message: "date required, format YYYY-MM-DD" });
+        }
+        if (!b.note_id) {
+          throw httpErr(400, { ok: false, message: "note_id required — a supplemented event must cite the note that documents it" });
+        }
+        const skill = loadAdherenceSkill(p.taskId);
+        const rule = skill.rules.find((r) => r.rule_id === b.rule_id);
+        if (!rule) throw httpErr(404, { ok: false, message: `rule ${b.rule_id} not found in task ${p.taskId}` });
+
+        // An anchor-free rule already has exactly one window stub covering the
+        // whole period; appending a dated event to it would leave both in the
+        // rollup, counting the same requirement twice.
+        const anchors = rule.event_anchor
+          ? (Array.isArray(rule.event_anchor) ? rule.event_anchor : [rule.event_anchor])
+          : [];
+        if (anchors.length === 0) {
+          throw httpErr(400, {
+            ok: false,
+            message: `rule ${b.rule_id} is window-scoped (no event_anchor) — it is judged once for the period, so it cannot take a supplemented event`,
+          });
+        }
+        // Constrain anchor_type to the rule's declared anchors: it surfaces to
+        // expressions as the synthetic `_anchor_type`, so a free-text value
+        // silently fails every `_anchor_type == "..."` comparison and the
+        // event quietly takes the wrong evaluability branch.
+        const anchorType = b.anchor_type ?? anchors[0];
+        if (!anchors.includes(anchorType)) {
+          throw httpErr(400, {
+            ok: false,
+            message: `anchor_type '${anchorType}' is not declared by rule ${b.rule_id} (expected one of: ${anchors.join(", ")})`,
+          });
+        }
+
+        const eventId = `${b.rule_id}@${b.date}@note`;
+        const result = mutateReviewState(p.patientId, task, "reviewer", (state) => {
+          state.task_kind = "adherence";
+          const events = [...(state.rule_events ?? [])];
+          if (events.some((e) => e.event_id === eventId)) {
+            throw httpErr(409, {
+              ok: false,
+              message: `event ${eventId} already exists`,
+              hint: "Answer the existing event through the event-verdict route instead of adding it again.",
+            });
+          }
+          events.push({
+            event_id: eventId,
+            rule_id: b.rule_id!,
+            anchor: { type: anchorType, date: b.date!, origin: "note", ref: `note:${b.note_id}` },
+            source: "reviewer",
+            ts: new Date().toISOString(),
+          });
+          state.rule_events = events;
+        });
+        return { ok: true, event_id: eventId, version: result.version };
       });
     },
   },
