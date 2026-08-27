@@ -31,7 +31,7 @@ import duckdb
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-from derive_anchors import asthma_encounter_anchors, ocs_burst_anchors, obligation_point_anchors
+from derive_anchors import derive_for_patient
 def load(n): return open(os.path.join(HERE, n)).read()
 def strip_comments(s):
     s = re.sub(r"/\*.*?\*/", "", s, flags=re.S)   # block comments
@@ -63,6 +63,9 @@ def render_duckdb(sql, schema_prefix=""):
     s = s.replace("@cdm_database_schema.", schema_prefix)
     s = s.replace("@cohort_table", "cohort").replace("@drug_class_table", "drug_class_map")
     s = s.replace("@min_age", "2").replace("@max_age", "17").replace("@min_asthma_encounters", "2").replace("@min_prior_observation_days", "365")
+    # 0 = no note floor, matching cohort.sql's default. The local corpus is the
+    # place to see the n_notes_12mo distribution, not to filter on it.
+    s = s.replace("@min_notes_12mo", "0")
     s = s.replace("@study_start", STUDY_START).replace("@study_end", STUDY_END)
     s = re.sub(r"DATEADD\(MONTH,\s*-12,\s*([^)]+)\)", r"(\1 - INTERVAL 12 MONTH)", s)
     s = re.sub(r"DATEADD\(DAY,\s*-(\d+),\s*([^)]+)\)", r"(\2 - INTERVAL \1 DAY)", s)
@@ -256,15 +259,20 @@ def main():
         for t, data in [("conditions",conditions),("drugs",drugs),("observations",observations),
                         ("measurements",measurements),("encounters",enc),("procedures",procedures),("demographics",demographics)]:
             json.dump(data, open(os.path.join(pdir,"omop",f"{t}.json"),"w"), indent=2, default=str)
-        # event-anchor lists (spec 2026-08-24): derived from the same in-memory
-        # enc/drugs rows just written above (identical shape to the on-disk json).
-        adir = os.path.join(pdir, "anchors"); os.makedirs(adir, exist_ok=True)
-        _enc_anchors = asthma_encounter_anchors(enc)
-        _bursts = ocs_burst_anchors(drugs)
-        for name, rows in (("asthma_encounters", _enc_anchors), ("ocs_bursts", _bursts), ("obligation_points", obligation_point_anchors(_bursts))):
-            with open(os.path.join(adir, f"{name}.json"), "w") as f:
-                json.dump(rows, f, indent=1)
-                f.write("\n")
+        # Event-anchor lists (spec 2026-08-24). Delegated to derive_anchors'
+        # OWN entry point, reading the omop/*.json just written above, rather
+        # than calling the three anchor builders in sequence here.
+        #
+        # This file used to re-implement that sequence, and it drifted three
+        # times: the builders gained a `win` argument (observation window),
+        # obligation_point_anchors' inputs changed from bursts to exacerbations +
+        # encounter anchors, and ocs_burst_anchors gained asthma attribution. Each
+        # change left etl.py calling a signature that no longer existed, so the
+        # full ETL raised TypeError on its first patient — undetected, because
+        # nothing runs it in CI and the standalone derive_anchors.py (which every
+        # local regeneration uses) was fine. One call site cannot drift from
+        # itself.
+        derive_for_patient(pdir)
         used = set(); doctypes = set()
         for r in G["notes"].get(pid, []):
             dt = str(r["note_date"])[:10]; dtp = slug(r["doc_type"]); doctypes.add(dtp)

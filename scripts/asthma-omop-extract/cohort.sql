@@ -5,6 +5,7 @@
 * Render for YOUR dialect with OHDSI SqlRender, e.g. (R):
 *   SqlRender::render(sql, cdm_database_schema='omop_cdm', min_age=2, max_age=17,
 *                     min_asthma_encounters=2, min_prior_observation_days=365,
+*                     min_notes_12mo=0,
 *                     study_start='2021-01-01', study_end='2099-12-31')  |>
 *   SqlRender::translate(targetDialect='postgresql')   # or 'sql server','bigquery',
 *                                                       # 'redshift','spark','duckdb'
@@ -27,6 +28,8 @@
 *     non-ED (outpatient).
 *   - AND the patient is continuously observable for
 *     >= @min_prior_observation_days before index_date (OMOP observation_period).
+*   - AND has >= @min_notes_12mo notes in the lookback window. DEFAULT 0, i.e.
+*     OFF — see WHY THE NOTE FLOOR IS OPT-IN below.
 *
 * ── WHY THE PRIOR-OBSERVATION REQUIREMENT ─────────────────────────────────────
 * Without it, a child whose records begin four months before index is scored
@@ -71,6 +74,23 @@
 *   n_notes_12mo    — note volume, from the standard NOTE table. Sites that do
 *                     not populate NOTE get 0 here and should substitute their
 *                     own document count.
+*
+* ── WHY THE NOTE FLOOR IS OPT-IN ──────────────────────────────────────────────
+* Event-level annotation is read FROM NOTES: what the control picture was at that
+* visit, whether the regimen matched, whether a follow-up was arranged. A patient
+* can satisfy every criterion above and still be unannotatable — a real WCM draw
+* returned one with 2 qualifying asthma encounters and n_notes_12mo = 1 (37 notes
+* on the chart, one inside the window). Two events, one note: the annotator has
+* almost nothing to read and most answers land on "cannot determine", which then
+* has to be told apart from a genuine care gap.
+*
+* But @min_notes_12mo DEFAULTS TO 0 (no filter), because not every OMOP site
+* populates the standard NOTE table. A hard floor would silently return zero
+* patients at such a site with nothing to indicate why — a new hidden premise, of
+* exactly the kind that has already cost this project real runs. Set it
+* explicitly once you have seen the distribution of n_notes_12mo in an unfiltered
+* draw, so you know what a given floor costs before you pay it. Sites that store
+* documents elsewhere should filter on their own count instead.
 *
 * SEVERITY is deliberately NOT emitted. It is a clinical judgment, not a codeable
 * field, and its structured proxies (controller class and dose, exacerbation
@@ -200,6 +220,11 @@ WHERE ia.age_at_index BETWEEN @min_age AND @max_age
   -- period; raising it to 730 also covers the spirometry question's lookback,
   -- at the cost of dropping patients.
   AND ob.observation_start_date <= DATEADD(DAY, -@min_prior_observation_days, ia.index_date)
+  -- Note floor. DEFAULT 0 = no filter; see WHY THE NOTE FLOOR IS OPT-IN. The
+  -- COALESCE matters: `notes` is a LEFT JOIN, so a patient with no notes at all
+  -- has NULL here, and `NULL >= 0` is UNKNOWN — which would drop exactly the
+  -- patients the default is supposed to keep.
+  AND COALESCE(nt.n_notes_12mo, 0) >= @min_notes_12mo
   -- Study window on the index date. Default is post-2020 (>= 2021-01-01) so EVERY
   -- patient falls under ONE guideline edition — the 2020 NAEPP Focused Update —
   -- and no one is scored against SMART/LAMA before it existed. Widen (e.g.
