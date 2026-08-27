@@ -10,6 +10,7 @@ import {
   withDerivedAnswers,
   rulesReadingQid,
   DERIVED_WORST_CONTROL_QID,
+  periodRequiredQuestions,
   type RuleDefinition,
 } from "./index.js";
 
@@ -668,5 +669,88 @@ describe("an unobserved tail censors the NEGATIVE only", () => {
     e.answers = [...(e.answers ?? []), { question_id: "Applies", tier: 2, answer: false }];
     const out = evaluateAllRuleEvents([gated], [], [e]).rule_events[0]!;
     expect(out.evaluable_reason).toBe(ENGINE_NOT_EVALUABLE_REASON);
+  });
+});
+
+describe("a period rule whose own question was never answered", () => {
+  // The event guard existed and the window one did not, and on a live run that
+  // cost a verdict: the agent committed 12 of 14 period questions and stopped
+  // with "all APPLICABLE adherence questions/events were committed", so
+  // R-T2-ComorbidityAddressed came out NON_CONCORDANT from an answer nobody
+  // gave. The bias is one-directional — silence always lands on the failing side.
+  const ADDRESSED: RuleDefinition = {
+    rule_id: "R-Addressed",
+    description: "documented comorbidities have a management plan",
+    verdict_if: 'Addressed == "addressed"',
+    excluded_if: 'Addressed == "not_applicable"',
+    attribution: "DOCUMENTATION_GAP",
+  };
+  const run = (rule: RuleDefinition, answers: QuestionAnswer[]) =>
+    evaluateAllRuleEvents([rule], answers, []);
+
+  it("is UNANSWERED, not NON_CONCORDANT, and names the question", () => {
+    const res = run(ADDRESSED, [qa("Something-Else", true)]);
+    expect(res.rule_verdicts[0]!.verdict).toBe("EXCLUDED");
+    expect(res.rule_verdicts[0]!.rationale).toContain("Addressed");
+    expect(res.rule_rollups[0]).toMatchObject({ n_evaluable: 0, rate: null });
+    expect(res.rule_events[0]!.evaluable).toBe(false);
+  });
+
+  it("is judged normally once the answer arrives", () => {
+    expect(run(ADDRESSED, [qa("Addressed", "addressed")]).rule_verdicts[0]!.verdict)
+      .toBe("CONCORDANT");
+    expect(run(ADDRESSED, [qa("Addressed", "acknowledged_not_addressed")]).rule_verdicts[0]!.verdict)
+      .toBe("NON_CONCORDANT");
+    // The explicit inapplicable answer still excludes — and carries no
+    // unanswered rationale, so the UI shows EXCLUDED rather than UNANSWERED.
+    const na = run(ADDRESSED, [qa("Addressed", "not_applicable")]).rule_verdicts[0]!;
+    expect(na.verdict).toBe("EXCLUDED");
+    expect(na.rationale).toBeUndefined();
+  });
+
+  it("does NOT overrule a rule that tests for absence itself", () => {
+    // R-T1-NoSABAOveruse's `is missing` arm is a deliberate "no medication
+    // documentation at all -> leave this patient out". Treating that as an
+    // omission would replace a designed exclusion with a different one.
+    const saba: RuleDefinition = {
+      rule_id: "R-Saba", description: "no SABA overuse",
+      verdict_if: 'Saba == "false"',
+      excluded_if: 'Saba == "not_applicable" or Saba is missing',
+      attribution: "GUIDELINE_DEVIATION",
+    };
+    expect(periodRequiredQuestions(saba)).toEqual([]);
+    const res = run(saba, []);
+    expect(res.rule_verdicts[0]!.verdict).toBe("EXCLUDED");
+    expect(res.rule_verdicts[0]!.rationale).toBeUndefined();
+  });
+
+  it("does NOT demand a DERIVED value — its absence is computed, not skipped", () => {
+    // The comorbidity gate is written so a patient with no ascertainable control
+    // level stays IN the denominator; demanding the derived answer would invert
+    // that to EXCLUDED. A unit test caught exactly this while it was being built.
+    const gated: RuleDefinition = {
+      rule_id: "R-Comorbid", description: "workup when not well controlled",
+      verdict_if: 'Comorbid in ["assessed_and_addressed", "assessed_not_addressed"]',
+      excluded_if: `${DERIVED_WORST_CONTROL_QID} == "well_controlled"`,
+      attribution: "DOCUMENTATION_GAP",
+    };
+    expect(periodRequiredQuestions(gated)).toEqual(["Comorbid"]);
+    expect(run(gated, [qa("Comorbid", "not_assessed")]).rule_verdicts[0]!.verdict)
+      .toBe("NON_CONCORDANT");
+  });
+
+  it("ignores event-scoped and synthetic ids", () => {
+    const r: RuleDefinition = {
+      rule_id: "R-X", description: "d",
+      verdict_if: 'Scoped == true and _anchor_type != "window"',
+      event_scoped_questions: ["Scoped"],
+    };
+    expect(periodRequiredQuestions(r)).toEqual([]);
+  });
+
+  it("re-evaluation is idempotent — the unanswered stub is re-derived", () => {
+    const first = run(ADDRESSED, []).rule_events[0]!;
+    const res = evaluateAllRuleEvents([ADDRESSED], [qa("Addressed", "addressed")], [first]);
+    expect(res.rule_verdicts[0]!.verdict).toBe("CONCORDANT");
   });
 });

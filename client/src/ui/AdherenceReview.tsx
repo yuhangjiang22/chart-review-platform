@@ -2035,6 +2035,14 @@ function RuleRow({
     : draftV === "NON_CONCORDANT" ? "text-[hsl(var(--oxblood))] border-[hsl(var(--oxblood))]/40"
     : "text-muted-foreground border-border";
 
+  // EXCLUDED-because-nobody-answered, carried on the verdict's rationale by the
+  // engine (ENGINE_PERIOD_UNANSWERED_REASON) so a reader does not have to walk
+  // rule_events to tell it from EXCLUDED-because-inapplicable.
+  const unansweredReason = verdict?.verdict === "EXCLUDED"
+      && verdict.rationale?.startsWith("question unanswered")
+    ? verdict.rationale
+    : undefined;
+
   return (
     <div id={`rule-row-${rule.rule_id}`} className="px-3 py-2 text-[12px] space-y-1.5">
       <div className="flex items-start justify-between gap-3">
@@ -2092,7 +2100,18 @@ function RuleRow({
                 verdict.verdict === "CONCORDANT" ? "text-emerald-700"
                 : verdict.verdict === "EXCLUDED" ? "text-muted-foreground"
                 : "text-[hsl(var(--oxblood))]",
-              )}>{verdict.verdict}</span>
+              )}>{unansweredReason ? "UNANSWERED" : verdict.verdict}</span>
+              {/* A rule can leave the denominator two ways that both roll up to
+                *  EXCLUDED, and they mean opposite things: the guideline does not
+                *  apply to this patient, or nobody answered the question. Showing
+                *  the second as plain "EXCLUDED" hides a lost measurement — this
+                *  is how one got past a review as a NON_CONCORDANT verdict
+                *  computed from an answer that was never committed. */}
+              {unansweredReason && (
+                <span className="text-[hsl(var(--ochre))] text-[10.5px]">
+                  {unansweredReason}
+                </span>
+              )}
               {verdict.attribution && <span className="text-muted-foreground">({verdict.attribution})</span>}
               {verdict.supporting_questions && verdict.supporting_questions.length > 0 && (
                 <span className="text-muted-foreground text-[10.5px]">

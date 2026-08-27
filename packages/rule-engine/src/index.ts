@@ -324,6 +324,25 @@ function collectQids(ast: Ast, into: Set<string>): void {
   }
 }
 
+/** question_ids this expression tests for ABSENCE (`X is missing` / `X is
+ *  present`). A rule that asks whether an answer exists has already decided what
+ *  absence means, so the unanswered guard must not overrule it —
+ *  R-T1-NoSABAOveruse's `excluded_if: T1-SABAOveruse is missing` is a deliberate
+ *  "no medication documentation at all -> leave this patient out". */
+function collectAbsenceTested(ast: Ast, into: Set<string>): void {
+  switch (ast.kind) {
+    case "missing": case "present":
+      into.add(ast.qid); break;
+    case "compare": case "in": case "truthy":
+      break;
+    case "not":
+      collectAbsenceTested(ast.inner, into); break;
+    case "and": case "or":
+      collectAbsenceTested(ast.left, into);
+      collectAbsenceTested(ast.right, into); break;
+  }
+}
+
 function compareValues(left: AnswerValue, op: string, right: AnswerValue): boolean {
   if (left === null || right === null) {
     if (op === "==") return left === right;
@@ -452,6 +471,56 @@ export function eventScopedQuestionsFor(
  *  means "the requirement does not apply here", this one means "we were never
  *  told anything about this event". */
 export const ENGINE_UNANSWERED_REASON = "event unanswered (no committed answer for this rule)";
+
+/** The PERIOD-level counterpart. A window rule whose own question was never
+ *  answered is UNANSWERED, not violated.
+ *
+ *  This guard existed for anchored events and not for window rules, and on a live
+ *  run that cost a real verdict: the agent committed 12 of 14 period questions,
+ *  stopped with "all APPLICABLE adherence questions/events were committed", and
+ *  R-T2-ComorbidityAddressed — whose question it had skipped — came out
+ *  NON_CONCORDANT, because an absent answer satisfies neither
+ *  `verdict_if: == "addressed"` nor `excluded_if: == "not_applicable"`. The
+ *  patient's own T1-ComorbidityAssessed said "assessed_and_addressed", so the
+ *  reported verdict was the opposite of the right one.
+ *
+ *  The bias is one-directional: silence always lands on the failing side, never
+ *  the passing one, so a lazy or confused extractor pushes the measured adherence
+ *  rate DOWN. */
+export const ENGINE_PERIOD_UNANSWERED_REASON =
+  "question unanswered (the rule's own question was never committed)";
+
+/** question_ids a WINDOW rule needs answered before it can be judged: those its
+ *  verdict/exclusion expressions read and could actually have been skipped.
+ *
+ *  Four kinds are excluded, each for its own reason:
+ *
+ *  - EVENT-SCOPED. A window rule reading one is a rubric error, not a missing
+ *    answer, and `event_scoped_questions` has no period answer by construction.
+ *  - ABSENCE-TESTED (`X is missing` / `X is present`). The rule has already said
+ *    what absence means; overruling it would break, e.g., R-T1-NoSABAOveruse's
+ *    deliberate "no medication documentation at all -> leave this patient out".
+ *  - DERIVED. Nobody extracts these, so nobody can skip one — their absence is
+ *    COMPUTED and load-bearing. The comorbidity gate is written
+ *    `excluded_if: T1-WorstControlLevel == "well_controlled"` precisely so that a
+ *    patient with no ascertainable control level stays IN the denominator; a
+ *    caught unit test showed this guard otherwise inverted that to EXCLUDED.
+ *  - SYNTHETIC (`_`-prefixed). Engine-supplied anchor facts, same argument. */
+export function periodRequiredQuestions(rule: RuleDefinition): string[] {
+  const scoped = new Set(rule.event_scoped_questions ?? []);
+  const qids = new Set<string>();
+  const absence = new Set<string>();
+  for (const src of [rule.verdict_if, rule.excluded_if]) {
+    if (!src) continue;
+    const ast = parseExpression(src);
+    collectQids(ast, qids);
+    collectAbsenceTested(ast, absence);
+  }
+  return [...qids]
+    .filter((q) => !scoped.has(q) && !absence.has(q)
+      && !DERIVED_QUESTION_IDS.has(q) && !q.startsWith("_"))
+    .sort();
+}
 
 /** Evaluate one compiled rule against the patient's answers.
  *  Pure / deterministic. */
@@ -694,6 +763,11 @@ export function windowEventStub(ruleId: string): RuleEvent {
  *  from `excluded_if` like any other id. */
 export const DERIVED_WORST_CONTROL_QID = "T1-WorstControlLevel";
 
+/** Every question_id the ENGINE produces rather than an extractor. Absence of one
+ *  is a computed fact, never a skipped question, so the period-unanswered guard
+ *  must not read it as an omission. */
+export const DERIVED_QUESTION_IDS: ReadonlySet<string> = new Set([DERIVED_WORST_CONTROL_QID]);
+
 /** The per-event question the derived value is computed from. */
 const CONTROL_LEVEL_QID = "T1-ControlLevel";
 
@@ -791,6 +865,7 @@ export function evaluateRuleEvents(
   const eventScoped = new Set(rule.event_scoped_questions ?? []);
   const scopedFor = eventScopedQuestionsFor(rule);
   const required = scopedFor.verdict;
+  const periodRequired = periodRequiredQuestions(rule);
   // Can the CENSORING gate be decided without any per-event answer? True when it
   // reads only patient-level answers and the synthetic anchor facts. Such a gate
   // runs BEFORE the unanswered check, or an unanswered unjudgeable event reports
@@ -810,6 +885,8 @@ export function evaluateRuleEvents(
     if (e.evaluable === false
         && e.evaluable_reason !== ENGINE_NOT_EVALUABLE_REASON
         && e.evaluable_reason !== ENGINE_UNANSWERED_REASON
+        // Prefix match: the period reason appends the missing question_ids.
+        && !e.evaluable_reason?.startsWith(ENGINE_PERIOD_UNANSWERED_REASON)
         && e.evaluable_reason !== rule.event_censored_reason) {
       return { ...e, verdict: undefined, attribution: undefined };
     }
@@ -833,8 +910,7 @@ export function evaluateRuleEvents(
     // none of them, is UNANSWERED — not concordant, not violated. Deriving a
     // verdict here reads a missing answer as false and reports a care gap
     // nobody established: on a live run an event with an empty answer list was
-    // scored NON_CONCORDANT purely because the question was absent. Window
-    // stubs are exempt — they legitimately read patient-level answers.
+    // scored NON_CONCORDANT purely because the question was absent.
     if (e.anchor.type !== WINDOW_ANCHOR_TYPE && required.length > 0) {
       const own = new Set((e.answers ?? []).map((a) => a.question_id));
       if (!required.every((q) => own.has(q))) {
@@ -842,6 +918,23 @@ export function evaluateRuleEvents(
           ...e,
           evaluable: false,
           evaluable_reason: ENGINE_UNANSWERED_REASON,
+          verdict: undefined,
+          attribution: undefined,
+        };
+      }
+    }
+    // The window stub's counterpart. Used to be exempt on the grounds that it
+    // "legitimately reads patient-level answers" — true, and beside the point:
+    // reading one that was never committed is exactly the case this catches. See
+    // ENGINE_PERIOD_UNANSWERED_REASON for the verdict it cost.
+    if (e.anchor.type === WINDOW_ANCHOR_TYPE && periodRequired.length > 0) {
+      const have = new Set(patientAnswers.map((a) => a.question_id));
+      const missing = periodRequired.filter((q) => !have.has(q));
+      if (missing.length > 0) {
+        return {
+          ...e,
+          evaluable: false,
+          evaluable_reason: `${ENGINE_PERIOD_UNANSWERED_REASON}: ${missing.join(", ")}`,
           verdict: undefined,
           attribution: undefined,
         };
@@ -941,12 +1034,21 @@ export function evaluateAllRuleEvents(
       const { events: evs, rollup, qids } = evaluateRuleEvents(rule, answers, ruleEvents);
       allEvents.push(...evs);
       rollups.push(rollup);
+      // A rule that left the denominator because nobody answered its question is
+      // not the same as one the guideline does not apply to, and both roll up to
+      // EXCLUDED. The reason rides along on the verdict so a reader (UI, IAA,
+      // compare) can tell them apart without walking rule_events, and so
+      // "questions the extractor skipped" is countable.
+      const unanswered = evs.find((x) =>
+        x.evaluable === false
+        && x.evaluable_reason?.startsWith(ENGINE_PERIOD_UNANSWERED_REASON));
       verdicts.push({
         rule_id: rule.rule_id,
         verdict: rollup.period_verdict,
         ...(rollup.period_verdict === "NON_CONCORDANT"
           ? { attribution: rollup.period_attribution ?? "OTHER" }
           : {}),
+        ...(unanswered ? { rationale: unanswered.evaluable_reason } : {}),
         supporting_questions: qids,
         source: "rule_engine",
         ts: new Date().toISOString(),

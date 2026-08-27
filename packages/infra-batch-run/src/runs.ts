@@ -1319,6 +1319,26 @@ async function runOneAgent(
           "        listed event via set_event_answer BEFORE calling set_review_status.",
           eventBlock,
         ] : []),
+        // SILENCE IS NOT AN ANSWER. On a live run the agent committed 12 of 14
+        // period questions and stopped with "all APPLICABLE adherence
+        // questions/events were committed" — it had judged two of them
+        // inapplicable and expressed that by not calling the tool. Both had a
+        // `not_applicable` option it could have used, and in both cases its
+        // applicability judgement was wrong anyway. An absent answer satisfies
+        // neither verdict_if nor excluded_if, so one of those rules came out
+        // NON_CONCORDANT: "the extractor skipped this" reported as "the
+        // clinician failed to do it". The engine now catches this
+        // (ENGINE_PERIOD_UNANSWERED_REASON) — this paragraph is the other half,
+        // because a rule left unjudged is still a lost measurement.
+        "EVERY question_id from `list_questions` needs a set_question_answer call.",
+        "        There are exactly as many calls as there are questions. If you",
+        "        judge a question inapplicable to this patient, SAY SO IN THE",
+        "        ANSWER — commit its `not_applicable` option (or `null` with a",
+        "        reason when the schema has none). Do NOT express it by skipping",
+        "        the call: a question with no committed answer is indistinguishable",
+        "        from one answered \"no\", so silence is read as a care gap the",
+        "        chart never showed. Answering \"nothing documented\" is a finding;",
+        "        answering nothing is a hole.",
         "Step 5: After every question has been answered, call",
         "        `set_review_status({status:'complete'})`. The platform runs the",
         "        rule engine afterwards — you DO NOT compute rule verdicts yourself.",
