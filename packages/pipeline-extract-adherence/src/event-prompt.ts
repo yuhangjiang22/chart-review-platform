@@ -13,6 +13,32 @@ import {
  *  legitimate evidence of the regimen in force today. */
 const NOTE_LEAD_IN_DAYS = 90;
 
+/** Grace AFTER the judged period, for DOCUMENTATION LAG. A chart is written
+ *  after the fact: a note describing an encounter can be filed the next day, and
+ *  a transcribed discharge summary later than that.
+ *
+ *  The span used to run 90 days back and ZERO forward, an asymmetry with no
+ *  justification — and it cost real evidence. On a live run the step-therapy
+ *  event at a 2021-09-25 clinic visit was handed five notes, all on or before
+ *  that day, and the agent went outside its list to cite the ED progress note
+ *  from 2021-09-26. For T1-ControlLevel at that visit, "went to the ED the next
+ *  day" is arguably the strongest evidence the asthma was not controlled. The
+ *  instruction was wrong, and separately the agent did not follow it.
+ *
+ *  Deliberately SHORT. This is filing lag, not a grace period for care: a longer
+ *  window would let a state that CHANGED after the event masquerade as the state
+ *  at it. A regimen changed a week later happened at another visit, which has its
+ *  own event and its own span.
+ *
+ *  This is evidence AVAILABILITY, not the clinical judgment window. The
+ *  `judge through <date>` printed on each event line stays the judgment end
+ *  (`judgmentEnd`); this only widens which notes are offered as evidence for it.
+ *
+ *  Mirrored by NOTE_DOC_LAG_DAYS in scripts/asthma-realtest/check-evidence-span.py
+ *  — the audit that measures compliance has to use the same span the prompt
+ *  promises, or it reports violations the agent was never told about. */
+const NOTE_DOC_LAG_DAYS = 3;
+
 /** Notes whose date falls in an event's evidence span: from NOTE_LEAD_IN_DAYS
  *  before the event through the end of its judgment window (the ETL's deadline
  *  when the anchor carries one, else the rule's declared window, else the event
@@ -47,9 +73,10 @@ function notesForEvent(
   const DAY = 86_400_000;
   const iso = (ms: number) => new Date(ms).toISOString().slice(0, 10);
   const deadline = typeof meta?.deadline === "string" ? new Date(meta.deadline).getTime() : NaN;
-  const end = Number.isFinite(deadline)
+  const judged = Number.isFinite(deadline)
     ? deadline
     : t + (typeof windowDays === "number" ? windowDays : 0) * DAY;
+  const end = judged + NOTE_DOC_LAG_DAYS * DAY;
   const start = t - NOTE_LEAD_IN_DAYS * DAY;
   const inSpan = notes.filter((n) => {
     const nt = new Date(n.date).getTime();
@@ -114,6 +141,13 @@ export function buildEventWorklistBlock(
     "the observation window, and those cannot describe the state of care at this",
     "event whatever they say. If an event names no notes, answer from structured",
     "data or mark it not evaluable — do not reach outside the span.",
+    "",
+    "The span runs a little PAST the judged period on purpose, because a chart is",
+    "written after the fact: a note filed the day after a visit can still document",
+    "what happened at it. That is why a note dated after the event may appear on",
+    "its line — use it. It does NOT mean later developments count: a note",
+    "describing care that changed after the event belongs to that later event, not",
+    "this one.",
     "",
     "EVERY answer needs evidence. Cite what it was determined from, dated at or",
     "around that event: a note quote (VERBATIM — the faithfulness gate rejects a",

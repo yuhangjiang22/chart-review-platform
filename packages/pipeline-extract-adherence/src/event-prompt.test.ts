@@ -138,7 +138,29 @@ describe("per-event note scoping", () => {
       [at("R-Step", "2021-09-25", { deadline: "2021-11-10" }) as never], [RULE as never], NOTES,
     );
     expect(block).toContain("2021-11-02__followup.txt");
-    expect(block).toContain("… 2021-11-10");
+    // The NOTE span runs NOTE_DOC_LAG_DAYS past the judged period — a chart is
+    // written after the fact. The judged end itself is unchanged and is what the
+    // event line prints as `judge through`.
+    expect(block).toContain("… 2021-11-13");
+    expect(block).toContain("judge through 2021-11-10");
+  });
+
+  it("offers a note filed just AFTER the judged period — documentation lag", () => {
+    // The case that motivated the grace: a point-judged event at a 2021-09-25
+    // clinic visit was handed five notes, all on or before that day, and the
+    // agent went outside its list to cite the next day's ED note. For the control
+    // level at that visit, "went to the ED the next day" is the strongest
+    // evidence the asthma was not controlled.
+    const notes = [
+      { filename: "2021-09-24__clinic.txt", date: "2021-09-24" },
+      { filename: "2021-09-26__emergency_dept.txt", date: "2021-09-26" },
+      { filename: "2021-10-05__later_visit.txt", date: "2021-10-05" },
+    ];
+    const block = buildEventWorklistBlock([at("R-Step", "2021-09-25") as never], [RULE as never], notes);
+    expect(block).toContain("2021-09-26__emergency_dept.txt");
+    // Still short: a note ten days later documents a state that may have changed,
+    // and belongs to whatever event covers it.
+    expect(block).not.toContain("2021-10-05__later_visit.txt");
   });
 
   it("states the span even when it holds no notes, and says not to reach outside it", () => {

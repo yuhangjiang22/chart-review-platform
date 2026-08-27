@@ -20,8 +20,15 @@ WHAT IS AND IS NOT A VIOLATION.
   the event date (a medication list from the previous visit is legitimate evidence
   of the regimen in force today) through the end of the judgment window — the
   ETL's `deadline` when the anchor carries one, else the rule's
-  `event_window_days`, else the event date itself. Outside that span is a
-  violation, because the rule's own definition says what window it is judging.
+  `event_window_days`, else the event date itself — plus NOTE_DOC_LAG_DAYS for
+  documentation lag, since a chart is written after the fact.
+
+  VIOLATIONS ARE BUCKETED BY DISTANCE and the widening is reported, not silently
+  applied. Moving a line to make a number look better is the obvious failure mode
+  of a check like this one, so a citation inside the lag grace is counted and named
+  separately from one outside it. A run whose only violations are one day out is a
+  different finding from one citing a note three years before the event, and the
+  headline number must not merge them.
 
   PERIOD answers are only DESCRIBED. Their lookback is not declared anywhere per
   question, and it genuinely differs: T1-SpirometryDate reaches 24 months,
@@ -47,10 +54,14 @@ import sys
 from collections import Counter
 from datetime import date, timedelta
 
-# Mirrors NOTE_LEAD_IN_DAYS in packages/pipeline-extract-adherence/src/event-prompt.ts.
-# Kept as a literal rather than imported because this is a Python-side audit of a
-# TypeScript pipeline; if that constant moves, this number has to move with it.
+# Mirror NOTE_LEAD_IN_DAYS / NOTE_DOC_LAG_DAYS in
+# packages/pipeline-extract-adherence/src/event-prompt.ts. Kept as literals rather
+# than imported because this is a Python-side audit of a TypeScript pipeline; if
+# either constant moves, the number here has to move with it. An audit that uses a
+# tighter span than the prompt promises reports violations the agent was never
+# told about.
 NOTE_LEAD_IN_DAYS = 90
+NOTE_DOC_LAG_DAYS = 3
 
 RUBRIC = ".claude/skills/chart-review-asthma-adherence/references/rules"
 
@@ -90,10 +101,11 @@ def event_span(event, windows):
     if d is None:
         return None
     meta = event.get("anchor", {}).get("meta") or {}
-    end = parse_day(meta.get("deadline"))
-    if end is None:
-        end = d + timedelta(days=windows.get(event.get("rule_id"), 0))
-    return (d - timedelta(days=NOTE_LEAD_IN_DAYS), end)
+    judged = parse_day(meta.get("deadline"))
+    if judged is None:
+        judged = d + timedelta(days=windows.get(event.get("rule_id"), 0))
+    return (d - timedelta(days=NOTE_LEAD_IN_DAYS),
+            judged + timedelta(days=NOTE_DOC_LAG_DAYS))
 
 
 def check_draft(fp, windows, violations, stats, period_ages):
@@ -174,10 +186,17 @@ def main():
         print(f"    {k:<48s} {stats[k]:>6}{pct}")
 
     if violations:
-        print(f"\n  {len(violations)} violation(s):")
-        for v in violations:
-            print(f"    {v['patient']}  {v['rule']} @{v['event_date']}  span {v['span']}")
-            print(f"      {v['question']} cited {v['note']}  ({v['days_off']} days outside)")
+        near = [v for v in violations if v["days_off"] <= NOTE_DOC_LAG_DAYS]
+        far = [v for v in violations if v["days_off"] > NOTE_DOC_LAG_DAYS]
+        print(f"\n  {len(violations)} violation(s) — {len(far)} beyond the lag grace, "
+              f"{len(near)} within {NOTE_DOC_LAG_DAYS} days of the span")
+        for label, group in (("BEYOND THE GRACE", far), (f"within {NOTE_DOC_LAG_DAYS} days", near)):
+            if not group:
+                continue
+            print(f"\n    {label}:")
+            for v in group:
+                print(f"      {v['patient']}  {v['rule']} @{v['event_date']}  span {v['span']}")
+                print(f"        {v['question']} cited {v['note']}  ({v['days_off']} days outside)")
 
     if period_ages:
         print("\n  PERIOD citations (described only — per-question lookback is not declared)")
@@ -192,7 +211,10 @@ def main():
             for q, n, m in old:
                 print(f"      {q} cited {n}  (~{m} months before index)")
 
-    return 1 if violations else 0
+    # Only citations BEYOND the documentation-lag grace fail the check. One inside
+    # it is reported (see above) but is filing lag, not evidence that cannot
+    # describe the event.
+    return 1 if any(v["days_off"] > NOTE_DOC_LAG_DAYS for v in violations) else 0
 
 
 if __name__ == "__main__":
