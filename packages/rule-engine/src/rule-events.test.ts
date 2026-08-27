@@ -161,7 +161,9 @@ describe("evaluateAllRuleEvents", () => {
 
     const bad = out.rule_verdicts.find((v) => v.rule_id === "R-Bad")!;
     expect(bad.verdict).toBe("NON_CONCORDANT");
-    expect(bad.attribution).toBe("OTHER");
+    // No attribution: a compile error is a rule DEFECT, and the rationale says
+    // so. It used to be filed as OTHER, which read as a clinical category.
+    expect(bad.attribution).toBeUndefined();
     expect(bad.rationale).toMatch(/^rule compile error:/);
 
     const badRollup = out.rule_rollups.find((r) => r.rule_id === "R-Bad")!;
@@ -752,5 +754,54 @@ describe("a period rule whose own question was never answered", () => {
     const first = run(ADDRESSED, []).rule_events[0]!;
     const res = evaluateAllRuleEvents([ADDRESSED], [qa("Addressed", "addressed")], [first]);
     expect(res.rule_verdicts[0]!.verdict).toBe("CONCORDANT");
+  });
+});
+
+describe("attribution: the design's five categories, and no catch-all", () => {
+  // The taxonomy had grown from five to nine. Three of the extras were ONE
+  // question's enum values (T2-ContraindicationDocumented) promoted to top-level
+  // categories, so PATIENT_REFUSAL and CONTRAINDICATION duplicated PATIENT_FACTOR
+  // — the design defines it as "allergy, contraindication, patient preference" —
+  // while PENDING_FOLLOWUP conflated a clinical deferral with an insurance
+  // barrier, two things the design keeps apart. Across every run: 290
+  // attributions, only DOCUMENTATION_GAP and GUIDELINE_DEVIATION ever produced.
+  const RULE: RuleDefinition = {
+    rule_id: "R-Step", description: "regimen matches step therapy",
+    verdict_if: 'Step == "matches"',
+    attribution_when: [
+      { when: 'Excuse in ["contraindication", "patient_refusal", "pending_followup"]',
+        category: "PATIENT_FACTOR" },
+      { when: 'Excuse == "system_barrier"', category: "SYSTEM_FACTOR" },
+      { when: 'Excuse == "not_documented"', category: "DOCUMENTATION_GAP" },
+    ],
+  };
+  const run = (excuse?: string) => evaluateAllRuleEvents([RULE],
+    [qa("Step", "under_treated"), ...(excuse ? [qa("Excuse", excuse)] : [])], [])
+    .rule_verdicts[0]!;
+
+  it("all three clinical excuses land on PATIENT_FACTOR", () => {
+    for (const e of ["contraindication", "patient_refusal", "pending_followup"]) {
+      expect(run(e).attribution, e).toBe("PATIENT_FACTOR");
+    }
+  });
+
+  it("an institutional barrier is SYSTEM_FACTOR, not a patient factor", () => {
+    // Merging these into one enum value is what made SYSTEM_FACTOR unreachable —
+    // declared in the taxonomy and never produced by any rule.
+    expect(run("system_barrier").attribution).toBe("SYSTEM_FACTOR");
+  });
+
+  it("undocumented is a DOCUMENTATION_GAP", () => {
+    expect(run("not_documented").attribution).toBe("DOCUMENTATION_GAP");
+  });
+
+  it("no branch matches -> NO attribution, and the rationale says the rule is at fault", () => {
+    // The old `?? "OTHER"` filed this as a category. Both real occurrences came
+    // from an input that was never answered — a defect, disguised as data.
+    const v = run("something_the_rule_does_not_cover");
+    expect(v.verdict).toBe("NON_CONCORDANT");
+    expect(v.attribution).toBeUndefined();
+    expect(v.rationale).toContain("declares no attribution");
+    expect(v.rationale).toContain("R-Step");
   });
 });

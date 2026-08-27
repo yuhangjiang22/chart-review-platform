@@ -166,16 +166,32 @@ export interface SpanReview {
 /** Standardized attribution categories for non-concordant verdicts.
  *  Extensible per task via the skill's `references/attribution.yaml`
  *  but the platform recognizes these out of the box. */
+/** The study design's attribution taxonomy — FIVE categories, as published in
+ *  the 2026-03 design document, and not more.
+ *
+ *  It had grown to nine. Four of the extras came from the wrong place: three were
+ *  the enum values of ONE question (T2-ContraindicationDocumented) promoted to
+ *  top-level categories, so PATIENT_REFUSAL and CONTRAINDICATION duplicated
+ *  PATIENT_FACTOR — the design puts "allergy, contraindication, patient
+ *  preference" in that single category — while PENDING_FOLLOWUP conflated a
+ *  clinical decision to defer with an insurance barrier, which the design keeps
+ *  apart as PATIENT_FACTOR and SYSTEM_FACTOR. Measured across every run: 290
+ *  attributions, only DOCUMENTATION_GAP and GUIDELINE_DEVIATION ever produced,
+ *  plus 2 OTHER.
+ *
+ *  OTHER is gone with them. It was the engine's `attribution ?? "OTHER"` fallback,
+ *  and both real occurrences came from the same defect: a rule whose input was
+ *  never answered reached NON_CONCORDANT and could not pick an attribution.
+ *  Unanswered inputs now have their own state (ENGINE_PERIOD_UNANSWERED_REASON /
+ *  ENGINE_UNANSWERED_REASON), so the fallback was only ever disguising a defect
+ *  as a category. A NON_CONCORDANT verdict with no attribution is now a RULE BUG
+ *  and says so, rather than being quietly filed. */
 export type AttributionCategory =
-  | "DOCUMENTATION_GAP"
-  | "GUIDELINE_DEVIATION"
-  | "PATIENT_FACTOR"        // ACCR design canonical: clinical reason, not refusal/contraindication
-  | "PATIENT_REFUSAL"       // refinement of PATIENT_FACTOR — explicit patient decision
-  | "CONTRAINDICATION"      // refinement of PATIENT_FACTOR — medically required deviation
-  | "SYSTEM_FACTOR"         // ACCR design canonical: formulary / insurance / access barrier
-  | "PENDING_FOLLOWUP"      // scheduled but not yet completed
-  | "INSUFFICIENT_DATA"     // ACCR design canonical: distinct from DOCUMENTATION_GAP
-  | "OTHER";
+  | "DOCUMENTATION_GAP"     // action may have occurred but is not documented
+  | "GUIDELINE_DEVIATION"   // documentation shows a different choice than the guideline
+  | "PATIENT_FACTOR"        // documented clinical reason: allergy, contraindication, preference
+  | "SYSTEM_FACTOR"         // institutional/access barrier: formulary, referral delay, insurance
+  | "INSUFFICIENT_DATA";    // not enough information to determine — distinct from DOCUMENTATION_GAP
 
 /** One extractor answer to one question in the framework. */
 export interface QuestionAnswer {

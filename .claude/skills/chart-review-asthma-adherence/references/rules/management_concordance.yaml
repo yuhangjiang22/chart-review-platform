@@ -26,13 +26,17 @@ rules:
     event_evaluable_if: "T1-ControlLevel is present and T1-ControlLevel != \"undetermined\""
     verdict_if: "T2-StepTherapyMatch == \"matches\""
     excluded_if: "T2-StepTherapyMatch == \"unknown\""
+      # v0.6: collapsed to the design document's five categories.
+      # PATIENT_REFUSAL and CONTRAINDICATION were refinements of PATIENT_FACTOR,
+      # which the design defines as "documented clinical reason for deviation
+      # (allergy, contraindication, patient preference)" — all three arms of this
+      # question land there. They were the question's ENUM VALUES promoted to
+      # top-level categories, which is how a five-category taxonomy became nine.
     attribution_when:
-      - when: "T2-ContraindicationDocumented == \"contraindication\""
-        category: CONTRAINDICATION
-      - when: "T2-ContraindicationDocumented == \"patient_refusal\""
-        category: PATIENT_REFUSAL
-      - when: "T2-ContraindicationDocumented == \"pending_followup\""
-        category: PENDING_FOLLOWUP
+      - when: "T2-ContraindicationDocumented in [\"contraindication\", \"patient_refusal\", \"pending_followup\"]"
+        category: PATIENT_FACTOR
+      - when: "T2-ContraindicationDocumented == \"system_barrier\""
+        category: SYSTEM_FACTOR
       - when: "T2-ContraindicationDocumented == \"not_documented\""
         category: DOCUMENTATION_GAP
     attribution: GUIDELINE_DEVIATION

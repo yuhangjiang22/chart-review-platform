@@ -288,6 +288,7 @@ questions:
         - contraindication
         - patient_refusal
         - pending_followup
+        - system_barrier
         - not_documented
         - not_applicable
     depends_on:
@@ -317,6 +318,10 @@ questions:
           "preferring alternative" → 'patient_refusal'.
         - "Will reassess at next visit", "planned step-up at
           follow-up", "trial period" → 'pending_followup'.
-        - Insurance/cost barrier with documented appeal in progress
-          → 'pending_followup'.
+        - Insurance/cost/formulary barrier, prior-auth or appeal in progress
+          → 'system_barrier'. (v0.6: this used to share 'pending_followup'
+          with the clinical-deferral arm above. They are different findings —
+          the design taxonomy keeps a clinician's decision to defer
+          (PATIENT_FACTOR) apart from an institutional barrier (SYSTEM_FACTOR)
+          — and merging them made SYSTEM_FACTOR unreachable.)
         - No documentation of any of the above → 'not_documented'.

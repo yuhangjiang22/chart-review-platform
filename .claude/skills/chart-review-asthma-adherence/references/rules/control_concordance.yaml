@@ -39,13 +39,17 @@ rules:
     event_censored_reason: >-
       grace period ran past the end of observation (no asthma visit after the
       obligation date, so the deadline is censored at the index date)
+      # v0.6: collapsed to the design document's five categories.
+      # PATIENT_REFUSAL and CONTRAINDICATION were refinements of PATIENT_FACTOR,
+      # which the design defines as "documented clinical reason for deviation
+      # (allergy, contraindication, patient preference)" — all three arms of this
+      # question land there. They were the question's ENUM VALUES promoted to
+      # top-level categories, which is how a five-category taxonomy became nine.
     attribution_when:
-      - when: "T1-ControllerPrescribed != true and T2-ContraindicationDocumented == \"patient_refusal\""
-        category: PATIENT_REFUSAL
-      - when: "T1-ControllerPrescribed != true and T2-ContraindicationDocumented == \"contraindication\""
-        category: CONTRAINDICATION
-      - when: "T1-ControllerPrescribed != true and T2-ContraindicationDocumented == \"pending_followup\""
-        category: PENDING_FOLLOWUP
+      - when: "T1-ControllerPrescribed != true and T2-ContraindicationDocumented in [\"patient_refusal\", \"contraindication\", \"pending_followup\"]"
+        category: PATIENT_FACTOR
+      - when: "T1-ControllerPrescribed != true and T2-ContraindicationDocumented == \"system_barrier\""
+        category: SYSTEM_FACTOR
       - when: "T1-ControllerPrescribed != true"
         category: DOCUMENTATION_GAP
     nuanced: true

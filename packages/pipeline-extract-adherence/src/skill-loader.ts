@@ -116,10 +116,12 @@ export function loadAdherenceSkill(taskId: string, sessionId?: string): Adherenc
     }
   }
 
+  // The design document's five. A task that genuinely needs a domain-specific
+  // category adds it through references/attribution.yaml below, which is the
+  // extension point — the default list is not the place to accumulate.
   let attributionCategories: AttributionCategory[] = [
     "DOCUMENTATION_GAP", "GUIDELINE_DEVIATION", "PATIENT_FACTOR",
-    "PATIENT_REFUSAL", "CONTRAINDICATION", "SYSTEM_FACTOR",
-    "PENDING_FOLLOWUP", "INSUFFICIENT_DATA", "OTHER",
+    "SYSTEM_FACTOR", "INSUFFICIENT_DATA",
   ];
   if (fs.existsSync(attributionFile)) {
     const doc = readYamlFile(attributionFile) as {

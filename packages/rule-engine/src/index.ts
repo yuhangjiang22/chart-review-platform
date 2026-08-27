@@ -487,6 +487,12 @@ export const ENGINE_UNANSWERED_REASON = "event unanswered (no committed answer f
  *  The bias is one-directional: silence always lands on the failing side, never
  *  the passing one, so a lazy or confused extractor pushes the measured adherence
  *  rate DOWN. */
+/** Prefix on the rationale of a NON_CONCORDANT verdict the rule could not
+ *  attribute. Not a category: a rule that reaches NON_CONCORDANT without
+ *  declaring an attribution for that case is incompletely written, and the batch
+ *  runner surfaces it rather than filing it under a catch-all. */
+export const UNATTRIBUTED_RATIONALE = "rule declares no attribution";
+
 export const ENGINE_PERIOD_UNANSWERED_REASON =
   "question unanswered (the rule's own question was never committed)";
 
@@ -560,10 +566,21 @@ export function evaluateRule(
   for (const aw of compiled.attribution_when_compiled) {
     if (evalAst(aw.ast, map)) { attribution = aw.category; break; }
   }
+  // NO "OTHER" FALLBACK. A NON_CONCORDANT verdict the rule cannot attribute is a
+  // RULE BUG — an attribution_when whose branches do not cover the case, or a
+  // missing constant `attribution` — and both real occurrences of the old
+  // fallback came from the same defect: an input that was never answered, which
+  // now has its own state. Filing it as a category disguised the bug as data.
+  // Left undefined and reported, so it reads as "this rule did not say", which
+  // is what happened.
   return {
     rule_id: compiled.rule.rule_id,
     verdict: "NON_CONCORDANT",
-    attribution: attribution ?? "OTHER",
+    ...(attribution ? { attribution } : {}),
+    ...(attribution ? {} : {
+      rationale: `${UNATTRIBUTED_RATIONALE}: ${compiled.rule.rule_id} reached `
+        + "NON_CONCORDANT but declares no attribution for this case",
+    }),
     supporting_questions: compiled.qids,
     source: "rule_engine",
     ts: new Date().toISOString(),
@@ -593,7 +610,6 @@ export async function evaluateAllRules(
       out.push({
         rule_id: rule.rule_id,
         verdict: "NON_CONCORDANT",
-        attribution: "OTHER",
         rationale: `rule compile error: ${(e as Error).message}`,
         source: "rule_engine",
         ts: new Date().toISOString(),
@@ -1045,8 +1061,14 @@ export function evaluateAllRuleEvents(
       verdicts.push({
         rule_id: rule.rule_id,
         verdict: rollup.period_verdict,
-        ...(rollup.period_verdict === "NON_CONCORDANT"
-          ? { attribution: rollup.period_attribution ?? "OTHER" }
+        // Same as the single-rule path: no catch-all. A rollup that reached
+        // NON_CONCORDANT without an attribution means the rule did not declare
+        // one for that case.
+        ...(rollup.period_verdict === "NON_CONCORDANT" && rollup.period_attribution
+          ? { attribution: rollup.period_attribution }
+          : {}),
+        ...(rollup.period_verdict === "NON_CONCORDANT" && !rollup.period_attribution
+          ? { rationale: `${UNATTRIBUTED_RATIONALE}: ${rule.rule_id}` }
           : {}),
         ...(unanswered ? { rationale: unanswered.evaluable_reason } : {}),
         supporting_questions: qids,
@@ -1073,7 +1095,6 @@ export function evaluateAllRuleEvents(
       verdicts.push({
         rule_id: rule.rule_id,
         verdict: "NON_CONCORDANT",
-        attribution: "OTHER",
         rationale: `rule compile error: ${(e as Error).message}`,
         source: "rule_engine",
         ts: new Date().toISOString(),
