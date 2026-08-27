@@ -5,6 +5,7 @@ import path from "node:path";
 import {
   reconcileOrphanedRunsOnStartup,
   getRunStatus,
+  initialRunStatus,
   statusPath,
   runDir,
   type RunStatus,
@@ -178,5 +179,65 @@ describe("reconcileOrphanedRunsOnStartup — owner liveness", () => {
     writeStatus("run_legacy", baseStatus("run_legacy"));
     expect(reconcileOrphanedRunsOnStartup(NOW)).toEqual(["run_legacy"]);
     expect(getRunStatus("run_legacy")!.state).toBe("failed");
+  });
+});
+
+// ── The invariant, not its two halves ────────────────────────────────────────
+//
+// A LIVE RUN'S STATUS SURVIVES A RECONCILER PASS.
+//
+// The four tests above hand-construct status.json, so they assert what the
+// reconciler DOES with owner_pid and never that anything WRITES it. That is the
+// same shape as the bug they were added for: the original reconciler shipped with
+// five green tests asserting its behaviour and none asserting the premise it
+// rested on — "a run still marked running at boot is orphaned by definition",
+// true only while every run was hosted in the server process, false the moment
+// scripts/*-realtest started running batches in their own. The premise expired,
+// the tests did not notice, and the reconciler began killing live runs.
+//
+// So these go through the REAL writer (`initialRunStatus`, which startBatchRun
+// calls) rather than a fixture. startBatchRun itself cannot be unit-tested — it
+// loads a compiled task and kicks off driveRun, which spawns agents.
+describe("a live run's status survives a reconciler pass", () => {
+  it("the real writer's status is left alone (this test process is the owner)", () => {
+    const runId = "2026-08-27T21-00-00-000Z";
+    const status = initialRunStatus(runId, NOW.toISOString(), ["p1", "p2"]);
+    writeStatus(runId, status);
+
+    expect(reconcileOrphanedRunsOnStartup(NOW)).toEqual([]);
+    const after = getRunStatus(runId)!;
+    expect(after.state).toBe("running");
+    expect(after.per_patient.p1!.state).toBe("pending");
+  });
+
+  it("and is reaped once its owner is gone — so the test above is not vacuous", () => {
+    const runId = "2026-08-27T21-00-01-000Z";
+    // 4194304 is above the Linux/macOS pid_max ceiling, so no process holds it.
+    writeStatus(runId, { ...initialRunStatus(runId, NOW.toISOString(), ["p1"]), owner_pid: 4194304 });
+
+    expect(reconcileOrphanedRunsOnStartup(NOW)).toEqual([runId]);
+    expect(getRunStatus(runId)!.state).toBe("failed");
+  });
+
+  it("carries the liveness fields the reconciler reads", () => {
+    const s = initialRunStatus("r", "2026-08-27T21:00:00.000Z", ["p1"]);
+    expect(s.owner_pid).toBe(process.pid);
+    expect(s.heartbeat_at).toBe("2026-08-27T21:00:00.000Z");
+  });
+
+  it("CANARY: exactly one place sets owner_pid, so a second literal cannot reopen the gap", () => {
+    // If a caller reintroduces its own initial-status literal alongside
+    // initialRunStatus(), the tests above would prove that function sets
+    // owner_pid while that caller writes a status without it — a green suite over
+    // the original bug. This is a source-text check for the same reason the
+    // derivation evaluator has a parity test: the property is "there is only one
+    // of these", which no amount of behavioural testing can express.
+    // cwd-relative, not import.meta.url — under the project vitest config that
+    // URL is not a file: scheme. existsSync is asserted FIRST so a moved file
+    // fails the canary loudly instead of silently passing on an empty read.
+    const fp = path.resolve(process.cwd(), "packages/infra-batch-run/src/runs.ts");
+    expect(fs.existsSync(fp), `canary cannot find ${fp}`).toBe(true);
+    const src = fs.readFileSync(fp, "utf8");
+    expect(src.match(/owner_pid: process\.pid/g) ?? []).toHaveLength(1);
   });
 });

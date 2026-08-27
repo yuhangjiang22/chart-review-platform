@@ -715,6 +715,51 @@ export function rubricRootForRun(taskId: string, sessionId?: string): string {
   return resolveRubricRoot(taskId, sessionId);
 }
 
+/** The status a run is born with — including the OWNER LIVENESS fields the
+ *  startup reconciler uses to tell a live run from a phantom
+ *  (`reconcileOrphanedRunsOnStartup`).
+ *
+ *  Extracted from `startBatchRun` so the wiring can be tested. The reconciler had
+ *  four tests that hand-construct status.json, and none asserting that anything
+ *  ever WRITES owner_pid — the same shape that produced the bug those tests were
+ *  added for: the original reconciler had five green tests asserting its BEHAVIOUR
+ *  and none asserting the PREMISE it rested on ("a run still marked running at
+ *  boot is orphaned by definition", true only while every run was hosted in the
+ *  server process, and false the moment scripts/*-realtest ran batches in their
+ *  own). Drop owner_pid here and the reconciler's own tests stay green while every
+ *  standalone run silently becomes reapable again.
+ *
+ *  MUST remain the ONLY place a run's initial status is built. If a caller
+ *  reintroduces its own literal alongside this, the test proves this function sets
+ *  owner_pid while that caller writes a status without it — a green suite over the
+ *  original bug. */
+export function initialRunStatus(
+  runId: string,
+  startedAt: string,
+  patientIds: string[],
+): RunStatus {
+  return {
+    run_id: runId,
+    state: "running",
+    started_at: startedAt,
+    updated_at: startedAt,
+    completed_at: null,
+    total_cost_usd: 0,
+    n_patients: patientIds.length,
+    n_complete: 0,
+    n_error: 0,
+    n_running: 0,
+    per_patient: Object.fromEntries(
+      patientIds.map((pid) => [pid, { state: "pending" } as PerPatientStatus]),
+    ),
+    // Liveness, for the reconciler. process.pid is the process that will DRIVE
+    // this run: the dev server for an API-launched batch, the standalone
+    // scripts/*-realtest process for a driver-launched one. Both need it.
+    owner_pid: process.pid,
+    heartbeat_at: startedAt,
+  };
+}
+
 export function startBatchRun(opts: StartBatchRunOptions): StartBatchRunResult {
   if (!opts.patient_ids || opts.patient_ids.length === 0) {
     throw new Error("patient_ids must be non-empty");
@@ -783,23 +828,7 @@ export function startBatchRun(opts: StartBatchRunOptions): StartBatchRunResult {
   fs.mkdirSync(runDir(runId), { recursive: true });
   atomicWriteJson(manifestPath(runId), manifest);
 
-  const status: RunStatus = {
-    run_id: runId,
-    state: "running",
-    started_at: manifest.started_at,
-    updated_at: manifest.started_at,
-    completed_at: null,
-    total_cost_usd: 0,
-    n_patients: opts.patient_ids.length,
-    n_complete: 0,
-    n_error: 0,
-    n_running: 0,
-    per_patient: Object.fromEntries(
-      opts.patient_ids.map((pid) => [pid, { state: "pending" } as PerPatientStatus]),
-    ),
-    owner_pid: process.pid,
-    heartbeat_at: manifest.started_at,
-  };
+  const status = initialRunStatus(runId, manifest.started_at, opts.patient_ids);
   atomicWriteJson(statusPath(runId), status);
   opts.onStatus?.(status);
 
