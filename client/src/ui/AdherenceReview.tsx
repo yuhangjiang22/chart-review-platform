@@ -218,10 +218,21 @@ function evidenceAge(noteId: string | undefined, eventDate: string | undefined):
   };
 }
 
-/** Per-question evidence inside an event card. Mirrors QuestionRow's citation
- *  block: a note quote is a button that opens the note at the cited offsets in
- *  the source pane; an OMOP row names its table. */
-function EventAnswerEvidence({ evidence, reasoning, eventDate, onJumpToSource }: {
+/** One answer's citations, used by BOTH surfaces — a question row in the
+ *  framework and a question row inside an event card. A note quote is a button
+ *  that opens the note at the cited offsets in the source pane; an OMOP row names
+ *  its table instead.
+ *
+ *  Shared deliberately: the framework's rows used to render citations only for
+ *  per-AGENT shadow drafts, so on a single-agent run the 14 period-level
+ *  questions showed no evidence at all and nothing to click, while the event
+ *  rows did. Two implementations of "show this answer's evidence" is how they
+ *  drifted apart.
+ *
+ *  `eventDate` drives the "N months before this event" age note and its stale
+ *  warning; omitted for a period-level answer, which has no single date to be
+ *  early or late relative to. */
+function AnswerEvidence({ evidence, reasoning, eventDate, onJumpToSource }: {
   evidence?: NonNullable<RuleEvent["answers"]>[number]["evidence"];
   reasoning?: string;
   eventDate?: string;
@@ -1921,6 +1932,29 @@ function QuestionRow({
         </Button>
       </div>
 
+      {/* The COMMITTED answer's own citations — the agent's until a reviewer
+       *  overrides, which is what a reviewer needs to click through to check it.
+       *  Full width, closing the row, same shape as an event's question row.
+       *  Hidden in blind mode by the upstream answersByQid filter (a blind
+       *  session has no non-reviewer answer to show). */}
+      {answer && (
+        <details className="col-span-12 mt-0.5">
+          <summary className="cursor-pointer text-[10.5px] text-muted-foreground hover:text-foreground">
+            Evidence ({answer.evidence?.length ?? 0})
+            {(answer.evidence?.length ?? 0) === 0 && (
+              <span className="ml-1 text-[hsl(var(--ochre))]">— none cited</span>
+            )}
+          </summary>
+          <div className="pl-4 border-l-2 border-[hsl(var(--sage))]/40">
+            <AnswerEvidence
+              evidence={answer.evidence}
+              reasoning={answer.reasoning}
+              onJumpToSource={onJumpToSource}
+            />
+          </div>
+        </details>
+      )}
+
       {/* Per-agent reasoning + evidence (expandable). */}
       {presentAgents.length > 0 && (
         <details className="col-span-12 mt-1">
@@ -1933,30 +1967,14 @@ function QuestionRow({
                 <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
                   {id.replace(/^agent_/, "Agent ")} · {JSON.stringify(a.answer)}
                 </div>
-                {a.reasoning && (
-                  <div className="whitespace-pre-wrap leading-snug text-foreground">{a.reasoning}</div>
-                )}
-                {a.evidence && a.evidence.length > 0 && (
-                  <div className="mt-1 space-y-0.5">
-                    {a.evidence.map((ev, i) => (
-                      <button
-                        key={i}
-                        type="button"
-                        onClick={() => onJumpToSource?.({
-                          filename: ev.note_id,
-                          highlight: ev.start != null && ev.end != null
-                            ? { start: ev.start, end: ev.end }
-                            : undefined,
-                        })}
-                        className="block text-left w-full rounded px-0.5 -mx-0.5 hover:bg-[hsl(var(--sage))]/10"
-                        title="Open this note in the source pane"
-                      >
-                        <span className="font-mono text-[10px] text-[hsl(var(--oxblood))] underline-offset-2 hover:underline">{ev.note_id}: </span>
-                        <span className="italic">&ldquo;{ev.quote}&rdquo;</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
+                {/* Same component as the committed answer's citations above and
+                  *  as an event's — this block used to be a second, drifted copy
+                  *  of the same rendering (no OMOP-row handling, no age note). */}
+                <AnswerEvidence
+                  evidence={a.evidence}
+                  reasoning={a.reasoning}
+                  onJumpToSource={onJumpToSource}
+                />
               </div>
             ))}
           </div>
@@ -2402,7 +2420,7 @@ function EventRowImpl({
                           Evidence{committed.evidence?.length ? ` (${committed.evidence.length})` : " — none cited"}
                         </summary>
                         <div className="mt-1 pl-4 border-l-2 border-[hsl(var(--sage))]/40">
-                          <EventAnswerEvidence
+                          <AnswerEvidence
                             evidence={committed.evidence}
                             reasoning={committed.reasoning}
                             eventDate={event.anchor.date}

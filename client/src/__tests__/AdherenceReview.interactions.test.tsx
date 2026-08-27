@@ -2160,6 +2160,62 @@ describe("Compare mode (Task 6)", () => {
 // strict TS configs (it is used implicitly by RTL but we reference it here).
 void act;
 
+describe("framework-question evidence (period-level)", () => {
+  // The framework's rows used to render citations ONLY for per-AGENT shadow
+  // drafts, so on a single-agent run the period-level questions showed no
+  // evidence and nothing to click, while the event rows did. Both surfaces now
+  // share one component.
+  const withEvidence = (over: Record<string, unknown> = {}) => baseState({
+    question_answers: [
+      {
+        question_id: "q_eligible", tier: 0, answer: true, source: "agent",
+        evidence: [{ source: "note", note_id: "note_7", quote: "asthma, moderate persistent", start: 12, end: 39 }],
+        reasoning: "problem list",
+      },
+      { question_id: "q_severity", tier: 0, answer: "moderate", source: "agent" },
+    ],
+    ...over,
+  });
+
+  it("a period-level question's citation opens the note at its offsets", async () => {
+    setupMocks({ state: () => withEvidence() });
+    renderPane();
+    await waitLoaded();
+
+    // Tiers start expanded (useState(new Set([0,1,2]))) — no click needed.
+    const cite = screen.getByRole("button", { name: /note_7.*asthma, moderate persistent/s });
+    fireEvent.click(cite);
+    await waitFor(() => {
+      expect(noteViewerProps.current?.noteFocus).toMatchObject({
+        filename: "note_7", highlight: { start: 12, end: 39 },
+      });
+    });
+  });
+
+  it("says so when a period-level answer cited nothing", async () => {
+    // Same reasoning as the event rows: an unevidenced answer is what a reviewer
+    // needs to notice, and silence reads as "not looked at yet".
+    setupMocks({ state: () => withEvidence() });
+    renderPane();
+    await waitLoaded();
+    // q_severity has no evidence; q_eligible has one.
+    expect(screen.getByText(/Evidence \(1\)/)).toBeInTheDocument();
+    expect(screen.getByText(/— none cited/)).toBeInTheDocument();
+  });
+
+  it("shows no period-level citation in blind mode", async () => {
+    // answersByQid is reviewer-only there, so an agent-sourced answer — and its
+    // citation, which steers as much as the answer does — is absent entirely.
+    setupMocks({ state: () => withEvidence() });
+    renderPane({ blind: true });
+    // A blind session handed a state carrying AGENT answers is contaminated, and
+    // the pane refuses it rather than rendering — so waitLoaded() would hang.
+    // Either way the citation must not reach the annotator.
+    await waitFor(() => expect(screen.getByText(/BLIND MODE/)).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: /note_7/ })).toBeNull();
+  });
+});
+
 describe("per-event evidence", () => {
   const withEvidence = () => stateWithEvents({
     rule_events: RULE_EVENTS.map((e) => (e.event_id === "ev_1" ? {
