@@ -4,8 +4,8 @@
 *
 * Render for YOUR dialect with OHDSI SqlRender, e.g. (R):
 *   SqlRender::render(sql, cdm_database_schema='omop_cdm', min_age=2, max_age=17,
-*                     min_asthma_encounters=2, study_start='2021-01-01',
-*                     study_end='2099-12-31')  |>
+*                     min_asthma_encounters=2, min_prior_observation_days=365,
+*                     study_start='2021-01-01', study_end='2099-12-31')  |>
 *   SqlRender::translate(targetDialect='postgresql')   # or 'sql server','bigquery',
 *                                                       # 'redshift','spark','duckdb'
 *
@@ -25,39 +25,27 @@
 *   - Eligible when the 12 months ending on index_date contain
 *     >= @min_asthma_encounters countable encounters, AT LEAST ONE of them
 *     non-ED (outpatient).
+*   - AND the patient is continuously observable for
+*     >= @min_prior_observation_days before index_date (OMOP observation_period).
 *
-* ── WHAT CHANGED FROM THE v0.4 VERSION OF THIS FILE ───────────────────────────
-* Two changes, both required for site cohorts to be comparable with each other.
-* Parameter names and the output contract are otherwise unchanged, except that
-* @min_lookback_visits is now @min_asthma_encounters (renamed because it no
-* longer counts visits) and stratification columns are added to the SELECT.
+* ── WHY THE PRIOR-OBSERVATION REQUIREMENT ─────────────────────────────────────
+* Without it, a child whose records begin four months before index is scored
+* against a 12-month window they were only observable for a third of. Every
+* absence-based answer then reads as a care gap: no spirometry found, no action
+* plan documented, exacerbation count of zero. Adherence would come out lower
+* for patients with shorter data, and the attribution would skew to
+* DOCUMENTATION_GAP for a reason that has nothing to do with care. The standard
+* OHDSI guard is a minimum prior-observation window, and it costs little here:
+* measured at one development site, 98% of otherwise-eligible patients already
+* have >= 365 days.
 *
-*   1. The lookback counts ASTHMA-RELATED encounters, not any outpatient visit.
-*      v0.4 counted every visit_concept_id=9202 in the window regardless of what
-*      it was for, so a child with an asthma diagnosis somewhere in history plus
-*      two unrelated visits (well-child, an ear infection) qualified with no
-*      asthma care in the observation year at all.
-*
-*   2. ED encounters count toward the total (inpatient still does not), with at
-*      least one non-ED encounter required. Clinical review (Fedele, 2026-08-15):
-*      "A lot of kids with asthma will get most of their care through the ED. So,
-*      I don't think I'd limit to no ED. I know we are focused on outpatient
-*      adherence to guidelines so they'd need at least one outpatient encounter."
-*
-* ── KNOWN LIMITATION OF THE OUTPATIENT-ANCHORED INDEX ─────────────────────────
-* index_date is the most recent pediatric outpatient visit of ANY kind, so a
-* child whose latest visit was a well-child check gets an index anchored there,
-* and asthma care earlier in the year can fall outside the 12-month window.
-* Change 1 above excludes patients left with no asthma encounter at all, but the
-* anchor still costs observation time for the patients who do qualify.
-*
-* Anchoring the index on the most recent ASTHMA encounter instead would remove
-* that loss, at the cost of shifting index_date — and therefore the observation
-* window — for most patients, which means re-extracting rather than reconciling.
-* Deliberately NOT done here (study lead, 2026-08-27) so that sites which have
-* already adapted this file need only the two changes above. Revisit if the
-* per-encounter rules turn out to be denominator-starved at any site: sample
-* across n_asthma_encounters_12mo (below) to see how much is being lost.
+* The instrument's LONGEST lookback is the 24-month spirometry question, so a
+* patient with 365-729 days of prior observation is fully observable for every
+* question EXCEPT that one. Requiring 730 days for everyone would shrink the
+* cohort for the sake of a single question, so instead
+* `days_observed_before_index` is emitted (below) — exclude the short-lookback
+* patients from the spirometry rule at analysis time rather than from the
+* cohort.
 *
 * ── STRATIFICATION COLUMNS ────────────────────────────────────────────────────
 * The study plan samples ~30 patients/site stratified by asthma severity, age
@@ -75,6 +63,11 @@
 *                     the year contributes one judgment per per-encounter rule,
 *                     a patient with eight contributes eight. A simple random
 *                     sample concentrates in the sparse tail.
+*   days_observed_before_index
+*                   — how much of the window the patient was actually
+*                     observable for. Use it to scope the 24-month spirometry
+*                     rule (see above) and to check that a stratum is not
+*                     confounded by data availability.
 *   n_notes_12mo    — note volume, from the standard NOTE table. Sites that do
 *                     not populate NOTE get 0 here and should substitute their
 *                     own document count.
@@ -156,6 +149,17 @@ lookback AS (
     AND enc.vdate <= ia.index_date
   GROUP BY ia.person_id
 ),
+-- Continuous-enrollment span before index. A site whose observation_period is
+-- unreliable (some HIEs) can substitute the patient's earliest record date, but
+-- must say so — the two are not equivalent: earliest-record is a lower bound on
+-- observability, observation_period is an assertion of it.
+obs AS (
+  SELECT ia.person_id,
+         MIN(op2.observation_period_start_date) AS observation_start_date
+  FROM idx_age ia
+  INNER JOIN @cdm_database_schema.observation_period op2 ON op2.person_id = ia.person_id
+  GROUP BY ia.person_id
+),
 -- Note volume for the note-volume stratum. LEFT JOINed below: a site that does
 -- not populate NOTE must still return its cohort, with 0 here.
 notes AS (
@@ -178,9 +182,11 @@ SELECT ia.person_id,
        lb.n_asthma_encounters_12mo,
        lb.n_ed_12mo,
        lb.n_outpatient_12mo,
-       COALESCE(nt.n_notes_12mo, 0) AS n_notes_12mo
+       COALESCE(nt.n_notes_12mo, 0) AS n_notes_12mo,
+       DATEDIFF(DAY, ob.observation_start_date, ia.index_date) AS days_observed_before_index
 FROM idx_age ia
 INNER JOIN lookback lb ON lb.person_id = ia.person_id
+INNER JOIN obs ob ON ob.person_id = ia.person_id
 LEFT JOIN notes nt ON nt.person_id = ia.person_id
 WHERE ia.age_at_index BETWEEN @min_age AND @max_age
   AND lb.n_asthma_encounters_12mo >= @min_asthma_encounters
@@ -189,6 +195,11 @@ WHERE ia.age_at_index BETWEEN @min_age AND @max_age
   -- audit — while their ED visits still count toward having enough asthma
   -- contact to review (clinical review, change 2 above).
   AND lb.n_outpatient_12mo >= 1
+  -- Continuous observability before index (see the header). Set
+  -- @min_prior_observation_days to 365 to match the 12-month observation
+  -- period; raising it to 730 also covers the spirometry question's lookback,
+  -- at the cost of dropping patients.
+  AND ob.observation_start_date <= DATEADD(DAY, -@min_prior_observation_days, ia.index_date)
   -- Study window on the index date. Default is post-2020 (>= 2021-01-01) so EVERY
   -- patient falls under ONE guideline edition — the 2020 NAEPP Focused Update —
   -- and no one is scored against SMART/LAMA before it existed. Widen (e.g.

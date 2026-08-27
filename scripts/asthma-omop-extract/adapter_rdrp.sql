@@ -28,6 +28,15 @@ SELECT CAST(DEID_PERSON_ID AS VARCHAR) AS person_id,
        CAST(YEAR_OF_BIRTH AS INTEGER)   AS year_of_birth
 FROM read_csv_auto('{RD}/r6745_person.csv', ignore_errors=true);
 
+-- Continuous-enrollment span. The cohort query requires >= 12 months of it
+-- before index, so a patient whose records begin four months earlier is not
+-- scored against a 12-month window they were only observable for a third of.
+CREATE OR REPLACE VIEW observation_period AS
+SELECT CAST(DEID_PERSON_ID AS VARCHAR)                     AS person_id,
+       CAST(OBSERVATION_PERIOD_START_DATE AS DATE)         AS observation_period_start_date,
+       CAST(OBSERVATION_PERIOD_END_DATE AS DATE)           AS observation_period_end_date
+FROM read_csv_auto('{RD}/r6745_observation_period.csv', ignore_errors=true);
+
 CREATE OR REPLACE VIEW condition_occurrence AS
 SELECT CAST(DEID_PERSON_ID AS VARCHAR)                                   AS person_id,
        CAST(CONDITION_OCCURRENCE_ID AS VARCHAR)                          AS condition_occurrence_id,

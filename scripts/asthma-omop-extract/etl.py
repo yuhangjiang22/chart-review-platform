@@ -62,9 +62,11 @@ def render_duckdb(sql, schema_prefix=""):
     s = strip_comments(sql)
     s = s.replace("@cdm_database_schema.", schema_prefix)
     s = s.replace("@cohort_table", "cohort").replace("@drug_class_table", "drug_class_map")
-    s = s.replace("@min_age", "2").replace("@max_age", "17").replace("@min_asthma_encounters", "2")
+    s = s.replace("@min_age", "2").replace("@max_age", "17").replace("@min_asthma_encounters", "2").replace("@min_prior_observation_days", "365")
     s = s.replace("@study_start", STUDY_START).replace("@study_end", STUDY_END)
     s = re.sub(r"DATEADD\(MONTH,\s*-12,\s*([^)]+)\)", r"(\1 - INTERVAL 12 MONTH)", s)
+    s = re.sub(r"DATEADD\(DAY,\s*-(\d+),\s*([^)]+)\)", r"(\2 - INTERVAL \1 DAY)", s)
+    s = re.sub(r"DATEDIFF\(DAY,\s*([^,]+),\s*([^)]+)\)", r"DATE_DIFF('day', \1, \2)", s)
     return s
 
 def named_blocks(sql):
