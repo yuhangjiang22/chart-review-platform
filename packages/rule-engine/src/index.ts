@@ -71,10 +71,25 @@ export interface RuleDefinition {
    *  (spec 2026-08-24). Omitted = one window-spanning event —
    *  current single-verdict behavior. */
   event_anchor?: string | string[];
-  /** Per-event applicability expression over the event's merged answer
-   *  map (patient answers overlaid with event answers, plus the
-   *  synthetic `_anchor_type` answer). False → event not evaluable. */
+  /** Per-event applicability expression over the event's answer map (see
+   *  `event_scoped_questions` for what that map contains, plus the synthetic
+   *  `_anchor_type` answer). False → event not evaluable. */
   event_evaluable_if?: string;
+  /** question_ids that describe ONE EVENT rather than the observation window.
+   *  A patient-level answer for one of these is NEVER inherited into an
+   *  event: if the event carries no answer of its own, the question is absent
+   *  for that event, so `event_evaluable_if` referencing it fails and the
+   *  event is marked not evaluable. Questions absent from this list are
+   *  genuinely patient-level and ARE inherited.
+   *
+   *  Stamped onto every rule by loadAdherenceSkill from the questions'
+   *  `event_scoped: true` flag, deliberately rather than being passed as an
+   *  option here: when it was implicit, every event inherited the whole-window
+   *  answer, so an agent that committed only the rule's own answer per event
+   *  had its evaluability decided by the window value — reinstating the
+   *  collapse the event model exists to remove, and marking zero events
+   *  not-evaluable across a whole run. */
+  event_scoped_questions?: string[];
 }
 
 // ── AST types (internal) ─────────────────────────────────────────────────────
@@ -480,13 +495,32 @@ export async function evaluateAllRules(
 
 // ── Event-level evaluation (spec 2026-08-24) ─────────────────────────────────
 
-/** Merged answer list for one event: patient-level answers, overlaid by the
- *  event's own answers (same question_id shadows), plus `_anchor_type`.
+/** Answer list for one event.
+ *
+ *  Patient-level answers are inherited ONLY for questions that describe the
+ *  whole observation window. A question listed in `eventScoped` describes one
+ *  event, so its patient-level answer is withheld: if the event carries no
+ *  answer of its own the question is simply absent here, and an
+ *  `event_evaluable_if` that reads it fails (an absent question_id compares
+ *  false), marking the event not evaluable rather than judging it on the
+ *  window value.
+ *
  *  `_anchor_type` is a reserved synthetic question_id — a real question
  *  authored with that id would be shadowed by this synthetic value. */
-function mergedAnswers(patient: QuestionAnswer[], event: RuleEvent): QuestionAnswer[] {
+function mergedAnswers(
+  patient: QuestionAnswer[],
+  event: RuleEvent,
+  eventScoped: ReadonlySet<string>,
+): QuestionAnswer[] {
+  // A window stub IS the observation window, so every patient-level answer is
+  // in scope for it — withholding them there would break the anchor-free
+  // rules whose behavior must stay byte-identical.
+  const withhold = event.anchor.type === WINDOW_ANCHOR_TYPE ? new Set<string>() : eventScoped;
   const map = new Map<string, QuestionAnswer>();
-  for (const a of patient) map.set(a.question_id, a);
+  for (const a of patient) {
+    if (withhold.has(a.question_id)) continue;
+    map.set(a.question_id, a);
+  }
   for (const a of event.answers ?? []) map.set(a.question_id, a);
   map.set("_anchor_type", { question_id: "_anchor_type", tier: -1, answer: event.anchor.type });
   return [...map.values()];
@@ -536,12 +570,13 @@ export function evaluateRuleEvents(
   const evaluableAst = rule.event_evaluable_if
     ? parseExpression(rule.event_evaluable_if)
     : null;
+  const eventScoped = new Set(rule.event_scoped_questions ?? []);
 
   const outEvents: RuleEvent[] = events.map((e) => {
     if (e.evaluable === false && e.evaluable_reason !== ENGINE_NOT_EVALUABLE_REASON) {
       return { ...e, verdict: undefined, attribution: undefined };
     }
-    const merged = mergedAnswers(patientAnswers, e);
+    const merged = mergedAnswers(patientAnswers, e, eventScoped);
     if (evaluableAst) {
       const map = new Map(merged.map((a) => [a.question_id, a]));
       if (!evalAst(evaluableAst, map)) {

@@ -103,6 +103,7 @@ questions:
       the event date (the obligation point) — a controller discontinued
       before the event date does not count.
     tier: 1
+    event_scoped: true
     answer_schema:
       type: boolean
     depends_on:
@@ -222,6 +223,7 @@ questions:
       picture at that visit, the regimen active on that date, the follow-up
       scheduled after that event — not the most recent state in the window.
     tier: 1
+    event_scoped: true
     answer_schema:
       type: string
       enum:

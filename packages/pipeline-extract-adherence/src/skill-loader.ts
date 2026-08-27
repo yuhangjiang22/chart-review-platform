@@ -37,6 +37,15 @@ export interface QuestionDefinition {
   /** Free-form retrieval hint shown to the extractor so it knows what
    *  to look for (e.g. "Medication list; albuterol use"). */
   retrieval_hints?: string;
+  /** True when this question describes ONE EVENT rather than the whole
+   *  observation window — e.g. "was the regimen step-appropriate at THIS
+   *  visit". Such a question must be committed per event; the rule engine
+   *  refuses to inherit a patient-level answer for it, so an event the
+   *  annotator or agent never answered evaluates as not-evaluable instead of
+   *  silently borrowing the window-level value. Questions without the flag
+   *  (age band, contraindication documented, …) are genuinely patient-level
+   *  and ARE inherited. */
+  event_scoped?: boolean;
 }
 
 export interface AdherenceSkill {
@@ -81,6 +90,19 @@ export function loadAdherenceSkill(taskId: string, sessionId?: string): Adherenc
     }
   }
 
+  // Questions marked `event_scoped: true` describe one event, not the window
+  // (asthma: control level, controller, step therapy, follow-up). The rule
+  // engine must never inherit a patient-level answer for one of these into an
+  // event — that is the whole-window collapse the event model exists to
+  // remove. The set is stamped onto every rule here, rather than passed as a
+  // call-site option, so no evaluation path can silently omit it and
+  // reintroduce the fallback.
+  const eventScoped: string[] = [];
+  for (const arr of questionsByTier.values()) {
+    for (const q of arr) if (q.event_scoped) eventScoped.push(q.question_id);
+  }
+  eventScoped.sort();
+
   const rules: RuleDefinition[] = [];
   if (fs.existsSync(rulesDir)) {
     for (const f of fs.readdirSync(rulesDir).sort()) {
@@ -88,7 +110,9 @@ export function loadAdherenceSkill(taskId: string, sessionId?: string): Adherenc
       const doc = readYamlFile(path.join(rulesDir, f)) as {
         rules?: RuleDefinition[];
       };
-      rules.push(...(doc.rules ?? []));
+      for (const r of doc.rules ?? []) {
+        rules.push(eventScoped.length > 0 ? { ...r, event_scoped_questions: eventScoped } : r);
+      }
     }
   }
 

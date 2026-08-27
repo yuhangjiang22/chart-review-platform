@@ -234,3 +234,85 @@ describe("evaluateAllRuleEvents", () => {
     expect(roll.period_verdict).toBe("NON_CONCORDANT");
   });
 });
+
+// ── event_scoped_questions: no whole-window fallback ─────────────────────────
+//
+// Regression for the collapse the event model exists to remove. Before
+// `event_scoped_questions`, patient-level answers were inherited by every
+// event, so an agent (or annotator) who committed only the rule's own answer
+// per event had each event's EVALUABILITY decided by the whole-window value.
+// Measured on a shipped fixture run: no event carried ControlLevel, every
+// event inherited the window's "not_well_controlled", and zero events across
+// the entire run were ever marked not-evaluable.
+
+const SCOPED_STEP_RULE: RuleDefinition = {
+  ...STEP_RULE,
+  event_scoped_questions: ["ControlLevel", "StepMatch"],
+};
+
+describe("event-scoped questions are never inherited from patient level", () => {
+  it("an event that did not commit the scoped question is NOT evaluable", () => {
+    const patient = [qa("ControlLevel", "not_well_controlled")];
+    const events = [ev("R-Step", "R-Step@2024-11-14@e1", { answers: [qa("StepMatch", "matches")] })];
+    const { rule_events, rule_rollups } = evaluateAllRuleEvents([SCOPED_STEP_RULE], patient, events);
+    expect(rule_events[0].evaluable).toBe(false);
+    expect(rule_events[0].evaluable_reason).toBe(ENGINE_NOT_EVALUABLE_REASON);
+    expect(rule_events[0].verdict).toBeUndefined();
+    expect(rule_rollups[0].n_evaluable).toBe(0);
+    expect(rule_rollups[0].rate).toBeNull();
+  });
+
+  it("the same event IS evaluable once it commits the scoped question itself", () => {
+    const patient = [qa("ControlLevel", "not_well_controlled")];
+    const events = [ev("R-Step", "R-Step@2024-11-14@e1", {
+      answers: [qa("ControlLevel", "well_controlled"), qa("StepMatch", "matches")],
+    })];
+    const { rule_events } = evaluateAllRuleEvents([SCOPED_STEP_RULE], patient, events);
+    expect(rule_events[0].evaluable).toBe(true);
+    expect(rule_events[0].verdict).toBe("CONCORDANT");
+  });
+
+  it("the event's own value wins over the patient-level one, not merely shadows it", () => {
+    // Patient-level says under_treated; this event says matches. Were the
+    // window value reaching the rule at all, the verdict would flip.
+    const patient = [qa("ControlLevel", "very_poorly_controlled"), qa("StepMatch", "under_treated")];
+    const events = [ev("R-Step", "R-Step@2024-11-14@e1", {
+      answers: [qa("ControlLevel", "well_controlled"), qa("StepMatch", "matches")],
+    })];
+    const { rule_events } = evaluateAllRuleEvents([SCOPED_STEP_RULE], patient, events);
+    expect(rule_events[0].verdict).toBe("CONCORDANT");
+  });
+
+  it("questions NOT marked event-scoped are still inherited", () => {
+    // AgeBand is genuinely patient-level: withholding it too would break
+    // every rule that legitimately reads window-level context.
+    const rule: RuleDefinition = {
+      rule_id: "R-Ctx",
+      description: "uses a patient-level question alongside an event-scoped one",
+      event_anchor: "visits",
+      event_evaluable_if: 'AgeBand is present',
+      verdict_if: 'StepMatch == "matches"',
+      attribution: "DOCUMENTATION_GAP",
+      event_scoped_questions: ["StepMatch"],
+    };
+    const patient = [qa("AgeBand", "age_5_11")];
+    const events = [ev("R-Ctx", "R-Ctx@2024-11-14@e1", { answers: [qa("StepMatch", "matches")] })];
+    const { rule_events } = evaluateAllRuleEvents([rule], patient, events);
+    expect(rule_events[0].evaluable).toBe(true);
+    expect(rule_events[0].verdict).toBe("CONCORDANT");
+  });
+
+  it("a window stub still inherits everything, including event-scoped questions", () => {
+    // A window stub IS the observation window, so anchor-free rules must stay
+    // byte-identical no matter what the questions are flagged as.
+    const rule: RuleDefinition = {
+      ...WINDOW_RULE,
+      event_scoped_questions: ["SpiroDate"],
+    };
+    const patient = [qa("SpiroDate", "2024-03-01")];
+    const withFlag = evaluateAllRuleEvents([rule], patient, []);
+    const withoutFlag = evaluateAllRuleEvents([WINDOW_RULE], patient, []);
+    expect(withFlag.rule_verdicts).toEqual(withoutFlag.rule_verdicts);
+    expect(withFlag.rule_verdicts[0].verdict).toBe("CONCORDANT");
+  });
+});

@@ -26,6 +26,7 @@ questions:
       picture at that visit, the regimen active on that date, the follow-up
       scheduled after that event — not the most recent state in the window.
     tier: 2
+    event_scoped: true
     answer_schema:
       type: string
       enum:
@@ -128,6 +129,7 @@ questions:
       picture at that visit, the regimen active on that date, the follow-up
       scheduled after that event — not the most recent state in the window.
     tier: 2
+    event_scoped: true
     answer_schema:
       type: boolean
     naepp_source: "EPR-3 Section 3, Component 2, p.94 (Key Points) —
