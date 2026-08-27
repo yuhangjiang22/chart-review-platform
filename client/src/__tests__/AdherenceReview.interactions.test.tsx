@@ -895,7 +895,7 @@ describe("Rationale textarea", () => {
     renderPane();
     await waitLoaded();
 
-    const value = "理由 — long ".repeat(80);
+    const value = "rationale ✓ Ünicöde — long ".repeat(80);
     fireEvent.change(verdictSelectIn("r_unadjudicated"), { target: { value: "NON_CONCORDANT" } });
     const card = ruleCardFor("r_unadjudicated");
     const rationale = within(card).getByPlaceholderText(/rationale/i) as HTMLTextAreaElement;
