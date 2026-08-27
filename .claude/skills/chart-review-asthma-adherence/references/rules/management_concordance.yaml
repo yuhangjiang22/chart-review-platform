@@ -73,11 +73,30 @@ rules:
       when controlled. 3 months is the cap for non-controlled patients.
     evidence_grade: B
     event_anchor: [asthma_encounters, ocs_bursts]
-    # "within 3 months of this event" — the span the reviewer is judging.
+    # "within 3 months of this event" — the SPAN this rule is judged over, not a
+    # display hint. Until 2026-08-27 nothing read it: the 90 days lived only in
+    # the question's prose ("within 3 months"), leaving the agent to hold the
+    # boundary in its head, while the question's own EVENT SCOPE paragraph told
+    # it to answer "as of the event date" — a point, for a span question. Same
+    # defect the controller obligation's deadline had, and the same fix: the
+    # span is stated once, both bounds named, and the engine knows it.
     event_window_days: 90
     # A burst always needs follow-up; a visit only when not well controlled
     # at THAT visit.
     event_evaluable_if: "_anchor_type == \"ocs_bursts\" or (T1-ControlLevel is present and T1-ControlLevel != \"well_controlled\")"
+    # AN UNOBSERVED TAIL MAKES ONLY A NEGATIVE INCONCLUSIVE. When the 90 days run
+    # past the end of observation, a follow-up that IS documented still settles
+    # the event — the requirement is met and no further observation can unmeet it.
+    # A follow-up that is NOT documented settles nothing: it may have been
+    # arranged in the days the extract does not cover. So this censors the
+    # negative only, rather than dropping the event, which would throw away
+    # conclusive positives. `_window_censored` is the engine comparing
+    # event_window_days above against the ETL's `days_to_index`.
+    event_censored_if: '_window_censored == true and T2-FollowupScheduled != true'
+    event_censored_reason: >-
+      the 3-month judgment window runs past the end of observation and no
+      follow-up was documented within the part that was observed — the chart
+      cannot show whether one was arranged in the remainder
     verdict_if: "T2-FollowupScheduled == true"
     attribution: DOCUMENTATION_GAP
     supporting_questions: [T2-FollowupScheduled, T1-ControlLevel]

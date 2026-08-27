@@ -483,4 +483,27 @@ def test_extract_predating_the_field_keeps_the_old_behaviour():
 
 def test_linked_ed_only_day_stays_ed():
     a = asthma_encounter_anchors([_linked(_ed("e1", "2025-06-12"))], WIN, {})
-    assert a[0]["meta"] == {"kind": "ed", "n_encounters": 1, "kind_from": "linked_dx"}
+    assert a[0]["meta"] == {"kind": "ed", "n_encounters": 1, "kind_from": "linked_dx",
+                            "days_to_index": (INDEX - date(2025, 6, 12)).days}
+
+
+# --- (h) days_to_index: how much observation is left after an anchor ---------
+#
+# Only the ETL knows the index date; only the rule knows the length of its
+# judgment span. The engine compares the two (`_window_censored`), so the ETL has
+# to stamp the remaining days. Without it a rule with a 90-day span judged an
+# event 30 days before index as if the whole 90 had been observed.
+
+
+def test_days_to_index_on_encounter_and_burst_anchors():
+    enc = asthma_encounter_anchors([_enc("e1", "2025-12-01")], WIN, {})
+    assert enc[0]["meta"]["days_to_index"] == 30      # 2025-12-01 -> 2025-12-31
+    b = ocs_burst_anchors([_ocs("d1", "2025-12-01")], WIN, {}, None)
+    assert b[0]["meta"]["days_to_index"] == 30
+
+
+def test_days_to_index_is_zero_on_the_index_date_itself():
+    # The window is (lo, index] — an anchor ON the index date has no observation
+    # left after it, so any declared span is censored.
+    enc = asthma_encounter_anchors([_enc("e1", INDEX.isoformat())], WIN, {})
+    assert enc[0]["meta"]["days_to_index"] == 0

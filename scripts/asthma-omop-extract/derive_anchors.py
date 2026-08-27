@@ -266,6 +266,13 @@ def asthma_encounter_anchors(encounters, win, stats=None):
             "meta": {
                 "kind": "outpatient" if any(not ed for ed in basis) else "ed",
                 "n_encounters": len(slot["refs"]),
+                # Days of observation remaining after this anchor. Only the ETL
+                # knows the index date; only the rule knows how long its judgment
+                # span is, so the engine compares the two (`_window_censored`).
+                # Without this a rule with a 90-day span silently judged events
+                # whose span ran past the end of observation as if the whole
+                # span had been seen.
+                "days_to_index": (win[1] - parse_date(day)).days,
                 # How the setting above was decided, so a reviewer reading a
                 # surprising label can tell whether it rests on a linked
                 # diagnosis or on the date fallback.
@@ -373,7 +380,8 @@ def ocs_burst_anchors(drugs, win, stats=None, asthma_dates=None):
         if not _in_window(d, win):
             stats["out_of_window"] = stats.get("out_of_window", 0) + 1
             continue
-        bursts.append({"date": d.isoformat(), "ref": f"drugs:{row_id}"})
+        bursts.append({"date": d.isoformat(), "ref": f"drugs:{row_id}",
+                       "meta": {"days_to_index": (win[1] - d).days}})
     return bursts
 
 

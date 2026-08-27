@@ -501,8 +501,8 @@ describe("a censored judgment deadline is not a care gap", () => {
     rule_id: "R-Controller",
     description: "controller active by the obligation's deadline",
     event_anchor: "obligation_points",
-    event_evaluable_if: "_deadline_censored != true",
-    event_not_evaluable_reason: "grace period ran past the end of observation",
+    event_censored_if: "_deadline_censored == true",
+    event_censored_reason: "grace period ran past the end of observation",
     verdict_if: "T1-ControllerPrescribed == true",
     event_scoped_questions: ["T1-ControllerPrescribed"],
     attribution: "DOCUMENTATION_GAP",
@@ -583,5 +583,90 @@ describe("a censored judgment deadline is not a care gap", () => {
         [qa("T1-ControllerPrescribed", false), qa("_deadline_censored", false)]),
     ]);
     expect(res.rule_events[0]!.evaluable).toBe(false);
+  });
+});
+
+describe("an unobserved tail censors the NEGATIVE only", () => {
+  // The follow-up rule judges a 90-day SPAN. 21.5% of its anchors in the local
+  // corpus sit close enough to the index date that the span runs past the end of
+  // observation, and every one of them used to be judged as if the whole 90 days
+  // had been seen. But the two answers are not symmetric: a follow-up that IS
+  // documented settles the event (no further observation can unmeet a met
+  // requirement), while one that is NOT documented settles nothing — it may have
+  // been arranged in the days the extract does not cover. Dropping the whole
+  // event would throw away the conclusive positives.
+  const FOLLOWUP_RULE: RuleDefinition = {
+    rule_id: "R-Followup",
+    description: "follow-up within 3 months of the event",
+    event_anchor: "asthma_encounters",
+    event_window_days: 90,
+    event_censored_if: '_window_censored == true and Followup != true',
+    event_censored_reason: "window runs past the end of observation, no follow-up seen in the observed part",
+    verdict_if: "Followup == true",
+    event_scoped_questions: ["Followup"],
+    attribution: "DOCUMENTATION_GAP",
+  };
+  const visit = (daysToIndex: number, followup: boolean | undefined): RuleEvent => ({
+    event_id: `e@${daysToIndex}`, rule_id: "R-Followup",
+    anchor: { type: "asthma_encounters", date: "2025-11-15", origin: "omop",
+              meta: { days_to_index: daysToIndex } },
+    ...(followup === undefined ? {} : {
+      answers: [{ question_id: "Followup", tier: 2, answer: followup }] }),
+  });
+  const run = (e: RuleEvent) => evaluateAllRuleEvents([FOLLOWUP_RULE], [], [e]).rule_events[0]!;
+
+  it("window fully observed: both answers are judged", () => {
+    expect(run(visit(200, true))).toMatchObject({ evaluable: true, verdict: "CONCORDANT" });
+    expect(run(visit(200, false))).toMatchObject({ evaluable: true, verdict: "NON_CONCORDANT" });
+  });
+
+  it("window truncated + follow-up FOUND: still conclusive", () => {
+    // The whole point of censoring the negative only.
+    expect(run(visit(30, true))).toMatchObject({ evaluable: true, verdict: "CONCORDANT" });
+  });
+
+  it("window truncated + follow-up NOT found: censored, not a care gap", () => {
+    const e = run(visit(30, false));
+    expect(e.evaluable).toBe(false);
+    expect(e.evaluable_reason).toBe(FOLLOWUP_RULE.event_censored_reason);
+    expect(e.verdict).toBeUndefined();
+  });
+
+  it("boundary: exactly the declared window is fully observed", () => {
+    expect(run(visit(90, false))).toMatchObject({ evaluable: true, verdict: "NON_CONCORDANT" });
+    expect(run(visit(89, false))).toMatchObject({ evaluable: false });
+  });
+
+  it("an asymmetric gate needs the answer, so unanswered is still UNANSWERED", () => {
+    // `_window_censored == true and Followup != true` reads an event-scoped
+    // question, so it cannot run before the unanswered check — and should not:
+    // with no answer there is nothing to call conclusive either way.
+    expect(run(visit(30, undefined)).evaluable_reason).toBe(ENGINE_UNANSWERED_REASON);
+  });
+
+  it("no days_to_index (extract predating the field) judges as before", () => {
+    const e: RuleEvent = {
+      event_id: "e0", rule_id: "R-Followup",
+      anchor: { type: "asthma_encounters", date: "2025-11-15", origin: "omop" },
+      answers: [{ question_id: "Followup", tier: 2, answer: false }],
+    };
+    expect(run(e)).toMatchObject({ evaluable: true, verdict: "NON_CONCORDANT" });
+  });
+
+  it("a rule with no declared window is never window-censored", () => {
+    const pointRule = { ...FOLLOWUP_RULE, event_window_days: undefined };
+    const res = evaluateAllRuleEvents([pointRule], [], [visit(1, false)]);
+    expect(res.rule_events[0]).toMatchObject({ evaluable: true, verdict: "NON_CONCORDANT" });
+  });
+
+  it("applicability is reported BEFORE censoring, not as censoring", () => {
+    // An event the requirement does not apply to is not "censored" — saying so
+    // would misreport why it left the denominator.
+    const gated = { ...FOLLOWUP_RULE, event_evaluable_if: 'Applies == true',
+                    event_scoped_questions: ["Followup", "Applies"] };
+    const e = { ...visit(30, false) } as RuleEvent;
+    e.answers = [...(e.answers ?? []), { question_id: "Applies", tier: 2, answer: false }];
+    const out = evaluateAllRuleEvents([gated], [], [e]).rule_events[0]!;
+    expect(out.evaluable_reason).toBe(ENGINE_NOT_EVALUABLE_REASON);
   });
 });

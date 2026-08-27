@@ -35,8 +35,8 @@ rules:
     # gap the data does not support — 8% of obligation points in the local corpus
     # are censored. The engine exposes the flag as the synthetic
     # `_deadline_censored`, since no extraction could supply it.
-    event_evaluable_if: '_deadline_censored != true'
-    event_not_evaluable_reason: >-
+    event_censored_if: '_deadline_censored == true'
+    event_censored_reason: >-
       grace period ran past the end of observation (no asthma visit after the
       obligation date, so the deadline is censored at the index date)
     attribution_when:

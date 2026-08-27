@@ -19,6 +19,22 @@ const NOTE_LEAD_IN_DAYS = 90;
  *  date itself). */
 const MAX_NAMED_NOTES = 10;
 
+/** End of an event's judgment span: the ETL's deadline when the anchor carries
+ *  one, else the rule's declared window, else null (the requirement is judged AT
+ *  the event date, a point). Same precedence the reviewer's UI uses, so the two
+ *  sides never disagree about what span an event covers. */
+function judgmentEnd(
+  eventDate: string | undefined,
+  meta: Record<string, unknown> | undefined,
+  windowDays: number | undefined,
+): string | null {
+  if (typeof meta?.deadline === "string") return meta.deadline.slice(0, 10);
+  if (typeof windowDays !== "number" || !eventDate) return null;
+  const t = new Date(eventDate).getTime();
+  if (!Number.isFinite(t)) return null;
+  return new Date(t + windowDays * 86_400_000).toISOString().slice(0, 10);
+}
+
 function notesForEvent(
   notes: Array<{ filename: string; date: string }>,
   eventDate: string | undefined,
@@ -113,13 +129,15 @@ export function buildEventWorklistBlock(
     "DIFFERENT answers at different events for one patient; that is the point of",
     "evaluating per event.",
     "",
-    "EXCEPTION — an event whose line carries `deadline=<date>` is judged over the",
-    "SPAN from its date THROUGH that deadline, not at its date. The deadline is a",
-    "grace period the guideline allows: the controller obligation runs to the",
-    "patient's next asthma visit, so a controller first started AT that visit",
-    "MEETS the obligation (the deadline is inclusive) and one started after it",
-    "does not. Judging such an event at its own date scores the clinician who did",
-    "exactly the right thing at the next visit as a care gap.",
+    "EXCEPTION — an event whose line carries `judge through <date>` is judged over",
+    "the SPAN from its own date THROUGH that date, inclusive, not at its date.",
+    "The span is a grace period the guideline allows, and it comes from one of two",
+    "places: the controller obligation runs to the patient's next asthma visit",
+    "(so a controller first started AT that visit MEETS the obligation, and one",
+    "started after it does not), and follow-up scheduling runs 3 months from the",
+    "event (so a recheck booked three weeks later counts). Judging either at its",
+    "own date scores the clinician who did exactly the right thing, slightly",
+    "later, as a care gap.",
     "",
     "Only when the chart genuinely cannot establish a `decides:` question at",
     "that date, commit the event with evaluable:false and an evaluable_reason.",
@@ -136,7 +154,12 @@ export function buildEventWorklistBlock(
     const meta = e.anchor.meta && Object.keys(e.anchor.meta).length > 0
       ? ` [${Object.entries(e.anchor.meta).map(([k, v]) => `${k}=${v}`).join(", ")}]`
       : "";
-    lines.push(`  - ${e.event_id} — rule ${e.rule_id}, ${e.anchor.type} on ${e.anchor.date}${ref}${meta}`);
+    // The judgment span, spelled out rather than left implicit in `deadline=` /
+    // the rule's declared window. An agent handed only a date answered span
+    // questions at that date.
+    const judgeThrough = judgmentEnd(e.anchor.date, e.anchor.meta, windowByRule.get(e.rule_id));
+    const span = judgeThrough ? `, judge through ${judgeThrough}` : "";
+    lines.push(`  - ${e.event_id} — rule ${e.rule_id}, ${e.anchor.type} on ${e.anchor.date}${span}${ref}${meta}`);
     const needs = needsByRule.get(e.rule_id);
     if (needs && (needs.verdict.length > 0 || needs.evaluability.length > 0)) {
       const parts: string[] = [];

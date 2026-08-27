@@ -87,17 +87,27 @@ export interface RuleDefinition {
    *  controller obligation runs to the patient's NEXT asthma visit, which is
    *  data-dependent and computed by the ETL, not a fixed number of days. */
   event_window_days?: number;
-  /** Human-readable reason stamped on an event this rule marks not evaluable,
-   *  in place of the generic ENGINE_NOT_EVALUABLE_REASON ("event_evaluable_if
-   *  not met"). Use it when the rule's evaluability gate encodes a specific
-   *  finding a reviewer needs to see — e.g. the controller obligation whose
-   *  grace period ran past the end of observation, which is a real limit on what
-   *  the data can show, not a judgement about care.
+  /** CENSORING gate: when this holds, the event is not evaluable because the
+   *  DATA CANNOT SHOW the answer — distinct from `event_evaluable_if`, which says
+   *  the requirement does not APPLY. Both end in "not evaluable" and they are
+   *  different findings: one is a limit on the observation window, the other is
+   *  clinical applicability.
    *
-   *  Recognised as ENGINE-supplied on re-evaluation like the two sentinels, so a
-   *  round-tripped event is still re-derived from scratch rather than
-   *  short-circuiting as an agent-authored reason. */
-  event_not_evaluable_reason?: string;
+   *  Kept a separate expression rather than ANDed into `event_evaluable_if` for
+   *  two reasons: the reason string can name the actual limit, and a gate that
+   *  reads no event-scoped question is evaluated BEFORE the unanswered check, so
+   *  an unjudgeable event says so instead of reporting "nobody looked".
+   *
+   *  May read the synthetic `_deadline_censored` / `_window_censored` and, when
+   *  the censoring is ASYMMETRIC, event answers too: an unobserved tail makes a
+   *  NEGATIVE inconclusive while a positive stays conclusive, which is
+   *  `_window_censored == true and <the answer> != true`. */
+  event_censored_if?: string;
+  /** Reason stamped on an event `event_censored_if` caught, in place of the
+   *  generic ENGINE_NOT_EVALUABLE_REASON. Recognised as ENGINE-supplied on
+   *  re-evaluation like the two sentinels, so a round-tripped event is re-derived
+   *  from scratch rather than short-circuiting as an agent-authored reason. */
+  event_censored_reason?: string;
   /** question_ids that describe ONE EVENT rather than the observation window.
    *  A patient-level answer for one of these is NEVER inherited into an
    *  event: if the event carries no answer of its own, the question is absent
@@ -571,16 +581,18 @@ export async function evaluateAllRules(
  *  false), marking the event not evaluable rather than judging it on the
  *  window value.
  *
- *  `_anchor_type` and `_deadline_censored` are reserved synthetic question_ids —
- *  a real question authored with either id would be shadowed by the synthetic
- *  value. They let `event_evaluable_if` read facts the ETL established about the
- *  event itself, which no extraction could supply: which anchor list produced
- *  it, and whether its judgment deadline was truncated at the end of
- *  observation. */
+ *  `_anchor_type`, `_deadline_censored` and `_window_censored` are reserved
+ *  synthetic question_ids — a real question authored with any of them would be
+ *  shadowed by the synthetic value. They let `event_evaluable_if` /
+ *  `event_censored_if` read facts about the event itself that no extraction could
+ *  supply: which anchor list produced it, whether its judgment deadline was
+ *  truncated at the end of observation, and whether the rule's declared judgment
+ *  span runs past that end. */
 function mergedAnswers(
   patient: QuestionAnswer[],
   event: RuleEvent,
   eventScoped: ReadonlySet<string>,
+  windowDays?: number,
 ): QuestionAnswer[] {
   // A window stub IS the observation window, so every patient-level answer is
   // in scope for it — withholding them there would break the anchor-free
@@ -596,6 +608,18 @@ function mergedAnswers(
   map.set("_deadline_censored", {
     question_id: "_deadline_censored", tier: -1,
     answer: event.anchor.meta?.deadline_censored === true,
+  });
+  // Does the rule's declared judgment span run past the end of observation? The
+  // ETL stamps `days_to_index` (index_date minus the anchor date) because only it
+  // knows the index date; the span comes from the rule, so only the engine can
+  // put the two together. Undefined either side -> false: absent information is
+  // not evidence of censoring, and an extract predating the field keeps its
+  // behaviour.
+  const daysToIndex = event.anchor.meta?.days_to_index;
+  map.set("_window_censored", {
+    question_id: "_window_censored", tier: -1,
+    answer: typeof windowDays === "number" && typeof daysToIndex === "number"
+      && daysToIndex < windowDays,
   });
   return [...map.values()];
 }
@@ -761,44 +785,49 @@ export function evaluateRuleEvents(
   const evaluableAst = rule.event_evaluable_if
     ? parseExpression(rule.event_evaluable_if)
     : null;
+  const censoredAst = rule.event_censored_if
+    ? parseExpression(rule.event_censored_if)
+    : null;
   const eventScoped = new Set(rule.event_scoped_questions ?? []);
   const scopedFor = eventScopedQuestionsFor(rule);
   const required = scopedFor.verdict;
-  // Can the evaluability gate be decided WITHOUT any per-event answer? True when
-  // it reads only patient-level answers and the synthetic anchor facts
-  // (`_anchor_type`, `_deadline_censored`) — the controller obligation's censored
-  // deadline is the case that matters. Such a gate must run BEFORE the unanswered
-  // check, or an unanswered censored event reports "nobody looked" when the truth
-  // is "this event can never be judged", which is a different finding and the
-  // more important one.
-  const evaluabilityIsStructural = scopedFor.evaluability.length === 0;
+  // Can the CENSORING gate be decided without any per-event answer? True when it
+  // reads only patient-level answers and the synthetic anchor facts. Such a gate
+  // runs BEFORE the unanswered check, or an unanswered unjudgeable event reports
+  // "nobody looked" when the truth is "the data cannot show this" — a different
+  // finding and the more important one. An ASYMMETRIC censoring gate (a positive
+  // stays conclusive, a negative does not) necessarily reads the answer, so it
+  // runs after, where the answer exists.
+  const censoringIsStructural = censoredAst
+    && eventScopedQuestionsFor({ ...rule, verdict_if: rule.event_censored_if! })
+      .verdict.length === 0;
 
   const outEvents: RuleEvent[] = events.map((e) => {
     // Reasons the ENGINE could itself have produced for THIS rule. Any other
     // reason is agent- or reviewer-authored and authoritative: it short-circuits
-    // rather than being re-derived. Without rule.event_not_evaluable_reason in
-    // this set, a custom reason would freeze the event at the first pass.
+    // rather than being re-derived. Without rule.event_censored_reason in this
+    // set, a custom reason would freeze the event at the first pass.
     if (e.evaluable === false
         && e.evaluable_reason !== ENGINE_NOT_EVALUABLE_REASON
         && e.evaluable_reason !== ENGINE_UNANSWERED_REASON
-        && e.evaluable_reason !== rule.event_not_evaluable_reason) {
+        && e.evaluable_reason !== rule.event_censored_reason) {
       return { ...e, verdict: undefined, attribution: undefined };
     }
-    const notEvaluable = (): RuleEvent => ({
+    const notEvaluable = (reason?: string): RuleEvent => ({
       ...e,
       evaluable: false,
-      evaluable_reason: e.evaluable_reason
-        ?? rule.event_not_evaluable_reason ?? ENGINE_NOT_EVALUABLE_REASON,
+      evaluable_reason: e.evaluable_reason ?? reason ?? ENGINE_NOT_EVALUABLE_REASON,
       verdict: undefined,
       attribution: undefined,
     });
-    const gateHolds = (answers: QuestionAnswer[]) =>
-      !evaluableAst || evalAst(evaluableAst, new Map(answers.map((a) => [a.question_id, a])));
+    const holds = (ast: Ast | null, answers: QuestionAnswer[]) =>
+      !ast || evalAst(ast, new Map(answers.map((a) => [a.question_id, a])));
+    const censored = (answers: QuestionAnswer[]) =>
+      !!censoredAst && holds(censoredAst, answers);
 
-    // A structural gate first — see evaluabilityIsStructural.
-    if (evaluabilityIsStructural
-        && !gateHolds(mergedAnswers(patientAnswers, e, eventScoped))) {
-      return notEvaluable();
+    if (censoringIsStructural
+        && censored(mergedAnswers(patientAnswers, e, eventScoped, rule.event_window_days))) {
+      return notEvaluable(rule.event_censored_reason);
     }
     // An anchored event whose rule needs per-event answers, but which carries
     // none of them, is UNANSWERED — not concordant, not violated. Deriving a
@@ -818,11 +847,13 @@ export function evaluateRuleEvents(
         };
       }
     }
-    const merged = mergedAnswers(patientAnswers, e, eventScoped);
-    if (evaluableAst) {
-      if (!gateHolds(merged)) {
-        return notEvaluable();
-      }
+    const merged = mergedAnswers(patientAnswers, e, eventScoped, rule.event_window_days);
+    // Applicability BEFORE censoring: an event the requirement does not apply to
+    // is not "censored", and saying so would misreport why it left the
+    // denominator.
+    if (!holds(evaluableAst, merged)) return notEvaluable();
+    if (!censoringIsStructural && censored(merged)) {
+      return notEvaluable(rule.event_censored_reason);
     }
     const v = evaluateRule(compiled, merged);
     return { ...e, evaluable: true, evaluable_reason: undefined, verdict: v.verdict, attribution: v.attribution };

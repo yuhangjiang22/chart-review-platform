@@ -125,9 +125,14 @@ questions:
       endocrine recheck) do NOT count, and "RTC PRN" is false.
 
       EVENT SCOPE: when this question is answered inside a rule event
-      (set_event_answer), answer it AS OF THE EVENT DATE — the control
-      picture at that visit, the regimen active on that date, the follow-up
-      scheduled after that event — not the most recent state in the window.
+      (set_event_answer), judge THE 3 MONTHS FOLLOWING THAT EVENT. The event's
+      own line in the work-list prints the span it is judged over. This is a
+      SPAN, not a point: a follow-up arranged at the visit itself counts, and so
+      does one arranged three weeks later; one arranged four months later does
+      not. Do not answer from the most recent state in the observation window,
+      and do not answer only from the event date — an earlier version of this
+      paragraph said "as of the event date", a point test for a span question,
+      which made a follow-up booked two weeks after the visit read as false.
     tier: 2
     event_scoped: true
     answer_schema:

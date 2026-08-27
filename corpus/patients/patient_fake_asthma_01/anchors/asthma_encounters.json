@@ -5,6 +5,7 @@
   "meta": {
    "kind": "outpatient",
    "n_encounters": 1,
+   "days_to_index": 159,
    "kind_from": "linked_dx"
   }
  },
@@ -14,6 +15,7 @@
   "meta": {
    "kind": "ed",
    "n_encounters": 2,
+   "days_to_index": 148,
    "kind_from": "linked_dx"
   }
  },
@@ -23,6 +25,7 @@
   "meta": {
    "kind": "outpatient",
    "n_encounters": 1,
+   "days_to_index": 117,
    "kind_from": "linked_dx"
   }
  },
@@ -32,6 +35,7 @@
   "meta": {
    "kind": "outpatient",
    "n_encounters": 1,
+   "days_to_index": 0,
    "kind_from": "linked_dx"
   }
  }
