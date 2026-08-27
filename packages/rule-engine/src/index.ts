@@ -377,6 +377,49 @@ export function compileRule(rule: RuleDefinition): CompiledRule {
   };
 }
 
+/** The event-scoped question_ids this rule needs COMMITTED PER EVENT.
+ *
+ *  Split into the two that matter separately:
+ *  - `verdict`: read by `verdict_if` / `excluded_if`. An event missing any of
+ *    these cannot be judged at all — without this distinction a missing
+ *    answer compares false and the event is scored "the guideline was
+ *    violated", turning "nobody looked" into a care gap.
+ *  - `evaluability`: read by `event_evaluable_if`. Missing means the
+ *    applicability of the requirement at that event is unknown, which the
+ *    existing gate already turns into not-evaluable.
+ *
+ *  Only questions the task marked `event_scoped: true` appear — patient-level
+ *  questions are legitimately inherited and must not be demanded per event.
+ *  The union is what the event work-list prompt tells the agent to commit;
+ *  before it did, the agent had to guess which questions belonged to which
+ *  event, and on a live run it answered one event with another event's
+ *  question and left four with nothing at all. */
+export function eventScopedQuestionsFor(
+  rule: RuleDefinition,
+): { verdict: string[]; evaluability: string[] } {
+  const scoped = new Set(rule.event_scoped_questions ?? []);
+  const pick = (srcs: Array<string | undefined>): string[] => {
+    const out = new Set<string>();
+    for (const src of srcs) {
+      if (!src) continue;
+      const qids = new Set<string>();
+      collectQids(parseExpression(src), qids);
+      for (const q of qids) if (scoped.has(q)) out.add(q);
+    }
+    return [...out].sort();
+  };
+  return {
+    verdict: pick([rule.verdict_if, rule.excluded_if]),
+    evaluability: pick([rule.event_evaluable_if]),
+  };
+}
+
+/** Reason stamped on an anchored event whose rule needs per-event answers the
+ *  event does not carry. Distinct from ENGINE_NOT_EVALUABLE_REASON: that one
+ *  means "the requirement does not apply here", this one means "we were never
+ *  told anything about this event". */
+export const ENGINE_UNANSWERED_REASON = "event unanswered (no committed answer for this rule)";
+
 /** Evaluate one compiled rule against the patient's answers.
  *  Pure / deterministic. */
 export function evaluateRule(
@@ -571,10 +614,31 @@ export function evaluateRuleEvents(
     ? parseExpression(rule.event_evaluable_if)
     : null;
   const eventScoped = new Set(rule.event_scoped_questions ?? []);
+  const required = eventScopedQuestionsFor(rule).verdict;
 
   const outEvents: RuleEvent[] = events.map((e) => {
-    if (e.evaluable === false && e.evaluable_reason !== ENGINE_NOT_EVALUABLE_REASON) {
+    if (e.evaluable === false
+        && e.evaluable_reason !== ENGINE_NOT_EVALUABLE_REASON
+        && e.evaluable_reason !== ENGINE_UNANSWERED_REASON) {
       return { ...e, verdict: undefined, attribution: undefined };
+    }
+    // An anchored event whose rule needs per-event answers, but which carries
+    // none of them, is UNANSWERED — not concordant, not violated. Deriving a
+    // verdict here reads a missing answer as false and reports a care gap
+    // nobody established: on a live run an event with an empty answer list was
+    // scored NON_CONCORDANT purely because the question was absent. Window
+    // stubs are exempt — they legitimately read patient-level answers.
+    if (e.anchor.type !== WINDOW_ANCHOR_TYPE && required.length > 0) {
+      const own = new Set((e.answers ?? []).map((a) => a.question_id));
+      if (!required.every((q) => own.has(q))) {
+        return {
+          ...e,
+          evaluable: false,
+          evaluable_reason: ENGINE_UNANSWERED_REASON,
+          verdict: undefined,
+          attribution: undefined,
+        };
+      }
     }
     const merged = mergedAnswers(patientAnswers, e, eventScoped);
     if (evaluableAst) {

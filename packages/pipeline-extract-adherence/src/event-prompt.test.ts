@@ -27,3 +27,43 @@ describe("buildEventWorklistBlock", () => {
     expect(buildEventWorklistBlock([windowEv])).toBe("");
   });
 });
+
+// The whole point of the block: tell the agent WHICH questions each event
+// needs. Without this the agent had to infer it, and on a live run it
+// answered one event with another event's question and left four with nothing.
+describe("per-event required questions", () => {
+  const STEP_RULE = {
+    rule_id: "R-Step",
+    description: "d",
+    event_anchor: "visits",
+    verdict_if: 'StepMatch == "matches"',
+    event_evaluable_if: "ControlLevel is present",
+    event_scoped_questions: ["StepMatch", "ControlLevel"],
+  };
+
+  it("names the answer questions and the applicability questions separately", () => {
+    const block = buildEventWorklistBlock([anchored], [STEP_RULE as never]);
+    expect(block).toMatch(/^ {6}answer: StepMatch/m);
+    expect(block).toContain("decides: ControlLevel");
+  });
+
+  it("tells the agent an unanswered event is recorded, not judged", () => {
+    const block = buildEventWorklistBlock([anchored], [STEP_RULE as never]);
+    expect(block).toMatch(/unanswered rather than judged/);
+  });
+
+  it("omits the needs line when the rule declares no event-scoped questions", () => {
+    const bare = { ...STEP_RULE, event_scoped_questions: [], event_evaluable_if: undefined };
+    const block = buildEventWorklistBlock([anchored], [bare as never]);
+    // The per-event needs line is indented under its event; the block header
+    // legitimately mentions `answers:[...]` in the tool-call shape.
+    expect(block).not.toMatch(/^ {6}answer: /m);
+    expect(block).toContain(anchored.event_id);
+  });
+
+  it("still renders without rules (no needs lines, event list intact)", () => {
+    const block = buildEventWorklistBlock([anchored]);
+    expect(block).toContain(anchored.event_id);
+    expect(block).not.toMatch(/^ {6}answer: /m);
+  });
+});

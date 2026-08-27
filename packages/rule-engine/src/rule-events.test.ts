@@ -4,6 +4,8 @@ import {
   evaluateAllRules,
   evaluateAllRuleEvents,
   ENGINE_NOT_EVALUABLE_REASON,
+  ENGINE_UNANSWERED_REASON,
+  eventScopedQuestionsFor,
   type RuleDefinition,
 } from "./index.js";
 
@@ -314,5 +316,87 @@ describe("event-scoped questions are never inherited from patient level", () => 
     const withoutFlag = evaluateAllRuleEvents([WINDOW_RULE], patient, []);
     expect(withFlag.rule_verdicts).toEqual(withoutFlag.rule_verdicts);
     expect(withFlag.rule_verdicts[0].verdict).toBe("CONCORDANT");
+  });
+});
+
+// ── unanswered events are not judged ────────────────────────────────────────
+//
+// Regression for what the live fixture run surfaced: a follow-up event whose
+// answer list was EMPTY was scored NON_CONCORDANT, because an absent
+// question_id compares false and false means "no follow-up was arranged".
+// "Nobody looked" and "we looked and found none" are different claims, and
+// only the second is a care gap.
+
+describe("an anchored event missing its rule's own answer is unanswered, not judged", () => {
+  const RULE: RuleDefinition = {
+    rule_id: "R-Follow",
+    description: "follow-up arranged within 3 months of this event",
+    event_anchor: "visits",
+    verdict_if: "Followup == true",
+    attribution: "DOCUMENTATION_GAP",
+    event_scoped_questions: ["Followup"],
+  };
+
+  it("an empty answer list yields evaluable:false with the unanswered reason, not NON_CONCORDANT", () => {
+    const events = [ev("R-Follow", "R-Follow@2025-01-10@e1", { answers: [] })];
+    const { rule_events, rule_rollups } = evaluateAllRuleEvents([RULE], [], events);
+    expect(rule_events[0].evaluable).toBe(false);
+    expect(rule_events[0].evaluable_reason).toBe(ENGINE_UNANSWERED_REASON);
+    expect(rule_events[0].verdict).toBeUndefined();
+    expect(rule_rollups[0].n_non_concordant).toBe(0);
+    expect(rule_rollups[0].n_evaluable).toBe(0);
+    expect(rule_rollups[0].period_verdict).toBe("EXCLUDED");
+  });
+
+  it("a committed FALSE answer still counts as a real gap", () => {
+    // The distinction has to cut only one way: an annotator or agent who
+    // looked and recorded "no follow-up arranged" must still produce a
+    // NON_CONCORDANT event.
+    const events = [ev("R-Follow", "R-Follow@2025-01-10@e1", { answers: [qa("Followup", false)] })];
+    const { rule_events, rule_rollups } = evaluateAllRuleEvents([RULE], [], events);
+    expect(rule_events[0].evaluable).toBe(true);
+    expect(rule_events[0].verdict).toBe("NON_CONCORDANT");
+    expect(rule_rollups[0].n_non_concordant).toBe(1);
+  });
+
+  it("answering some OTHER event's question does not make the event answered", () => {
+    const events = [ev("R-Follow", "R-Follow@2025-01-10@e1", { answers: [qa("StepMatch", "matches")] })];
+    const { rule_events } = evaluateAllRuleEvents([RULE], [], events);
+    expect(rule_events[0].evaluable_reason).toBe(ENGINE_UNANSWERED_REASON);
+  });
+
+  it("a window stub is exempt — it legitimately reads patient-level answers", () => {
+    const windowRule: RuleDefinition = { ...RULE, event_anchor: undefined, event_scoped_questions: [] };
+    const { rule_verdicts } = evaluateAllRuleEvents([windowRule], [qa("Followup", true)], []);
+    expect(rule_verdicts[0].verdict).toBe("CONCORDANT");
+  });
+});
+
+describe("eventScopedQuestionsFor", () => {
+  it("splits the questions that decide a verdict from those that decide applicability", () => {
+    const rule: RuleDefinition = {
+      rule_id: "R-Step",
+      description: "d",
+      event_anchor: "visits",
+      verdict_if: 'StepMatch == "matches"',
+      excluded_if: 'StepMatch == "unknown"',
+      event_evaluable_if: 'ControlLevel is present and ControlLevel != "undetermined"',
+      event_scoped_questions: ["StepMatch", "ControlLevel"],
+    };
+    expect(eventScopedQuestionsFor(rule)).toEqual({
+      verdict: ["StepMatch"],
+      evaluability: ["ControlLevel"],
+    });
+  });
+
+  it("omits questions the task did not mark event-scoped — those are inherited", () => {
+    const rule: RuleDefinition = {
+      rule_id: "R-Ctx",
+      description: "d",
+      event_anchor: "visits",
+      verdict_if: 'StepMatch == "matches" and AgeBand == "age_5_11"',
+      event_scoped_questions: ["StepMatch"],
+    };
+    expect(eventScopedQuestionsFor(rule).verdict).toEqual(["StepMatch"]);
   });
 });

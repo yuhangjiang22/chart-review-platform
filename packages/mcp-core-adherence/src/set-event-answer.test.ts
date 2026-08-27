@@ -49,6 +49,10 @@ beforeAll(() => {
       "    tier: 1",
       "    text: control level at the event date",
       "    answer_schema: { type: string, enum: [well_controlled, not_well_controlled] }",
+      "  - question_id: Followup",
+      "    tier: 2",
+      "    text: follow-up arranged after this event",
+      "    answer_schema: { type: boolean }",
       "  - question_id: StepMatch",
       "    tier: 2",
       "    text: regimen matches step",
@@ -63,6 +67,12 @@ beforeAll(() => {
       "  - rule_id: R-Step",
       "    description: d",
       "    verdict_if: StepMatch == \"matches\"",
+      // Mirrors the real anchored rules: the control level decides whether
+      // the requirement applies at that event. Without it declared, the
+      // in-scope check below would (correctly) reject ControlLevel answers —
+      // a rule that reads only StepMatch has no business being told one.
+      "    event_evaluable_if: ControlLevel is present",
+      "    event_anchor: asthma_encounters",
     ].join("\n"),
   );
   prevRubric = process.env.CHART_REVIEW_RUBRIC_ROOT;
@@ -235,5 +245,45 @@ describe("setEventAnswer", () => {
       const msg = result.error.issues.map((i) => i.message).join("; ");
       expect(msg).toContain("YYYY-MM-DD");
     }
+  });
+});
+
+describe("out-of-scope question rejection", () => {
+  it("rejects a question belonging to a different event's rule", async () => {
+    // Observed live: the agent committed the follow-up question onto a
+    // step-therapy event. It stored fine, so the event LOOKED answered while
+    // the rule's own question stayed missing — the event then dropped out of
+    // the denominator with no signal.
+    const body = parse(await setEventAnswer(session, {
+      event_id: STUB_ID,
+      answers: [{ question_id: "Followup", answer: true }],
+    }));
+    expect(body.ok).toBe(false);
+    expect(body.error).toContain("not in scope");
+    expect(body.hint).toContain("StepMatch");
+  });
+
+  it("accepts the questions the rule actually reads", async () => {
+    const body = parse(await setEventAnswer(session, {
+      event_id: STUB_ID,
+      answers: [
+        { question_id: "StepMatch", answer: "matches" },
+        { question_id: "ControlLevel", answer: "well_controlled" },
+      ],
+    }));
+    expect(body.ok).toBe(true);
+  });
+
+  it("rejects the whole call — an out-of-scope question stores nothing", async () => {
+    const before = loadOrCreate(session.patientId, session.task).version;
+    const body = parse(await setEventAnswer(session, {
+      event_id: STUB_ID,
+      answers: [
+        { question_id: "StepMatch", answer: "under_treated" },
+        { question_id: "Followup", answer: false },
+      ],
+    }));
+    expect(body.ok).toBe(false);
+    expect(loadOrCreate(session.patientId, session.task).version).toBe(before);
   });
 });

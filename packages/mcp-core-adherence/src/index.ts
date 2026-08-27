@@ -38,6 +38,7 @@ import {
   type AdherenceSkill,
   type QuestionDefinition,
 } from "@chart-review/pipeline-extract-adherence";
+import { compileRule, type RuleDefinition } from "@chart-review/rule-engine";
 
 /** CallToolResult shape mirrored from the MCP spec (same shape mcp-core uses). */
 export type CallToolResult = {
@@ -343,6 +344,20 @@ export async function getAdherenceState(
 // via new_event. Verdicts are NOT written here — the engine pass after
 // the agent loop computes them.
 
+/** question_ids a rule legitimately reads — its own expressions plus the
+ *  questions it declares as supporting context. Used to reject an answer
+ *  aimed at some other event's rule. Deliberately permissive: it accepts
+ *  anything the rule references or declares, and only rejects a question with
+ *  no relationship to it at all. */
+function eventQuestionScope(rule: RuleDefinition): Set<string> {
+  const out = new Set<string>(compileRule(rule).qids);
+  if (rule.event_evaluable_if) {
+    for (const q of compileRule({ ...rule, verdict_if: rule.event_evaluable_if }).qids) out.add(q);
+  }
+  for (const q of rule.supporting_questions ?? []) out.add(q);
+  return out;
+}
+
 const eventAnswerSchema = z.object({
   question_id: z.string(),
   answer: z.union([z.string(), z.number(), z.boolean(), z.null()]),
@@ -410,6 +425,8 @@ export async function setEventAnswer(
     }
   }
 
+  const eventRule = skill.rules.find((r) => r.rule_id === events[idx]!.rule_id);
+
   // Coerce + faithfulness-check each event answer against its question def.
   // Dedupe duplicate question_ids WITHIN this call's answers array — last
   // wins — before merging onto the event's existing answers.
@@ -417,6 +434,20 @@ export async function setEventAnswer(
   for (const a of args.answers) {
     const q = findQuestion(skill, a.question_id);
     if (!q) return err(`question_id '${a.question_id}' not found`);
+    // Reject a question that belongs to a DIFFERENT event's rule. Observed on
+    // a live run: the agent committed T2-FollowupScheduled onto a
+    // step-therapy event, which stored fine and then contributed nothing —
+    // the step rule's own question stayed missing, so that event silently
+    // dropped out of the denominator while looking answered.
+    if (eventRule && !eventQuestionScope(eventRule).has(a.question_id)) {
+      return err(
+        `question_id '${a.question_id}' is not in scope for rule '${eventRule.rule_id}'`,
+        {
+          hint: `This event's rule reads: ${[...eventQuestionScope(eventRule)].sort().join(", ")}. `
+            + "Check the event work-list line for the question_ids this event needs.",
+        },
+      );
+    }
     const check = verifyAnswerEvidence(session.patientId, a.evidence ?? []);
     if (!check.ok) {
       return err(`answer '${a.question_id}': ${check.error}`, {
