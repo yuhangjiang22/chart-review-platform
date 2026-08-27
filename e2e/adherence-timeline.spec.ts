@@ -130,7 +130,9 @@ test.describe("adherence event timeline", () => {
     await expect(page.getByText(/Adherence ·/i)).toBeVisible();
     // Rules live in ONE list, marked by the scope each is judged at — the
     // separate window-rule chip strip duplicated it and is gone.
-    await expect(page.getByText("patient-level").first()).toBeVisible();
+    // Rules sit in the section for the scope they are judged at.
+    await expect(page.getByText(/Rules judged once for the period/)).toBeVisible();
+    await expect(page.getByText(/Rules judged per event/)).toBeVisible();
 
     await openSourceTimeline(page);
     const firstLine = ruleLines(page).first();

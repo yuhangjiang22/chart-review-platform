@@ -1319,7 +1319,7 @@ describe("Event timeline + per-event validation", () => {
     expect(screen.queryByText(/Events:.*validated/)).not.toBeInTheDocument();
     // Everything else renders exactly as before.
     expect(screen.getByText("Question framework")).toBeInTheDocument();
-    expect(screen.getByText("Rule verdicts")).toBeInTheDocument();
+    expect(screen.getByText(/Rules judged once for the period/)).toBeInTheDocument();
   });
 
   it("drafts survive a refresh triggered by ANOTHER row's save (C2)", async () => {
@@ -1393,21 +1393,24 @@ describe("Event timeline + per-event validation", () => {
     expect(scrolledEl.id).toBe("event-row-ev_1");
   });
 
-  it("I7: every rule appears once, in the Rules list, marked by the scope it is judged at", async () => {
+  it("I7: rules sit in the section for the scope they are judged at, per-event ones carrying a rate", async () => {
     // Replaces the window-rule chip strip, which duplicated rules the Rules
-    // section already listed. One list, two badges: a reviewer reads "the
-    // rules" as one set, and the badge says where each is answered.
+    // section already listed. Scope is now carried by WHICH section a rule
+    // appears in — a badge in a mixed list was not legible.
     setupMocks({ state: () => stateWithEvents() });
     renderPane();
     await waitLoaded();
 
-    // r_unadjudicated has no event_anchor → patient-level.
-    const windowRule = document.getElementById("rule-row-r_unadjudicated")!;
-    expect(within(windowRule).getByText("patient-level")).toBeInTheDocument();
-    // r_concordant is anchored → per event, and its badge carries the rate
-    // rather than implying one verdict.
-    const anchoredRule = document.getElementById("rule-row-r_concordant")!;
-    expect(within(anchoredRule).getByText(/per event/)).toBeInTheDocument();
+    const periodHeading = screen.getByText(/Rules judged once for the period/);
+    const eventHeading = screen.getByText(/Rules judged per event/);
+    const periodSection = periodHeading.closest("section")!;
+    const eventSection = eventHeading.closest("section")!;
+
+    // r_unadjudicated has no event_anchor; r_concordant does.
+    expect(within(periodSection).getByText("r_unadjudicated")).toBeInTheDocument();
+    expect(within(eventSection).getByText("r_concordant")).toBeInTheDocument();
+    // A per-event rule has no single verdict — its readout is a rate.
+    expect(within(eventSection).getByText(/\d+\/\d+ events/)).toBeInTheDocument();
     // No duplicate chip strip.
     expect(screen.queryByText(/Window rules/)).toBeNull();
   });
@@ -2115,7 +2118,7 @@ describe("Compare mode (Task 6)", () => {
     // Non-fatal: the main pane (framework, timeline, rules) stays rendered —
     // the compare fetch's failure doesn't blow it away.
     expect(screen.getByText("Question framework")).toBeInTheDocument();
-    expect(screen.getByText("Rule verdicts")).toBeInTheDocument();
+    expect(screen.getByText(/Rules judged once for the period/)).toBeInTheDocument();
     expect(screen.getByText(/Adherence ·/)).toBeInTheDocument();
     // Compare mode never activated — no chips, timeline stayed in review mode.
     expect(chronologyLine("ev_1").verdict ?? "").not.toContain("A:");

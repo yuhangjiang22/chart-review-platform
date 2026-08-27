@@ -1221,6 +1221,11 @@ export function AdherenceReview(props: AdherenceReviewProps) {
   // Which anchored events each event-scoped question is answered at. Read from
   // the RULES that reference it rather than from committed answers, so the row
   // reports the work still outstanding rather than only what is already done.
+  // Rules split by the scope they are judged at, so each sits with the
+  // questions that feed it rather than carrying a badge in a mixed list.
+  const patientLevelRules = (meta.rules ?? []).filter((r) => !r.event_anchor);
+  const eventLevelRules = (meta.rules ?? []).filter((r) => r.event_anchor);
+
   const validatedQuestionsInFramework = [...frameworkQids].filter(
     (qid) => !eventScopedQids.has(qid) && validatedQuestions.has(qid),
   ).length;
@@ -1370,6 +1375,94 @@ export function AdherenceReview(props: AdherenceReviewProps) {
           </section>
         )}
 
+        {/* ── PATIENT-LEVEL ─────────────────────────────────────────────
+         *  Questions asked once for the observation window, and the rules
+         *  judged from them. Grouping the rules WITH the questions they read
+         *  is what makes the scope legible: a badge saying "patient-level"
+         *  next to a rule in a mixed list was not landing, whereas its
+         *  position under the period-level questions is unambiguous. */}
+        {/* Questions section, tier-grouped */}
+        <section>
+          <h2 className="text-[13px] font-semibold mb-1.5">Question framework</h2>
+          {tiers.map((t) => {
+            // Event-scoped questions are answered in the Events section, once
+            // per event, with the span they are judged over. They are not listed
+            // here at all: a period-level control for them has no meaning (the
+            // write path refuses one), and a read-only stand-in was just a
+            // second place to look for one answer.
+            const qs = (meta.questions_by_tier[t] ?? [])
+              .filter((q) => !eventScopedQids.has(q.question_id));
+            if (qs.length === 0) return null;
+            const open = expandedTiers.has(t);
+            return (
+              <div key={t} className="border border-border rounded mb-2 bg-card">
+                <button
+                  onClick={() => toggleTier(t)}
+                  className="w-full px-3 py-2 text-left text-[12.5px] font-medium flex items-center gap-1.5 hover:bg-muted/50"
+                >
+                  {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                  {TIER_LABELS[t] ?? `Tier ${t}`}
+                  <span className="text-muted-foreground font-normal">({qs.length})</span>
+                </button>
+                {open && (
+                  <div className="border-t border-border">
+                    {qs.map((q) => (
+                      <QuestionRow
+                        key={q.question_id}
+                        q={q}
+                        answer={answersByQid.get(q.question_id)}
+                        agentIds={agentIds}
+                        agentAnswers={agentIds.map(
+                          (id) => agentAnswersByQid.get(id)?.get(q.question_id),
+                        )}
+                        validated={validatedQuestions.has(q.question_id)}
+                        busy={busy === `q:${q.question_id}`}
+                        blind={blind}
+                        onSave={(a) => saveAnswer(q.question_id, a)}
+                        onJumpToSource={setNoteFocus}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </section>
+
+
+        {patientLevelRules.length > 0 && (
+          <section>
+            <h2 className="text-[13px] font-semibold mb-1.5">
+              Rules judged once for the period
+              <span className="ml-1.5 font-normal text-muted-foreground">({patientLevelRules.length})</span>
+            </h2>
+          <div className="border border-border rounded bg-card divide-y divide-border">
+            {patientLevelRules.map((r) => (
+              <RuleRow
+                key={r.rule_id}
+                rule={r}
+                verdict={verdictsByRid.get(r.rule_id)}
+                validated={validatedRules.has(r.rule_id)}
+                categories={meta.attribution_categories}
+                answersByQid={answersByQid}
+                agentIds={agentIds}
+                agentVerdicts={agentIds.map(
+                  (id) => agentVerdictsByRid.get(id)?.get(r.rule_id),
+                )}
+                eventRollup={blind ? undefined : ruleRollups.find((x) => x.rule_id === r.rule_id)}
+                busy={busy === `r:${r.rule_id}`}
+                blind={blind}
+                onSave={(v, a, rationale) => saveVerdict(r.rule_id, v, a, rationale)}
+              />
+            ))}
+          </div>
+          </section>
+        )}
+
+        {/* ── PER EVENT ─────────────────────────────────────────────────
+         *  Each qualifying day of care, the questions it asks, and the rules
+         *  judged at it. Below the period-level half because a reviewer works
+         *  top-down: establish the year, then walk the events in it. */}
         {/* Events section — anchored events only (encounter/ed/burst/...).
          *  Window events stay represented in the Rules section below. */}
         {anchoredEvents.length > 0 && (
@@ -1425,59 +1518,15 @@ export function AdherenceReview(props: AdherenceReviewProps) {
           </section>
         )}
 
-        {/* Questions section, tier-grouped */}
-        <section>
-          <h2 className="text-[13px] font-semibold mb-1.5">Question framework</h2>
-          {tiers.map((t) => {
-            // Event-scoped questions are answered in the Events section, once
-            // per event, with the span they are judged over. They are not listed
-            // here at all: a period-level control for them has no meaning (the
-            // write path refuses one), and a read-only stand-in was just a
-            // second place to look for one answer.
-            const qs = (meta.questions_by_tier[t] ?? [])
-              .filter((q) => !eventScopedQids.has(q.question_id));
-            if (qs.length === 0) return null;
-            const open = expandedTiers.has(t);
-            return (
-              <div key={t} className="border border-border rounded mb-2 bg-card">
-                <button
-                  onClick={() => toggleTier(t)}
-                  className="w-full px-3 py-2 text-left text-[12.5px] font-medium flex items-center gap-1.5 hover:bg-muted/50"
-                >
-                  {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-                  {TIER_LABELS[t] ?? `Tier ${t}`}
-                  <span className="text-muted-foreground font-normal">({qs.length})</span>
-                </button>
-                {open && (
-                  <div className="border-t border-border">
-                    {qs.map((q) => (
-                      <QuestionRow
-                        key={q.question_id}
-                        q={q}
-                        answer={answersByQid.get(q.question_id)}
-                        agentIds={agentIds}
-                        agentAnswers={agentIds.map(
-                          (id) => agentAnswersByQid.get(id)?.get(q.question_id),
-                        )}
-                        validated={validatedQuestions.has(q.question_id)}
-                        busy={busy === `q:${q.question_id}`}
-                        blind={blind}
-                        onSave={(a) => saveAnswer(q.question_id, a)}
-                        onJumpToSource={setNoteFocus}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </section>
 
-        {/* Rules section */}
-        <section>
-          <h2 className="text-[13px] font-semibold mb-1.5">Rule verdicts</h2>
+        {eventLevelRules.length > 0 && (
+          <section>
+            <h2 className="text-[13px] font-semibold mb-1.5">
+              Rules judged per event
+              <span className="ml-1.5 font-normal text-muted-foreground">({eventLevelRules.length})</span>
+            </h2>
           <div className="border border-border rounded bg-card divide-y divide-border">
-            {meta.rules.map((r) => (
+            {eventLevelRules.map((r) => (
               <RuleRow
                 key={r.rule_id}
                 rule={r}
@@ -1496,7 +1545,8 @@ export function AdherenceReview(props: AdherenceReviewProps) {
               />
             ))}
           </div>
-        </section>
+          </section>
+        )}
       </div>
        </div>
        {/* Source pane — the patient's notes + structured data, so the reviewer
@@ -1914,23 +1964,16 @@ function RuleRow({
         <div className="flex-1">
           <div className="flex items-center gap-2">
             <span className="font-mono text-[11px] text-muted-foreground">{rule.rule_id}</span>
-            {/* Which SCOPE this rule is judged at. Both kinds live in one list
-             *  — a reviewer reads "the eleven rules" as one set — but they are
-             *  answered in different places, and the per-event ones carry a
-             *  rate rather than a single verdict. */}
-            {rule.event_anchor ? (
+            {/* Scope is carried by WHICH SECTION the rule sits in, not by a
+             *  badge — a badge in a mixed list was not landing. What a
+             *  per-event rule still needs is its RATE: it has no single
+             *  verdict, it has n concordant of n evaluable. */}
+            {rule.event_anchor && eventRollup && (
               <span
                 className="text-[10px] uppercase tracking-wider px-1.5 py-0 rounded bg-[hsl(var(--oxblood)/0.10)] text-[hsl(var(--oxblood))]"
-                title="Judged once per qualifying event — answered in the Events section"
+                title="Concordant events of evaluable events"
               >
-                per event{eventRollup ? ` · ${eventRollup.n_concordant}/${eventRollup.n_evaluable}` : ""}
-              </span>
-            ) : (
-              <span
-                className="text-[10px] uppercase tracking-wider px-1.5 py-0 rounded bg-muted text-muted-foreground"
-                title="Judged once for the whole observation window"
-              >
-                patient-level
+                {eventRollup.n_concordant}/{eventRollup.n_evaluable} events
               </span>
             )}
             {rule.nuanced && (
@@ -2252,50 +2295,63 @@ function EventRowImpl({
            *  they need the width. An unanswered question still gets an empty
            *  control rather than disappearing. */}
           {draft.answers.length > 0 && (
-            <div className="mt-1.5 divide-y divide-border/40">
+            <div className="mt-1 -mx-3 border-t border-border/60 divide-y divide-border/60">
               {draft.answers.map((a) => {
                 const q = questionDefsById.get(a.question_id);
                 const committed = (event.answers ?? []).find((x) => x.question_id === a.question_id);
                 return (
-                  <div key={a.question_id} className="py-1.5 grid grid-cols-12 gap-3 items-start">
-                    {/* The question_id alone: its text would repeat what the
-                     *  Question framework shows for a period-level question
-                     *  that also carries a committed event answer, and the
-                     *  rule's own wording is one disclosure up. */}
+                  <div
+                    key={a.question_id}
+                    className="px-3 py-2 grid grid-cols-12 gap-3 text-[12px] items-start"
+                  >
+                    {/* Same three columns QuestionRow uses — question, what the
+                     *  agent said, what the reviewer sets — so the two surfaces
+                     *  read identically. Evidence is a full-width disclosure at
+                     *  the end of the row, again as QuestionRow does it, rather
+                     *  than a side column: an evidence quote is a sentence and
+                     *  a column squeezes it. */}
                     <div className="col-span-4 min-w-0">
-                      <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground truncate"
-                        title={q?.text}>
+                      <div
+                        className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground truncate"
+                        title={q?.text}
+                      >
                         {a.question_id}
                       </div>
                     </div>
-                    <div className="col-span-3 min-w-0">
+                    <div className="col-span-3 text-[11.5px] min-w-0">
+                      {!blind && committed && (
+                        <>
+                          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                            {committed.source === "reviewer" ? "reviewer" : "agent"}
+                          </div>
+                          <div className="truncate" title={JSON.stringify(committed.answer)}>
+                            {committed.answer === null ? "—" : String(committed.answer)}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                    <div className="col-span-5 min-w-0">
                       {q ? (
                         <AnswerControl q={q} value={a.answer} onChange={(v) => updateAnswer(a.question_id, v)} />
                       ) : (
                         <div className="text-[11px] text-muted-foreground italic">unknown question</div>
                       )}
                     </div>
-                    <div className="col-span-5 min-w-0">
-                    {/* What the answer was determined FROM, per question, the
-                     *  same way QuestionRow shows it — the reviewer checks the
-                     *  answer against the quote instead of re-searching the
-                     *  chart. Hidden in blind mode: agent evidence is agent
-                     *  output, and seeing which line it keyed on would steer
-                     *  the annotator as much as seeing its answer.
-                     *
-                     *  A committed answer with NO evidence is called out rather
-                     *  than left blank: an unevidenced answer is exactly what a
-                     *  reviewer needs to notice, and silence reads like there
-                     *  was nothing to show. */}
                     {!blind && committed && (
-                        <EventAnswerEvidence
-                          evidence={committed.evidence}
-                          reasoning={committed.reasoning}
-                          eventDate={event.anchor.date}
-                          onJumpToSource={onJumpToSource}
-                        />
-                      )}
-                    </div>
+                      <details className="col-span-12 mt-0.5">
+                        <summary className="cursor-pointer text-[11px] text-muted-foreground hover:text-foreground">
+                          Evidence{committed.evidence?.length ? ` (${committed.evidence.length})` : " — none cited"}
+                        </summary>
+                        <div className="mt-1 pl-4 border-l-2 border-[hsl(var(--sage))]/40">
+                          <EventAnswerEvidence
+                            evidence={committed.evidence}
+                            reasoning={committed.reasoning}
+                            eventDate={event.anchor.date}
+                            onJumpToSource={onJumpToSource}
+                          />
+                        </div>
+                      </details>
+                    )}
                   </div>
                 );
               })}
