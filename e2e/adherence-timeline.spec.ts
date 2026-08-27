@@ -127,7 +127,6 @@ test.describe("adherence event timeline", () => {
     await setActiveSession(page, TASK_ID, sid);
     await gotoPatient(page, TASK_ID, PATIENT_ID);
 
-    await expect(page.getByText(/Adherence ·/i)).toBeVisible();
     // Rules sit in the section for the scope they are judged at, and the page
     // runs eligibility gate → events → period conclusions. The order matters:
     // a period question's instruction reads a value the engine reduces from the

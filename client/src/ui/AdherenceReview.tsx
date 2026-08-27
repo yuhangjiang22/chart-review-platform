@@ -821,11 +821,6 @@ export function AdherenceReview(props: AdherenceReviewProps) {
     [ruleEvents],
   );
   const windowEvents = useMemo(() => ruleEvents.filter((e) => e.anchor.type === "window"), [ruleEvents]);
-  const compositeTotals = useMemo(() => {
-    let c = 0, n = 0;
-    for (const r of ruleRollups) { c += r.n_concordant; n += r.n_evaluable; }
-    return { c, n };
-  }, [ruleRollups]);
   const compareHumanOnly = useMemo(() => {
     if (!compareActive || blind) return [];
     const activeIds = new Set(ruleEvents.filter(isAnchoredEvent).map((e) => e.event_id));
@@ -1447,31 +1442,26 @@ export function AdherenceReview(props: AdherenceReviewProps) {
       )}
 
       <div className="flex-1 overflow-y-auto p-3 space-y-4 min-w-0">
-        {/* The chronology itself lives in the source pane's EVENTS tab, beside
-         *  Timeline (which stays a view of what the chart records). What stays
-         *  here is the period-level readout: the composite and the whole-window
-         *  rules, which have no date and so no place on a chronology. */}
-        {ruleEvents.length > 0 && (
-          <section className="border border-border rounded-md bg-card">
-            <div className="flex items-center justify-between px-3 py-2 border-b border-border text-[12px]">
-              <span className="uppercase tracking-wider text-muted-foreground">
-                Adherence · {adherenceDays.length} {adherenceDays.length === 1 ? "day" : "days"} of care
-              </span>
-              {!blind && (
-                <span>
-                  {compareActive ? "Agent composite" : "Composite"}: <b>
-                    {compositeTotals.c}/{compositeTotals.n} concordant
-                    {compositeTotals.n > 0 ? ` (${Math.round((compositeTotals.c / compositeTotals.n) * 100)}%)` : ""}
-                  </b>
-                </span>
-              )}
-            </div>
-            {compareActive && compareHumanOnly.length > 0 && (
-              <div className="px-3 py-1 text-[11px] text-[hsl(var(--ochre))]">
-                human only: {compareHumanOnly.map((h) => h.event_id).join(", ")}
-              </div>
-            )}
-          </section>
+        {/* All that remains of the old EventTimeline header. The chronology it
+         *  labelled moved to the source pane's EVENTS tab; its whole-window rule
+         *  chips became the "Rules judged once for the period" section; and its
+         *  composite + day count are gone. The composite was a pooled
+         *  Σn_concordant/Σn_evaluable across every rule, so a rule with four
+         *  events counted four times toward the patient's headline and a period
+         *  rule once — a number weighted by how many events each anchor list
+         *  happened to produce rather than by care, shown above the eligibility
+         *  gate that decides whether it exists, and priming the reviewer with the
+         *  agent's bottom line before they had read anything. Per-rule rates on
+         *  the rule rows are the study's actual unit.
+         *
+         *  The human-only event ids survive: in compare mode they are the one
+         *  thing here a reviewer cannot get elsewhere (the compare bar gives the
+         *  COUNT, not which). Kept outside the Events section so they still show
+         *  when the active session has no events of its own. */}
+        {compareActive && compareHumanOnly.length > 0 && (
+          <div className="text-[11px] text-[hsl(var(--ochre))]">
+            human only: {compareHumanOnly.map((h) => h.event_id).join(", ")}
+          </div>
         )}
 
         {/* ── ① ELIGIBILITY ────────────────────────────────────────────

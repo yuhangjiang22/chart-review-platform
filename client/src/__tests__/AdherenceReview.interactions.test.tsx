@@ -1226,20 +1226,6 @@ function eventSaveBtn(row: HTMLElement): HTMLButtonElement {
 // 11. Event timeline + per-event validation (Task 4, event-concordance design)
 // ────────────────────────────────────────────────────────────────────────────
 describe("Event timeline + per-event validation", () => {
-  it("(a) the period strip reports the days of care", async () => {
-    setupMocks({ state: () => stateWithEvents() });
-    renderPane();
-    await waitLoaded();
-
-    // The chronology itself renders in the SOURCE pane's Timeline tab now (the
-    // adherence days interleave with the notes and encounters they were judged
-    // from). What the review pane keeps is the period-level readout, and the
-    // day/rule mapping that feeds the chronology is covered directly in
-    // client/src/ui/adherence/build-days.test.ts.
-    expect(screen.getByText(/Adherence ·/)).toBeInTheDocument();
-    expect(screen.getByText(/2 days of care/)).toBeInTheDocument();
-  });
-
   it("(b) EventRow Save posts ONLY the CHANGED answer, never a re-stamp of the untouched one (I8)", async () => {
     setupMocks({ state: () => stateWithEvents() });
     renderPane();
@@ -1314,7 +1300,6 @@ describe("Event timeline + per-event validation", () => {
     renderPane();
     await waitLoaded();
 
-    expect(screen.queryByText(/Adherence ·/)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Events/ })).not.toBeInTheDocument();
     expect(screen.queryByText(/Events:.*validated/)).not.toBeInTheDocument();
     // Everything else renders exactly as before.
@@ -2137,7 +2122,7 @@ describe("Compare mode (Task 6)", () => {
 
     await waitFor(() => expect(screen.getByText(/BLIND MODE/)).toBeInTheDocument());
     // Sanity: this really is the normal (non-refusal) blind render path.
-    expect(screen.getByText(/Adherence ·/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Events/ })).toBeInTheDocument();
     expect(screen.queryByLabelText(/compare with session/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/matched:/)).not.toBeInTheDocument();
   });
@@ -2165,7 +2150,7 @@ describe("Compare mode (Task 6)", () => {
     // the compare fetch's failure doesn't blow it away.
     expect(screen.getByText("Question framework")).toBeInTheDocument();
     expect(screen.getByText(/Rules judged once for the period/)).toBeInTheDocument();
-    expect(screen.getByText(/Adherence ·/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Events/ })).toBeInTheDocument();
     // Compare mode never activated — no chips, timeline stayed in review mode.
     expect(chronologyLine("ev_1").verdict ?? "").not.toContain("A:");
   });
