@@ -3,21 +3,16 @@
   "date": "2025-09-20",
   "ref": "encounters:22401",
   "meta": {
-   "kind": "outpatient"
+   "kind": "outpatient",
+   "n_encounters": 1
   }
  },
  {
   "date": "2026-01-15",
   "ref": "encounters:22402",
   "meta": {
-   "kind": "outpatient"
-  }
- },
- {
-  "date": "2026-04-10",
-  "ref": "encounters:22403",
-  "meta": {
-   "kind": "outpatient"
+   "kind": "outpatient",
+   "n_encounters": 1
   }
  }
 ]
