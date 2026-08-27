@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildAdherenceDays } from "./build-days";
+import { buildAdherenceDays, judgmentWindow } from "./build-days";
 import type { RuleEvent } from "./types";
 
 const ev = (
@@ -195,5 +195,59 @@ describe("buildAdherenceDays — compare mode", () => {
       events: canonical, mode: "compare", validatedEvents: NONE, compareEvents: [],
     });
     expect(days[0].rules[0].verdict).toBe("A: C · H: —");
+  });
+});
+
+describe("judgmentWindow — the span a reviewer is judging", () => {
+  it("uses the ETL's deadline when the anchor carries one", () => {
+    // The controller obligation runs to the patient's NEXT asthma visit, which
+    // is data-dependent — no fixed number of days can express it.
+    expect(judgmentWindow("2025-11-15", { deadline: "2025-12-16" }, undefined))
+      .toBe("2025-11-15 → 2025-12-16 (next asthma visit)");
+  });
+
+  it("says so when that deadline was censored at the end of the period", () => {
+    // "no controller by the deadline" and "the grace period ran past the end of
+    // what we can observe" are different findings and must not read alike.
+    expect(judgmentWindow("2025-11-15", { deadline: "2026-04-12", deadline_censored: true }, undefined))
+      .toContain("censored");
+  });
+
+  it("computes the end date from the rule's declared window", () => {
+    expect(judgmentWindow("2025-09-25", undefined, 90))
+      .toBe("2025-09-25 → 2025-12-24 (90 days)");
+  });
+
+  it("reads as a point when the rule declares no window", () => {
+    // Step therapy is judged on the regimen in force THAT DAY, not over a span.
+    expect(judgmentWindow("2025-09-25", undefined, undefined)).toBe("as of 2025-09-25");
+  });
+
+  it("prefers the deadline over a declared window", () => {
+    expect(judgmentWindow("2025-11-15", { deadline: "2025-12-16" }, 90))
+      .toContain("next asthma visit");
+  });
+});
+
+describe("buildAdherenceDays — the window reaches every line", () => {
+  it("attaches it in review mode", () => {
+    const days = buildAdherenceDays({
+      events: [ev("a", "R-T2-FollowupScheduled", "2025-09-25", { verdict: "CONCORDANT" })],
+      rules: [{ rule_id: "R-T2-FollowupScheduled", event_window_days: 90 }],
+      mode: "review", validatedEvents: NONE,
+    });
+    expect(days[0].rules[0].window).toBe("2025-09-25 → 2025-12-24 (90 days)");
+  });
+
+  it("attaches it in BLIND mode too — it is not agent output", () => {
+    // The annotator cannot answer "was follow-up scheduled within 3 months"
+    // without being told which 3 months.
+    const days = buildAdherenceDays({
+      events: [ev("a", "R-T2-FollowupScheduled", "2025-09-25", { verdict: "CONCORDANT" })],
+      rules: [{ rule_id: "R-T2-FollowupScheduled", event_window_days: 90 }],
+      mode: "blind", validatedEvents: NONE,
+    });
+    expect(days[0].rules[0].window).toBe("2025-09-25 → 2025-12-24 (90 days)");
+    expect(days[0].rules[0].verdict).toBeUndefined();
   });
 });

@@ -75,6 +75,18 @@ export interface RuleDefinition {
    *  `event_scoped_questions` for what that map contains, plus the synthetic
    *  `_anchor_type` answer). False → event not evaluable. */
   event_evaluable_if?: string;
+  /** How long after an event its requirement is judged, in days.
+   *
+   *  Part of the clinical definition, not presentation: "follow-up scheduled
+   *  within 3 MONTHS of this event" is a 90-day judgment window, and a
+   *  reviewer looking at one event needs to know what span they are judging.
+   *  Omitted → the requirement is judged AS OF the event date (the regimen in
+   *  force that day), a point rather than a span.
+   *
+   *  An event whose anchor carries `meta.deadline` overrides this: the
+   *  controller obligation runs to the patient's NEXT asthma visit, which is
+   *  data-dependent and computed by the ETL, not a fixed number of days. */
+  event_window_days?: number;
   /** question_ids that describe ONE EVENT rather than the observation window.
    *  A patient-level answer for one of these is NEVER inherited into an
    *  event: if the event carries no answer of its own, the question is absent

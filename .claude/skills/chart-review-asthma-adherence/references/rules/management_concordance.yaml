@@ -73,6 +73,8 @@ rules:
       when controlled. 3 months is the cap for non-controlled patients.
     evidence_grade: B
     event_anchor: [asthma_encounters, ocs_bursts]
+    # "within 3 months of this event" — the span the reviewer is judging.
+    event_window_days: 90
     # A burst always needs follow-up; a visit only when not well controlled
     # at THAT visit.
     event_evaluable_if: "_anchor_type == \"ocs_bursts\" or (T1-ControlLevel is present and T1-ControlLevel != \"well_controlled\")"

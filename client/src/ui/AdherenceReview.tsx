@@ -48,7 +48,7 @@ import { cn } from "@/lib/utils";
 import { NoteViewer } from "../NoteViewer";
 import type { NoteFocus } from "../types";
 import { isAnchoredEvent, type RuleEvent, type RuleRollup } from "./adherence/types";
-import { buildAdherenceDays } from "./adherence/build-days";
+import { buildAdherenceDays, judgmentWindow } from "./adherence/build-days";
 // Reused ONLY for its type shape + the GET /api/sessions/:taskId endpoint —
 // same listing SessionSwitcher/Workspace's refreshSessions() uses (Task 6,
 // agent-vs-human compare mode). AdherenceReview renders its own plain
@@ -755,12 +755,13 @@ export function AdherenceReview(props: AdherenceReviewProps) {
   const adherenceDays = useMemo(
     () => buildAdherenceDays({
       events: ruleEvents,
+      rules: meta?.rules,
       mode: blind ? "blind" : compareActive ? "compare" : "review",
       validatedEvents,
       compareEvents: !blind && compareActive ? compareState?.rule_events ?? undefined : undefined,
       agentEvents: !blind ? agentSideEvents : undefined,
     }),
-    [ruleEvents, blind, compareActive, validatedEvents, compareState, agentSideEvents],
+    [ruleEvents, meta, blind, compareActive, validatedEvents, compareState, agentSideEvents],
   );
 
   // Compare summary (Task 6 review, Important 2): ANCHORED events only —
@@ -1051,7 +1052,14 @@ export function AdherenceReview(props: AdherenceReviewProps) {
   }
 
   const tiers = Object.keys(meta.questions_by_tier).map(Number).sort((a, b) => a - b);
-  const totalQuestions = tiers.reduce((s, t) => s + (meta.questions_by_tier[t]?.length ?? 0), 0);
+  // Counts PERIOD-LEVEL questions only. Event-scoped ones are answered per
+  // event and are reported by the Events counter instead — counting them here
+  // too would report the same work twice under two headings.
+  const totalQuestions = tiers.reduce(
+    (s, t) => s + (meta.questions_by_tier[t] ?? [])
+      .filter((q) => !(q as { event_scoped?: boolean }).event_scoped).length,
+    0,
+  );
   // Clamp the validated numerator to questions that actually exist in the
   // current framework. Stale validated qids (e.g. from a prior framework
   // version) would otherwise make "N / M validated" read N > M.
@@ -1078,22 +1086,8 @@ export function AdherenceReview(props: AdherenceReviewProps) {
   // Which anchored events each event-scoped question is answered at. Read from
   // the RULES that reference it rather than from committed answers, so the row
   // reports the work still outstanding rather than only what is already done.
-  const eventsByQuestion = (() => {
-    const out = new Map<string, RuleEvent[]>();
-    for (const qid of eventScopedQids) {
-      const rules = (meta.rules ?? []).filter((r) => {
-        const exprs = [r.verdict_if, r.excluded_if, (r as { event_evaluable_if?: string }).event_evaluable_if];
-        return exprs.some((e) => e?.includes(qid));
-      }).map((r) => r.rule_id);
-      out.set(qid, anchoredEvents.filter((e) => rules.includes(e.rule_id)));
-    }
-    return out;
-  })();
-
-  const allEventsValidated = anchoredEvents.length > 0
-    && anchoredEvents.every((e) => validatedEvents.has(e.event_id));
-  const validatedQuestionsInFramework = [...frameworkQids].filter((qid) =>
-    eventScopedQids.has(qid) ? allEventsValidated : validatedQuestions.has(qid),
+  const validatedQuestionsInFramework = [...frameworkQids].filter(
+    (qid) => !eventScopedQids.has(qid) && validatedQuestions.has(qid),
   ).length;
 
   return (
@@ -1338,7 +1332,14 @@ export function AdherenceReview(props: AdherenceReviewProps) {
         <section>
           <h2 className="text-[13px] font-semibold mb-1.5">Question framework</h2>
           {tiers.map((t) => {
-            const qs = meta.questions_by_tier[t] ?? [];
+            // Event-scoped questions are answered in the Events section, once
+            // per event, with the span they are judged over. They are not listed
+            // here at all: a period-level control for them has no meaning (the
+            // write path refuses one), and a read-only stand-in was just a
+            // second place to look for one answer.
+            const qs = (meta.questions_by_tier[t] ?? [])
+              .filter((q) => !eventScopedQids.has(q.question_id));
+            if (qs.length === 0) return null;
             const open = expandedTiers.has(t);
             return (
               <div key={t} className="border border-border rounded mb-2 bg-card">
@@ -1353,37 +1354,20 @@ export function AdherenceReview(props: AdherenceReviewProps) {
                 {open && (
                   <div className="border-t border-border">
                     {qs.map((q) => (
-                      eventScopedQids.has(q.question_id) ? (
-                        /* Answered PER EVENT, so it has no single period answer.
-                         * Showing a control here would put a second, unrelated
-                         * answer beside the real per-event ones with nothing to
-                         * say which governs — and the write path rejects a
-                         * period-level answer to it anyway. A read-only summary
-                         * points at the one place it IS answered. */
-                        <EventScopedQuestionRow
-                          key={q.question_id}
-                          q={q}
-                          events={eventsByQuestion.get(q.question_id) ?? []}
-                          validatedEvents={validatedEvents}
-                          blind={blind}
-                          onSelectEvent={(id) => { setSelectedEventId(id); setEventsOpen(true); }}
-                        />
-                      ) : (
-                        <QuestionRow
-                          key={q.question_id}
-                          q={q}
-                          answer={answersByQid.get(q.question_id)}
-                          agentIds={agentIds}
-                          agentAnswers={agentIds.map(
-                            (id) => agentAnswersByQid.get(id)?.get(q.question_id),
-                          )}
-                          validated={validatedQuestions.has(q.question_id)}
-                          busy={busy === `q:${q.question_id}`}
-                          blind={blind}
-                          onSave={(a) => saveAnswer(q.question_id, a)}
-                          onJumpToSource={setNoteFocus}
-                        />
-                      )
+                      <QuestionRow
+                        key={q.question_id}
+                        q={q}
+                        answer={answersByQid.get(q.question_id)}
+                        agentIds={agentIds}
+                        agentAnswers={agentIds.map(
+                          (id) => agentAnswersByQid.get(id)?.get(q.question_id),
+                        )}
+                        validated={validatedQuestions.has(q.question_id)}
+                        busy={busy === `q:${q.question_id}`}
+                        blind={blind}
+                        onSave={(a) => saveAnswer(q.question_id, a)}
+                        onJumpToSource={setNoteFocus}
+                      />
                     ))}
                   </div>
                 )}
@@ -2054,8 +2038,15 @@ function EventRowImpl({
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-mono text-[11px] text-muted-foreground">{event.event_id}</span>
             {rule && <span className="font-mono text-[11px] text-muted-foreground">{rule.rule_id}</span>}
+            {/* The SPAN this event's requirement is judged over — not just the
+             *  anchor date. A reviewer answering "was follow-up scheduled" needs
+             *  to know they are judging the 90 days after this visit, and for
+             *  the controller obligation the span runs to the patient's next
+             *  visit, which differs per patient. */}
             <span className="text-[11px] text-muted-foreground">
-              {event.anchor.date ?? "—"} · {event.anchor.type}
+              {event.anchor.date
+                ? judgmentWindow(event.anchor.date, event.anchor.meta, rule?.event_window_days)
+                : "—"}
               {refNode}
               {anchorMetaEntries.length > 0 && (
                 <> · {anchorMetaEntries.map(([k, v]) => `${k}=${String(v)}`).join(", ")}</>
@@ -2189,59 +2180,3 @@ function EventRowImpl({
 
 const EventRow = memo(EventRowImpl);
 
-/** A question answered PER EVENT, shown read-only in the Question framework.
- *
- *  The framework list is where a reviewer looks for "what does this instrument
- *  ask?", so an event-scoped question has to appear — but it must not offer a
- *  period-level control. It has no single answer, the write path rejects one,
- *  and a control here would sit beside the real per-event answers with nothing
- *  to say which one governs. Instead: the count of events it is answered at,
- *  how many are validated, and a way into each. */
-function EventScopedQuestionRow(props: {
-  q: QuestionDefinition;
-  events: RuleEvent[];
-  validatedEvents: Set<string>;
-  blind: boolean;
-  onSelectEvent: (eventId: string) => void;
-}) {
-  const { q, events, validatedEvents, blind, onSelectEvent } = props;
-  const done = events.filter((e) => validatedEvents.has(e.event_id)).length;
-  return (
-    <div className="px-3 py-2 border-b border-border last:border-b-0">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="font-mono text-[11px] text-muted-foreground">{q.question_id}</div>
-          <div className="text-[12px] mt-0.5">{q.text.split("\n")[0]}</div>
-        </div>
-        <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[9.5px] uppercase tracking-wider text-muted-foreground">
-          per event
-        </span>
-      </div>
-      <div className="mt-1 text-[11px] text-muted-foreground">
-        {events.length === 0
-          ? "No events for this question in the observation window."
-          : blind
-            ? `Answered at ${events.length} ${events.length === 1 ? "event" : "events"} — ${done} annotated.`
-            : `Answered at ${events.length} ${events.length === 1 ? "event" : "events"} — ${done} validated. There is no period-level answer; it is derived from the events.`}
-      </div>
-      {events.length > 0 && (
-        <div className="mt-1 flex flex-wrap gap-1">
-          {events.map((e) => (
-            <button
-              key={e.event_id}
-              type="button"
-              onClick={() => onSelectEvent(e.event_id)}
-              title={e.event_id}
-              className={cn(
-                "rounded-full border border-border px-2 py-0.5 text-[10px] hover:bg-muted",
-                validatedEvents.has(e.event_id) && "text-[hsl(var(--sage))]",
-              )}
-            >
-              {e.anchor.date ?? "—"}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}

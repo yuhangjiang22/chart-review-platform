@@ -111,12 +111,11 @@ export function deriveAdherenceReviewStatus(
   framework: {
     questionIds: string[];
     ruleIds: string[];
-    /** question_ids answered PER EVENT rather than for the period. These have
-     *  no period-level answer to validate — their work IS the per-event
-     *  annotation — so they count as done exactly when every anchored event
-     *  does, instead of blocking completion forever waiting for a
-     *  validated_questions entry that can never be written (the MCP write path
-     *  rejects a period-level answer to them). */
+    /** question_ids answered PER EVENT rather than for the period. EXCLUDED
+     *  from the question check entirely: they have no period-level answer to
+     *  validate (the MCP write path refuses one), their work is the per-event
+     *  annotation, and `eventsDone` already covers that. Counting them here as
+     *  well would gate completion twice on the same work. */
     eventScopedQuestionIds?: string[];
   },
 ): DerivedReviewStatus {
@@ -139,9 +138,9 @@ export function deriveAdherenceReviewStatus(
   const hasFramework =
     framework.questionIds.length > 0 || framework.ruleIds.length > 0 || anchoredEventIds.length > 0;
   const eventScoped = new Set(framework.eventScopedQuestionIds ?? []);
+  const periodQuestionIds = framework.questionIds.filter((q) => !eventScoped.has(q));
   const questionsDone =
-    framework.questionIds.length === 0
-    || framework.questionIds.every((q) => (eventScoped.has(q) ? eventsDone : vq.has(q)));
+    periodQuestionIds.length === 0 || periodQuestionIds.every((q) => vq.has(q));
   const rulesDone =
     framework.ruleIds.length === 0 || framework.ruleIds.every((r) => vr.has(r));
   if (hasFramework && questionsDone && rulesDone && eventsDone) return "reviewer_validated";

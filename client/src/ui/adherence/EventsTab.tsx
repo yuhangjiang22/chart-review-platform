@@ -120,13 +120,20 @@ export function EventsTab({ days, indexDate, selectedEventId, onSelectEvent }: P
                         onClick={() => onSelectEvent?.(r.event_id)}
                         aria-current={selectedEventId === r.event_id}
                         title={r.event_id}
-                        className={`w-full text-left flex items-center gap-2 rounded px-1.5 py-1 text-[11.5px] hover:bg-muted/60 ${
+                        className={`w-full text-left flex items-start gap-2 rounded px-1.5 py-1 text-[11.5px] hover:bg-muted/60 ${
                           selectedEventId === r.event_id
                             ? "bg-muted ring-1 ring-[hsl(var(--oxblood))]"
                             : ""
                         }`}
                       >
-                        <span className="flex-1 truncate">{r.label}</span>
+                        <span className="flex-1 min-w-0">
+                          <span className="block truncate">{r.label}</span>
+                          {r.window && (
+                            <span className="block text-[10px] text-muted-foreground/80 truncate">
+                              {r.window}
+                            </span>
+                          )}
+                        </span>
                         {r.validated && (
                           <span className="shrink-0 text-[9px] uppercase tracking-wider text-[hsl(var(--sage))]">
                             validated
