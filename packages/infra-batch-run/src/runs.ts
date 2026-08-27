@@ -1422,8 +1422,10 @@ async function runOneAgent(
       // phenotype promote, but inline since the verdicts are computed here,
       // not by the agent). `skill` and `scratchStateFp` come from the
       // pre-run event work-list setup above — same lexical scope.
-      const { evaluateAllRules, evaluateAllRuleEvents, WINDOW_ANCHOR_TYPE } =
-        await import("@chart-review/rule-engine");
+      const {
+        evaluateAllRules, evaluateAllRuleEvents, WINDOW_ANCHOR_TYPE,
+        ENGINE_PERIOD_UNANSWERED_REASON,
+      } = await import("@chart-review/rule-engine");
       let questionAnswers: QuestionAnswer[] = [];
       let committedEvents: RuleEvent[] = [];
       if (fs.existsSync(scratchStateFp)) {
@@ -1451,6 +1453,9 @@ async function runOneAgent(
       // for — the engine falls back to patient-level answers for these, so
       // surface the count for the reviewer instead of letting it pass silently.
       let unansweredAnchored = 0;
+      // Rules the engine refused to judge because their own question was never
+      // committed — see the warning below.
+      let rulesUnanswered = 0;
       if (auditExcluded) {
         ruleVerdicts = skill.rules.map((r) => ({
           rule_id: r.rule_id,
@@ -1507,6 +1512,27 @@ async function runOneAgent(
             }) + "\n");
           } catch { /* ignore */ }
         }
+        // Its period-level counterpart. Events had a coverage counter and
+        // questions did not, and the gap cost a verdict: an agent that stopped
+        // after 12 of 14 questions produced a NON_CONCORDANT rule computed from
+        // an answer nobody gave, and it took reading all 14 by hand to notice.
+        // The engine now refuses to judge such a rule
+        // (ENGINE_PERIOD_UNANSWERED_REASON) — this makes the SKIPPING itself
+        // visible, because a rule left unjudged is a lost measurement even when
+        // it is no longer a wrong one.
+        rulesUnanswered = ruleVerdicts.filter((v) =>
+          v.rationale?.startsWith(ENGINE_PERIOD_UNANSWERED_REASON)).length;
+        if (rulesUnanswered > 0) {
+          const which = ruleVerdicts
+            .filter((v) => v.rationale?.startsWith(ENGINE_PERIOD_UNANSWERED_REASON))
+            .map((v) => v.rule_id);
+          try {
+            fs.appendFileSync(agentTranscriptPath(runId, patientId, spec.id), JSON.stringify({
+              ts: new Date().toISOString(), type: "text",
+              text: `warning: ${rulesUnanswered} rule(s) not judged — their question was never committed: ${which.join(", ")}`,
+            }) + "\n");
+          } catch { /* ignore */ }
+        }
       }
 
       const draftFp = agentDraftPath(runId, patientId, spec.id);
@@ -1536,6 +1562,7 @@ async function runOneAgent(
         // review_state /import merges into.
         rule_events_provenance,
         events_unanswered: unansweredAnchored || undefined,
+        rules_unanswered: rulesUnanswered || undefined,
         adherence_excluded: auditExcluded || undefined,
         lock_task_sha: manifest.guideline_sha,
       });
