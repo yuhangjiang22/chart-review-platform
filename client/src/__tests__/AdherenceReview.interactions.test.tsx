@@ -1758,9 +1758,7 @@ describe("Compare mode (Task 6)", () => {
       // chip used a moment ago. Review mode was never in scope for the
       // Critical-1 fix; it's correct for it to show the current, edited
       // truth.
-      // Review mode shows the verdict as an abbreviation chip on the rule row
-      // (the day's card headline carries the date and what happened instead).
-      expect(within(card).getByText("NC")).toBeInTheDocument();
+      expect(within(card).getByText("NON-CONCORDANT")).toBeInTheDocument();
     });
     // The summary disappears along with compare mode.
     expect(screen.queryByText(/matched:/)).not.toBeInTheDocument();

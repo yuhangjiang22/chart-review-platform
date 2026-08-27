@@ -29,7 +29,7 @@ describe("EventTimeline (review mode)", () => {
   it("renders anchored event cards with verdicts, window rules as chips, and a composite header", () => {
     render(<EventTimeline events={EVENTS} rollups={ROLLUPS} validatedEvents={new Set()} mode="review" onSelectEvent={() => {}} />);
     expect(screen.getByTitle("R-Step@2025-11-04@encounters:1")).toBeInTheDocument();
-    expect(screen.getAllByText("NC").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("NON-CONCORDANT").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText(/Window rules/i)).toBeInTheDocument();
     expect(screen.getByText(/SpirometryWithin24mo/)).toBeInTheDocument();
     // Composite: 1 concordant of 3 evaluable events across rules.
@@ -50,7 +50,7 @@ describe("EventTimeline (review mode)", () => {
 describe("EventTimeline (blind mode)", () => {
   it("hides verdicts, rates, and the composite header", () => {
     render(<EventTimeline events={EVENTS} rollups={ROLLUPS} validatedEvents={new Set()} mode="blind" onSelectEvent={() => {}} />);
-    expect(screen.queryByText("NC")).toBeNull();
+    expect(screen.queryByText("NON-CONCORDANT")).toBeNull();
     expect(screen.queryByText(/concordant/i)).toBeNull();
     // Cards still render (the annotator navigates by them).
     expect(screen.getByTitle("R-Step@2025-11-04@encounters:1")).toBeInTheDocument();
@@ -224,11 +224,11 @@ describe("EventTimeline (not-evaluable styling)", () => {
         evaluable: false, evaluable_reason: "no qualifying encounter in window", verdict: "NON_CONCORDANT" },
     ];
     render(<EventTimeline events={events} rollups={[]} validatedEvents={new Set()} mode="review" onSelectEvent={() => {}} />);
-    const badge = screen.getByText("NE");
+    const badge = screen.getByText("NOT EVALUABLE");
     expect(badge).toBeInTheDocument();
     expect(badge.className).toMatch(/text-muted-foreground/);
     expect(badge.className).not.toMatch(/oxblood/);
-    expect(screen.queryByText("NC")).toBeNull();
+    expect(screen.queryByText("NON-CONCORDANT")).toBeNull();
   });
 });
 
@@ -307,6 +307,9 @@ describe("EventTimeline — one card per day of care, not per rule", () => {
         rollups={[]} validatedEvents={new Set()} mode="review"
         selectedEventId={null} onSelectEvent={() => {}} />,
     );
-    expect(screen.getByText(/ED visit · Steroid course/i)).toBeInTheDocument();
+    // Each kind is its own badge, so assert them individually rather than as
+    // one joined string.
+    expect(screen.getByText(/ED visit/i)).toBeInTheDocument();
+    expect(screen.getByText(/Steroid course/i)).toBeInTheDocument();
   });
 });

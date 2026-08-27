@@ -1,14 +1,21 @@
-// EventTimeline — single-axis event stream (approved mockup B-v2).
+// EventTimeline — vertical chronology of the patient's days of care.
+//
+// Newest first, grouped by month, with a date/offset gutter and a rail — the
+// same shape as the source-data Timeline tab (client/src/TimelineTab.tsx),
+// which the study lead picked over the earlier horizontal axis. The horizontal
+// version placed variable-height cards absolutely in lanes above and below an
+// axis; the cards overran their lanes and covered the axis, and the collision
+// math got worse with every rule added.
+//
 // Presentational only: no fetching, no review-state writes. Three modes:
 //   review  — verdict-colored cards + window-rule chips + composite header
 //   blind   — same geometry, NO verdicts/rates anywhere (gold collection)
 //   compare — per-event agent-vs-human verdict chip pairs + enumeration flags
 // ALL user-facing text is English (multi-site team; spec decision 7).
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useMemo } from "react";
 import { cn } from "@/lib/utils";
 import {
-  deriveWindow, datePercent, monthTicks, clinicalAnchors, assignLanes, cardHalfPct,
-  groupByOccurrence,
+  deriveWindow, groupByOccurrence, groupOccurrencesByMonth, relativeToAnchor,
 } from "./timeline-layout";
 
 /** What happened, in clinical words. The card headline used to be the RULE id,
@@ -87,6 +94,11 @@ export interface EventTimelineProps {
   agentEvents?: RuleEvent[];
   selectedEventId?: string | null;
   onSelectEvent: (eventId: string) => void;
+  /** Reference point for the left gutter's relative offsets ("index", "-28d").
+   *  When omitted, the NEWEST occurrence is used and labelled from there — the
+   *  offsets stay meaningful as spacing between days of care even without the
+   *  patient's index date plumbed through. */
+  indexDate?: string;
 }
 
 const VERDICT_STYLE: Record<string, string> = {
@@ -132,59 +144,20 @@ function chipTitle(prefix: string, e?: RuleEvent): string {
   if (!e.verdict) return `${prefix}: not yet scored`;
   return `${prefix} ${verdictLabel(e.verdict)}`;
 }
-const ANCHOR_GLYPH: Record<string, string> = { encounter: "●", ed: "▲", burst: "◆" };
-// px — must match the card button's rendered width (Tailwind w-[150px] below).
-const CARD_W = 150;
-const LANE_PX = 64;
-
 export function EventTimeline(props: EventTimelineProps) {
-  const { events, rollups, validatedEvents, mode, compareEvents, agentEvents, selectedEventId, onSelectEvent } = props;
+  const { events, rollups, validatedEvents, mode, compareEvents, agentEvents, selectedEventId, onSelectEvent, indexDate } = props;
   const anchored = useMemo(
     () => events
       .filter(isAnchoredEvent)
-      .sort((a, b) => (a.anchor.date ?? "").localeCompare(b.anchor.date ?? "")),
+      .sort((a, b) => (b.anchor.date ?? "").localeCompare(a.anchor.date ?? "")),
     [events],
   );
   const windowEvents = useMemo(() => events.filter((e) => e.anchor.type === "window"), [events]);
   const win = useMemo(() => deriveWindow(anchored), [anchored]);
-  const ticks = useMemo(() => monthTicks(win), [win]);
-  const anchors = useMemo(() => clinicalAnchors(anchored), [anchored]);
-
-  // The lane-collision half-width must always equal half the card's
-  // RENDERED width, expressed as a percent of the track — hardcoding a
-  // fixed percent decouples the collision test from the real card and lets
-  // cards overlap at narrow widths (see cardHalfPct's doc comment in
-  // timeline-layout.ts). We measure the track and derive the percent live.
-  const trackRef = useRef<HTMLDivElement>(null);
-  const [trackW, setTrackW] = useState(0);
-  useLayoutEffect(() => {
-    const el = trackRef.current;
-    if (!el) return;
-    // Seed synchronously from the current layout (before paint) so the
-    // first frame already uses the real width instead of the fallback —
-    // avoids a visible re-pack flash once ResizeObserver's first callback
-    // would otherwise fire.
-    setTrackW(Math.round(el.getBoundingClientRect().width));
-    if (typeof ResizeObserver === "undefined") {
-      // jsdom (tests) / very old browsers have no ResizeObserver — fall
-      // back to a representative desktop track width so lane packing still
-      // runs deterministically.
-      setTrackW(1250);
-      return;
-    }
-    const ro = new ResizeObserver((entries) => {
-      // Guard the read: a missing entry can't throw, and rounding avoids
-      // re-render churn on every sub-pixel drag during a live resize.
-      const w = entries[0]?.contentRect.width;
-      if (w != null) setTrackW(Math.round(w));
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-  const halfPct = cardHalfPct(trackW, CARD_W);
-  // One card per DAY OF CARE, not per rule — see groupByOccurrence.
+  // One entry per DAY OF CARE, not per rule — see groupByOccurrence.
   const occurrences = useMemo(() => groupByOccurrence(anchored), [anchored]);
-  const lanes = useMemo(() => assignLanes(occurrences, win, halfPct), [occurrences, win, halfPct]);
+  const monthGroups = useMemo(() => groupOccurrencesByMonth(occurrences), [occurrences]);
+  const anchorDate = indexDate ?? occurrences[0]?.date;
 
   const humanById = useMemo(() => new Map((compareEvents ?? []).map((e) => [e.event_id, e])), [compareEvents]);
   // Falls back to `events` when no agentEvents snapshot is supplied — see
@@ -206,9 +179,6 @@ export function EventTimeline(props: EventTimelineProps) {
     return (compareEvents ?? []).filter((h) => isAnchoredEvent(h) && !activeAnchoredIds.has(h.event_id));
   }, [compareEvents, events]);
   const showVerdicts = mode !== "blind";
-  const maxLane = { above: 0, below: 0 };
-  for (const l of lanes.values()) maxLane[l.side] = Math.max(maxLane[l.side], l.lane);
-  const axisTop = (maxLane.above + 1) * LANE_PX;
   const totals = useMemo(() => {
     let c = 0, n = 0;
     for (const r of rollups) { c += r.n_concordant; n += r.n_evaluable; }
@@ -226,68 +196,53 @@ export function EventTimeline(props: EventTimelineProps) {
         )}
       </div>
 
-      <div className="relative px-4 overflow-x-auto">
-        <div
-          className="relative min-w-[640px]"
-          style={{ height: axisTop + 56 + (maxLane.below + 1) * LANE_PX + 8 }}
-        >
-          {/* Inset track: 0%..100% maps to THIS div, inset by half a card
-              width on each side, so a card centered at 0% or 100% stays
-              fully inside the container instead of being clipped. */}
-          <div
-            ref={trackRef}
-            className="absolute inset-0"
-            style={{ marginLeft: CARD_W / 2, marginRight: CARD_W / 2 }}
-          >
-            {/* axis */}
-            <div className="absolute left-0 right-0 border-t-2 border-border" style={{ top: axisTop + 20 }} />
-            {/* Ticks stay left-aligned (not centered like glyphs/cards) — a
-                tick marks a month BOUNDARY, a single point in time, not a
-                range with a visual width to center against. */}
-            {ticks.map((t) => (
-              <span key={t.date} className="absolute text-[9px] text-muted-foreground" style={{ left: `${t.percent}%`, top: axisTop + 24 }}>{t.label}</span>
-            ))}
-            {anchors.map((a) => (
-              <span
-                key={`${a.date}|${a.ref ?? ""}|${a.kind}`}
-                title={`${a.date}${a.ref ? ` (${a.ref})` : ""}`}
-                aria-hidden="true"
-                className="absolute text-[11px] -translate-x-1/2"
-                style={{ left: `${datePercent(a.date, win)}%`, top: axisTop + 8 }}
-              >
-                {ANCHOR_GLYPH[a.kind]}
-              </span>
-            ))}
-            {/* One card per day of care; the rules judged that day are rows
-                inside it. Selecting a row selects that rule's event. */}
-            {occurrences.map((occ) => {
-              const pos = lanes.get(occ.key);
-              if (!pos) return null;
-              const rows = occ.events.length;
-              const top = pos.side === "above"
-                ? (maxLane.above - pos.lane) * LANE_PX
-                : axisTop + 56 + pos.lane * LANE_PX;
-              const selectedHere = occ.events.some((e) => e.event_id === selectedEventId);
-              return (
-                <div
-                  key={occ.key}
-                  className={cn(
-                    "absolute w-[168px] -translate-x-1/2 text-left border rounded-md bg-card overflow-hidden",
-                    selectedHere ? "ring-2 ring-[hsl(var(--oxblood))] border-border" : "border-border",
-                  )}
-                  style={{ left: `${pos.percent}%`, top }}
-                >
-                  <div className="px-2 pt-1 pb-0.5 border-b border-border/60">
-                    <div className="text-[10px] font-medium leading-tight">{occ.date}</div>
-                    <div className="text-[9px] uppercase tracking-wider text-muted-foreground leading-tight">
-                      {occ.kinds.map(kindLabel).join(" · ")}
-                    </div>
+      <div className="max-h-[420px] overflow-y-auto">
+        {monthGroups.length === 0 && (
+          <div className="px-3 py-4 text-[11px] text-muted-foreground">
+            No dated events in the observation window.
+          </div>
+        )}
+        {monthGroups.map((g) => (
+          <div key={g.key}>
+            <div className="sticky top-0 z-10 bg-muted/70 backdrop-blur-sm px-3 py-1 border-y border-border/60 text-[10px] uppercase tracking-wider text-muted-foreground">
+              {g.label}
+            </div>
+            {g.occurrences.map((occ) => (
+              <div key={occ.key} className="flex gap-2 px-3 py-1.5 border-b border-border/40">
+                {/* Gutter: the date, and how far it sits from the reference
+                    point — spacing between days of care is the thing a reader
+                    scans for, and it is invisible in a bare date column. */}
+                <div className="w-[82px] shrink-0 text-right leading-tight">
+                  <div className="text-[10.5px] tabular-nums">{occ.date}</div>
+                  {(() => {
+                    const rel = relativeToAnchor(occ.date, anchorDate);
+                    return rel ? <div className="text-[9.5px] text-muted-foreground">{rel}</div> : null;
+                  })()}
+                </div>
+                {/* Rail */}
+                <div className="relative w-3 shrink-0 flex justify-center" aria-hidden="true">
+                  <span className="absolute inset-y-0 w-px bg-border" />
+                  <span className="relative mt-[4px] w-2 h-2 rounded-full bg-[hsl(var(--oxblood))]" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  {/* What happened that day — not a rule id. Several kinds can
+                      share a day (an ED visit and the steroid course started
+                      at it), so every kind present is named. */}
+                  <div className="flex flex-wrap items-center gap-1">
+                    {occ.kinds.map((k) => (
+                      <span key={k} className="rounded bg-muted px-1 py-px text-[9.5px] uppercase tracking-wider text-muted-foreground">
+                        {kindLabel(k)}
+                      </span>
+                    ))}
+                    {occ.events.length > 1 && (
+                      <span className="text-[9.5px] text-muted-foreground">· {occ.events.length} rules judged</span>
+                    )}
                   </div>
-                  <div className="divide-y divide-border/40">
+                  <div className="mt-0.5">
                     {occ.events.map((e) => {
                       const human = humanById.get(e.event_id);
-                      const notEvaluable = e.evaluable === false;
                       const agentSide = agentById.get(e.event_id);
+                      const notEvaluable = e.evaluable === false;
                       return (
                         <button
                           key={e.event_id}
@@ -296,46 +251,41 @@ export function EventTimeline(props: EventTimelineProps) {
                           aria-current={selectedEventId === e.event_id}
                           title={e.event_id}
                           className={cn(
-                            "w-full text-left px-2 py-0.5 text-[9.5px] leading-snug hover:bg-muted/50",
-                            selectedEventId === e.event_id && "bg-muted",
+                            "w-full text-left flex items-center gap-2 rounded px-1 py-0.5 text-[11px] hover:bg-muted/50",
+                            selectedEventId === e.event_id && "bg-muted ring-1 ring-[hsl(var(--oxblood))]",
                           )}
                         >
-                          <div className="flex items-center justify-between gap-1">
-                            <span className="truncate">{ruleLabel(e.rule_id)}</span>
-                            {showVerdicts && mode === "review" && (
-                              <span className={cn(
-                                "shrink-0 rounded px-1",
-                                VERDICT_STYLE[notEvaluable ? "EXCLUDED" : (e.verdict ?? "EXCLUDED")],
-                              )}>
-                                {notEvaluable ? "NE" : verdictAbbrev(e.verdict)}
-                              </span>
-                            )}
-                            {mode === "compare" && (
-                              <span className="shrink-0 flex gap-0.5">
-                                <span className={cn("rounded px-1", chipClass(agentSide))} title={chipTitle("agent", agentSide)}>
-                                  A: {chipAbbrev(agentSide)}
-                                </span>
-                                <span className={cn("rounded px-1", chipClass(human))} title={chipTitle("human", human)}>
-                                  H: {chipAbbrev(human)}
-                                </span>
-                              </span>
-                            )}
-                          </div>
+                          <span className="flex-1 truncate">{ruleLabel(e.rule_id)}</span>
                           {mode !== "blind" && validatedEvents.has(e.event_id) && (
-                            <span className="text-[8.5px] text-[hsl(var(--sage))] uppercase">validated</span>
+                            <span className="shrink-0 text-[9px] uppercase text-[hsl(var(--sage))]">validated</span>
+                          )}
+                          {showVerdicts && mode === "review" && (
+                            <span className={cn(
+                              "shrink-0 rounded px-1 text-[10px]",
+                              VERDICT_STYLE[notEvaluable ? "EXCLUDED" : (e.verdict ?? "EXCLUDED")],
+                            )}>
+                              {notEvaluable ? "NOT EVALUABLE" : verdictLabel(e.verdict)}
+                            </span>
+                          )}
+                          {mode === "compare" && (
+                            <span className="shrink-0 flex gap-1">
+                              <span className={cn("rounded px-1", chipClass(agentSide))} title={chipTitle("agent", agentSide)}>
+                                A: {chipAbbrev(agentSide)}
+                              </span>
+                              <span className={cn("rounded px-1", chipClass(human))} title={chipTitle("human", human)}>
+                                H: {chipAbbrev(human)}
+                              </span>
+                            </span>
                           )}
                         </button>
                       );
                     })}
                   </div>
-                  {rows > 1 && (
-                    <div className="px-2 pb-0.5 text-[8.5px] text-muted-foreground">{rows} rules judged</div>
-                  )}
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
-        </div>
+        ))}
       </div>
 
       {mode === "compare" && humanOnly.length > 0 && (
