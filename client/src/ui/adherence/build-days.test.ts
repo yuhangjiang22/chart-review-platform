@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { buildAdherenceDays, judgmentWindow } from "./build-days";
+import { eventQuestionIds } from "../AdherenceReview";
 import type { RuleEvent } from "./types";
 
 const ev = (
@@ -249,5 +250,59 @@ describe("buildAdherenceDays — the window reaches every line", () => {
     });
     expect(days[0].rules[0].window).toBe("2025-09-25 → 2025-12-24 (90 days)");
     expect(days[0].rules[0].verdict).toBeUndefined();
+  });
+});
+
+describe("eventQuestionIds — an event asks only its OWN questions", () => {
+  // The defect: the event form built its controls from `supporting_questions`,
+  // a hand-maintained list. On the real step-therapy rule that list carried a
+  // question no expression references at all, a period-level question that
+  // belongs in the Question framework, and an event-scoped question belonging
+  // to a DIFFERENT rule — five controls where two were needed.
+  const STEP = {
+    rule_id: "R-T2-StepTherapyMatches",
+    description: "d",
+    event_anchor: "asthma_encounters",
+    verdict_if: 'T2-StepTherapyMatch == "matches"',
+    excluded_if: 'T2-StepTherapyMatch == "unknown"',
+    event_evaluable_if: 'T1-ControlLevel is present',
+    supporting_questions: [
+      "T0-AgeBand",                    // referenced by NO expression
+      "T2-StepTherapyMatch",
+      "T2-ContraindicationDocumented", // period-level, attribution only
+      "T1-ControllerPrescribed",       // event-scoped, but another rule's
+    ],
+    event_scoped_questions: [
+      "T1-ControlLevel", "T1-ControllerPrescribed",
+      "T2-StepTherapyMatch", "T2-FollowupScheduled",
+    ],
+  };
+
+  it("keeps only the event-scoped questions this rule's expressions read", () => {
+    expect(eventQuestionIds(STEP as never)).toEqual([
+      "T1-ControlLevel", "T2-StepTherapyMatch",
+    ]);
+  });
+
+  it("excludes a period-level question even when supporting_questions names it", () => {
+    expect(eventQuestionIds(STEP as never)).not.toContain("T2-ContraindicationDocumented");
+    expect(eventQuestionIds(STEP as never)).not.toContain("T0-AgeBand");
+  });
+
+  it("excludes an event-scoped question belonging to another rule", () => {
+    expect(eventQuestionIds(STEP as never)).not.toContain("T1-ControllerPrescribed");
+  });
+
+  it("returns nothing for a rule that declares no per-event question", () => {
+    // A degenerate rubric: an anchored rule whose events cannot be answered.
+    // Surfacing that as an empty form is correct — falling back to
+    // supporting_questions is what let the drift in.
+    expect(eventQuestionIds({
+      rule_id: "R", description: "d", verdict_if: "X == 1", event_anchor: "visits",
+    } as never)).toEqual([]);
+  });
+
+  it("returns nothing for no rule at all", () => {
+    expect(eventQuestionIds(undefined)).toEqual([]);
   });
 });

@@ -142,10 +142,44 @@ interface EventDraft {
 // reviewer-sourced — an agent-sourced (or provenance-less legacy) answer on
 // the event is treated as absent, so the control renders empty rather than
 // silently pre-filling the annotator's "own" answer with the agent's.
+/** The questions THIS event asks: the rule's event-scoped questions, and only
+ *  those. Read from the rule's own expressions rather than from
+ *  `supporting_questions`, which is a hand-maintained list that had drifted —
+ *  on the step-therapy rule it carried a question no expression references at
+ *  all, a period-level question that belongs in the Question framework, and an
+ *  event-scoped question belonging to a DIFFERENT rule. Five controls where two
+ *  were needed.
+ *
+ *  This is the same set the agent's event work-list names, so the reviewer and
+ *  the agent answer exactly the same questions per event. */
+export function eventQuestionIds(rule: RuleDefinition | undefined): string[] {
+  if (!rule) return [];
+  const scoped = new Set(rule.event_scoped_questions ?? []);
+  if (scoped.size === 0) return [];
+  const exprs = [
+    rule.verdict_if,
+    rule.excluded_if,
+    (rule as { event_evaluable_if?: string }).event_evaluable_if,
+  ].filter((e): e is string => !!e);
+  return [...scoped].filter((qid) => exprs.some((e) => e.includes(qid))).sort();
+}
+
+/** What happened, in clinical words — the event card's headline. */
+const EVENT_KIND_HEADLINE: Record<string, string> = {
+  outpatient: "Clinic visit",
+  ed: "ED visit",
+  asthma_encounters: "Asthma visit",
+  ocs_bursts: "Steroid course",
+  exacerbations: "Exacerbation",
+  obligation_points: "Controller obligation",
+};
+
 function seedEventDraft(event: RuleEvent, rule: RuleDefinition | undefined, blind = false): EventDraft {
-  const qids = new Set<string>();
+  const qids = new Set<string>(eventQuestionIds(rule));
+  // Keep anything already committed on the event even if the rule no longer
+  // names it — a stored answer must stay visible and editable, not silently
+  // drop out of the form after a rubric edit.
   for (const a of event.answers ?? []) qids.add(a.question_id);
-  for (const qid of rule?.supporting_questions ?? []) qids.add(qid);
   const answers = [...qids].map((qid) => {
     const existing = (event.answers ?? []).find((a) => a.question_id === qid);
     const usable = existing && (!blind || existing.source === "reviewer");
@@ -2001,7 +2035,6 @@ function EventRowImpl({
     });
   }
 
-  const anchorMetaEntries = event.anchor.meta ? Object.entries(event.anchor.meta) : [];
   const verdictStyle =
     event.verdict === "CONCORDANT" ? "bg-[hsl(var(--sage))]/15 text-[hsl(var(--sage))]"
     : event.verdict === "NON_CONCORDANT" ? "bg-[hsl(var(--oxblood))]/12 text-[hsl(var(--oxblood))]"
@@ -2009,9 +2042,11 @@ function EventRowImpl({
   const reasonMissing = draft.notEvaluable && draft.reason.trim().length === 0;
   const hasCommittedAnswers = (event.answers ?? []).length > 0;
 
-  // The anchor's ref is a note filename when origin==="note" — make it
+  // The anchor's ref is a note filename when origin==="note" — keep it
   // actionable via the same source-pane jump QuestionRow's citations use, so
-  // the reviewer can read the note for the encounter being adjudicated.
+  // the reviewer can read the note the event was supplemented from. An
+  // omop-origin ref is a row id: a machine handle, so it lives in the card's
+  // title rather than on its face.
   const refNode = event.anchor.ref
     ? (event.anchor.origin === "note" ? (
         <>
@@ -2025,8 +2060,15 @@ function EventRowImpl({
             {event.anchor.ref}
           </button>
         </>
-      ) : ` · ${event.anchor.ref}`)
+      ) : null)
     : null;
+
+  const kindHeadline = (() => {
+    const k = event.anchor.meta?.kind;
+    const raw = event.anchor.type === "asthma_encounters" && typeof k === "string"
+      ? k : event.anchor.type;
+    return EVENT_KIND_HEADLINE[raw] ?? raw.replace(/_/g, " ");
+  })();
 
   return (
     <div
@@ -2035,22 +2077,22 @@ function EventRowImpl({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-mono text-[11px] text-muted-foreground">{event.event_id}</span>
-            {rule && <span className="font-mono text-[11px] text-muted-foreground">{rule.rule_id}</span>}
-            {/* The SPAN this event's requirement is judged over — not just the
-             *  anchor date. A reviewer answering "was follow-up scheduled" needs
-             *  to know they are judging the 90 days after this visit, and for
-             *  the controller obligation the span runs to the patient's next
-             *  visit, which differs per patient. */}
+          {/* Headline: WHAT happened, and WHICH SPAN is being judged. The
+           *  event_id and the anchor row ref are machine handles — they moved
+           *  to the title attribute, where a reviewer can still get at them
+           *  without reading them on every card. The raw anchor meta went with
+           *  them: `kind=` is already in the headline, and `n_encounters=` is
+           *  provenance for the same-day collapse, not something to answer
+           *  from. */}
+          <div className="flex items-center gap-2 flex-wrap" title={event.event_id}>
+            <span className="text-foreground font-medium">
+              {kindHeadline}
+            </span>
             <span className="text-[11px] text-muted-foreground">
               {event.anchor.date
                 ? judgmentWindow(event.anchor.date, event.anchor.meta, rule?.event_window_days)
                 : "—"}
               {refNode}
-              {anchorMetaEntries.length > 0 && (
-                <> · {anchorMetaEntries.map(([k, v]) => `${k}=${String(v)}`).join(", ")}</>
-              )}
             </span>
             {/* Engine verdict — READ-ONLY. The reviewer edits answers below;
              *  the server re-runs the deterministic engine and refreshes
@@ -2067,7 +2109,18 @@ function EventRowImpl({
               <span className="text-[10px] text-[hsl(var(--sage))] uppercase">validated</span>
             )}
           </div>
-          {rule?.description && <div className="text-foreground">{rule.description}</div>}
+          {/* The rule's full text is its guideline citation and worked
+           *  definition — three or four lines of it. Collapsed: a reviewer
+           *  needs it once while learning the instrument, not on every card
+           *  between them and the controls. */}
+          {rule?.description && (
+            <details className="text-[11px] text-muted-foreground">
+              <summary className="cursor-pointer hover:text-foreground">
+                What this rule asks
+              </summary>
+              <div className="mt-0.5">{rule.description}</div>
+            </details>
+          )}
           {/* event.evaluable_reason is agent free text (the MCP tool takes
            *  z.string().optional()) — gated the SAME way seedEventDraft
            *  seeds the not-evaluable control (Task 5 re-review, Important

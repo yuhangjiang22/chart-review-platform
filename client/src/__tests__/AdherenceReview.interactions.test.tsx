@@ -151,6 +151,11 @@ const FRAMEWORK = {
       verdict_if: "q_act_band <= 2",
       nuanced: true,
       supporting_questions: ["q_act_band"],
+      // An anchored rule declares which of its questions are answered PER
+      // EVENT; that set — not supporting_questions — is what the event form
+      // renders, so the reviewer and the agent's work-list ask the same thing.
+      event_anchor: "visits",
+      event_scoped_questions: ["q_act_band"],
     },
     {
       rule_id: "r_excluded",
@@ -1510,20 +1515,26 @@ describe("Event timeline + per-event validation", () => {
     await waitFor(() => expect(eventSaveBtn(eventRowFor("ev_1")).textContent).toBe("Save"));
   });
 
-  it("I9/I10: EventRow shows the rule's clinical context and an actionable note-origin ref", async () => {
+  it("I9/I10: EventRow headlines what happened, keeps the rule text one click away, and the note ref actionable", async () => {
     setupMocks({ state: () => stateWithEvents() });
     renderPane();
     await waitLoaded();
 
     const row = eventRowFor("ev_1");
-    // Rule id + description (mirrors RuleRow's own presentation).
-    expect(within(row).getByText("r_concordant")).toBeInTheDocument();
+    // The headline says WHAT happened, not which rule id — the id and the
+    // anchor row ref are machine handles and moved to the card's title.
+    expect(within(row).queryByText("r_concordant")).toBeNull();
+    // The rule's full text (guideline citation + worked definition) is behind a
+    // disclosure so it doesn't sit between the reviewer and the controls.
+    const disclosure = within(row).getByText(/What this rule asks/);
+    expect(disclosure).toBeInTheDocument();
+    fireEvent.click(disclosure);
     expect(within(row).getByText("Controller prescribed")).toBeInTheDocument();
-    // The note-origin anchor ref is a clickable button, not inert text.
+    // The note-origin anchor ref is still a clickable button, not inert text.
     expect(within(row).getByRole("button", { name: "note_12" })).toBeInTheDocument();
   });
 
-  it("I11: an anchored event with NO committed answers still renders controls (unioned from supporting_questions) plus a notice", async () => {
+  it("I11: an anchored event with NO committed answers still renders its per-event controls plus a notice", async () => {
     const noAnswersState = stateWithEvents({
       rule_events: RULE_EVENTS.map((e) => (e.event_id === "ev_1" ? { ...e, answers: [] } : e)),
     });
@@ -1533,8 +1544,8 @@ describe("Event timeline + per-event validation", () => {
 
     const row = eventRowFor("ev_1");
     expect(within(row).getByText(/no answers committed/i)).toBeInTheDocument();
-    // r_concordant's supporting_questions is ["q_act_band"] — still gets a
-    // (empty) control instead of rendering zero controls.
+    // r_concordant declares q_act_band as its per-event question and reads it
+    // in verdict_if — so it still gets an (empty) control rather than zero.
     expect(within(row).getByRole("combobox")).toBeInTheDocument();
   });
 });
