@@ -36,7 +36,7 @@ The suite requires the dev server to be running. Before invoking:
 
 ```bash
 # In a separate terminal (if not already running):
-cd chart-review-platform-v2 && npm run dev
+cd chart-review-platform && npm run dev
 ```
 
 Check for it with:
@@ -52,7 +52,7 @@ dev server — don't try to launch it from inside a test run.
 ## How to run
 
 ```bash
-cd chart-review-platform-v2 && npm run test:ui
+cd chart-review-platform && npm run test:ui
 ```
 
 Pass `-- --headed` for a visible browser, or `-- --debug` for the
@@ -95,6 +95,14 @@ e2e/
 │                          - active session shows LOCKED cohort
 │                          - sidebar "Reviewers" label parity (NER)
 │                          - cross-session iter isolation
+├── adherence-timeline.spec.ts   event-concordance timeline (adherence):
+│                          - timeline + "Window rules" strip render; event
+│                            card click sets aria-current + scrolls its
+│                            EventRow into view
+│                          - per-event Save validates (marker + "Events:
+│                            N / M validated" counter increments)
+│                          - blind mode hides agent/engine output and still
+│                            renders (seeded via the seed-events route)
 ```
 
 When the platform grows (NER calibration, package generate flow,
