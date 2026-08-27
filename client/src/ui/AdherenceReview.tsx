@@ -1214,18 +1214,16 @@ export function AdherenceReview(props: AdherenceReviewProps) {
       )}
 
       <div className="flex-1 overflow-y-auto p-3 space-y-4 min-w-0">
-        {/* The chronology itself lives in the source pane's Timeline tab, where
-         *  the adherence days interleave with the notes, encounters and labs
-         *  they were judged from — one axis instead of two to correlate by eye.
-         *  What stays here is the period-level readout: the window, the
-         *  composite, and the whole-window rules, which have no date and so no
-         *  place on a chronology. */}
+        {/* The chronology itself lives in the source pane's EVENTS tab, beside
+         *  Timeline (which stays a view of what the chart records). What stays
+         *  here is the period-level readout: the composite and the whole-window
+         *  rules, which have no date and so no place on a chronology. */}
         {ruleEvents.length > 0 && (
           <section className="border border-border rounded-md bg-card">
             <div className="flex items-center justify-between px-3 py-2 border-b border-border text-[12px]">
               <span className="uppercase tracking-wider text-muted-foreground">
                 Adherence · {adherenceDays.length} {adherenceDays.length === 1 ? "day" : "days"} of care
-                <span className="normal-case tracking-normal"> — see the Timeline tab</span>
+                <span className="normal-case tracking-normal"> — see the Events tab</span>
               </span>
               {!blind && (
                 <span>
