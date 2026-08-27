@@ -1,13 +1,13 @@
 ---
 field_id: ohe_365d
-prompt: Overt hepatic encephalopathy within 365 days of index (graded)?
+prompt: Overt hepatic encephalopathy — grade the most recent documented event, ANY date (graded)?
 answer_schema:
   enum: [definite, highly_likely, probable, none]
 cardinality: one
 group: decompensation
 ---
 
-# Decompensation: overt hepatic encephalopathy (365-day lookback)
+# Decompensation: overt hepatic encephalopathy (event grading, windowless)
 
 ## Definition
 **Overt HE** (ISHEN grade >=2: asterixis, disorientation, or inappropriate
@@ -15,8 +15,31 @@ behavior). Qualifying symptoms: acute disorientation (unaware of person,
 place, or time), somnolence, coma. HE suspected ONLY from family/caregiver
 report - without professional confirmation - does NOT count. Grade with the paper's tiers and commit the HIGHEST tier satisfied; if the
 event is mentioned but no tier's definition is fully satisfied, answer `none`
-and explain in the rationale. The event must be **within 365 days before index
-or present at index**.
+and explain in the rationale. Grade the MOST RECENT documented event at ANY date — do NOT apply any time
+window; the outcome scanner owns all window logic (see FORWARD-SCAN SEMANTICS
+in SKILL.md). The `365d` in the field name is historical; the grading itself
+is WINDOWLESS. In particular, never dismiss an event as 'outside the index
+window' — that reasoning produced a confirmed false positive (a 2021 ascites
+wave dismissed because a 2015 index was used as the anchor).
+
+## Where Definite-tier evidence lives (verify-run lesson)
+An OHE trail often looks like: K72.9x codes + months of continuous
+lactulose/rifaximin fills (see `fnd_decomp_ohe_or_hepatic_failure` and
+`fnd_drug_lactulose`/`fnd_drug_rifaximin`) + hepatology/PCP notes near those
+dates documenting the episode and therapy response. Read those notes before
+answering `none` — a verify-run false negative dated OHE a year early by
+stopping at the first hepatology note found.
+
+
+## ONGOING STATE = EVENT (v0.6.1)
+Documentation of an ONGOING decompensated state counts as an event dated at
+that documentation — e.g. a hepatology note stating "encephalopathy is
+stable" with lactulose/rifaximin on the current med list IS a qualifying
+OHE event on that note's date (provider-documented, on directed therapy →
+definite). A chronic, therapy-controlled decompensation is NOT "no event";
+dating only the last acute episode misdates the state by years (confirmed
+verify-run miss: outcome passed 51 days after a "stable encephalopathy on
+rifaximin+lactulose" hepatology note).
 
 ## Tiers (paper's definitions)
 - **`definite`**: >=1 episode of qualifying symptoms AND documented improvement
@@ -26,7 +49,7 @@ or present at index**.
   documented by a **non-GI/non-hepatology** provider.
 - **`probable`**: >=1 episode of qualifying symptoms AND documentation of HE by
   a non-GI/non-hepatology provider (no documented therapy response).
-- **`none`** - no tier satisfied in the window.
+- **`none`** - no tier satisfied anywhere in the chart.
 
 ## Provider tiers read HIERARCHICALLY (v2 op 10)
 GI/hepatology documentation satisfies the provider requirement of ANY tier.

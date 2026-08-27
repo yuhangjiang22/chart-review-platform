@@ -10,7 +10,7 @@ group: severity
 # Criterion: shunt_date (evidence date)
 
 ## Definition
-The procedure date of the earliest TIPS / BRTO / porto-systemic shunt surgery up to index. Blank when shunt_ever is `no`.
+The procedure date of the earliest TIPS / BRTO / porto-systemic shunt surgery at ANY time ANYWHERE in the chart — before OR AFTER index. Blank only when no such procedure is documented anywhere.
 
 ## Extraction guidance
 - Report an ISO date **YYYY-MM-DD**. When the note states only a month/year,

@@ -1,7 +1,7 @@
 task_type: phenotype_validation
 uses_structured_data: true
 review_unit: patient
-manual_version: 0.4.0
+manual_version: 0.6.0
 status: draft
 final_output: lcn_compensated_cirrhosis
 source_documents:
@@ -77,6 +77,39 @@ overview_prose: >-
   crit_d requires the MINIMUM platelet across all rows in-window. LIMITATION:
   earliest-only dates mean a later re-qualification is invisible to the scan
   (same shape as the most-recent-decompensation limitation; both documented).
+
+  v0.4 -> v0.5 (2026-08-25, from the 10-patient pilot audit — 3 of 5 MET were
+  lab-refutable false positives): (1) DECOMPENSATION TIER FIELDS
+  (ascites/ohe/variceal_bleed/phg_bleed_365d) are now WINDOWLESS EVENT
+  GRADING — grade the most recent documented event at any date; never dismiss
+  an event as 'outside the index window' (a 2021 ascites wave was dismissed
+  against a 2015 index, missing 17 structured ascites codes). The `365d` field
+  names are historical. (2) The decompensation DATE fields mandate a
+  STRUCTURED-CODE SWEEP of the conditions table before answering. (3)
+  meld_na_ge_15 / ctp_class re-anchored from index to REFERENCE date and now
+  carry a MANDATORY-COMPUTATION rule: with the lab components charted,
+  not_assessable is a wrong answer (two false positives passed through it).
+  (4) The outcome scanner (v0.6) now computes MELD-Na and a lab-based CTP
+  floor from measurements.json at EVERY candidate date — the agent's severity
+  snapshots remain the note-documented fallback at the reference date only.
+
+  v0.5 -> v0.6 (2026-08-26, from Xuguang's audit of the verification run —
+  one outcome passed as compensated while the patient had K72.90 codes and 7
+  months of continuous lactulose/rifaximin inside the window): ROOT CAUSE is
+  that the OMOP concept mapping HIDES source-code semantics (K70.31 'alcoholic
+  cirrhosis WITH ASCITES' -> concept 'Alcoholic cirrhosis'; K72.90 -> 'Hepatic
+  failure'), defeating every name-based sweep, and the drugs table was never
+  materialized. Fixes: ETL now (a) materializes drugs.json (hepatology-
+  relevant fills: lactulose, rifaximin, aldosterone antagonists, loop
+  diuretics, NSBBs), (b) emits fnd_decomp_* computed foundations — every
+  decompensation-relevant condition row matched on SOURCE codes + names, and
+  fnd_drug_* fill trails — immune to read-budget truncation, (c) ranks notes
+  by decompensation-event and drug dates too, not just Step-1 signals. The
+  decomp date fields' mandatory sweep now points at fnd_decomp_*/fnd_drug_*;
+  ohe_365d documents where Definite-tier evidence lives. The outcome scanner
+  (v0.7) matches decomp codes on source values as well and feeds OHE
+  codes/fills into the CTP encephalopathy component plus non-blocking review
+  warnings. Blocking remains agent tier grading (op-6 fidelity).
 
   The agent extracts 16 evidence leaves; the Step-1 count, Step-1 verdict,
   decompensation roll-up, Step-2 verdict, and the final phenotype are COMPUTED

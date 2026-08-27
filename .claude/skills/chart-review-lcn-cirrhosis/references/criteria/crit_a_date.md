@@ -19,7 +19,7 @@ exists anywhere.
 # Criterion: crit_a_date (evidence date)
 
 ## Definition
-The exam date of the imaging that satisfies criterion A. If several qualify, give the EARLIEST. Blank when crit_a_imaging is not_met.
+The exam date of the imaging that satisfies criterion A. If several qualify, give the EARLIEST. Blank ONLY when no qualifying imaging exists ANYWHERE in the chart — never blank because the calibration enum (crit_a_imaging) is not_met: the enum is reference-anchored, this date is windowless.
 
 ## Extraction guidance
 - Report an ISO date **YYYY-MM-DD**. When the note states only a month/year,

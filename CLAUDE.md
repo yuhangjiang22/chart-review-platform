@@ -132,6 +132,63 @@ npm run build:client
 cd python && ./.venv/bin/python -m pytest -q
 ```
 
+## Agent batch runs — operational conventions
+
+These are hard-won; violating them wastes hours of model time or leaks PHI
+to the wrong lane. They apply to EVERY task (asthma, LCN, RUCAM, ACTS, …).
+
+1. **Model routing is the phi flag, nothing else.** `meta.json phi:true`
+   patients (all `patient_real_*`) route to `CHART_REVIEW_PHI_MODEL` (the
+   HIPAA lane); `patient_fake_*` are `phi:false` and run on the default
+   backend. Never point the default backend at the PHI model for synthetic
+   smokes unless you are deliberately testing prod parity — and then
+   coordinate the PHI-lane rate window with the other sessions first.
+2. **Launch batches through a `scripts/<task>-realtest/run.ts`-style driver**
+   (`startBatchRun` + status poll + draft-presence check), concurrency 1 for
+   the PHI lane. Don't hand-roll ad-hoc launchers per smoke.
+3. **Never let the driver kill mid-patient.** The standalone drivers run the
+   batch IN-PROCESS: if the poller exits (deadline or otherwise), the run
+   dies mid-patient and orphans the Python sidecar, leaving a partial draft.
+   Treat deadlines as advisory (warn + keep polling; stop externally only if
+   truly hung). Completed patients' drafts persist under `var/runs/<id>/`
+   either way; downstream consumers must reject partial drafts (the LCN
+   scanner requires >=31 fields).
+4. **Keep agents fast with the two levers that actually work:** a SKILL
+   structured-read budget (max_rows<=300, no re-reads, <=2 notes/call) and
+   ETL-precomputed foundation rows so the agent adjudicates pointers instead
+   of scanning raw tables. Real patients with 2-6k-row charts complete in
+   ~4-6 min under these; without them, runs blow deadlines and rate limits.
+5. **Structured facts belong to deterministic code, note judgment to the
+   agent.** If a field is computable from OMOP rows (lab thresholds,
+   MELD/CTP, code+fill trails), compute it in the ETL/scanner and let the
+   agent verify/cite — prompt wording alone does not survive agent variance
+   (measured: 3 consecutive runs repeating the same index-anchored mistake).
+6. **OMOP concept names hide source-code semantics** (K70.31 "alcoholic
+   cirrhosis WITH ASCITES" maps to concept "Alcoholic cirrhosis"; K72.90 to
+   "Hepatic failure"). Any code sweep must match `source_value` codes as
+   well as concept names.
+7. **Shared machine etiquette:** several Claude sessions spawn
+   identically-named processes (`tsx run.ts`, `chart_review_deepagents`).
+   Clean up ONLY with task-scoped patterns (`pkill -f lcn-realtest`), never
+   bare `deepagents`/`tsx`. Coordinate PHI-lane (rate-limited) traffic and
+   shared-working-tree branch switches with the other sessions via
+   SendMessage before acting.
+8. **A batch launched through the API runs IN-PROCESS in the dev server**
+   (`dev:server` is `tsx watch server/index.ts`). For its whole duration any
+   SAVE — not just a commit — under `server/` or `packages/` restarts the
+   watcher and kills the run mid-patient. Announce server-hosted batches;
+   other sessions hold `server/`+`packages/` edits until you send CLEAR.
+   `client/` edits cannot reach a run (separate vite process) but a
+   non-compiling client save blanks the WHOLE Studio UI for every viewer
+   via vite's app-wide HMR error overlay — so while anyone has the UI open,
+   save client files in compiling states or land refactors as one atomic
+   write. A standalone `scripts/*-realtest` run is immune to all of this,
+   but its poller exiting still kills it (see #3).
+9. **Sidecar spawns read the shared WORKING TREE, not your branch.** Another
+   session's uncommitted edit under `python/chart_review_deepagents` (or a
+   branch switch) reaches your next patient's spawn. Same coordination rule
+   as #8.
+
 ## Gotchas (intentional)
 
 1. **`.gitignore` has `/workspace/` (anchored)**, not `workspace/`. The

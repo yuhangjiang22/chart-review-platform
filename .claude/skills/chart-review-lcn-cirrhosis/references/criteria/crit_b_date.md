@@ -19,7 +19,7 @@ exists anywhere.
 # Criterion: crit_b_date (evidence date)
 
 ## Definition
-The exam date of the stiffness measurement that satisfies criterion B (earliest qualifying). Blank when crit_b_stiffness is not_met.
+The exam date of the stiffness measurement that satisfies criterion B (earliest qualifying). Blank ONLY when no qualifying measurement exists ANYWHERE in the chart — never blank because the calibration enum (crit_b_stiffness) is not_met: the enum is reference-anchored, this date is windowless.
 
 ## Extraction guidance
 - Report an ISO date **YYYY-MM-DD**. When the note states only a month/year,

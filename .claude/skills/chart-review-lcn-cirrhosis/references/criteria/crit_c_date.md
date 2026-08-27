@@ -19,7 +19,7 @@ exists anywhere.
 # Criterion: crit_c_date (evidence date)
 
 ## Definition
-The exam date on which varices were demonstrated (earliest qualifying). Blank when crit_c_varices is not_met.
+The exam date on which varices were demonstrated (earliest qualifying). Blank ONLY when varices are demonstrated NOWHERE in the chart — never blank because the calibration enum (crit_c_varices) is not_met: the enum is reference-anchored, this date is windowless (a confirmed verification-run miss: post-index varices were blanked on exactly this stale wording).
 
 ## Extraction guidance
 - Report an ISO date **YYYY-MM-DD**. When the note states only a month/year,

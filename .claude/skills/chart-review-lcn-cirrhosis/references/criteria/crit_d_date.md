@@ -22,7 +22,7 @@ with a qualifying (<150) value. Same for FIB-4: earliest qualifying value.
 # Criterion: crit_d_date (evidence date)
 
 ## Definition
-The lab date of the earliest measurement satisfying criterion D. Blank when crit_d_biomarker is not_met.
+The lab date of the earliest measurement satisfying criterion D. Blank ONLY when no qualifying lab exists ANYWHERE in the chart — never blank because the calibration enum (crit_d_biomarker) is not_met: the enum is reference-anchored, this date is windowless.
 
 ## Extraction guidance
 - Report an ISO date **YYYY-MM-DD**. When the note states only a month/year,

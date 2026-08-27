@@ -111,6 +111,42 @@ def main():
             FROM read_csv_auto('{D}/r6263_condition_occurrence.csv') co
             LEFT JOIN cn ON cn.concept_id = co.condition_concept_id
             WHERE co.person_id={pid}{W('condition_start_date')} ORDER BY 4""").fetchall()]
+
+        # Decompensation-relevant rows, matched on BOTH the SOURCE code and the
+        # concept name — the OMOP mapping destroys source semantics (K70.31
+        # 'alcoholic cirrhosis WITH ASCITES' -> concept 'Alcoholic cirrhosis';
+        # K72.90 -> 'Hepatic failure', no 'encephalopathy' in the name), so
+        # name-only sweeps are blind to exactly the codes that matter.
+        # Found via the XG-verify audit (patient 5046a3, 2026-08-26).
+        def _code(sv):  # '1284^^K70.31^' -> 'K70.31'
+            return next((p for p in str(sv or "").split("^") if re.match(r"^[A-Z]\d", p)), "")
+        def _decomp_kind(r):
+            code = _code(r.get("source_value")); nm = (r.get("concept_name") or "").lower()
+            if code.startswith(("R18", "K70.31", "K70.11", "K71.51")) or "ascites" in nm:
+                return "ascites"
+            if code.startswith(("K72.9", "K72.0", "K72.1")) or "encephalopath" in nm or "hepatic failure" in nm:
+                return "ohe_or_hepatic_failure"
+            if code.startswith(("I85.01", "I85.11")) or ("varice" in nm and ("bleed" in nm or "hemorrh" in nm)):
+                return "variceal_bleed"
+            return None
+        decomp_rows = {}
+        for r in conds:
+            k = _decomp_kind(r)
+            if k: decomp_rows.setdefault(k, []).append(r)
+
+        # hepatology-relevant drug fills (OHE therapy, ascites diuretics, NSBB)
+        HEPDRUGS = ("lactulose", "rifaximin", "spironolactone", "eplerenone", "amiloride",
+                    "furosemide", "torsemide", "bumetanide", "nadolol", "propranolol", "carvedilol")
+        drugs = [dict(zip(("row_id","concept_id","concept_name","start_date","end_date","days_supply","source_value"), r)) for r in con.execute(f"""
+            SELECT drug_exposure_id, drug_concept_id, cn.concept_name,
+                   CAST(drug_exposure_start_date AS DATE), CAST(drug_exposure_end_date AS DATE),
+                   days_supply, drug_source_value
+            FROM read_csv_auto('{D}/r6263_drug_exposure.csv') dr
+            LEFT JOIN cn ON cn.concept_id = dr.drug_concept_id
+            WHERE dr.person_id={pid}{W('drug_exposure_start_date')}
+              AND regexp_matches(lower(COALESCE(cn.concept_name,'') || ' ' || COALESCE(dr.drug_source_value,'')),
+                                 '{"|".join(HEPDRUGS)}')
+            ORDER BY 4""").fetchall()]
         lo = f" AND CAST(measurement_date AS DATE) {meas_lo}" if meas_lo else ""
         if a.cohort_csv:
             # rubric-relevant labs only: crit B (stiffness), crit D (platelets),
@@ -151,7 +187,15 @@ def main():
             WHERE person_id={pid}{W('PHYSIOLOGIC_TIME')}{lo}
               AND REPORT_TEXT IS NOT NULL ORDER BY 1""").fetchall()
         if len(notes) > a.note_cap:
-            sig = signals.get(pid, [])
+            # signal set = Step-1 screen dates + decompensation code dates +
+            # hep-drug fill dates, so notes near DECOMP events are retained too
+            # (XG-verify audit: the 2016-01-11 PCP and 2016-08-23 hepatology
+            # visits — exactly the Definite-tier documentation — were dropped
+            # by Step-1-only ranking).
+            sig = list(signals.get(pid, []))
+            for rows in decomp_rows.values():
+                sig += [r["date"] for r in rows if r.get("date")]
+            sig += [r["start_date"] for r in drugs if r.get("start_date")]
             if sig:
                 # signal-guided: rank by distance to the nearest signal date,
                 # then by priority type — evidence-dense regions of the chart win.
@@ -197,6 +241,28 @@ def main():
                     concept_name="Earliest liver-stiffness measurement [computed foundation - verify in measurements]",
                     value=f"{r0['date']} (value {r0['value']}, measurements row {r0['row_id']})",
                     date=r0["date"]))
+            # decompensation-code trails (source-code matched — see _decomp_kind)
+            for kind, rows in sorted(decomp_rows.items()):
+                dates = sorted({str(r["date"]) for r in rows if r.get("date")})
+                codes = sorted({_code(r["source_value"]) for r in rows if _code(r["source_value"])})
+                fnd.append(dict(row_id=f"fnd_decomp_{kind}", concept_id=0,
+                    concept_name=(f"Decompensation-code trail: {kind} [computed foundation — "
+                                  "adjudicate EACH date against the tier definitions; matched on "
+                                  "source codes, which concept names hide]"),
+                    value=(f"{len(rows)} condition rows on {len(dates)} dates "
+                           f"(codes {codes[:5]}): " + ", ".join(dates[:40]) + ("…" if len(dates) > 40 else "")),
+                    date=dates[0] if dates else None))
+            by_drug = {}
+            for r in drugs:
+                blob = ((r["concept_name"] or "") + " " + (r["source_value"] or "")).lower()
+                g = next((g for g in HEPDRUGS if g in blob), None)
+                if g: by_drug.setdefault(g, []).append(r)
+            for g, rows in sorted(by_drug.items()):
+                ds = sorted(str(r["start_date"]) for r in rows if r.get("start_date"))
+                fnd.append(dict(row_id=f"fnd_drug_{g}", concept_id=0,
+                    concept_name=f"Hepatology-relevant drug trail: {g} [computed foundation — verify in drugs table]",
+                    value=f"{len(rows)} fills, first {ds[0]}, last {ds[-1]}" if ds else f"{len(rows)} fills",
+                    date=ds[0] if ds else None))
             obs = fnd + obs
         all_dates = [str(r["date"]) for r in conds + meas + procs + obs if r.get("date")] + \
                     [str(r["start_date"]) for r in encs if r.get("start_date")] + \
@@ -207,12 +273,13 @@ def main():
                     index_date=index_date)
         if a.cohort_csv: demo["reference_date"] = reference_date
         for name, data in [("conditions", conds), ("measurements", meas), ("procedures", procs),
-                           ("observations", obs), ("encounters", encs), ("demographics", [demo])]:
+                           ("observations", obs), ("encounters", encs), ("drugs", drugs),
+                           ("demographics", [demo])]:
             json.dump(data, open(os.path.join(pdir, "omop", f"{name}.json"), "w"), indent=1, default=str)
         meta = {"patient_id": anon, "category": "lcn_real", "phi": True,
                 "demographics": {"age": age, "sex": (sex or "")[:1] or None},
                 "index_date": index_date, "first_cirrhosis_code": first_cir,
-                "source": "OMOP ETL (liver-cp/scripts/lcn_etl.py) — real de-identified EHR (r6263)"}
+                "source": "OMOP ETL (liver-cp/scripts/lcn_etl.py) — real EHR, NOT de-identified (r6263, PHI)"}
         if a.cohort_csv:
             meta["reference_date"] = reference_date
             meta["index_semantics"] = "first-AUD (clean cohort); chart NOT truncated; outcome scan runs FORWARD from index to reference_date"
@@ -222,7 +289,8 @@ def main():
                             "Index = first cirrhosis code + 90d (pilot choice; study index design TBD).")
         json.dump(meta, open(os.path.join(pdir, "meta.json"), "w"), indent=2)
         print(f"[ok] {anon}  index={index_date}  ref={reference_date if a.cohort_csv else index_date}  "
-              f"notes={len(notes)} cond={len(conds)} meas={len(meas)} proc={len(procs)}")
+              f"notes={len(notes)} cond={len(conds)} meas={len(meas)} proc={len(procs)} "
+              f"drugs={len(drugs)} decomp_fnd={ {k: len(v) for k, v in decomp_rows.items()} }")
 
 if __name__ == "__main__":
     main()

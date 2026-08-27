@@ -18,6 +18,15 @@ Entry exclusions:
      OR in note text, ANY time. FALD has no dedicated ICD-10 code.
   Note regex excludes 'fontanelle'/'fontanel' and 'Fontana(-Masson)' — the
   first run flagged 9 patients, ALL false positives from those two words.
+  4. congenital biliary atresia — Q44.2 / ICD-9 751.61 or concept-name match,
+     ANY time (congenital). Added after the pilot audit: one pilot MET was a
+     biliary-atresia / secondary-biliary-cirrhosis patient with an AUD code at
+     age 13 — etiology contamination, not alcohol-related liver disease.
+
+  5. age < 18 ON THE INDEX DATE (age_at_index from the cohort CSV) — the
+     Tapper definition targets adults; decided 2026-08-25: minors at index are
+     excluded at entry (the outcome scanner's own 18th-birthday clamp remains
+     as belt-and-suspenders for any legacy materializations).
 
 Prints counts only (no ids). The output CSV stays local (data dir is PHI-adjacent).
 """
@@ -62,7 +71,12 @@ SELECT b.*,
   OR EXISTS (SELECT 1 FROM po JOIN cn ON cn.concept_id = po.cid
     WHERE po.pid = b.pid AND (lower(cn.concept_name) LIKE '%fontan%' OR lower(po.sv) LIKE '%fontan%'))
   OR EXISTS (SELECT 1 FROM nt
-    WHERE nt.pid = b.pid AND regexp_matches(lower(nt.t), 'fontan($|[^ae])'))) AS excl_fald
+    WHERE nt.pid = b.pid AND regexp_matches(lower(nt.t), 'fontan($|[^ae])'))) AS excl_fald,
+ EXISTS (SELECT 1 FROM co JOIN cn ON cn.concept_id = co.cid
+   WHERE co.pid = b.pid
+     AND (lower(cn.concept_name) LIKE '%biliary atresia%'
+          OR co.sv LIKE 'Q44.2%' OR co.sv LIKE '751.61%')) AS excl_biliary_atresia,
+ (b.age_at_index IS NOT NULL AND b.age_at_index < 18) AS excl_age_lt18
 FROM base b""")
 
 stats = con.execute("""SELECT
@@ -70,13 +84,18 @@ stats = con.execute("""SELECT
   sum(CAST(excl_liver_cancer AS INT)) ca,
   sum(CAST(excl_cardiac_cirrhosis AS INT)) cc,
   sum(CAST(excl_fald AS INT)) fa,
-  sum(CAST(NOT excl_liver_cancer AND NOT excl_cardiac_cirrhosis AND NOT excl_fald AS INT)) clean
+  sum(CAST(excl_biliary_atresia AS INT)) ba,
+  sum(CAST(excl_age_lt18 AS INT)) u18,
+  sum(CAST(NOT excl_liver_cancer AND NOT excl_cardiac_cirrhosis AND NOT excl_fald
+           AND NOT excl_biliary_atresia AND NOT excl_age_lt18 AS INT)) clean
 FROM flags""").fetchone()
 
 con.execute(f"""COPY (
   SELECT pid AS person_id, ix AS index_date, age_at_index, sex, race_ethnicity,
-         excl_liver_cancer, excl_cardiac_cirrhosis, excl_fald,
-         (NOT excl_liver_cancer AND NOT excl_cardiac_cirrhosis AND NOT excl_fald) AS clean
+         excl_liver_cancer, excl_cardiac_cirrhosis, excl_fald, excl_biliary_atresia,
+         excl_age_lt18,
+         (NOT excl_liver_cancer AND NOT excl_cardiac_cirrhosis AND NOT excl_fald
+          AND NOT excl_biliary_atresia AND NOT excl_age_lt18) AS clean
   FROM flags ORDER BY person_id
 ) TO '{OUT}' (HEADER)""")
 
@@ -84,5 +103,7 @@ print(f"[prep] AUD cohort ∩ local r6263 slice : {n_local}")
 print(f"[prep] excluded — liver cancer ≤index : {stats[1]}")
 print(f"[prep] excluded — cardiac cirrhosis   : {stats[2]}")
 print(f"[prep] excluded — FALD (codes+notes)  : {stats[3]}")
-print(f"[prep] CLEAN cohort                   : {stats[4]}")
+print(f"[prep] excluded — biliary atresia     : {stats[4]}")
+print(f"[prep] excluded — age<18 at index      : {stats[5]}")
+print(f"[prep] CLEAN cohort                   : {stats[6]}")
 print(f"[prep] -> {OUT}")
