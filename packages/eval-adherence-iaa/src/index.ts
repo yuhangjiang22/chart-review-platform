@@ -319,24 +319,53 @@ export function computeAdherenceIaa(input: AdherenceIaaInput): AdherenceIaaRepor
 // ── Per-event agreement ──────────────────────────────────────────────────────
 //
 // Third surface, added for the event-concordance timeline (spec
-// 2026-08-24, Task 7). Pairs agent vs reviewer RuleEvent[] — flattened to
-// EventSide[] by the caller — by `${patient_id}|${event_id}`. Two axes,
-// reported separately (plan ERRATA, Task 6 re-review):
+// 2026-08-24, Task 7; statistically hardened in the Task 7 quality
+// review — see the C1-C4 fixes below). Pairs two annotation sides'
+// RuleEvent[] — flattened to EventSide[] by the caller — by
+// `${patient_id}|${event_id}`. The CALLER is responsible for C1: side A
+// must be the agent's PRISTINE shadow draft (`agent_rule_events[agent_id]`),
+// never `rule_events` once a human has validated in place, or every
+// already-validated event scores as human-vs-self guaranteed agreement.
+// This function has no way to detect that mistake — it only sees flattened
+// EventSide[] — so the CLI is where C1 is actually enforced.
+//
+// Two axes, reported separately (plan ERRATA, Task 6 re-review):
 //
 //   1. Enumeration — did both sides produce the same anchored events at
 //      all? Window-rule stubs (anchor.type === "window", no date) are
 //      constants present on both sides by construction and are never
 //      rendered as comparable timeline cards, so they are excluded from
 //      matched/a_only/b_only/jaccard and reported separately as
-//      `window_rules`.
-//   2. Verdict agreement — for MATCHED keys (from either population),
-//      do the two sides' verdict labels agree? A present-but-unscored
-//      event (no verdict yet — a seeded stub the annotator hasn't
-//      reached) is label "NONE", distinct from an event the agent
-//      explicitly judged NOT_EVALUABLE. Both are scored as verdict
-//      disagreements against a differently-labeled counterpart, but
-//      neither is ever an enumeration miss — the KEY existed on both
-//      sides, only the label differs.
+//      `window_rules`. (C4) Stratified further by `anchor.origin`: both
+//      sides are seeded from the SAME deterministic work-list whenever the
+//      provenance gate passes, so the omop-origin stratum's agreement is
+//      close to tautological by construction — the note-origin stratum
+//      (annotator-supplemented events) is the real signal, reported
+//      separately under `enumeration.by_origin`.
+//   2. Verdict agreement — for matched keys where BOTH sides have
+//      progressed past "unscored", do the two sides' verdict labels
+//      agree? (C2) A present-but-unscored event (no verdict yet — a
+//      seeded stub neither annotator has reached) is label "NONE"; a
+//      NONE/NONE pair is EXCLUDED from `verdict_kappa`/`verdict_agreement`
+//      /each rule's `verdict_agreement` — counting it as agreement lets an
+//      incomplete annotation pass score BETTER than a complete one. It is
+//      still counted (via `n_unscored_a`/`n_unscored_b`/`n_unscored_both`
+//      and the `completeness_a`/`completeness_b` fractions) so the gap is
+//      visible rather than silently dropped. An event the agent explicitly
+//      judged NOT_EVALUABLE is a real judgment, not an absence — it stays
+//      distinct from "NONE" and DOES enter the scored population against a
+//      counterpart that carries an actual verdict.
+//
+// (C3) `cohensKappa` returns 1 for a no-variance population (a documented
+// convention of the shared helper, harmless where it's already used) but
+// that reads as "perfect agreement" for what is really "nothing to
+// chance-correct" — misleading when asthma golds skew heavily CONCORDANT.
+// This surface does NOT delegate that convention: `verdict_kappa` is NaN
+// (with `verdict_kappa_reason` explaining why) whenever fewer than 2
+// matched-scored pairs exist OR fewer than 2 distinct labels are observed
+// among them. `verdict_n`, `verdict_agreement` (raw fraction), and the
+// `label_marginals`/`confusion` breakdown are always reported alongside so
+// a masked kappa is never silently indistinguishable from "no data".
 
 /** One side's view of one event, flattened for comparison. */
 export interface EventSide {
@@ -347,23 +376,78 @@ export interface EventSide {
    *  both sides and are reported separately, never inside the enumeration
    *  counts (plan ERRATA, Task 6 re-review). */
   anchored: boolean;
+  /** anchor.origin — "omop" (ETL-seeded, deterministic work-list) vs "note"
+   *  (annotator-supplemented). Required: the enumeration axis is
+   *  stratified by this (C4) because the omop stratum's agreement is
+   *  driven mostly by the shared deterministic seed, not independent
+   *  annotation — the note stratum is where real signal lives. */
+  origin: "omop" | "note";
   verdict?: "CONCORDANT" | "NON_CONCORDANT" | "EXCLUDED";
   evaluable?: boolean;
 }
 
 export interface PerEventRuleMetrics {
   rule_id: string;
+  /** Anchored keys present on both sides, regardless of verdict/score. */
   n_matched: number;
+  /** Subset of n_matched where BOTH sides carry a real label (non-"NONE") —
+   *  the population verdict_agreement is computed over (C2). */
+  n_scored: number;
+  /** NaN when n_scored === 0 (nothing to score, not "0% agreement"). */
   verdict_agreement: number;
   a_only: number;
   b_only: number;
+  /** Scored pairs (both sides non-"NONE") whose labels differ. Mirrors
+   *  PerRuleMetrics.disagreements[] from the sibling per-rule surface. */
+  disagreements: Array<{ patient_id: string; event_id: string; a: string; b: string }>;
 }
+
+interface OriginBucket { matched: number; a_only: number; b_only: number; jaccard: number }
 
 export interface PerEventReport {
   per_rule: PerEventRuleMetrics[];
+  /** NaN when not computable — see verdict_kappa_reason. Never silently
+   *  coerced to 1 for a no-variance population (C3) or to 0 for no data. */
   verdict_kappa: number;
-  enumeration: { matched: number; a_only: number; b_only: number; jaccard: number };
-  /** Window-scoped events seen (max of the two sides) — reported, not scored. */
+  /** Present iff verdict_kappa is NaN, so a consumer can't mistake NaN
+   *  (which JSON serializes to null) for "no data" vs "no variance". */
+  verdict_kappa_reason?: "insufficient_pairs" | "no_label_variance";
+  /** Matched-anchored pairs where BOTH sides are scored — the population
+   *  feeding verdict_kappa and verdict_agreement. */
+  verdict_n: number;
+  /** Raw fraction of verdict_n pairs where labels agree. NaN when
+   *  verdict_n === 0. Distinct from verdict_kappa (chance-corrected). */
+  verdict_agreement: number;
+  /** Observed label counts over the verdict_n population — surfaces
+   *  prevalence skew that can make a low kappa look like a bug when it
+   *  isn't (C3). */
+  label_marginals: { a: Record<string, number>; b: Record<string, number> };
+  /** Full confusion matrix over the verdict_n population, sparse
+   *  (a, b, n) triples. */
+  confusion: Array<{ a: string; b: string; n: number }>;
+  /** Matched-anchored pairs where side A's label is "NONE" (regardless of
+   *  B) / side B's label is "NONE" / both are "NONE" (C2). */
+  n_unscored_a: number;
+  n_unscored_b: number;
+  n_unscored_both: number;
+  /** Fraction of matched-anchored events where that side is scored
+   *  (non-"NONE"). NaN when there are no matched-anchored events at all. */
+  completeness_a: number;
+  completeness_b: number;
+  enumeration: {
+    matched: number;
+    a_only: number;
+    b_only: number;
+    /** NaN when matched+a_only+b_only === 0 (no data — was incorrectly 0,
+     *  read as "total disagreement"; a real 0 still reports as 0). */
+    jaccard: number;
+    /** (C4) Same shape, stratified by anchor.origin. omop is close to
+     *  tautological by construction (see file header); note is the real
+     *  signal. */
+    by_origin: { omop: OriginBucket; note: OriginBucket };
+  };
+  /** Distinct non-anchored (window-scoped) keys seen — a deduplicated
+   *  union across both sides, NOT a max. Reported, never scored. */
   window_rules: number;
 }
 
@@ -371,6 +455,7 @@ interface EventKeyed {
   key: string;
   rule_id: string;
   anchored: boolean;
+  origin: "omop" | "note";
   side: EventSide;
 }
 
@@ -382,42 +467,99 @@ function labelOf(e: EventSide): string {
   return e.evaluable === false ? "NOT_EVALUABLE" : e.verdict ?? "NONE";
 }
 
-function indexEvents(events: EventSide[]): Map<string, EventKeyed> {
+function isScored(label: string): boolean {
+  return label !== "NONE";
+}
+
+/** Indexes one side's events by key, throwing on a duplicate event_id
+ *  within that side (C9 / duplicate-detection) — silently taking the last
+ *  one would make the result depend on array order. */
+function indexEvents(events: EventSide[], side: "a" | "b"): Map<string, EventKeyed> {
   const idx = new Map<string, EventKeyed>();
   for (const e of events) {
-    idx.set(keyOf(e), { key: keyOf(e), rule_id: e.rule_id, anchored: e.anchored, side: e });
+    const key = keyOf(e);
+    if (idx.has(key)) {
+      throw new Error(
+        `computePerEventMetrics: duplicate event_id within side ${side}: ` +
+        `patient_id=${e.patient_id} event_id=${e.event_id}`,
+      );
+    }
+    idx.set(key, { key, rule_id: e.rule_id, anchored: e.anchored, origin: e.origin, side: e });
   }
   return idx;
 }
 
+/** cohensKappa returns 1 for <2 pairs or <2 distinct labels — a documented
+ *  convention that's misleading for this surface (C3, see file header).
+ *  Returns NaN with a reason instead of delegating to that convention. */
+function eventKappa(cells: KappaCell[]): { kappa: number; reason?: "insufficient_pairs" | "no_label_variance" } {
+  if (cells.length < 2) return { kappa: Number.NaN, reason: "insufficient_pairs" };
+  const labels = new Set<string>();
+  for (const c of cells) { labels.add(c.rater_a); labels.add(c.rater_b); }
+  if (labels.size < 2) return { kappa: Number.NaN, reason: "no_label_variance" };
+  return { kappa: cohensKappa(cells) };
+}
+
+function marginalsAndConfusion(cells: KappaCell[]): Pick<PerEventReport, "label_marginals" | "confusion"> {
+  const a: Record<string, number> = {};
+  const b: Record<string, number> = {};
+  const confCounts = new Map<string, number>();
+  for (const c of cells) {
+    a[c.rater_a] = (a[c.rater_a] ?? 0) + 1;
+    b[c.rater_b] = (b[c.rater_b] ?? 0) + 1;
+    const k = `${c.rater_a} ${c.rater_b}`;
+    confCounts.set(k, (confCounts.get(k) ?? 0) + 1);
+  }
+  const confusion = [...confCounts.entries()]
+    .map(([k, n]) => {
+      const [ca, cb] = k.split(" ");
+      return { a: ca!, b: cb!, n };
+    })
+    .sort((x, y) => (x.a === y.a ? (x.b < y.b ? -1 : x.b > y.b ? 1 : 0) : x.a < y.a ? -1 : 1));
+  return { label_marginals: { a, b }, confusion };
+}
+
+function jaccardOf(matched: number, aOnly: number, bOnly: number): number {
+  const denom = matched + aOnly + bOnly;
+  return denom > 0 ? matched / denom : Number.NaN;
+}
+
 /**
- * Per-event inter-annotator agreement. Pairs two flattened event lists
- * (agent vs reviewer, or any two annotation sides) by
+ * Per-event inter-annotator agreement. Pairs two flattened event lists by
  * `${patient_id}|${event_id}` and reports enumeration + verdict-agreement
- * axes separately. Both axes — global `verdict_kappa` and each rule's
- * `n_matched`/`verdict_agreement`/`a_only`/`b_only` — are scoped to
- * ANCHORED events only; window-rule stubs never touch those counters, they
- * only bump `window_rules`. `per_rule` still lists every rule_id seen on
- * either side (a pure-window rule gets a zeroed row, not an absent one).
- * Pure / deterministic / no I/O — same shape as computePerRuleMetrics
- * above.
+ * axes separately, both scoped to ANCHORED events (window stubs only bump
+ * `window_rules`). `per_rule` lists every rule_id seen on either side (a
+ * pure-window rule gets a zeroed row, not an absent one). Throws on a
+ * duplicate event_id within one side, or when a matched key's two sides
+ * disagree on `anchored`/`rule_id` (a data-integrity bug upstream, not
+ * something to silently resolve A-wins). Pure / deterministic / no I/O —
+ * same shape as computePerRuleMetrics above.
  */
 export function computePerEventMetrics(a: EventSide[], b: EventSide[]): PerEventReport {
-  const aIdx = indexEvents(a);
-  const bIdx = indexEvents(b);
+  const aIdx = indexEvents(a, "a");
+  const bIdx = indexEvents(b, "b");
   const allKeys = new Set([...aIdx.keys(), ...bIdx.keys()]);
 
   let enumMatched = 0, enumAOnly = 0, enumBOnly = 0;
-  // Distinct non-anchored keys seen (union across sides — window stubs are
-  // constants on both sides by construction, so this equals "max across
-  // sides" in practice).
+  const byOrigin: Record<"omop" | "note", { matched: number; a_only: number; b_only: number }> = {
+    omop: { matched: 0, a_only: 0, b_only: 0 },
+    note: { matched: 0, a_only: 0, b_only: 0 },
+  };
   const windowKeys = new Set<string>();
   const kappaCells: KappaCell[] = [];
+  let nUnscoredA = 0, nUnscoredB = 0, nUnscoredBoth = 0;
 
-  const byRule = new Map<string, { matched: KappaCell[]; a_only: number; b_only: number }>();
-  const ensureRule = (rid: string) => {
+  interface RuleAcc {
+    n_matched: number;
+    scoredCells: KappaCell[];
+    a_only: number;
+    b_only: number;
+    disagreements: PerEventRuleMetrics["disagreements"];
+  }
+  const byRule = new Map<string, RuleAcc>();
+  const ensureRule = (rid: string): RuleAcc => {
     let r = byRule.get(rid);
-    if (!r) { r = { matched: [], a_only: 0, b_only: 0 }; byRule.set(rid, r); }
+    if (!r) { r = { n_matched: 0, scoredCells: [], a_only: 0, b_only: 0, disagreements: [] }; byRule.set(rid, r); }
     return r;
   };
   // Seed a per_rule row for every rule_id seen on either side, even one
@@ -429,57 +571,112 @@ export function computePerEventMetrics(a: EventSide[], b: EventSide[]): PerEvent
   for (const key of allKeys) {
     const av = aIdx.get(key);
     const bv = bIdx.get(key);
+
+    if (av && bv) {
+      if (av.anchored !== bv.anchored) {
+        throw new Error(
+          `computePerEventMetrics: key ${key} disagrees on anchored (a=${av.anchored}, b=${bv.anchored})`,
+        );
+      }
+      if (av.rule_id !== bv.rule_id) {
+        throw new Error(
+          `computePerEventMetrics: key ${key} disagrees on rule_id (a=${av.rule_id}, b=${bv.rule_id})`,
+        );
+      }
+    }
+
     const ruleId = (av?.rule_id ?? bv?.rule_id)!;
     const anchored = (av?.anchored ?? bv?.anchored) === true;
+    const origin = (av?.origin ?? bv?.origin)!;
 
     if (!anchored) {
       // Window stub: counted only in window_rules, never in enumeration,
-      // per-rule matched/a_only/b_only, or the kappa population.
+      // per-rule counters, or the kappa population.
       windowKeys.add(key);
       continue;
     }
 
     if (av && bv) {
-      // Matched key on both sides — verdict comparison, never an
-      // enumeration miss regardless of label.
+      enumMatched++;
+      byOrigin[origin].matched++;
+      const r = ensureRule(ruleId);
+      r.n_matched++;
+
       const aLabel = labelOf(av.side);
       const bLabel = labelOf(bv.side);
-      kappaCells.push({ rater_a: aLabel, rater_b: bLabel });
-      ensureRule(ruleId).matched.push({ rater_a: aLabel, rater_b: bLabel });
-      enumMatched++;
+      const aScored = isScored(aLabel);
+      const bScored = isScored(bLabel);
+      if (!aScored) nUnscoredA++;
+      if (!bScored) nUnscoredB++;
+      if (!aScored && !bScored) nUnscoredBoth++;
+
+      if (aScored && bScored) {
+        // (C2) Only pairs where BOTH sides have progressed past "NONE"
+        // enter the verdict-agreement population.
+        kappaCells.push({ rater_a: aLabel, rater_b: bLabel });
+        r.scoredCells.push({ rater_a: aLabel, rater_b: bLabel });
+        if (aLabel !== bLabel) {
+          r.disagreements.push({ patient_id: av.side.patient_id, event_id: av.side.event_id, a: aLabel, b: bLabel });
+        }
+      }
     } else if (av) {
       ensureRule(ruleId).a_only++;
       enumAOnly++;
+      byOrigin[origin].a_only++;
     } else if (bv) {
       ensureRule(ruleId).b_only++;
       enumBOnly++;
+      byOrigin[origin].b_only++;
     }
   }
 
   const per_rule: PerEventRuleMetrics[] = [...byRule.entries()]
     .map(([rule_id, r]) => {
-      const nMatched = r.matched.length;
-      const agree = r.matched.filter((c) => c.rater_a === c.rater_b).length;
+      const nScored = r.scoredCells.length;
+      const agree = r.scoredCells.filter((c) => c.rater_a === c.rater_b).length;
       return {
         rule_id,
-        n_matched: nMatched,
-        verdict_agreement: nMatched > 0 ? agree / nMatched : 0,
+        n_matched: r.n_matched,
+        n_scored: nScored,
+        verdict_agreement: nScored > 0 ? agree / nScored : Number.NaN,
         a_only: r.a_only,
         b_only: r.b_only,
+        disagreements: r.disagreements,
       };
     })
     .sort((x, y) => (x.rule_id < y.rule_id ? -1 : x.rule_id > y.rule_id ? 1 : 0));
 
-  const enumDenom = enumMatched + enumAOnly + enumBOnly;
+  const { kappa: verdict_kappa, reason: verdict_kappa_reason } = eventKappa(kappaCells);
+  const verdict_n = kappaCells.length;
+  const scoredAgree = kappaCells.filter((c) => c.rater_a === c.rater_b).length;
+  const verdict_agreement = verdict_n > 0 ? scoredAgree / verdict_n : Number.NaN;
+  const { label_marginals, confusion } = marginalsAndConfusion(kappaCells);
+
+  const completeness_a = enumMatched > 0 ? (enumMatched - nUnscoredA) / enumMatched : Number.NaN;
+  const completeness_b = enumMatched > 0 ? (enumMatched - nUnscoredB) / enumMatched : Number.NaN;
 
   return {
     per_rule,
-    verdict_kappa: cohensKappa(kappaCells),
+    verdict_kappa,
+    ...(verdict_kappa_reason ? { verdict_kappa_reason } : {}),
+    verdict_n,
+    verdict_agreement,
+    label_marginals,
+    confusion,
+    n_unscored_a: nUnscoredA,
+    n_unscored_b: nUnscoredB,
+    n_unscored_both: nUnscoredBoth,
+    completeness_a,
+    completeness_b,
     enumeration: {
       matched: enumMatched,
       a_only: enumAOnly,
       b_only: enumBOnly,
-      jaccard: enumDenom > 0 ? enumMatched / enumDenom : 0,
+      jaccard: jaccardOf(enumMatched, enumAOnly, enumBOnly),
+      by_origin: {
+        omop: { ...byOrigin.omop, jaccard: jaccardOf(byOrigin.omop.matched, byOrigin.omop.a_only, byOrigin.omop.b_only) },
+        note: { ...byOrigin.note, jaccard: jaccardOf(byOrigin.note.matched, byOrigin.note.a_only, byOrigin.note.b_only) },
+      },
     },
     window_rules: windowKeys.size,
   };
