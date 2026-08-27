@@ -79,3 +79,42 @@ describe("buildAdherenceClusters", () => {
     expect(clusters.get("Q1")!.examples.map((e) => e.patient_id)).toEqual(["refine1"]);
   });
 });
+
+describe("gold outlives the rubric", () => {
+  // Reviewer gold is whatever a human validated, and it can outlive the question:
+  // a question deleted in a later rubric version still sits in old review_states.
+  // Measured on a real session — T1-ControllerAdherenceProxy, gone from the
+  // rubric, still present in gold and still forming a cluster with no text, no
+  // retrieval_hints and no enum. The proposer would then be asked to append
+  // guidance to a question that no longer exists.
+  const patient = (over: Partial<AdherencePatientInput> = {}): AdherencePatientInput => ({
+    patient_id: "p1",
+    validated_questions: ["T1-Live", "T1-Retired"],
+    human_answers: { "T1-Live": "a", "T1-Retired": "x" },
+    agent_answers_by_agent: { agent_1: { "T1-Live": "b", "T1-Retired": "y" } },
+    ...over,
+  });
+
+  it("a retired question still clusters at the build step — it is not filtered here", () => {
+    // buildAdherenceClusters has no rubric to consult; the drop happens where the
+    // question definitions are joined. Pinned so the two halves stay honest about
+    // which one owns the filter.
+    const { clusters, gold_by_question } = buildAdherenceClusters([patient()]);
+    expect([...clusters.keys()].sort()).toEqual(["T1-Live", "T1-Retired"]);
+    expect(Object.keys(gold_by_question).sort()).toEqual(["T1-Live", "T1-Retired"]);
+  });
+
+  it("gold for a retired question is dropped, not just its cluster", () => {
+    // The held-out re-score reads gold_by_question. Leaving the entry there would
+    // score a held-out patient on a question the current rubric cannot ask.
+    const { clusters, gold_by_question } = buildAdherenceClusters([patient()]);
+    const defs = new Map([["T1-Live", { text: "t", retrieval_hints: null, tier: 1, answer_enum: null }]]);
+    const retired = [...new Set([...clusters.keys(), ...Object.keys(gold_by_question)])]
+      .filter((q) => !defs.has(q)).sort();
+    for (const q of retired) { clusters.delete(q); delete gold_by_question[q]; }
+
+    expect(retired).toEqual(["T1-Retired"]);
+    expect([...clusters.keys()]).toEqual(["T1-Live"]);
+    expect(Object.keys(gold_by_question)).toEqual(["T1-Live"]);
+  });
+});

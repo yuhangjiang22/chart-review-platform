@@ -18,6 +18,8 @@ import { PLATFORM_ROOT } from "@chart-review/patients";
 import { loadCompiledTask } from "@chart-review/tasks";
 import { loadAdherenceSkill } from "@chart-review/pipeline-extract-adherence";
 import type { QuestionAnswer } from "@chart-review/platform-types";
+import { computeTaskSha } from "@chart-review/lock";
+import { guidelineDir } from "@chart-review/rubric";
 import { runChainForIter } from "./candidates.js";
 
 // ── Public shapes ────────────────────────────────────────────────────────────
@@ -57,6 +59,25 @@ export interface AdherenceRefinementCandidates {
    *  disagreements): question_id → { patient_id → reviewer_answer }. The
    *  held-out re-score needs gold for held-out patients. */
   gold_by_question: Record<string, Record<string, unknown>>;
+  /** Set when the run this iter refines executed against a DIFFERENT rubric than
+   *  the one now on disk. Both SHAs were already recorded — the run's
+   *  `guideline_sha` and the rubric's current hash — and nothing compared them.
+   *
+   *  It matters because the loop reads TODAY's question text and YESTERDAY's
+   *  answers. On a real session that produced a wrong attribution: an agent had
+   *  answered `not_applicable` in July, when the enum offered it; the option was
+   *  removed in August; and the error-analysis pass read the current text, saw a
+   *  value it forbids, and concluded the agent "ignored the explicit
+   *  instruction". The answer had been correct when given.
+   *
+   *  A WARNING, not a refusal. Normal use refines an iter right after running it,
+   *  where the SHAs match by construction, and an operator re-examining an older
+   *  iter on purpose should not be blocked — only told what they are comparing. */
+  rubric_drift?: { run_sha: string; current_sha: string };
+  /** question_ids present in reviewer gold but ABSENT from the current rubric —
+   *  dropped from both clusters and gold, and named here so the omission is
+   *  visible rather than silent. Absent when there are none. */
+  retired_questions?: string[];
   unsupported?: { task_kind: string; reason: string };
 }
 
@@ -285,6 +306,31 @@ export function collectAdherenceRefinementCandidates(opts: {
 
   const { clusters, n_validated_patients, gold_by_question } = buildAdherenceClusters(patients, examplePatientFilter);
   const defs = loadQuestionDefs(taskId);
+
+  // RETIRED QUESTIONS. Gold is whatever a reviewer validated, which can outlive
+  // the rubric: a question deleted in a later version still sits in old
+  // review_states, and this loop would carry it forward. Its cluster arrives with
+  // no text, no retrieval_hints and no enum, and the proposer would be asked to
+  // append guidance to a question that no longer exists — a proposal nobody can
+  // apply. Measured on a real session: T1-ControllerAdherenceProxy, gone from the
+  // rubric, still present in gold.
+  //
+  // Dropped from BOTH clusters and gold_by_question: the held-out re-score reads
+  // gold, so leaving it there would score a held-out patient on a question the
+  // current rubric cannot ask.
+  //
+  // REPORTED, not silently filtered — a question vanishing from the loop should be
+  // visible, since the alternative is a reviewer wondering why their validated
+  // answers stopped mattering.
+  const retired = [...new Set([
+    ...clusters.keys(),
+    ...Object.keys(gold_by_question),
+  ])].filter((qid) => !defs.has(qid)).sort();
+  for (const qid of retired) {
+    clusters.delete(qid);
+    delete gold_by_question[qid];
+  }
+
   const out = [...clusters.values()].sort((a, b) => a.question_id.localeCompare(b.question_id));
   for (const c of out) {
     const d = defs.get(c.question_id);
@@ -294,5 +340,21 @@ export function collectAdherenceRefinementCandidates(opts: {
     c.answer_enum = d?.answer_enum ?? null;
   }
 
-  return { ...base, n_validated_patients, clusters: out, gold_by_question };
+  // Did the run this iter refines execute against the rubric now on disk?
+  let drift: { run_sha: string; current_sha: string } | undefined;
+  try {
+    const manifest = readJson<{ guideline_sha?: string }>(
+      path.join(runsRootDir(), run ?? "", "manifest.json"));
+    const runSha = manifest?.guideline_sha;
+    const currentSha = computeTaskSha(guidelineDir(taskId));
+    if (runSha && currentSha && runSha !== currentSha) {
+      drift = { run_sha: runSha, current_sha: currentSha };
+    }
+  } catch { /* best-effort — an unreadable manifest must not fail the chain */ }
+
+  return {
+    ...base, n_validated_patients, clusters: out, gold_by_question,
+    ...(retired.length > 0 ? { retired_questions: retired } : {}),
+    ...(drift ? { rubric_drift: drift } : {}),
+  };
 }
