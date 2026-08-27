@@ -1352,7 +1352,6 @@ export function AdherenceReview(props: AdherenceReviewProps) {
             <div className="flex items-center justify-between px-3 py-2 border-b border-border text-[12px]">
               <span className="uppercase tracking-wider text-muted-foreground">
                 Adherence · {adherenceDays.length} {adherenceDays.length === 1 ? "day" : "days"} of care
-                <span className="normal-case tracking-normal"> — see the Events tab</span>
               </span>
               {!blind && (
                 <span>
@@ -1368,43 +1367,6 @@ export function AdherenceReview(props: AdherenceReviewProps) {
                 human only: {compareHumanOnly.map((h) => h.event_id).join(", ")}
               </div>
             )}
-            <div className="px-3 py-2">
-              <div className="uppercase tracking-wider text-[10px] text-muted-foreground mb-1">
-                Window rules (whole observation window)
-              </div>
-              <div className="flex flex-wrap gap-1">
-                {windowEvents.map((e) => {
-                  const roll = ruleRollups.find((r) => r.rule_id === e.rule_id);
-                  return (
-                    <button
-                      key={e.event_id}
-                      type="button"
-                      onClick={() => setSelectedEventId(e.event_id)}
-                      aria-current={selectedEventId === e.event_id}
-                      title={blind ? undefined : (e.verdict ?? "not scored")}
-                      className={cn(
-                        "border border-border rounded-full px-2 py-0.5 text-[10px] flex items-center gap-1",
-                        selectedEventId === e.event_id && "ring-2 ring-[hsl(var(--oxblood))]",
-                      )}
-                    >
-                      {!blind && (
-                        <>
-                          <span className={cn("w-2 h-2 rounded-full inline-block",
-                            e.verdict === "CONCORDANT" ? "bg-[hsl(var(--sage))]"
-                              : e.verdict === "NON_CONCORDANT" ? "bg-[hsl(var(--oxblood))]"
-                                : "bg-muted-foreground")} />
-                          <span className="sr-only">{e.verdict ?? "not scored"}</span>
-                        </>
-                      )}
-                      <span>{e.rule_id.replace(/^R-T\d-/, "")}</span>
-                      {!blind && roll && (
-                        <span className="text-muted-foreground">· {roll.n_concordant}/{roll.n_evaluable}</span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
           </section>
         )}
 
@@ -1527,6 +1489,7 @@ export function AdherenceReview(props: AdherenceReviewProps) {
                 agentVerdicts={agentIds.map(
                   (id) => agentVerdictsByRid.get(id)?.get(r.rule_id),
                 )}
+                eventRollup={blind ? undefined : ruleRollups.find((x) => x.rule_id === r.rule_id)}
                 busy={busy === `r:${r.rule_id}`}
                 blind={blind}
                 onSave={(v, a, rationale) => saveVerdict(r.rule_id, v, a, rationale)}
@@ -1896,6 +1859,7 @@ function QuestionRow({
 
 function RuleRow({
   rule, verdict, validated, categories, answersByQid, agentIds, agentVerdicts, busy, blind = false, onSave,
+  eventRollup,
 }: {
   rule: RuleDefinition;
   verdict: RuleVerdict | undefined;
@@ -1904,6 +1868,9 @@ function RuleRow({
   answersByQid: Map<string, QuestionAnswer>;
   agentIds: string[];
   agentVerdicts: Array<RuleVerdict | undefined>;
+  /** Per-event rollup for an anchored rule — its badge reads the rate rather
+   *  than implying a single verdict. Undefined for patient-level rules. */
+  eventRollup?: RuleRollup;
   busy: boolean;
   /** Blind-annotation mode: render only the reviewer's own verdict control
    *  (select/attribution/rationale/save) — no engine-computed "Engine:"
@@ -1947,6 +1914,25 @@ function RuleRow({
         <div className="flex-1">
           <div className="flex items-center gap-2">
             <span className="font-mono text-[11px] text-muted-foreground">{rule.rule_id}</span>
+            {/* Which SCOPE this rule is judged at. Both kinds live in one list
+             *  — a reviewer reads "the eleven rules" as one set — but they are
+             *  answered in different places, and the per-event ones carry a
+             *  rate rather than a single verdict. */}
+            {rule.event_anchor ? (
+              <span
+                className="text-[10px] uppercase tracking-wider px-1.5 py-0 rounded bg-[hsl(var(--oxblood)/0.10)] text-[hsl(var(--oxblood))]"
+                title="Judged once per qualifying event — answered in the Events section"
+              >
+                per event{eventRollup ? ` · ${eventRollup.n_concordant}/${eventRollup.n_evaluable}` : ""}
+              </span>
+            ) : (
+              <span
+                className="text-[10px] uppercase tracking-wider px-1.5 py-0 rounded bg-muted text-muted-foreground"
+                title="Judged once for the whole observation window"
+              >
+                patient-level
+              </span>
+            )}
             {rule.nuanced && (
               <span className="text-[10px] uppercase tracking-wider px-1.5 py-0 rounded bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200">nuanced</span>
             )}
@@ -2259,27 +2245,37 @@ function EventRowImpl({
             </div>
           )}
 
-          {/* Per-answer editable controls — the union of event.answers and
-           *  the rule's supporting_questions (seedEventDraft), so a missing
-           *  answer still gets an (empty) control instead of disappearing. */}
+          {/* One ROW per question this event asks (eventQuestionIds via
+           *  seedEventDraft) — label, control, evidence, the same shape the
+           *  Question framework uses. Not a grid of narrow cells: an event asks
+           *  two or three questions and each one's evidence is a sentence, so
+           *  they need the width. An unanswered question still gets an empty
+           *  control rather than disappearing. */}
           {draft.answers.length > 0 && (
-            <div
-              className="mt-1.5 grid gap-2"
-              style={{ gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))" }}
-            >
+            <div className="mt-1.5 divide-y divide-border/40">
               {draft.answers.map((a) => {
                 const q = questionDefsById.get(a.question_id);
                 const committed = (event.answers ?? []).find((x) => x.question_id === a.question_id);
                 return (
-                  <div key={a.question_id} className="min-w-0">
-                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground truncate font-mono">
-                      {a.question_id}
+                  <div key={a.question_id} className="py-1.5 grid grid-cols-12 gap-3 items-start">
+                    {/* The question_id alone: its text would repeat what the
+                     *  Question framework shows for a period-level question
+                     *  that also carries a committed event answer, and the
+                     *  rule's own wording is one disclosure up. */}
+                    <div className="col-span-4 min-w-0">
+                      <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground truncate"
+                        title={q?.text}>
+                        {a.question_id}
+                      </div>
                     </div>
-                    {q ? (
-                      <AnswerControl q={q} value={a.answer} onChange={(v) => updateAnswer(a.question_id, v)} />
-                    ) : (
-                      <div className="text-[11px] text-muted-foreground italic">unknown question</div>
-                    )}
+                    <div className="col-span-3 min-w-0">
+                      {q ? (
+                        <AnswerControl q={q} value={a.answer} onChange={(v) => updateAnswer(a.question_id, v)} />
+                      ) : (
+                        <div className="text-[11px] text-muted-foreground italic">unknown question</div>
+                      )}
+                    </div>
+                    <div className="col-span-5 min-w-0">
                     {/* What the answer was determined FROM, per question, the
                      *  same way QuestionRow shows it — the reviewer checks the
                      *  answer against the quote instead of re-searching the
@@ -2292,13 +2288,14 @@ function EventRowImpl({
                      *  reviewer needs to notice, and silence reads like there
                      *  was nothing to show. */}
                     {!blind && committed && (
-                      <EventAnswerEvidence
-                        evidence={committed.evidence}
-                        reasoning={committed.reasoning}
-                        eventDate={event.anchor.date}
-                        onJumpToSource={onJumpToSource}
-                      />
-                    )}
+                        <EventAnswerEvidence
+                          evidence={committed.evidence}
+                          reasoning={committed.reasoning}
+                          eventDate={event.anchor.date}
+                          onJumpToSource={onJumpToSource}
+                        />
+                      )}
+                    </div>
                   </div>
                 );
               })}

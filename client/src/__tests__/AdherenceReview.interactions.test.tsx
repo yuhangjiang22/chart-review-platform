@@ -1393,20 +1393,23 @@ describe("Event timeline + per-event validation", () => {
     expect(scrolledEl.id).toBe("event-row-ev_1");
   });
 
-  it("clicking a window-rule chip scrolls to its RuleRow, not an EventRow (I7)", async () => {
-    const scrollSpy = vi.spyOn(Element.prototype, "scrollIntoView").mockImplementation(() => {});
+  it("I7: every rule appears once, in the Rules list, marked by the scope it is judged at", async () => {
+    // Replaces the window-rule chip strip, which duplicated rules the Rules
+    // section already listed. One list, two badges: a reviewer reads "the
+    // rules" as one set, and the badge says where each is answered.
     setupMocks({ state: () => stateWithEvents() });
     renderPane();
     await waitLoaded();
 
-    const windowRulesLabel = screen.getByText(/Window rules/);
-    const chip = within(windowRulesLabel.parentElement as HTMLElement).getByRole("button");
-    fireEvent.click(chip);
-
-    expect(chip.getAttribute("aria-current")).toBe("true");
-    await waitFor(() => expect(scrollSpy).toHaveBeenCalled());
-    const scrolledEl = scrollSpy.mock.instances[scrollSpy.mock.instances.length - 1] as HTMLElement;
-    expect(scrolledEl.id).toBe("rule-row-r_unadjudicated");
+    // r_unadjudicated has no event_anchor → patient-level.
+    const windowRule = document.getElementById("rule-row-r_unadjudicated")!;
+    expect(within(windowRule).getByText("patient-level")).toBeInTheDocument();
+    // r_concordant is anchored → per event, and its badge carries the rate
+    // rather than implying one verdict.
+    const anchoredRule = document.getElementById("rule-row-r_concordant")!;
+    expect(within(anchoredRule).getByText(/per event/)).toBeInTheDocument();
+    // No duplicate chip strip.
+    expect(screen.queryByText(/Window rules/)).toBeNull();
   });
 
   it("unchecking 'Not evaluable' posts evaluable:true, undoing a prior mis-marking (C3)", async () => {
