@@ -28,8 +28,8 @@ const ROLLUPS: RuleRollup[] = [
 describe("EventTimeline (review mode)", () => {
   it("renders anchored event cards with verdicts, window rules as chips, and a composite header", () => {
     render(<EventTimeline events={EVENTS} rollups={ROLLUPS} validatedEvents={new Set()} mode="review" onSelectEvent={() => {}} />);
-    expect(screen.getByText(/R-Step@2025-11-04@encounters:1/)).toBeInTheDocument();
-    expect(screen.getAllByText(/NON-CONCORDANT/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByTitle("R-Step@2025-11-04@encounters:1")).toBeInTheDocument();
+    expect(screen.getAllByText("NC").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText(/Window rules/i)).toBeInTheDocument();
     expect(screen.getByText(/SpirometryWithin24mo/)).toBeInTheDocument();
     // Composite: 1 concordant of 3 evaluable events across rules.
@@ -38,7 +38,7 @@ describe("EventTimeline (review mode)", () => {
   it("clicking a card fires onSelectEvent with the event_id", () => {
     const onSelect = vi.fn();
     render(<EventTimeline events={EVENTS} rollups={ROLLUPS} validatedEvents={new Set()} mode="review" onSelectEvent={onSelect} />);
-    fireEvent.click(screen.getByText(/R-Step@2025-11-04@encounters:1/));
+    fireEvent.click(screen.getByTitle("R-Step@2025-11-04@encounters:1"));
     expect(onSelect).toHaveBeenCalledWith("R-Step@2025-11-04@encounters:1");
   });
   it("marks validated events", () => {
@@ -50,10 +50,10 @@ describe("EventTimeline (review mode)", () => {
 describe("EventTimeline (blind mode)", () => {
   it("hides verdicts, rates, and the composite header", () => {
     render(<EventTimeline events={EVENTS} rollups={ROLLUPS} validatedEvents={new Set()} mode="blind" onSelectEvent={() => {}} />);
-    expect(screen.queryByText(/NON-CONCORDANT/i)).toBeNull();
+    expect(screen.queryByText("NC")).toBeNull();
     expect(screen.queryByText(/concordant/i)).toBeNull();
     // Cards still render (the annotator navigates by them).
-    expect(screen.getByText(/R-Step@2025-11-04@encounters:1/)).toBeInTheDocument();
+    expect(screen.getByTitle("R-Step@2025-11-04@encounters:1")).toBeInTheDocument();
   });
 });
 
@@ -69,7 +69,7 @@ describe("EventTimeline (compare mode)", () => {
     // human verdict is overridden to CONCORDANT above — abbreviated chips
     // must read "A: NC" / "H: C", not just contain the words "agent"/"human"
     // (those also appear in the header/footer, which would pass vacuously).
-    const card = screen.getByText(/R-Step@2025-11-04@encounters:1/).closest("button")!;
+    const card = screen.getByTitle("R-Step@2025-11-04@encounters:1");
     expect(within(card).getByText(/A:\s*NC/)).toBeInTheDocument();
     expect(within(card).getByText(/H:\s*C\b/)).toBeInTheDocument();
     expect(screen.getByText(/human only/i)).toBeInTheDocument();
@@ -80,7 +80,7 @@ describe("EventTimeline (compare mode — agentEvents override, spec 2026-08-24 
   it("without agentEvents, the A: chip falls back to `events` (byte-identical to before the prop existed)", () => {
     const human: RuleEvent[] = [{ ...EVENTS[0], verdict: "CONCORDANT" }];
     render(<EventTimeline events={EVENTS} rollups={ROLLUPS} validatedEvents={new Set()} mode="compare" compareEvents={human} onSelectEvent={() => {}} />);
-    const card = screen.getByText(/R-Step@2025-11-04@encounters:1/).closest("button")!;
+    const card = screen.getByTitle("R-Step@2025-11-04@encounters:1");
     // EVENTS[0].verdict is NON_CONCORDANT — the fallback source.
     expect(within(card).getByText(/A:\s*NC/)).toBeInTheDocument();
   });
@@ -103,7 +103,7 @@ describe("EventTimeline (compare mode — agentEvents override, spec 2026-08-24 
         onSelectEvent={() => {}}
       />,
     );
-    const card = screen.getByText(/R-Step@2025-11-04@encounters:1/).closest("button")!;
+    const card = screen.getByTitle("R-Step@2025-11-04@encounters:1");
     expect(within(card).getByText(/A:\s*NC/)).toBeInTheDocument();
     expect(within(card).queryByText(/A:\s*C\b/)).not.toBeInTheDocument();
   });
@@ -127,7 +127,7 @@ describe("EventTimeline (compare mode — NOT_EVALUABLE chips, spec 2026-08-24 r
         onSelectEvent={() => {}}
       />,
     );
-    const card = screen.getByText(/R-Step@2025-11-04@encounters:1/).closest("button")!;
+    const card = screen.getByTitle("R-Step@2025-11-04@encounters:1");
     expect(within(card).getByText("A: NE")).toBeInTheDocument();
     expect(within(card).getByText("H: NE")).toBeInTheDocument();
   });
@@ -143,7 +143,7 @@ describe("EventTimeline (compare mode — NOT_EVALUABLE chips, spec 2026-08-24 r
         onSelectEvent={() => {}}
       />,
     );
-    const card = screen.getByText(/R-Step@2025-11-04@encounters:1/).closest("button")!;
+    const card = screen.getByTitle("R-Step@2025-11-04@encounters:1");
     expect(within(card).getByText("H: —")).toBeInTheDocument();
   });
 });
@@ -170,7 +170,7 @@ describe("EventTimeline (compare mode — present-but-unscored chips, Task 6 re-
         onSelectEvent={() => {}}
       />,
     );
-    const card = screen.getByText(/R-Step@2025-11-04@encounters:1/).closest("button")!;
+    const card = screen.getByTitle("R-Step@2025-11-04@encounters:1");
     const agentChip = within(card).getByText("A: ?");
     const humanChip = within(card).getByText("H: ?");
     expect(agentChip).toBeInTheDocument();
@@ -188,7 +188,7 @@ describe("EventTimeline (compare mode — present-but-unscored chips, Task 6 re-
     render(
       <EventTimeline events={agentSide} rollups={[]} validatedEvents={new Set()} mode="compare" compareEvents={[]} onSelectEvent={() => {}} />,
     );
-    const card = screen.getByText(/R-Step@2025-11-04@encounters:1/).closest("button")!;
+    const card = screen.getByTitle("R-Step@2025-11-04@encounters:1");
     expect(within(card).getByText("A: NE")).toBeInTheDocument();
     expect(within(card).queryByText("A: ?")).not.toBeInTheDocument();
   });
@@ -224,11 +224,11 @@ describe("EventTimeline (not-evaluable styling)", () => {
         evaluable: false, evaluable_reason: "no qualifying encounter in window", verdict: "NON_CONCORDANT" },
     ];
     render(<EventTimeline events={events} rollups={[]} validatedEvents={new Set()} mode="review" onSelectEvent={() => {}} />);
-    const badge = screen.getByText(/NOT EVALUABLE/);
+    const badge = screen.getByText("NE");
     expect(badge).toBeInTheDocument();
     expect(badge.className).toMatch(/text-muted-foreground/);
     expect(badge.className).not.toMatch(/oxblood/);
-    expect(screen.queryByText(/NON-CONCORDANT/i)).toBeNull();
+    expect(screen.queryByText("NC")).toBeNull();
   });
 });
 
@@ -245,5 +245,68 @@ describe("EventTimeline (window chip interaction)", () => {
     render(<EventTimeline events={EVENTS} rollups={ROLLUPS} validatedEvents={new Set()} mode="review" onSelectEvent={onSelect} />);
     fireEvent.click(screen.getByText(/SpirometryWithin24mo/));
     expect(onSelect).toHaveBeenCalledWith("R-Spiro@window");
+  });
+});
+
+describe("EventTimeline — one card per day of care, not per rule", () => {
+  // The defect: the timeline drew one card per EVENT, so a visit with two
+  // rules anchored on it appeared as two cards, both headlined with a rule
+  // name and nothing to say they were the same visit. On a real patient, two
+  // cards a day apart both read "FOLLOWUPSCHEDULED".
+  const SAME_DAY: RuleEvent[] = [
+    { event_id: "R-Step@2025-11-15@e1", rule_id: "R-T2-StepTherapyMatches",
+      anchor: { type: "asthma_encounters", date: "2025-11-15", origin: "omop", meta: { kind: "ed" } },
+      evaluable: true, verdict: "NON_CONCORDANT" },
+    { event_id: "R-FU@2025-11-15@e1", rule_id: "R-T2-FollowupScheduled",
+      anchor: { type: "asthma_encounters", date: "2025-11-15", origin: "omop", meta: { kind: "ed" } },
+      evaluable: true, verdict: "CONCORDANT" },
+  ];
+
+  it("headlines the card with the date and what happened, not with a rule id", () => {
+    render(
+      <EventTimeline events={SAME_DAY} rollups={[]} validatedEvents={new Set()}
+        mode="review" selectedEventId={null} onSelectEvent={() => {}} />,
+    );
+    expect(screen.getByText("2025-11-15")).toBeInTheDocument();
+    expect(screen.getByText(/ED visit/i)).toBeInTheDocument();
+  });
+
+  it("puts both rules judged that day inside ONE card", () => {
+    render(
+      <EventTimeline events={SAME_DAY} rollups={[]} validatedEvents={new Set()}
+        mode="review" selectedEventId={null} onSelectEvent={() => {}} />,
+    );
+    // One date headline for two events...
+    expect(screen.getAllByText("2025-11-15")).toHaveLength(1);
+    // ...and the card says how many rules it carries.
+    expect(screen.getByText(/2 rules judged/i)).toBeInTheDocument();
+    // Each rule is still individually addressable.
+    expect(screen.getByTitle("R-Step@2025-11-15@e1")).toBeInTheDocument();
+    expect(screen.getByTitle("R-FU@2025-11-15@e1")).toBeInTheDocument();
+  });
+
+  it("clicking a rule row selects THAT rule's event, not the whole day", () => {
+    const onSelect = vi.fn();
+    render(
+      <EventTimeline events={SAME_DAY} rollups={[]} validatedEvents={new Set()}
+        mode="review" selectedEventId={null} onSelectEvent={onSelect} />,
+    );
+    fireEvent.click(screen.getByTitle("R-FU@2025-11-15@e1"));
+    expect(onSelect).toHaveBeenCalledWith("R-FU@2025-11-15@e1");
+  });
+
+  it("names every kind present when a day carries more than one", () => {
+    render(
+      <EventTimeline
+        events={[
+          SAME_DAY[0],
+          { event_id: "R-FU@2025-11-15@d1", rule_id: "R-T2-FollowupScheduled",
+            anchor: { type: "ocs_bursts", date: "2025-11-15", origin: "omop" },
+            evaluable: true, verdict: "CONCORDANT" },
+        ]}
+        rollups={[]} validatedEvents={new Set()} mode="review"
+        selectedEventId={null} onSelectEvent={() => {}} />,
+    );
+    expect(screen.getByText(/ED visit · Steroid course/i)).toBeInTheDocument();
   });
 });

@@ -1204,12 +1204,9 @@ describe("Event timeline + per-event validation", () => {
     // "Adherence timeline" header confirms EventTimeline mounted.
     expect(screen.getByText(/Adherence timeline/)).toBeInTheDocument();
 
-    // ev_1's event_id renders both as a timeline card AND as the Events
-    // section row header — find the one inside a <button> (the card).
-    const card = screen
-      .getAllByText("ev_1")
-      .map((el) => el.closest("button"))
-      .find((b): b is HTMLButtonElement => b !== null);
+    // The timeline groups by day of care, so the event_id is no longer on the
+    // card face — it is the rule row's title. getByTitle returns that button.
+    const card = screen.getByTitle("ev_1") as HTMLButtonElement;
     expect(card).toBeTruthy();
 
     fireEvent.click(card!);
@@ -1359,10 +1356,7 @@ describe("Event timeline + per-event validation", () => {
     fireEvent.click(screen.getByRole("button", { name: /^Events/ })); // collapse
     await waitFor(() => expect(document.getElementById("event-row-ev_1")).not.toBeInTheDocument());
 
-    const card = screen
-      .getAllByText("ev_1")
-      .map((el) => el.closest("button"))
-      .find((b): b is HTMLButtonElement => b !== null);
+    const card = screen.getByTitle("ev_1") as HTMLButtonElement;
     expect(card).toBeTruthy();
     fireEvent.click(card!);
 
@@ -1643,14 +1637,15 @@ describe("Compare mode (Task 6)", () => {
     return picker;
   }
 
-  /** The timeline card <button> for a given event_id (present in both review
-   *  and compare mode — only its CONTENTS differ). */
+  /** The timeline row <button> for a given event_id (present in both review
+   *  and compare mode — only its CONTENTS differ).
+   *
+   *  The timeline groups by DAY OF CARE, so a day's card carries one row per
+   *  rule judged there and the event_id is the row's title rather than its
+   *  visible text. */
   function eventCard(eventId: string): HTMLButtonElement {
-    const card = screen
-      .getAllByText(eventId)
-      .map((el) => el.closest("button"))
-      .find((b): b is HTMLButtonElement => b !== null);
-    if (!card) throw new Error(`timeline card not found for ${eventId}`);
+    const card = screen.queryByTitle(eventId) as HTMLButtonElement | null;
+    if (!card) throw new Error(`timeline row not found for ${eventId}`);
     return card;
   }
 
@@ -1763,7 +1758,9 @@ describe("Compare mode (Task 6)", () => {
       // chip used a moment ago. Review mode was never in scope for the
       // Critical-1 fix; it's correct for it to show the current, edited
       // truth.
-      expect(within(card).getByText("NON-CONCORDANT")).toBeInTheDocument();
+      // Review mode shows the verdict as an abbreviation chip on the rule row
+      // (the day's card headline carries the date and what happened instead).
+      expect(within(card).getByText("NC")).toBeInTheDocument();
     });
     // The summary disappears along with compare mode.
     expect(screen.queryByText(/matched:/)).not.toBeInTheDocument();

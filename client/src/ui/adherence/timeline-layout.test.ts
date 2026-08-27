@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   deriveWindow, datePercent, monthTicks, clinicalAnchors, assignLanes, cardHalfPct,
+  groupByOccurrence, anchorKindOf,
   type TimelineEventLite,
   type TimelineWindow,
 } from "./timeline-layout";
@@ -84,37 +85,68 @@ describe("clinicalAnchors", () => {
   });
 });
 
+describe("groupByOccurrence", () => {
+  it("collapses the several rules judged on ONE day into ONE occurrence", () => {
+    // The defect this fixes: three events on two days used to draw three
+    // cards, two of them labelled with the same rule name and nothing to say
+    // they were the same visit.
+    const occ = groupByOccurrence([
+      ev("R-Step@2025-11-15@e2", "R-T2-StepTherapyMatches", "2025-11-15"),
+      ev("R-FU@2025-11-15@e2", "R-T2-FollowupScheduled", "2025-11-15"),
+      ev("R-FU@2025-11-16@d1", "R-T2-FollowupScheduled", "2025-11-16"),
+    ]);
+    expect(occ.map((o) => o.date)).toEqual(["2025-11-15", "2025-11-16"]);
+    expect(occ[0].events).toHaveLength(2);
+    expect(occ[1].events).toHaveLength(1);
+  });
+  it("drops window and undated events — they have no position on an axis", () => {
+    expect(groupByOccurrence([
+      ev("R-Spiro@window", "R-Spiro", undefined, "window"),
+      ev("R2@invalid@e2", "R2", "Nov 15, 2025"),
+    ])).toEqual([]);
+  });
+  it("lists the distinct kinds that day, so the headline can name what happened", () => {
+    const withMeta = (id: string, rid: string, date: string, type: string, kind?: string) => ({
+      event_id: id, rule_id: rid,
+      anchor: { type, date, origin: "omop", ...(kind ? { meta: { kind } } : {}) },
+    });
+    const occ = groupByOccurrence([
+      withMeta("a", "R-T2-StepTherapyMatches", "2025-11-15", "asthma_encounters", "ed"),
+      withMeta("b", "R-T2-FollowupScheduled", "2025-11-15", "ocs_bursts"),
+    ]);
+    expect(occ[0].kinds).toEqual(["ed", "ocs_bursts"]);
+  });
+  it("anchorKindOf reads the ED/outpatient split from anchor.meta, everything else from the list name", () => {
+    expect(anchorKindOf({
+      event_id: "a", rule_id: "R", anchor: { type: "asthma_encounters", date: "2025-01-01", origin: "omop", meta: { kind: "ed" } },
+    })).toBe("ed");
+    expect(anchorKindOf({
+      event_id: "b", rule_id: "R", anchor: { type: "obligation_points", date: "2025-01-01", origin: "omop" },
+    })).toBe("obligation_points");
+  });
+});
+
 describe("assignLanes", () => {
-  it("splits rules across above/below (sorted by rule_id) and packs overlapping cards into sub-lanes", () => {
-    const events = [
+  it("alternates occurrences above/below in date order and packs overlaps into sub-lanes", () => {
+    const occ = groupByOccurrence([
       ev("R-Step@2025-11-04@e1", "R-T2-StepTherapyMatches", "2025-11-04"),
       ev("R-Step@2025-11-15@e2", "R-T2-StepTherapyMatches", "2025-11-15"),
       ev("R-FU@2025-11-15@e2", "R-T2-FollowupScheduled", "2025-11-15"),
-      ev("R-Ctrl@2025-11-15@d1", "R-T1-ControllerForPersistent", "2025-11-15"),
-    ];
-    const lanes = assignLanes(events, { start: "2025-09-01", end: "2026-05-01" }, 12);
-    // Sorted rule_ids: ["R-T1-ControllerForPersistent", "R-T2-FollowupScheduled", "R-T2-StepTherapyMatches"]
-    // → above, below, above respectively
-    const step = lanes.get("R-Step@2025-11-04@e1")!;
-    expect(step.side).toBe("above");
-    const fu = lanes.get("R-FU@2025-11-15@e2")!;
-    expect(fu.side).toBe("below");
-    // Same-side, same-date cards land in different sub-lanes.
-    expect(lanes.get("R-Step@2025-11-15@e2")!.lane).not.toBe(lanes.get("R-Ctrl@2025-11-15@d1")!.lane);
-    // Overlapping different-date cards on one side also bump.
-    expect(lanes.get("R-Step@2025-11-04@e1")!.lane).not.toBe(lanes.get("R-Step@2025-11-15@e2")!.lane);
+      ev("R-Ctrl@2025-12-20@d1", "R-T1-ControllerForPersistent", "2025-12-20"),
+    ]);
+    const lanes = assignLanes(occ, { start: "2025-09-01", end: "2026-05-01" }, 12);
+    // Three occurrences (11-04, 11-15, 12-20), keyed by DATE not event_id.
+    expect(lanes.size).toBe(3);
+    expect(lanes.get("2025-11-04")!.side).toBe("above");
+    expect(lanes.get("2025-11-15")!.side).toBe("below");
+    expect(lanes.get("2025-12-20")!.side).toBe("above");
+    // Same-side neighbours whose spans overlap bump to different sub-lanes;
+    // 11-04 and 12-20 are 46 days apart in an 8-month window, so at
+    // halfPct=12 their spans DO overlap.
+    expect(lanes.get("2025-11-04")!.lane).not.toBe(lanes.get("2025-12-20")!.lane);
   });
-  it("window-anchored events get no lane entry", () => {
-    const lanes = assignLanes([ev("R-Spiro@window", "R-Spiro", undefined, "window")], { start: "2025-01-01", end: "2026-01-01" }, 12);
-    expect(lanes.size).toBe(0);
-  });
-  it("skips events with invalid dates without throwing", () => {
-    const lanes = assignLanes([
-      ev("R1@2025-11-15@e1", "R1", "2025-11-15"),
-      ev("R2@invalid@e2", "R2", "Nov 15, 2025"),
-    ], { start: "2025-01-01", end: "2026-01-01" }, 12);
-    expect(lanes.size).toBe(1);
-    expect(lanes.get("R1@2025-11-15@e1")).toBeDefined();
+  it("no occurrences → no lanes", () => {
+    expect(assignLanes([], { start: "2025-01-01", end: "2026-01-01" }, 12).size).toBe(0);
   });
 });
 
@@ -149,24 +181,30 @@ describe("cardHalfPct × assignLanes — a narrow track bumps overlapping cards,
   const winStartMs = new Date("2025-01-01T00:00:00.000Z").getTime();
   const win: TimelineWindow = { start: "2025-01-01", end: isoDate(winStartMs + 371 * DAY) };
   const d1 = isoDate(winStartMs + 100 * DAY); // 2025-04-11
+  const dMid = isoDate(winStartMs + 120 * DAY); // between, so d1/d2 land on the SAME side
   const d2 = isoDate(winStartMs + 149 * DAY); // 2025-05-30 — 49 days after d1
+  // Sides now alternate by chronological position, so the pair under test has
+  // to be occurrences #1 and #3 with something between them; consecutive
+  // occurrences are on opposite sides and can never collide.
   const events: TimelineEventLite[] = [
     ev("e1", "R-X", d1),
+    ev("emid", "R-Y", dMid),
     ev("e2", "R-X", d2),
   ];
+  const occ = () => groupByOccurrence(events);
 
-  it("at a 700px track, the two events collide into different lanes", () => {
-    const lanes = assignLanes(events, win, cardHalfPct(700, 150));
-    const l1 = lanes.get("e1")!;
-    const l2 = lanes.get("e2")!;
+  it("at a 700px track, the two same-side occurrences collide into different lanes", () => {
+    const lanes = assignLanes(occ(), win, cardHalfPct(700, 150));
+    const l1 = lanes.get(d1)!;
+    const l2 = lanes.get(d2)!;
     expect(l1.side).toBe(l2.side);
     expect(l1.lane).not.toBe(l2.lane);
   });
 
-  it("at a 1250px track, the two events fit in the same lane", () => {
-    const lanes = assignLanes(events, win, cardHalfPct(1250, 150));
-    const l1 = lanes.get("e1")!;
-    const l2 = lanes.get("e2")!;
+  it("at a 1250px track, the two fit in the same lane", () => {
+    const lanes = assignLanes(occ(), win, cardHalfPct(1250, 150));
+    const l1 = lanes.get(d1)!;
+    const l2 = lanes.get(d2)!;
     expect(l1.side).toBe(l2.side);
     expect(l1.lane).toBe(l2.lane);
   });

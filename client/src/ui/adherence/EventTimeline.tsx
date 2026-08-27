@@ -8,7 +8,23 @@ import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import {
   deriveWindow, datePercent, monthTicks, clinicalAnchors, assignLanes, cardHalfPct,
+  groupByOccurrence,
 } from "./timeline-layout";
+
+/** What happened, in clinical words. The card headline used to be the RULE id,
+ *  so two cards on one day both read "FOLLOWUPSCHEDULED" with nothing to say
+ *  they were the same visit — a reader could not tell one visit judged twice
+ *  from two visits judged once. */
+const KIND_LABEL: Record<string, string> = {
+  outpatient: "Clinic visit",
+  ed: "ED visit",
+  asthma_encounters: "Asthma visit",
+  ocs_bursts: "Steroid course",
+  exacerbations: "Exacerbation",
+  obligation_points: "Controller due",
+};
+const kindLabel = (k: string) => KIND_LABEL[k] ?? k.replace(/_/g, " ");
+const ruleLabel = (ruleId: string) => ruleId.replace(/^R-T\d-/, "");
 
 // Local mirrors of @chart-review/platform-types (client convention — see
 // AdherenceReview.tsx header note). Exported for AdherenceReview to reuse.
@@ -166,7 +182,9 @@ export function EventTimeline(props: EventTimelineProps) {
     return () => ro.disconnect();
   }, []);
   const halfPct = cardHalfPct(trackW, CARD_W);
-  const lanes = useMemo(() => assignLanes(anchored, win, halfPct), [anchored, win, halfPct]);
+  // One card per DAY OF CARE, not per rule — see groupByOccurrence.
+  const occurrences = useMemo(() => groupByOccurrence(anchored), [anchored]);
+  const lanes = useMemo(() => assignLanes(occurrences, win, halfPct), [occurrences, win, halfPct]);
 
   const humanById = useMemo(() => new Map((compareEvents ?? []).map((e) => [e.event_id, e])), [compareEvents]);
   // Falls back to `events` when no agentEvents snapshot is supplied — see
@@ -240,57 +258,80 @@ export function EventTimeline(props: EventTimelineProps) {
                 {ANCHOR_GLYPH[a.kind]}
               </span>
             ))}
-            {/* event cards */}
-            {anchored.map((e) => {
-              const pos = lanes.get(e.event_id);
+            {/* One card per day of care; the rules judged that day are rows
+                inside it. Selecting a row selects that rule's event. */}
+            {occurrences.map((occ) => {
+              const pos = lanes.get(occ.key);
               if (!pos) return null;
+              const rows = occ.events.length;
               const top = pos.side === "above"
                 ? (maxLane.above - pos.lane) * LANE_PX
                 : axisTop + 56 + pos.lane * LANE_PX;
-              const human = humanById.get(e.event_id);
-              const notEvaluable = e.evaluable === false;
+              const selectedHere = occ.events.some((e) => e.event_id === selectedEventId);
               return (
-                <button
-                  key={e.event_id}
-                  type="button"
-                  onClick={() => onSelectEvent(e.event_id)}
-                  aria-current={selectedEventId === e.event_id}
+                <div
+                  key={occ.key}
                   className={cn(
-                    "absolute w-[150px] -translate-x-1/2 text-left border rounded-md px-2 py-1 text-[10px] leading-snug bg-card hover:border-foreground/40",
-                    selectedEventId === e.event_id ? "ring-2 ring-[hsl(var(--oxblood))]" : "border-border",
+                    "absolute w-[168px] -translate-x-1/2 text-left border rounded-md bg-card overflow-hidden",
+                    selectedHere ? "ring-2 ring-[hsl(var(--oxblood))] border-border" : "border-border",
                   )}
                   style={{ left: `${pos.percent}%`, top }}
                 >
-                  <div className="font-mono text-[9px] truncate text-muted-foreground">{e.event_id}</div>
-                  <div className="uppercase tracking-wider text-[9px]">{e.rule_id.replace(/^R-T\d-/, "")}</div>
-                  {showVerdicts && mode === "review" && (
-                    <span className={cn("inline-block rounded px-1", VERDICT_STYLE[notEvaluable ? "EXCLUDED" : (e.verdict ?? "EXCLUDED")])}>
-                      {notEvaluable ? "NOT EVALUABLE" : verdictLabel(e.verdict)}
-                    </span>
-                  )}
-                  {mode === "compare" && (() => {
-                    const agentSide = agentById.get(e.event_id);
-                    return (
-                      <div className="flex flex-wrap gap-1">
-                        <span
-                          className={cn("rounded px-1 whitespace-nowrap", chipClass(agentSide))}
-                          title={chipTitle("agent", agentSide)}
+                  <div className="px-2 pt-1 pb-0.5 border-b border-border/60">
+                    <div className="text-[10px] font-medium leading-tight">{occ.date}</div>
+                    <div className="text-[9px] uppercase tracking-wider text-muted-foreground leading-tight">
+                      {occ.kinds.map(kindLabel).join(" · ")}
+                    </div>
+                  </div>
+                  <div className="divide-y divide-border/40">
+                    {occ.events.map((e) => {
+                      const human = humanById.get(e.event_id);
+                      const notEvaluable = e.evaluable === false;
+                      const agentSide = agentById.get(e.event_id);
+                      return (
+                        <button
+                          key={e.event_id}
+                          type="button"
+                          onClick={() => onSelectEvent(e.event_id)}
+                          aria-current={selectedEventId === e.event_id}
+                          title={e.event_id}
+                          className={cn(
+                            "w-full text-left px-2 py-0.5 text-[9.5px] leading-snug hover:bg-muted/50",
+                            selectedEventId === e.event_id && "bg-muted",
+                          )}
                         >
-                          A: {chipAbbrev(agentSide)}
-                        </span>
-                        <span
-                          className={cn("rounded px-1 whitespace-nowrap", chipClass(human))}
-                          title={chipTitle("human", human)}
-                        >
-                          H: {chipAbbrev(human)}
-                        </span>
-                      </div>
-                    );
-                  })()}
-                  {mode !== "blind" && validatedEvents.has(e.event_id) && (
-                    <span className="text-[9px] text-[hsl(var(--sage))] uppercase">validated</span>
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="truncate">{ruleLabel(e.rule_id)}</span>
+                            {showVerdicts && mode === "review" && (
+                              <span className={cn(
+                                "shrink-0 rounded px-1",
+                                VERDICT_STYLE[notEvaluable ? "EXCLUDED" : (e.verdict ?? "EXCLUDED")],
+                              )}>
+                                {notEvaluable ? "NE" : verdictAbbrev(e.verdict)}
+                              </span>
+                            )}
+                            {mode === "compare" && (
+                              <span className="shrink-0 flex gap-0.5">
+                                <span className={cn("rounded px-1", chipClass(agentSide))} title={chipTitle("agent", agentSide)}>
+                                  A: {chipAbbrev(agentSide)}
+                                </span>
+                                <span className={cn("rounded px-1", chipClass(human))} title={chipTitle("human", human)}>
+                                  H: {chipAbbrev(human)}
+                                </span>
+                              </span>
+                            )}
+                          </div>
+                          {mode !== "blind" && validatedEvents.has(e.event_id) && (
+                            <span className="text-[8.5px] text-[hsl(var(--sage))] uppercase">validated</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {rows > 1 && (
+                    <div className="px-2 pb-0.5 text-[8.5px] text-muted-foreground">{rows} rules judged</div>
                   )}
-                </button>
+                </div>
               );
             })}
           </div>
