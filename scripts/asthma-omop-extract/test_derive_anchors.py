@@ -15,9 +15,11 @@ from derive_anchors import (
     window_for,
     _clean_rows,
     asthma_encounter_anchors,
+    asthma_encounter_dates,
     ocs_burst_anchors,
     exacerbation_anchors,
     obligation_point_anchors,
+    OCS_ASTHMA_ATTRIBUTION_DAYS,
 )
 
 # Index 2025-12-31 -> window is (2024-12-31, 2025-12-31]. Every fixture date
@@ -316,3 +318,106 @@ def test_deadline_censored_at_index_when_no_later_visit():
     pts = obligation_point_anchors(exac, [], WIN)
     assert pts[0]["meta"]["deadline"] == INDEX.isoformat()
     assert pts[0]["meta"]["deadline_censored"] is True
+
+
+# --- (f) decision 5: an OCS course counts only when attributable to asthma ---
+#
+# Before this, every systemic-steroid fill became an exacerbation regardless of
+# indication. In the real cohort dexamethasone is 40.7% of all OCS rows and only
+# 35.7% of it is asthma-linked, because in paediatrics it is the standard
+# treatment for CROUP — peak incidence ages 2-5, this study's lower age band.
+
+
+def test_ocs_with_no_asthma_encounter_nearby_is_dropped_and_counted():
+    stats = {}
+    drugs = [_ocs("d1", "2025-06-01")]
+    assert ocs_burst_anchors(drugs, WIN, stats, asthma_dates=set()) == []
+    assert stats["ocs_not_asthma"] == 1
+
+
+def test_ocs_on_an_asthma_visit_day_is_kept():
+    encounters = [_enc("e1", "2025-06-01")]
+    dates = asthma_encounter_dates(encounters)
+    bursts = ocs_burst_anchors([_ocs("d1", "2025-06-01")], WIN, {}, dates)
+    assert [b["date"] for b in bursts] == ["2025-06-01"]
+
+
+def test_attribution_window_boundary_inclusive_at_7_exclusive_at_8():
+    assert OCS_ASTHMA_ATTRIBUTION_DAYS == 7
+    dates = asthma_encounter_dates([_enc("e1", "2025-06-01")])
+    # A discharge prescription filled a week later still attributes.
+    assert [b["date"] for b in ocs_burst_anchors([_ocs("d1", "2025-06-08")], WIN, {}, dates)] \
+        == ["2025-06-08"]
+    assert ocs_burst_anchors([_ocs("d1", "2025-06-09")], WIN, {}, dates) == []
+    # Symmetric: a fill BEFORE the visit that documented the flare.
+    assert [b["date"] for b in ocs_burst_anchors([_ocs("d1", "2025-05-25")], WIN, {}, dates)] \
+        == ["2025-05-25"]
+    assert ocs_burst_anchors([_ocs("d1", "2025-05-24")], WIN, {}, dates) == []
+
+
+def test_inpatient_asthma_stay_attributes_a_discharge_course():
+    # Decision 2 excludes inpatient rows from step-therapy DECISION POINTS;
+    # decision 5 still accepts them as attributing evidence, because a steroid
+    # course written at discharge from an asthma admission is an asthma course.
+    dates = asthma_encounter_dates([_inpatient("e1", "2025-06-01")])
+    assert [b["date"] for b in ocs_burst_anchors([_ocs("d1", "2025-06-03")], WIN, {}, dates)] \
+        == ["2025-06-03"]
+
+
+def test_non_asthma_encounter_does_not_attribute():
+    dates = asthma_encounter_dates([_enc("e1", "2025-06-01", asthma_related=False)])
+    assert dates == set()
+    assert ocs_burst_anchors([_ocs("d1", "2025-06-01")], WIN, {}, dates) == []
+
+
+def test_attribution_absent_means_everything_passes():
+    # asthma_dates=None is "no encounter table at all" — refusing every course
+    # would be an artefact of a missing file, not a finding about the patient.
+    assert [b["date"] for b in ocs_burst_anchors([_ocs("d1", "2025-06-01")], WIN, {}, None)] \
+        == ["2025-06-01"]
+
+
+def test_croup_scenario_produces_no_burst_no_exacerbation_no_obligation():
+    # The case that motivated decision 5: a well-controlled 3-year-old with two
+    # croup episodes (single-dose dexamethasone, no asthma dx on either) and one
+    # asthma check-up where no daily controller is indicated. Previously this
+    # produced 2 ocs_bursts + an obligation_points event, and the controller rule
+    # has no event_evaluable_if — so three non-concordances that never happened.
+    drugs = [_ocs("d1", "2025-02-10"), _ocs("d2", "2025-09-03")]
+    encounters = [
+        _ed("e1", "2025-02-10", asthma_related=False),   # croup in the ED
+        _enc("e2", "2025-09-03", asthma_related=False),  # croup in clinic
+        _enc("e3", "2025-11-20"),                        # the asthma check-up
+    ]
+    dates = asthma_encounter_dates(encounters)
+    stats = {}
+    bursts = ocs_burst_anchors(drugs, WIN, stats, dates)
+    exac = exacerbation_anchors(drugs, encounters, WIN, stats, dates)
+    enc_anchors = asthma_encounter_anchors(encounters, WIN, {})
+    obligation = obligation_point_anchors(exac, enc_anchors, WIN)
+
+    assert bursts == []
+    assert exac == []
+    assert obligation == []
+    assert stats["ocs_not_asthma"] == 4  # two fills, read once per caller
+    # The asthma check-up is still a step-therapy decision point.
+    assert [a["date"] for a in enc_anchors] == ["2025-11-20"]
+
+
+def test_two_real_asthma_courses_still_establish_the_obligation():
+    # The mirror of the croup test: decision 5 must not suppress a genuine
+    # obligation. Same two dates, now with asthma-flagged encounters.
+    drugs = [_ocs("d1", "2025-02-10"), _ocs("d2", "2025-09-03")]
+    encounters = [
+        _ed("e1", "2025-02-10"),
+        _enc("e2", "2025-09-03"),
+        _enc("e3", "2025-11-20"),
+    ]
+    dates = asthma_encounter_dates(encounters)
+    exac = exacerbation_anchors(drugs, encounters, WIN, {}, dates)
+    enc_anchors = asthma_encounter_anchors(encounters, WIN, {})
+    obligation = obligation_point_anchors(exac, enc_anchors, WIN)
+
+    assert [e["date"] for e in exac] == ["2025-02-10", "2025-09-03"]
+    assert [o["date"] for o in obligation] == ["2025-09-03"]
+    assert obligation[0]["meta"]["deadline"] == "2025-11-20"
