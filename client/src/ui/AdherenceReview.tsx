@@ -174,12 +174,52 @@ const EVENT_KIND_HEADLINE: Record<string, string> = {
   obligation_points: "Controller obligation",
 };
 
+/** Leading YYYY-MM-DD of a note filename, which is how this corpus dates notes
+ *  (e.g. "2018-08-09__discharge_summary.txt"). Null when the name is not dated. */
+function noteDateOf(noteId?: string): string | null {
+  const m = /^(\d{4}-\d{2}-\d{2})/.exec(noteId ?? "");
+  return m ? m[1]! : null;
+}
+
+/** How far a cited note sits from the event it was cited for, as display text,
+ *  plus whether that distance is far enough to be suspect.
+ *
+ *  The faithfulness gate checks that a quote really appears in the note it
+ *  names — it does NOT check that the note has anything to do with the event's
+ *  date. So an answer about a 2021 visit can be "supported" by a 2018 discharge
+ *  summary and pass every automated check. The reviewer has to see the gap
+ *  without reading filenames.
+ *
+ *  `stale` marks evidence dated more than a year before the event: outside any
+ *  observation window this study uses, so it cannot describe the state of care
+ *  at that event whatever it says. */
+function evidenceAge(noteId: string | undefined, eventDate: string | undefined): {
+  text: string; stale: boolean;
+} | null {
+  const nd = noteDateOf(noteId);
+  if (!nd || !eventDate) return null;
+  const days = Math.round(
+    (new Date(eventDate).getTime() - new Date(nd).getTime()) / 86_400_000,
+  );
+  if (!Number.isFinite(days)) return null;
+  const abs = Math.abs(days);
+  const rel = abs < 45
+    ? `${abs}d`
+    : abs < 400 ? `${Math.round(abs / 30)}mo` : `${(abs / 365).toFixed(1)}y`;
+  if (days === 0) return { text: "same day", stale: false };
+  return {
+    text: `${rel} ${days > 0 ? "before" : "after"} this event`,
+    stale: abs > 365,
+  };
+}
+
 /** Per-question evidence inside an event card. Mirrors QuestionRow's citation
  *  block: a note quote is a button that opens the note at the cited offsets in
  *  the source pane; an OMOP row names its table. */
-function EventAnswerEvidence({ evidence, reasoning, onJumpToSource }: {
+function EventAnswerEvidence({ evidence, reasoning, eventDate, onJumpToSource }: {
   evidence?: NonNullable<RuleEvent["answers"]>[number]["evidence"];
   reasoning?: string;
+  eventDate?: string;
   onJumpToSource?: (focus: NoteFocus | null) => void;
 }) {
   if (!evidence || evidence.length === 0) {
@@ -191,8 +231,9 @@ function EventAnswerEvidence({ evidence, reasoning, onJumpToSource }: {
   }
   return (
     <div className="mt-0.5 space-y-0.5">
-      {evidence.map((ev, i) => (
-        ev.note_id ? (
+      {evidence.map((ev, i) => {
+        const age = evidenceAge(ev.note_id, eventDate);
+        return ev.note_id ? (
           <button
             key={i}
             type="button"
@@ -209,13 +250,21 @@ function EventAnswerEvidence({ evidence, reasoning, onJumpToSource }: {
               {ev.note_id}:{" "}
             </span>
             <span className="italic">&ldquo;{ev.quote}&rdquo;</span>
+            {age && (
+              <span className={cn(
+                "ml-1 whitespace-nowrap",
+                age.stale ? "text-[hsl(var(--oxblood))] font-medium" : "text-muted-foreground",
+              )}>
+                · {age.text}{age.stale ? " ⚠" : ""}
+              </span>
+            )}
           </button>
         ) : (
           <div key={i} className="text-[10px] text-muted-foreground">
             structured: {ev.table}{ev.concept_name ? ` · ${ev.concept_name}` : ""}
           </div>
-        )
-      ))}
+        );
+      })}
       {reasoning && (
         <details className="text-[10px] text-muted-foreground">
           <summary className="cursor-pointer hover:text-foreground">why</summary>
@@ -2246,6 +2295,7 @@ function EventRowImpl({
                       <EventAnswerEvidence
                         evidence={committed.evidence}
                         reasoning={committed.reasoning}
+                        eventDate={event.anchor.date}
                         onJumpToSource={onJumpToSource}
                       />
                     )}

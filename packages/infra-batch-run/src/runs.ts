@@ -1264,7 +1264,7 @@ async function runOneAgent(
           atomicWriteJson(scratchStateFp, st);
         }
       }
-      const eventBlock = buildEventWorklistBlock(eventWorklist, skill.rules);
+      const eventBlock = buildEventWorklistBlock(eventWorklist, skill.rules, listNotes(patientId));
 
       const adherenceUserPrompt = [
         `Adherence chart review for patient \`${patientId}\` on task \`${taskId}\`.`,

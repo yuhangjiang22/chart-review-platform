@@ -94,3 +94,70 @@ describe("evidence discipline", () => {
     expect(block).toMatch(/stored but shown to the reviewer as unevidenced/);
   });
 });
+
+describe("per-event note scoping", () => {
+  const RULE = {
+    rule_id: "R-Step", description: "d", event_anchor: "visits",
+    verdict_if: 'StepMatch == "matches"',
+    event_scoped_questions: ["StepMatch"],
+  };
+  const FOLLOWUP = { ...RULE, rule_id: "R-FU", event_window_days: 90 };
+  const NOTES = [
+    { filename: "2018-08-09__discharge_summary.txt", date: "2018-08-09" },
+    { filename: "2021-08-03__telephone_note.txt", date: "2021-08-03" },
+    { filename: "2021-09-24__care_management_note.txt", date: "2021-09-24" },
+    { filename: "2021-11-02__followup.txt", date: "2021-11-02" },
+    { filename: "2022-06-01__later.txt", date: "2022-06-01" },
+  ];
+  const at = (ruleId: string, date: string, meta?: Record<string, unknown>) => ({
+    event_id: `${ruleId}@${date}`, rule_id: ruleId,
+    anchor: { type: "visits", date, origin: "omop" as const, ...(meta ? { meta } : {}) },
+  });
+
+  it("names the notes in the event's span and EXCLUDES ones from years outside it", () => {
+    // The defect: the agent was handed the patient's whole chart with nothing
+    // to say which part belonged to which event, and answered a 2021 visit
+    // citing a 2018 discharge summary — which passed every automated check,
+    // because the quote really was in that note.
+    const block = buildEventWorklistBlock([at("R-Step", "2021-09-25") as never], [RULE as never], NOTES);
+    expect(block).toContain("2021-08-03__telephone_note.txt");
+    expect(block).toContain("2021-09-24__care_management_note.txt");
+    expect(block).not.toContain("2018-08-09__discharge_summary.txt");
+    expect(block).not.toContain("2022-06-01__later.txt");
+  });
+
+  it("extends the span to the end of the rule's judgment window", () => {
+    // A follow-up arranged AT the visit is documented in the following weeks,
+    // so the span has to reach forward as far as the requirement does.
+    const block = buildEventWorklistBlock([at("R-FU", "2021-09-25") as never], [FOLLOWUP as never], NOTES);
+    expect(block).toContain("2021-11-02__followup.txt");
+  });
+
+  it("uses the ETL deadline as the span end when the anchor carries one", () => {
+    const block = buildEventWorklistBlock(
+      [at("R-Step", "2021-09-25", { deadline: "2021-11-10" }) as never], [RULE as never], NOTES,
+    );
+    expect(block).toContain("2021-11-02__followup.txt");
+    expect(block).toContain("… 2021-11-10");
+  });
+
+  it("states the span even when it holds no notes, and says not to reach outside it", () => {
+    const block = buildEventWorklistBlock([at("R-Step", "2019-05-05") as never], [RULE as never], NOTES);
+    expect(block).toMatch(/notes in .*: none/);
+    expect(block).toMatch(/do not cite a note from outside the span/);
+  });
+
+  it("caps the named list but keeps the span, so a busy chart does not flood the prompt", () => {
+    const many = Array.from({ length: 25 }, (_, i) => ({
+      filename: `2021-09-0${(i % 9) + 1}__note_${i}.txt`, date: `2021-09-0${(i % 9) + 1}`,
+    }));
+    const block = buildEventWorklistBlock([at("R-Step", "2021-09-25") as never], [RULE as never], many);
+    expect(block).toMatch(/\+15 more in span/);
+  });
+
+  it("renders without a note list at all (phenotype-style callers pass none)", () => {
+    const block = buildEventWorklistBlock([at("R-Step", "2021-09-25") as never], [RULE as never]);
+    expect(block).toContain("R-Step@2021-09-25");
+    expect(block).toMatch(/notes in .*: none/);
+  });
+});

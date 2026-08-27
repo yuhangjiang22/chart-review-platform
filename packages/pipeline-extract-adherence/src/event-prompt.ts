@@ -8,6 +8,48 @@ import {
   WINDOW_ANCHOR_TYPE, eventScopedQuestionsFor, type RuleDefinition,
 } from "@chart-review/rule-engine";
 
+/** Lead-in before an event during which documentation can still establish the
+ *  state of care AT the event — a medication list from the previous visit is
+ *  legitimate evidence of the regimen in force today. */
+const NOTE_LEAD_IN_DAYS = 90;
+
+/** Notes whose date falls in an event's evidence span: from NOTE_LEAD_IN_DAYS
+ *  before the event through the end of its judgment window (the ETL's deadline
+ *  when the anchor carries one, else the rule's declared window, else the event
+ *  date itself). */
+const MAX_NAMED_NOTES = 10;
+
+function notesForEvent(
+  notes: Array<{ filename: string; date: string }>,
+  eventDate: string | undefined,
+  windowDays: number | undefined,
+  meta: Record<string, unknown> | undefined,
+): { span: string; named: string[]; extra: number } | null {
+  if (!eventDate) return null;
+  const t = new Date(eventDate).getTime();
+  if (!Number.isFinite(t)) return null;
+  const DAY = 86_400_000;
+  const iso = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+  const deadline = typeof meta?.deadline === "string" ? new Date(meta.deadline).getTime() : NaN;
+  const end = Number.isFinite(deadline)
+    ? deadline
+    : t + (typeof windowDays === "number" ? windowDays : 0) * DAY;
+  const start = t - NOTE_LEAD_IN_DAYS * DAY;
+  const inSpan = notes.filter((n) => {
+    const nt = new Date(n.date).getTime();
+    return Number.isFinite(nt) && nt >= start && nt <= end;
+  });
+  // The SPAN is the instruction; the filenames are a convenience. Capped
+  // because a busy patient's span can hold dozens of notes that have nothing
+  // to do with asthma (one real chart's span was mostly elbow x-rays), and a
+  // wall of filenames in every prompt is noise the agent has to read past.
+  return {
+    span: `${iso(start)} … ${iso(end)}`,
+    named: inSpan.slice(0, MAX_NAMED_NOTES).map((n) => n.filename),
+    extra: Math.max(0, inSpan.length - MAX_NAMED_NOTES),
+  };
+}
+
 /** Per-event instructions for the agent.
  *
  *  Each line names the question_ids that event needs, derived from its rule's
@@ -21,11 +63,19 @@ import {
 export function buildEventWorklistBlock(
   worklist: RuleEvent[],
   rules: RuleDefinition[] = [],
+  notes: Array<{ filename: string; date?: string }> = [],
 ): string {
   const anchored = worklist.filter((e) => e.anchor.type !== WINDOW_ANCHOR_TYPE);
   if (anchored.length === 0) return "";
   const needsByRule = new Map<string, { verdict: string[]; evaluability: string[] }>();
-  for (const r of rules) needsByRule.set(r.rule_id, eventScopedQuestionsFor(r));
+  const windowByRule = new Map<string, number | undefined>();
+  for (const r of rules) {
+    needsByRule.set(r.rule_id, eventScopedQuestionsFor(r));
+    windowByRule.set(r.rule_id, r.event_window_days);
+  }
+  const datedNotes = notes
+    .filter((n): n is { filename: string; date: string } => !!n.date)
+    .sort((a, b) => a.date.localeCompare(b.date));
 
   const lines: string[] = [
     "",
@@ -42,6 +92,12 @@ export function buildEventWorklistBlock(
     "  decides:  the question that establishes whether the requirement applies",
     "            at that event. Answering it is not optional — it is what makes",
     "            the event countable at all.",
+    "",
+    "Read the notes NAMED ON THE EVENT'S OWN LINE. They are the ones dated in",
+    "that event's span; the patient's chart also holds notes from years outside",
+    "the observation window, and those cannot describe the state of care at this",
+    "event whatever they say. If an event names no notes, answer from structured",
+    "data or mark it not evaluable — do not reach outside the span.",
     "",
     "EVERY answer needs evidence. Cite what it was determined from, dated at or",
     "around that event: a note quote (VERBATIM — the faithfulness gate rejects a",
@@ -79,6 +135,22 @@ export function buildEventWorklistBlock(
       if (needs.verdict.length > 0) parts.push(`answer: ${needs.verdict.join(", ")}`);
       if (needs.evaluability.length > 0) parts.push(`decides: ${needs.evaluability.join(", ")}`);
       lines.push(`      ${parts.join("  |  ")}`);
+    }
+    // The notes covering THIS event's span, named. Without them the agent is
+    // handed the patient's whole chart with nothing to say which part belongs
+    // to which event — on a real patient half the notes predate the
+    // observation window entirely, and an answer about a 2021 visit came back
+    // cited to a 2018 discharge summary, which every automated check passed
+    // because the quote really was in that note.
+    const ns = notesForEvent(datedNotes, e.anchor.date, windowByRule.get(e.rule_id), e.anchor.meta);
+    if (ns) {
+      lines.push(
+        ns.named.length > 0
+          ? `      notes in ${ns.span}: ${ns.named.join(", ")}`
+            + (ns.extra > 0 ? ` (+${ns.extra} more in span — list_notes to see them)` : "")
+          : `      notes in ${ns.span}: none — answer from structured data or mark not evaluable,`
+            + " do not cite a note from outside the span",
+      );
     }
   }
   lines.push("");
