@@ -47,9 +47,15 @@ describe("per-event required questions", () => {
     expect(block).toContain("decides: ControlLevel");
   });
 
-  it("tells the agent an unanswered event is recorded, not judged", () => {
+  it("states that BOTH groups are required, not just the verdict question", () => {
+    // The first wording tied the consequence to the `answer:` group only, so a
+    // live agent read `decides:` as informational: it committed the verdict
+    // question for all eight anchored events and the control level for none,
+    // leaving both per-event rules with zero verdicts.
     const block = buildEventWorklistBlock([anchored], [STEP_RULE as never]);
-    expect(block).toMatch(/unanswered rather than judged/);
+    expect(block).toMatch(/Both groups are required/);
+    expect(block).toMatch(/missing EITHER is dropped/);
+    expect(block).toMatch(/not optional/);
   });
 
   it("omits the needs line when the rule declares no event-scoped questions", () => {

@@ -8,7 +8,7 @@ OHDSI SqlRender so we can validate on the RDRP files); AT YOUR SITE render with
 real OHDSI SqlRender instead:
     SqlRender::translate(SqlRender::render(readr::read_file('cohort.sql'),
         cdm_database_schema='omop_cdm', min_age=2, max_age=17,
-        min_lookback_visits=2), targetDialect='postgresql')
+        min_asthma_encounters=2), targetDialect='postgresql')
 
 Transform (Python, dialect-independent): drug→RxNorm-ingredient fills +
 saba_canisters_12mo, conditions dedup + icd10cm parse, asthma_related, and the
@@ -62,7 +62,7 @@ def render_duckdb(sql, schema_prefix=""):
     s = strip_comments(sql)
     s = s.replace("@cdm_database_schema.", schema_prefix)
     s = s.replace("@cohort_table", "cohort").replace("@drug_class_table", "drug_class_map")
-    s = s.replace("@min_age", "2").replace("@max_age", "17").replace("@min_lookback_visits", "2")
+    s = s.replace("@min_age", "2").replace("@max_age", "17").replace("@min_asthma_encounters", "2")
     s = s.replace("@study_start", STUDY_START).replace("@study_end", STUDY_END)
     s = re.sub(r"DATEADD\(MONTH,\s*-12,\s*([^)]+)\)", r"(\1 - INTERVAL 12 MONTH)", s)
     return s
