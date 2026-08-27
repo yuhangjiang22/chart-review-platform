@@ -17,11 +17,28 @@ rules:
       Figure 4-5 prescribes a controller at Step 2 and above.
     evidence_grade: A
     event_anchor: obligation_points
-    # Grace window (how soon after the obligation a controller must be
-    # active to count) — PENDING clinical confirmation (Fedele/Blake);
-    # until then: controller active at/after the obligation date within
-    # the observation window.
+    # GRACE WINDOW — settled (study lead, 2026-08-27): the controller must be
+    # active BY THE EVENT'S DEADLINE (anchor.meta.deadline, the patient's next
+    # asthma visit after the obligation date, computed by the ETL). Three
+    # framings had been in play and they disagree on the patient who does the
+    # right thing: the question text said "active AT OR AFTER the event date"
+    # (no upper bound, so a controller started eight months late passed), the
+    # batch prompt said "answer AS OF THAT EVENT'S DATE" (no grace period, so
+    # starting one at the next visit FAILED), and the ETL computed a deadline
+    # that nothing read. "By the deadline" is what EPR-3 means and what the
+    # deadline was computed for; the other two are now worded to match.
     verdict_if: "T1-ControllerPrescribed == true"
+    # A CENSORED DEADLINE IS NOT A CARE GAP. When no asthma visit is observed
+    # after the obligation, the ETL censors the deadline at index_date and flags
+    # it: the grace period ran past the end of observation, so the chart cannot
+    # show whether the controller was started in time. Judging it anyway scores a
+    # gap the data does not support — 8% of obligation points in the local corpus
+    # are censored. The engine exposes the flag as the synthetic
+    # `_deadline_censored`, since no extraction could supply it.
+    event_evaluable_if: '_deadline_censored != true'
+    event_not_evaluable_reason: >-
+      grace period ran past the end of observation (no asthma visit after the
+      obligation date, so the deadline is censored at the index date)
     attribution_when:
       - when: "T1-ControllerPrescribed != true and T2-ContraindicationDocumented == \"patient_refusal\""
         category: PATIENT_REFUSAL

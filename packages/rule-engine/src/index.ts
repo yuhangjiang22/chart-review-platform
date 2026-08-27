@@ -87,6 +87,17 @@ export interface RuleDefinition {
    *  controller obligation runs to the patient's NEXT asthma visit, which is
    *  data-dependent and computed by the ETL, not a fixed number of days. */
   event_window_days?: number;
+  /** Human-readable reason stamped on an event this rule marks not evaluable,
+   *  in place of the generic ENGINE_NOT_EVALUABLE_REASON ("event_evaluable_if
+   *  not met"). Use it when the rule's evaluability gate encodes a specific
+   *  finding a reviewer needs to see — e.g. the controller obligation whose
+   *  grace period ran past the end of observation, which is a real limit on what
+   *  the data can show, not a judgement about care.
+   *
+   *  Recognised as ENGINE-supplied on re-evaluation like the two sentinels, so a
+   *  round-tripped event is still re-derived from scratch rather than
+   *  short-circuiting as an agent-authored reason. */
+  event_not_evaluable_reason?: string;
   /** question_ids that describe ONE EVENT rather than the observation window.
    *  A patient-level answer for one of these is NEVER inherited into an
    *  event: if the event carries no answer of its own, the question is absent
@@ -560,8 +571,12 @@ export async function evaluateAllRules(
  *  false), marking the event not evaluable rather than judging it on the
  *  window value.
  *
- *  `_anchor_type` is a reserved synthetic question_id — a real question
- *  authored with that id would be shadowed by this synthetic value. */
+ *  `_anchor_type` and `_deadline_censored` are reserved synthetic question_ids —
+ *  a real question authored with either id would be shadowed by the synthetic
+ *  value. They let `event_evaluable_if` read facts the ETL established about the
+ *  event itself, which no extraction could supply: which anchor list produced
+ *  it, and whether its judgment deadline was truncated at the end of
+ *  observation. */
 function mergedAnswers(
   patient: QuestionAnswer[],
   event: RuleEvent,
@@ -578,6 +593,10 @@ function mergedAnswers(
   }
   for (const a of event.answers ?? []) map.set(a.question_id, a);
   map.set("_anchor_type", { question_id: "_anchor_type", tier: -1, answer: event.anchor.type });
+  map.set("_deadline_censored", {
+    question_id: "_deadline_censored", tier: -1,
+    answer: event.anchor.meta?.deadline_censored === true,
+  });
   return [...map.values()];
 }
 
@@ -743,13 +762,43 @@ export function evaluateRuleEvents(
     ? parseExpression(rule.event_evaluable_if)
     : null;
   const eventScoped = new Set(rule.event_scoped_questions ?? []);
-  const required = eventScopedQuestionsFor(rule).verdict;
+  const scopedFor = eventScopedQuestionsFor(rule);
+  const required = scopedFor.verdict;
+  // Can the evaluability gate be decided WITHOUT any per-event answer? True when
+  // it reads only patient-level answers and the synthetic anchor facts
+  // (`_anchor_type`, `_deadline_censored`) — the controller obligation's censored
+  // deadline is the case that matters. Such a gate must run BEFORE the unanswered
+  // check, or an unanswered censored event reports "nobody looked" when the truth
+  // is "this event can never be judged", which is a different finding and the
+  // more important one.
+  const evaluabilityIsStructural = scopedFor.evaluability.length === 0;
 
   const outEvents: RuleEvent[] = events.map((e) => {
+    // Reasons the ENGINE could itself have produced for THIS rule. Any other
+    // reason is agent- or reviewer-authored and authoritative: it short-circuits
+    // rather than being re-derived. Without rule.event_not_evaluable_reason in
+    // this set, a custom reason would freeze the event at the first pass.
     if (e.evaluable === false
         && e.evaluable_reason !== ENGINE_NOT_EVALUABLE_REASON
-        && e.evaluable_reason !== ENGINE_UNANSWERED_REASON) {
+        && e.evaluable_reason !== ENGINE_UNANSWERED_REASON
+        && e.evaluable_reason !== rule.event_not_evaluable_reason) {
       return { ...e, verdict: undefined, attribution: undefined };
+    }
+    const notEvaluable = (): RuleEvent => ({
+      ...e,
+      evaluable: false,
+      evaluable_reason: e.evaluable_reason
+        ?? rule.event_not_evaluable_reason ?? ENGINE_NOT_EVALUABLE_REASON,
+      verdict: undefined,
+      attribution: undefined,
+    });
+    const gateHolds = (answers: QuestionAnswer[]) =>
+      !evaluableAst || evalAst(evaluableAst, new Map(answers.map((a) => [a.question_id, a])));
+
+    // A structural gate first — see evaluabilityIsStructural.
+    if (evaluabilityIsStructural
+        && !gateHolds(mergedAnswers(patientAnswers, e, eventScoped))) {
+      return notEvaluable();
     }
     // An anchored event whose rule needs per-event answers, but which carries
     // none of them, is UNANSWERED — not concordant, not violated. Deriving a
@@ -771,15 +820,8 @@ export function evaluateRuleEvents(
     }
     const merged = mergedAnswers(patientAnswers, e, eventScoped);
     if (evaluableAst) {
-      const map = new Map(merged.map((a) => [a.question_id, a]));
-      if (!evalAst(evaluableAst, map)) {
-        return {
-          ...e,
-          evaluable: false,
-          evaluable_reason: e.evaluable_reason ?? ENGINE_NOT_EVALUABLE_REASON,
-          verdict: undefined,
-          attribution: undefined,
-        };
+      if (!gateHolds(merged)) {
+        return notEvaluable();
       }
     }
     const v = evaluateRule(compiled, merged);

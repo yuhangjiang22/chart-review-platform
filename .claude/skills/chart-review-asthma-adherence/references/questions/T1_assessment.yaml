@@ -99,9 +99,14 @@ questions:
       prescribed and active in the lookback window?
 
       EVENT SCOPE: when this question is answered inside a rule event
-      (set_event_answer), answer whether a controller was active AT OR AFTER
-      the event date (the obligation point) — a controller discontinued
-      before the event date does not count.
+      (set_event_answer), answer whether a controller was active at any point
+      FROM THE EVENT DATE THROUGH THE EVENT'S DEADLINE. The deadline is printed
+      on the event's own line in the work-list (`deadline=<date>`) and is the
+      patient's next asthma visit after the obligation. A controller
+      discontinued before the event date does not count, and neither does one
+      first started AFTER the deadline — the obligation is to have the child on
+      a controller BY that visit, not eventually. One started AT that visit
+      counts; the deadline is inclusive.
     tier: 1
     event_scoped: true
     answer_schema:

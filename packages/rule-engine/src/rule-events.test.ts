@@ -489,3 +489,99 @@ describe("derived patient-level answers (worst control level)", () => {
       .map((r) => r.rule_id)).toEqual(["R-Comorbid"]);
   });
 });
+
+describe("a censored judgment deadline is not a care gap", () => {
+  // The controller obligation runs to the patient's next asthma visit. When no
+  // such visit is observed, the ETL censors the deadline at the index date and
+  // flags it: the grace period ran past the end of observation, so the chart
+  // CANNOT show whether the controller was started in time. The flag existed and
+  // nothing read it, so 8% of obligation points in the corpus were scored as care
+  // gaps the data does not support — and this rule has no other escape hatch.
+  const OBLIGATION_RULE: RuleDefinition = {
+    rule_id: "R-Controller",
+    description: "controller active by the obligation's deadline",
+    event_anchor: "obligation_points",
+    event_evaluable_if: "_deadline_censored != true",
+    event_not_evaluable_reason: "grace period ran past the end of observation",
+    verdict_if: "T1-ControllerPrescribed == true",
+    event_scoped_questions: ["T1-ControllerPrescribed"],
+    attribution: "DOCUMENTATION_GAP",
+  };
+  const point = (over: Partial<RuleEvent["anchor"]> = {}, answers?: QuestionAnswer[]): RuleEvent => ({
+    event_id: "R-Controller@2025-09-03@drugs:1",
+    rule_id: "R-Controller",
+    anchor: { type: "obligation_points", date: "2025-09-03", origin: "omop", ...over },
+    ...(answers ? { answers } : {}),
+  });
+
+  it("an uncensored deadline is judged normally", () => {
+    const res = evaluateAllRuleEvents([OBLIGATION_RULE], [], [
+      point({ meta: { deadline: "2025-11-20", deadline_censored: false } },
+        [qa("T1-ControllerPrescribed", false)]),
+    ]);
+    expect(res.rule_events[0]!.evaluable).toBe(true);
+    expect(res.rule_events[0]!.verdict).toBe("NON_CONCORDANT");
+  });
+
+  it("a censored deadline is NOT evaluable, and says why", () => {
+    const res = evaluateAllRuleEvents([OBLIGATION_RULE], [], [
+      point({ meta: { deadline: "2026-04-12", deadline_censored: true } },
+        [qa("T1-ControllerPrescribed", false)]),
+    ]);
+    const e = res.rule_events[0]!;
+    expect(e.evaluable).toBe(false);
+    expect(e.evaluable_reason).toBe("grace period ran past the end of observation");
+    expect(e.verdict).toBeUndefined();
+    // Not counted either way — it leaves the denominator rather than failing.
+    expect(res.rule_rollups[0]).toMatchObject({ n_events: 1, n_evaluable: 0, rate: null });
+  });
+
+  it("a censored deadline reports the CENSORING, not 'unanswered', when nobody answered", () => {
+    // The gate reads only anchor facts, so it is decidable before any answer
+    // exists and must run first: "this event can never be judged" is a different
+    // finding from "nobody looked", and the more important one.
+    const res = evaluateAllRuleEvents([OBLIGATION_RULE], [], [
+      point({ meta: { deadline: "2026-04-12", deadline_censored: true } }),
+    ]);
+    expect(res.rule_events[0]!.evaluable_reason).toBe("grace period ran past the end of observation");
+    expect(res.rule_events[0]!.evaluable_reason).not.toBe(ENGINE_UNANSWERED_REASON);
+  });
+
+  it("an UNcensored event with no answer is still UNANSWERED, not censored", () => {
+    const res = evaluateAllRuleEvents([OBLIGATION_RULE], [], [
+      point({ meta: { deadline: "2025-11-20", deadline_censored: false } }),
+    ]);
+    expect(res.rule_events[0]!.evaluable_reason).toBe(ENGINE_UNANSWERED_REASON);
+  });
+
+  it("re-evaluation is idempotent: the custom reason is re-derived, not frozen", () => {
+    // Without rule.event_not_evaluable_reason in the engine-reason set, a
+    // round-tripped event would short-circuit as agent-authored and never flip
+    // back when the censoring is corrected upstream.
+    const censored = evaluateAllRuleEvents([OBLIGATION_RULE], [], [
+      point({ meta: { deadline: "2026-04-12", deadline_censored: true } },
+        [qa("T1-ControllerPrescribed", true)]),
+    ]).rule_events[0]!;
+    const fixed = evaluateAllRuleEvents([OBLIGATION_RULE], [], [
+      { ...censored, anchor: { ...censored.anchor, meta: { deadline: "2025-11-20", deadline_censored: false } } },
+    ]).rule_events[0]!;
+    expect(fixed.evaluable).toBe(true);
+    expect(fixed.verdict).toBe("CONCORDANT");
+  });
+
+  it("an agent-authored not-evaluable reason still short-circuits", () => {
+    const res = evaluateAllRuleEvents([OBLIGATION_RULE], [], [
+      { ...point({ meta: { deadline: "2025-11-20" } }), evaluable: false,
+        evaluable_reason: "chart has no medication documentation at all" },
+    ]);
+    expect(res.rule_events[0]!.evaluable_reason).toBe("chart has no medication documentation at all");
+  });
+
+  it("a synthetic anchor fact cannot be spoofed by an event answer", () => {
+    const res = evaluateAllRuleEvents([OBLIGATION_RULE], [], [
+      point({ meta: { deadline: "2026-04-12", deadline_censored: true } },
+        [qa("T1-ControllerPrescribed", false), qa("_deadline_censored", false)]),
+    ]);
+    expect(res.rule_events[0]!.evaluable).toBe(false);
+  });
+});
