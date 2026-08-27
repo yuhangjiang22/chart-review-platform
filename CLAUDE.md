@@ -182,8 +182,23 @@ to the wrong lane. They apply to EVERY task (asthma, LCN, RUCAM, ACTS, …).
    non-compiling client save blanks the WHOLE Studio UI for every viewer
    via vite's app-wide HMR error overlay — so while anyone has the UI open,
    save client files in compiling states or land refactors as one atomic
-   write. A standalone `scripts/*-realtest` run is immune to all of this,
-   but its poller exiting still kills it (see #3).
+   write. A standalone `scripts/*-realtest` run survives the watcher — it is
+   not tsx's child — but it is **not immune**, and this line used to say it
+   was. Any session booting a dev server runs
+   `reconcileOrphanedRunsOnStartup()`, which marked every run whose
+   status.json said `running` as failed, on the premise that boot implies
+   phantom. That premise was true only while every batch was server-hosted,
+   and it expired the moment standalone drivers existed: your `packages/` save
+   restarts someone else's watcher, whose boot then reaps YOUR live run
+   ("run orphaned — server restarted while this patient was in progress"), and
+   your poller exits on the status it did not write. It cost five runs across
+   two sessions, and two wrong root-cause theories, because a reaped run shows
+   as `complete_with_errors` rather than failed — it looks like a batch that
+   mostly worked. Fixed 2026-08-27: runs record `owner_pid` + a
+   timer-written heartbeat and the reconciler skips live owners (34855845),
+   with the premise itself now under test (0b4494e8). Announce standalone runs
+   anyway — coordination is cheap and this failure mode is silent. Its poller
+   exiting still kills it (see #3).
 9. **Sidecar spawns read the shared WORKING TREE, not your branch.** Another
    session's uncommitted edit under `python/chart_review_deepagents` (or a
    branch switch) reaches your next patient's spawn. Same coordination rule
