@@ -441,6 +441,12 @@ export interface AdherenceReviewProps {
   blind?: boolean;
 }
 
+/** The rule the engine treats as the study-eligibility gate: when it resolves
+ *  EXCLUDED, every other rule and event becomes EXCLUDED. Mirrors the literal in
+ *  packages/infra-batch-run/src/runs.ts (client convention — the client mirrors
+ *  server shapes rather than importing them). */
+const ELIGIBILITY_RULE_ID = "R-T0-Eligible";
+
 const TIER_LABELS: Record<number, string> = {
   0: "T0 · Eligibility",
   1: "T1 · Assessment",
@@ -1228,8 +1234,91 @@ export function AdherenceReview(props: AdherenceReviewProps) {
   // reports the work still outstanding rather than only what is already done.
   // Rules split by the scope they are judged at, so each sits with the
   // questions that feed it rather than carrying a badge in a mixed list.
-  const patientLevelRules = (meta.rules ?? []).filter((r) => !r.event_anchor);
   const eventLevelRules = (meta.rules ?? []).filter((r) => r.event_anchor);
+  // ELIGIBILITY comes out of the period block and goes FIRST. It is a gate: a
+  // patient who fails it contributes nothing to any rule, so annotating their
+  // events before checking it is the most wasteful order there is.
+  //
+  // Matched by the SAME rule_id the engine treats as the gate (see
+  // ELIGIBILITY_RULE_ID's twin in packages/infra-batch-run/src/runs.ts, where an
+  // EXCLUDED verdict here turns every other rule and event EXCLUDED). A
+  // tier-based heuristic was tried first and was wrong for the right reason: a
+  // rule that happens to read only tier-0 questions is not the gate, and pulling
+  // it out of the period block misfiled it.
+  const periodRules = (meta.rules ?? []).filter((r) => !r.event_anchor);
+  const eligibilityRules = periodRules.filter((r) => r.rule_id === ELIGIBILITY_RULE_ID);
+  const patientLevelRules = periodRules.filter((r) => r.rule_id !== ELIGIBILITY_RULE_ID);
+  const eligibilityTiers = tiers.filter((t) => t === 0);
+  const periodTiers = tiers.filter((t) => t !== 0);
+
+  // Plain functions, NOT useMemo/useCallback — they sit after this component's
+  // early returns, where a hook would change the hook count between renders.
+  const renderTierBlocks = (ts: number[]) => ts.map((t) => {
+    // Event-scoped questions are answered in the Events section, once per
+    // event, with the span they are judged over. They are not listed here at
+    // all: a period-level control for them has no meaning (the write path
+    // refuses one), and a read-only stand-in was just a second place to look
+    // for one answer.
+    const qs = (meta.questions_by_tier[t] ?? [])
+      .filter((q) => !eventScopedQids.has(q.question_id));
+    if (qs.length === 0) return null;
+    const open = expandedTiers.has(t);
+    return (
+      <div key={t} className="border border-border rounded mb-2 bg-card">
+        <button
+          onClick={() => toggleTier(t)}
+          className="w-full px-3 py-2 text-left text-[12.5px] font-medium flex items-center gap-1.5 hover:bg-muted/50"
+        >
+          {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+          {TIER_LABELS[t] ?? `Tier ${t}`}
+          <span className="text-muted-foreground font-normal">({qs.length})</span>
+        </button>
+        {open && (
+          <div className="border-t border-border">
+            {qs.map((q) => (
+              <QuestionRow
+                key={q.question_id}
+                q={q}
+                answer={answersByQid.get(q.question_id)}
+                agentIds={agentIds}
+                agentAnswers={agentIds.map(
+                  (id) => agentAnswersByQid.get(id)?.get(q.question_id),
+                )}
+                validated={validatedQuestions.has(q.question_id)}
+                busy={busy === `q:${q.question_id}`}
+                blind={blind}
+                onSave={(a) => saveAnswer(q.question_id, a)}
+                onJumpToSource={setNoteFocus}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  });
+
+  const renderRuleList = (rules: RuleDefinition[]) => (
+    <div className="border border-border rounded bg-card divide-y divide-border">
+      {rules.map((r) => (
+        <RuleRow
+          key={r.rule_id}
+          rule={r}
+          verdict={verdictsByRid.get(r.rule_id)}
+          validated={validatedRules.has(r.rule_id)}
+          categories={meta.attribution_categories}
+          answersByQid={answersByQid}
+          agentIds={agentIds}
+          agentVerdicts={agentIds.map(
+            (id) => agentVerdictsByRid.get(id)?.get(r.rule_id),
+          )}
+          eventRollup={blind ? undefined : ruleRollups.find((x) => x.rule_id === r.rule_id)}
+          busy={busy === `r:${r.rule_id}`}
+          blind={blind}
+          onSave={(v, a, rationale) => saveVerdict(r.rule_id, v, a, rationale)}
+        />
+      ))}
+    </div>
+  );
   // Values the ENGINE computed from the per-event answers (currently the worst
   // control level in the period). They live in question_answers but have no
   // question in the framework — answersByQid is already blind-filtered, so a
@@ -1385,113 +1474,40 @@ export function AdherenceReview(props: AdherenceReviewProps) {
           </section>
         )}
 
-        {/* ── PATIENT-LEVEL ─────────────────────────────────────────────
-         *  Questions asked once for the observation window, and the rules
-         *  judged from them. Grouping the rules WITH the questions they read
-         *  is what makes the scope legible: a badge saying "patient-level"
-         *  next to a rule in a mixed list was not landing, whereas its
-         *  position under the period-level questions is unambiguous. */}
-        {/* Questions section, tier-grouped */}
-        <section>
-          <h2 className="text-[13px] font-semibold mb-1.5">Question framework</h2>
-          {/* Engine-computed inputs. Shown here rather than as a QuestionRow
-           *  because there is nothing to answer: the reviewer's job is to know
-           *  what a rule's applicability gate READ, since it decides whether
-           *  this patient counts toward that rule at all. Hidden in blind mode
-           *  along with every other non-reviewer answer. */}
-          {derivedAnswers.length > 0 && (
-            <div className="mb-2 px-3 py-1.5 border border-dashed border-border rounded bg-muted/30 text-[11.5px] flex flex-wrap gap-x-4 gap-y-1">
-              {derivedAnswers.map((a) => (
-                <span key={a.question_id} className="text-muted-foreground">
-                  <span className="font-mono">{a.question_id}</span>
-                  {" = "}
-                  <span className="text-foreground font-medium">{String(a.answer)}</span>
-                  <span className="ml-1.5 text-[10.5px]">
-                    computed{a.reasoning ? ` · ${a.reasoning}` : ""}
-                  </span>
-                </span>
-              ))}
-            </div>
-          )}
-          {tiers.map((t) => {
-            // Event-scoped questions are answered in the Events section, once
-            // per event, with the span they are judged over. They are not listed
-            // here at all: a period-level control for them has no meaning (the
-            // write path refuses one), and a read-only stand-in was just a
-            // second place to look for one answer.
-            const qs = (meta.questions_by_tier[t] ?? [])
-              .filter((q) => !eventScopedQids.has(q.question_id));
-            if (qs.length === 0) return null;
-            const open = expandedTiers.has(t);
-            return (
-              <div key={t} className="border border-border rounded mb-2 bg-card">
-                <button
-                  onClick={() => toggleTier(t)}
-                  className="w-full px-3 py-2 text-left text-[12.5px] font-medium flex items-center gap-1.5 hover:bg-muted/50"
-                >
-                  {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-                  {TIER_LABELS[t] ?? `Tier ${t}`}
-                  <span className="text-muted-foreground font-normal">({qs.length})</span>
-                </button>
-                {open && (
-                  <div className="border-t border-border">
-                    {qs.map((q) => (
-                      <QuestionRow
-                        key={q.question_id}
-                        q={q}
-                        answer={answersByQid.get(q.question_id)}
-                        agentIds={agentIds}
-                        agentAnswers={agentIds.map(
-                          (id) => agentAnswersByQid.get(id)?.get(q.question_id),
-                        )}
-                        validated={validatedQuestions.has(q.question_id)}
-                        busy={busy === `q:${q.question_id}`}
-                        blind={blind}
-                        onSave={(a) => saveAnswer(q.question_id, a)}
-                        onJumpToSource={setNoteFocus}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </section>
-
-
-        {patientLevelRules.length > 0 && (
+        {/* ── ① ELIGIBILITY ────────────────────────────────────────────
+         *  The gate, first. A patient who fails it contributes nothing to any
+         *  rule, so annotating their events before checking it is the most
+         *  wasteful order available. This is why the page is three blocks and
+         *  not a simple period/event swap. */}
+        {eligibilityTiers.length > 0 && (
           <section>
-            <h2 className="text-[13px] font-semibold mb-1.5">
-              Rules judged once for the period
-              <span className="ml-1.5 font-normal text-muted-foreground">({patientLevelRules.length})</span>
-            </h2>
-          <div className="border border-border rounded bg-card divide-y divide-border">
-            {patientLevelRules.map((r) => (
-              <RuleRow
-                key={r.rule_id}
-                rule={r}
-                verdict={verdictsByRid.get(r.rule_id)}
-                validated={validatedRules.has(r.rule_id)}
-                categories={meta.attribution_categories}
-                answersByQid={answersByQid}
-                agentIds={agentIds}
-                agentVerdicts={agentIds.map(
-                  (id) => agentVerdictsByRid.get(id)?.get(r.rule_id),
-                )}
-                eventRollup={blind ? undefined : ruleRollups.find((x) => x.rule_id === r.rule_id)}
-                busy={busy === `r:${r.rule_id}`}
-                blind={blind}
-                onSave={(v, a, rationale) => saveVerdict(r.rule_id, v, a, rationale)}
-              />
-            ))}
-          </div>
+            <h2 className="text-[13px] font-semibold mb-1.5">Eligibility</h2>
+            {renderTierBlocks(eligibilityTiers)}
+            {eligibilityRules.length > 0 && renderRuleList(eligibilityRules)}
           </section>
         )}
 
-        {/* ── PER EVENT ─────────────────────────────────────────────────
+        {/* ── ② PER EVENT ───────────────────────────────────────────────
          *  Each qualifying day of care, the questions it asks, and the rules
-         *  judged at it. Below the period-level half because a reviewer works
-         *  top-down: establish the year, then walk the events in it. */}
+         *  judged at it. ABOVE the period block, for two reasons:
+         *
+         *  1. It removes a forward dependency. T1-WorstControlLevel is reduced
+         *     from the per-event control levels, and T2-SpecialtyReferral's
+         *     instruction tells the annotator to read it — with the period
+         *     block first, that value was still empty when they reached the
+         *     question that needs it.
+         *  2. It is how a chart is read. Walking the visits in date order is
+         *     what builds the picture, and several period questions are
+         *     CONCLUSIONS over the window ("was an action plan ever given",
+         *     "how many exacerbations", "most recent ACT") — answering those
+         *     first means guessing, or reading the notes twice.
+         *
+         *  One backward dependency remains and is harmless:
+         *  T2-ContraindicationDocumented (period) is read by two event rules,
+         *  but only from `attribution_when`, so it labels the reason on a
+         *  non-concordance and never decides one. An event's attribution can
+         *  therefore change once that question is answered in ③; its verdict
+         *  cannot. */}
         {/* Events section — anchored events only (encounter/ed/burst/...).
          *  Window events stay represented in the Rules section below. */}
         {anchoredEvents.length > 0 && (
@@ -1554,26 +1570,50 @@ export function AdherenceReview(props: AdherenceReviewProps) {
               Rules judged per event
               <span className="ml-1.5 font-normal text-muted-foreground">({eventLevelRules.length})</span>
             </h2>
-          <div className="border border-border rounded bg-card divide-y divide-border">
-            {eventLevelRules.map((r) => (
-              <RuleRow
-                key={r.rule_id}
-                rule={r}
-                verdict={verdictsByRid.get(r.rule_id)}
-                validated={validatedRules.has(r.rule_id)}
-                categories={meta.attribution_categories}
-                answersByQid={answersByQid}
-                agentIds={agentIds}
-                agentVerdicts={agentIds.map(
-                  (id) => agentVerdictsByRid.get(id)?.get(r.rule_id),
-                )}
-                eventRollup={blind ? undefined : ruleRollups.find((x) => x.rule_id === r.rule_id)}
-                busy={busy === `r:${r.rule_id}`}
-                blind={blind}
-                onSave={(v, a, rationale) => saveVerdict(r.rule_id, v, a, rationale)}
-              />
-            ))}
-          </div>
+            {renderRuleList(eventLevelRules)}
+          </section>
+        )}
+
+        {/* ── ③ THE PERIOD ──────────────────────────────────────────────
+         *  Questions answered once for the whole observation window, and the
+         *  rules judged from them. Last because they are conclusions over the
+         *  window the events above just walked — including the engine's own
+         *  reduction of the per-event control levels. */}
+        {periodTiers.length > 0 && (
+          <section>
+            <h2 className="text-[13px] font-semibold mb-1.5">Question framework</h2>
+            {/* Engine-computed inputs. Shown here rather than as a QuestionRow
+             *  because there is nothing to answer: the reviewer's job is to know
+             *  what a rule's applicability gate READ, since it decides whether
+             *  this patient counts toward that rule at all. It is populated by
+             *  the events above — which is the ordering this block's position
+             *  exists to guarantee. Hidden in blind mode along with every other
+             *  non-reviewer answer. */}
+            {derivedAnswers.length > 0 && (
+              <div className="mb-2 px-3 py-1.5 border border-dashed border-border rounded bg-muted/30 text-[11.5px] flex flex-wrap gap-x-4 gap-y-1">
+                {derivedAnswers.map((a) => (
+                  <span key={a.question_id} className="text-muted-foreground">
+                    <span className="font-mono">{a.question_id}</span>
+                    {" = "}
+                    <span className="text-foreground font-medium">{String(a.answer)}</span>
+                    <span className="ml-1.5 text-[10.5px]">
+                      computed{a.reasoning ? ` · ${a.reasoning}` : ""}
+                    </span>
+                  </span>
+                ))}
+              </div>
+            )}
+            {renderTierBlocks(periodTiers)}
+          </section>
+        )}
+
+        {patientLevelRules.length > 0 && (
+          <section>
+            <h2 className="text-[13px] font-semibold mb-1.5">
+              Rules judged once for the period
+              <span className="ml-1.5 font-normal text-muted-foreground">({patientLevelRules.length})</span>
+            </h2>
+            {renderRuleList(patientLevelRules)}
           </section>
         )}
       </div>

@@ -1415,6 +1415,52 @@ describe("Event timeline + per-event validation", () => {
     expect(screen.queryByText(/Window rules/)).toBeNull();
   });
 
+  it("I8: page order is eligibility gate, then events, then the period conclusions", async () => {
+    // The order is the feature. T2-SpecialtyReferral's instruction tells the
+    // annotator to read T1-WorstControlLevel, which the engine reduces from the
+    // per-event control levels — with the period block first that value was
+    // still empty when they reached the question needing it. Events therefore
+    // sit ABOVE the period block. Eligibility stays first regardless: a patient
+    // who fails the gate contributes nothing, so annotating their events before
+    // checking it is the most wasteful order available.
+    setupMocks({
+      state: () => stateWithEvents(),
+      framework: {
+        ...FRAMEWORK,
+        rules: [
+          {
+            rule_id: "R-T0-Eligible",
+            description: "study eligibility gate",
+            verdict_if: "q_eligible == true",
+            supporting_questions: ["q_eligible"],
+          },
+          ...FRAMEWORK.rules,
+        ],
+      },
+    });
+    renderPane();
+    await waitLoaded();
+
+    // Headings by role — "Events" also appears in the completion strip
+    // ("Events: 0 / 3"), so the accordion is matched as a button.
+    const order = [
+      screen.getByRole("heading", { name: /^Eligibility/ }),
+      screen.getByRole("button", { name: /^Events/ }),
+      screen.getByRole("heading", { name: /^Question framework/ }),
+      screen.getByRole("heading", { name: /^Rules judged once for the period/ }),
+    ];
+    for (let i = 1; i < order.length; i++) {
+      // Node.compareDocumentPosition: 4 = the argument FOLLOWS this node.
+      expect(order[i - 1]!.compareDocumentPosition(order[i]!) & 4).toBe(4);
+    }
+
+    // The gate sits in the Eligibility block, not down in the period rules.
+    const eligibilitySection = order[0]!.closest("section")!;
+    expect(within(eligibilitySection).getByText("R-T0-Eligible")).toBeInTheDocument();
+    const periodRulesSection = order[3]!.closest("section")!;
+    expect(within(periodRulesSection).queryByText("R-T0-Eligible")).toBeNull();
+  });
+
   it("unchecking 'Not evaluable' posts evaluable:true, undoing a prior mis-marking (C3)", async () => {
     setupMocks({ state: () => stateWithEvents() });
     renderPane();

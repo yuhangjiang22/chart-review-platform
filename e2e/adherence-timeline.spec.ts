@@ -128,11 +128,20 @@ test.describe("adherence event timeline", () => {
     await gotoPatient(page, TASK_ID, PATIENT_ID);
 
     await expect(page.getByText(/Adherence ·/i)).toBeVisible();
-    // Rules live in ONE list, marked by the scope each is judged at — the
-    // separate window-rule chip strip duplicated it and is gone.
-    // Rules sit in the section for the scope they are judged at.
-    await expect(page.getByText(/Rules judged once for the period/)).toBeVisible();
+    // Rules sit in the section for the scope they are judged at, and the page
+    // runs eligibility gate → events → period conclusions. The order matters:
+    // a period question's instruction reads a value the engine reduces from the
+    // per-event answers, so the events must come first.
+    await expect(page.getByRole("heading", { name: /^Eligibility/ })).toBeVisible();
     await expect(page.getByText(/Rules judged per event/)).toBeVisible();
+    await expect(page.getByText(/Rules judged once for the period/)).toBeVisible();
+    const yOf = async (l: ReturnType<typeof page.getByText>) =>
+      (await l.first().boundingBox())!.y;
+    const yEligibility = await yOf(page.getByRole("heading", { name: /^Eligibility/ }));
+    const yEvents = await yOf(page.getByRole("button", { name: /^Events/ }));
+    const yPeriod = await yOf(page.getByRole("heading", { name: /^Question framework/ }));
+    expect(yEligibility).toBeLessThan(yEvents);
+    expect(yEvents).toBeLessThan(yPeriod);
 
     await openSourceTimeline(page);
     const firstLine = ruleLines(page).first();
