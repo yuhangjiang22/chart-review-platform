@@ -27,11 +27,10 @@
 *     non-ED (outpatient).
 *
 * ── WHAT CHANGED FROM THE v0.4 VERSION OF THIS FILE ───────────────────────────
-* Two changes, both required for a site's cohort to be comparable with the INPC
-* development cohort. Parameter names and the output contract are otherwise
-* unchanged, except that @min_lookback_visits is now @min_asthma_encounters
-* (renamed because it no longer counts visits) and stratification columns are
-* added to the SELECT.
+* Two changes, both required for site cohorts to be comparable with each other.
+* Parameter names and the output contract are otherwise unchanged, except that
+* @min_lookback_visits is now @min_asthma_encounters (renamed because it no
+* longer counts visits) and stratification columns are added to the SELECT.
 *
 *   1. The lookback counts ASTHMA-RELATED encounters, not any outpatient visit.
 *      v0.4 counted every visit_concept_id=9202 in the window regardless of what
@@ -48,11 +47,9 @@
 * ── KNOWN LIMITATION OF THE OUTPATIENT-ANCHORED INDEX ─────────────────────────
 * index_date is the most recent pediatric outpatient visit of ANY kind, so a
 * child whose latest visit was a well-child check gets an index anchored there,
-* and asthma care earlier in the year can fall outside the 12-month window. On
-* the INPC draw made under the v0.4 rule, 12 of 30 sampled patients ended up
-* with zero asthma encounters inside their own window — change 1 above now
-* excludes those patients rather than admitting them empty, but the anchor still
-* costs observation time for the patients who do qualify.
+* and asthma care earlier in the year can fall outside the 12-month window.
+* Change 1 above excludes patients left with no asthma encounter at all, but the
+* anchor still costs observation time for the patients who do qualify.
 *
 * Anchoring the index on the most recent ASTHMA encounter instead would remove
 * that loss, at the cost of shifting index_date — and therefore the observation
@@ -103,8 +100,8 @@ asthma_pts AS (
 ),
 -- Encounters an asthma diagnosis is actually attached to. The link is
 -- visit_occurrence_id, NOT a same-day match: a same-day rule flags every
--- encounter sharing a calendar day with an asthma diagnosis, which on the INPC
--- data inflated the asthma-encounter count several-fold on multi-visit days.
+-- encounter sharing a calendar day with an asthma diagnosis, which inflates the
+-- asthma-encounter count on any day a patient was seen more than once.
 asthma_visit AS (
   SELECT DISTINCT co.visit_occurrence_id AS vid
   FROM @cdm_database_schema.condition_occurrence co
