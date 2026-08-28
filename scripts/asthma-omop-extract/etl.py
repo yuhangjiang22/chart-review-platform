@@ -192,9 +192,23 @@ def main():
     lim = f" LIMIT {a.limit}" if a.limit else ""
     coh = render_duckdb(load("cohort.sql")).strip().rstrip(";")
     con.execute(f"CREATE TABLE cohort AS SELECT * FROM ({coh}) t{where}{lim}")
-    cohort = con.execute("SELECT person_id, CAST(index_date AS VARCHAR), age_at_index FROM cohort").fetchall()
+    # OBSERVABILITY FIELDS carried through to meta.json. cohort.sql emits both
+    # and NOTHING downstream could see them, because the ETL dropped them here —
+    # so the mitigation cohort.sql documents ("exclude the short-lookback
+    # patients from the spirometry rule at analysis time rather than from the
+    # cohort") had nothing to work with. A patient with 365-729 days of prior
+    # observation is fully observable for every question EXCEPT the 24-month
+    # spirometry one, and judging that one anyway reports a DOCUMENTATION_GAP
+    # that is an artifact of the extract window, not of care.
+    cohort = con.execute(
+        "SELECT person_id, CAST(index_date AS VARCHAR), age_at_index, "
+        "days_observed_before_index, n_notes_12mo FROM cohort").fetchall()
     print(f"[etl] cohort rows to extract: {len(cohort)}")
-    pmeta = {r[0]: {"idx": r[1][:10], "age": r[2]} for r in cohort}
+    pmeta = {r[0]: {"idx": r[1][:10], "age": r[2],
+                    "days_observed_before_index": r[3], "n_notes_12mo": r[4]} for r in cohort}
+    short = [r for r in cohort if (r[3] or 0) < 730]
+    print(f"[etl] prior observation: {len(short)}/{len(cohort)} patients have < 730 days "
+          f"(the 24-month spirometry question cannot be fully observed for them)")
     demo = {r[0]: r[1:] for r in con.execute("SELECT person_id, year_of_birth, gender_concept_id FROM person").fetchall()}
 
     # run extracts (all cohort patients at once) → group by person_id
@@ -326,6 +340,13 @@ def main():
             if r["note_text"]: open(os.path.join(pdir,"notes",f"{fn}.txt"),"w").write(str(r["note_text"]))
         json.dump({"patient_id":anon,"category":"asthma_adherence_real","demographics":{"age":age,"sex":sex},
                    "index_date":idx,"phi":True,"doc_types":sorted(doctypes),
+                   # How much chart there was to read BEFORE the index date, and how
+                   # many notes fell in the 12-month lookback. Both decide whether a
+                   # "not documented" answer means absent-from-care or
+                   # absent-from-the-extract; without them nothing downstream can
+                   # tell those apart.
+                   "days_observed_before_index": pmeta[pid].get("days_observed_before_index"),
+                   "n_notes_12mo": pmeta[pid].get("n_notes_12mo"),
                    "source":"OMOP ETL (scripts/asthma-omop-extract) — real de-identified EHR",
                    "note":"Real patient; PHI — gitignored. Chart filtered to date <= index_date."},
                   open(os.path.join(pdir,"meta.json"),"w"), indent=2)

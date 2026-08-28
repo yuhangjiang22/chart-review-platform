@@ -122,7 +122,13 @@ interface RuleDefinition {
   verdict_if: string;
   excluded_if?: string;
   nuanced?: boolean;
+  /** Hand-written declaration of what supports the rule. Drifts from what the
+   *  engine reads, in both directions — see questions_read. */
   supporting_questions?: string[];
+  /** question_ids the ENGINE actually reads, computed server-side from the
+   *  rule's own expressions (questionsReadBy). Absent on a server that predates
+   *  it, in which case the row falls back to supporting_questions. */
+  questions_read?: string[];
 }
 
 interface AdherenceMeta {
@@ -1339,6 +1345,9 @@ export function AdherenceReview(props: AdherenceReviewProps) {
             (id) => agentVerdictsByRid.get(id)?.get(r.rule_id),
           )}
           eventRollup={blind ? undefined : ruleRollups.find((x) => x.rule_id === r.rule_id)}
+          unansweredEvents={blind ? 0 : ruleEvents.filter((e) =>
+            e.rule_id === r.rule_id && e.evaluable === false && isUnansweredReason(e.evaluable_reason),
+          ).length}
           busy={busy === `r:${r.rule_id}`}
           blind={blind}
           onSave={(v, a, rationale) => saveVerdict(r.rule_id, v, a, rationale)}
@@ -2009,6 +2018,7 @@ function QuestionRow({
 function RuleRow({
   rule, verdict, validated, categories, answersByQid, agentIds, agentVerdicts, busy, blind = false, onSave,
   eventRollup,
+  unansweredEvents = 0,
 }: {
   rule: RuleDefinition;
   verdict: RuleVerdict | undefined;
@@ -2020,6 +2030,11 @@ function RuleRow({
   /** Per-event rollup for an anchored rule — its badge reads the rate rather
    *  than implying a single verdict. Undefined for patient-level rules. */
   eventRollup?: RuleRollup;
+  /** Events of this rule the ENGINE could not judge because nobody answered
+   *  them — as opposed to ones the requirement does not apply to. Both leave the
+   *  denominator and both roll up EXCLUDED, so without this the row reports a
+   *  lost measurement as a clean exclusion. */
+  unansweredEvents?: number;
   busy: boolean;
   /** Blind-annotation mode: render only the reviewer's own verdict control
    *  (select/attribution/rationale/save) — no engine-computed "Engine:"
@@ -2057,6 +2072,15 @@ function RuleRow({
     : draftV === "NON_CONCORDANT" ? "text-[hsl(var(--oxblood))] border-[hsl(var(--oxblood))]/40"
     : "text-muted-foreground border-border";
 
+  // What the engine reads vs what the rule merely declares. Falls back to the
+  // declaration on a server that does not send questions_read, which reproduces
+  // the old (single-list) row rather than showing an empty one.
+  const declared = rule.supporting_questions ?? [];
+  const inputsRead = rule.questions_read ?? declared;
+  const inputsDeclaredOnly = rule.questions_read
+    ? declared.filter((q) => !rule.questions_read!.includes(q))
+    : [];
+
   // EXCLUDED-because-nobody-answered, carried on the verdict's rationale by the
   // engine (ENGINE_PERIOD_UNANSWERED_REASON) so a reader does not have to walk
   // rule_events to tell it from EXCLUDED-because-inapplicable.
@@ -2083,6 +2107,20 @@ function RuleRow({
                 {eventRollup.n_concordant}/{eventRollup.n_evaluable} events
               </span>
             )}
+            {/* A rule can lose events two ways that both roll up EXCLUDED and
+              *  mean opposite things: the requirement does not apply there, or
+              *  nobody answered them. Only the period-level case was surfaced
+              *  (the UNANSWERED label below reads the verdict's rationale), so
+              *  an anchored rule whose events went unanswered reported as a
+              *  clean exclusion — a lost measurement shown as a decision. */}
+            {unansweredEvents > 0 && (
+              <span
+                className="text-[10px] uppercase tracking-wider px-1.5 py-0 rounded bg-[hsl(var(--ochre)/0.15)] text-[hsl(var(--ochre))]"
+                title="Events the engine could not judge because no answer was committed for them — not events the requirement fails to apply to."
+              >
+                {unansweredEvents} unanswered
+              </span>
+            )}
             {rule.nuanced && (
               <span className="text-[10px] uppercase tracking-wider px-1.5 py-0 rounded bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200">nuanced</span>
             )}
@@ -2097,10 +2135,10 @@ function RuleRow({
            *  mode: answersByQid is already reviewer-only there, but this is
            *  explicitly gated too (spec 2026-08-24 Task 5 review, Critical
            *  2) rather than relying solely on the upstream filter. */}
-          {!blind && rule.supporting_questions && rule.supporting_questions.length > 0 && (
+          {!blind && inputsRead.length > 0 && (
             <div className="mt-1 text-[11px] flex flex-wrap gap-x-3 gap-y-0.5">
               <span className="text-muted-foreground">Inputs:</span>
-              {rule.supporting_questions.map((qid) => {
+              {inputsRead.map((qid) => {
                 const a = answersByQid.get(qid);
                 const val = a ? JSON.stringify(a.answer) : "—";
                 const tag = a?.source === "reviewer" ? "(R)" : a?.source === "agent" ? "(A)" : "";
@@ -2110,6 +2148,37 @@ function RuleRow({
                     {" = "}
                     <span className={a ? "text-foreground" : "text-muted-foreground italic"}>{val}</span>
                     {tag && <span className="text-[10px] ml-0.5 text-muted-foreground">{tag}</span>}
+                  </span>
+                );
+              })}
+            </div>
+          )}
+          {/* Declared in supporting_questions but NOT read by any of the rule's
+            *  expressions. Shown apart, because listing them under "Inputs:"
+            *  told the reviewer that questions which cannot affect the verdict
+            *  decide it — on the v0.6 rubric that covered 4 of 12 rules, and it
+            *  is how a whole missing rule arm stayed invisible: the control
+            *  level appeared as an input to the controller rule for weeks while
+            *  no expression read it. They are still worth showing: a rule can
+            *  legitimately delegate applicability to a question's own enum
+            *  (T2-SpecialtyReferral == "not_indicated"), in which case the
+            *  declared context is what the ANSWERER was told to consider, and
+            *  the engine simply does not re-check it. */}
+          {!blind && inputsDeclaredOnly.length > 0 && (
+            <div className="mt-0.5 text-[10.5px] flex flex-wrap gap-x-3 gap-y-0.5">
+              <span
+                className="text-muted-foreground"
+                title="Declared as supporting the rule, but no expression reads them — they inform whoever answers, and cannot change the verdict."
+              >
+                Context (not read by the engine):
+              </span>
+              {inputsDeclaredOnly.map((qid) => {
+                const a = answersByQid.get(qid);
+                return (
+                  <span key={qid} className="text-muted-foreground">
+                    <span className="font-mono">{qid}</span>
+                    {" = "}
+                    <span className={a ? "" : "italic"}>{a ? JSON.stringify(a.answer) : "—"}</span>
                   </span>
                 );
               })}
@@ -2272,6 +2341,15 @@ function RuleRow({
 // draft changes (e.g. every reason-input keystroke).
 const ENGINE_GATED_REASON = "event_evaluable_if not met";
 
+/** Does this not-evaluable reason mean "nobody answered", as opposed to "the
+ *  requirement does not apply"? Mirrors the engine's two unanswered sentinels
+ *  (ENGINE_UNANSWERED_REASON for an anchored event, ENGINE_PERIOD_UNANSWERED_REASON
+ *  — which appends the missing question_ids — for a window one). */
+function isUnansweredReason(reason: string | undefined): boolean {
+  return reason === "event unanswered (no committed answer for this rule)"
+    || (reason ?? "").startsWith("question unanswered");
+}
+
 function EventRowImpl({
   event, rule, questionDefsById, draft, onDraftChange, dirty, canSave,
   selected, validated, busy, error, blind = false, onSave, onJumpToSource,
@@ -2294,6 +2372,11 @@ function EventRowImpl({
   onSave: (eventId: string, payload: EventSavePayload) => void;
   onJumpToSource?: (focus: NoteFocus) => void;
 }) {
+  // The gate's own inputs, named so the reviewer can see WHICH answer left this
+  // event out rather than being told to go answer something. Server-computed
+  // from the rule's expressions (questions_read); falls back to the declaration.
+  const gateInputs = rule?.questions_read ?? rule?.supporting_questions ?? [];
+
   function updateAnswer(qid: string, value: QuestionAnswer["answer"]) {
     onDraftChange(event.event_id, {
       ...draft,
@@ -2396,14 +2479,22 @@ function EventRowImpl({
            *  file otherwise refuses for a non-reviewer event. */}
           {(!blind || event.source === "reviewer") && event.evaluable === false && event.evaluable_reason && (
             event.evaluable_reason === ENGINE_GATED_REASON ? (
-              // The engine itself re-derives evaluable:false from this
-              // event's gating question on every run — sending
-              // evaluable:true here will look like it "didn't take" once
-              // the engine re-marks it, unless the reviewer actually
-              // answers the gating question. Explain that instead of the
+              // The engine itself re-derives evaluable:false from this event's
+              // applicability gate on every run — sending evaluable:true here
+              // will look like it "didn't take" once the engine re-marks it,
+              // unless the gate's own inputs change. Explain that instead of the
               // raw internal sentinel string.
+              //
+              // The old wording said "not evaluable until its gating question is
+              // answered", which is usually FALSE: the common case is that the
+              // question IS answered and the answer simply does not meet the gate
+              // (well_controlled at a rule that only applies when control is
+              // poor). Saying "unanswered" there sent the reviewer looking for
+              // missing work that does not exist — and it hid the real reading,
+              // which is that the requirement does not apply here.
               <div className="text-[11px] text-muted-foreground italic mt-0.5">
-                engine-gated: this event is not evaluable until its gating question is answered
+                the requirement does not apply at this event — its applicability gate
+                {gateInputs.length > 0 ? ` (${gateInputs.join(", ")})` : ""} is not met
               </div>
             ) : (
               <div className="text-[11px] text-muted-foreground italic mt-0.5">

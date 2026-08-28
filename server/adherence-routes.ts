@@ -64,7 +64,7 @@ import {
   loadAdherenceSkill, expandEventWorklist, toAnchorEntries, computeWorklistHash,
 } from "@chart-review/pipeline-extract-adherence";
 import {
-  evaluateAllRuleEvents, rulesReadingQid, DERIVED_WORST_CONTROL_QID,
+  evaluateAllRuleEvents, rulesReadingQid, questionsReadBy, DERIVED_WORST_CONTROL_QID,
 } from "@chart-review/rule-engine";
 import { deriveAdherenceReviewStatus } from "./lib/review-completion.js";
 import { mergeRecomputedVerdicts } from "./lib/adherence-merge.js";
@@ -191,7 +191,13 @@ export const adherenceRoutes: RouteEntry[] = [
         ok: true,
         task_id: p.taskId,
         questions_by_tier,
-        rules: skill.rules,
+        // `questions_read` is what the ENGINE actually reads, computed from the
+        // rule's own expressions. `supporting_questions` beside it is a
+        // hand-written declaration and drifts from them (4 of 12 rules did), so
+        // the pane renders the two differently instead of presenting the
+        // declaration as if it decided the verdict. Computed here rather than in
+        // the client so there is one expression parser, not two.
+        rules: skill.rules.map((r) => ({ ...r, questions_read: questionsReadBy(r) })),
         attribution_categories: skill.attribution_categories,
       };
     },

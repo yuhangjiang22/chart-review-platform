@@ -1724,8 +1724,17 @@ async function runOneAgent(
         // the run) and never reach the persisted draft or the committed
         // review_state /import merges into.
         rule_events_provenance,
-        events_unanswered: unansweredAnchored || undefined,
-        rules_unanswered: rulesUnanswered || undefined,
+        // events_unanswered / rules_unanswered were written here and read
+        // NOWHERE — not by the pane, the import, the pilots view, or any
+        // analysis. Removed rather than wired up, for two reasons. They are
+        // derivable from data that travels with them (an event's own
+        // evaluable_reason, a verdict's own rationale), and the pane now derives
+        // exactly that, so a stored copy is a second answer to the same
+        // question. And a stored count goes STALE the moment a reviewer answers
+        // one of the events it counted, while the merge has no rule to update
+        // it — a wrong number that looks authoritative, which is the failure
+        // this audit kept finding. The information still reaches a human: both
+        // are written as transcript warnings a few lines above.
         adherence_excluded: auditExcluded || undefined,
         lock_task_sha: manifest.guideline_sha,
       });

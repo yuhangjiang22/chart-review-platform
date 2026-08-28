@@ -42,8 +42,14 @@ rules:
     attribution: GUIDELINE_DEVIATION
     nuanced: true
     judge_can_override: false
+    # T1-ControlLevel added 2026-08-28: `event_evaluable_if` READS it — it is what
+    # decides whether this rule applies at a visit at all — and it was the one
+    # input the reviewer's pane never listed. The other direction (declared but
+    # unread) is fine and stays: those inform whoever answers, and the pane now
+    # shows them under "Context (not read by the engine)".
     supporting_questions:
-      [T0-AgeBand, T2-StepTherapyMatch, T2-ContraindicationDocumented, T1-ControllerPrescribed]
+      [T0-AgeBand, T1-ControlLevel, T2-StepTherapyMatch, T2-ContraindicationDocumented,
+       T1-ControllerPrescribed]
 
   - rule_id: R-T2-WrittenActionPlan
     description: >-

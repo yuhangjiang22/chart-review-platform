@@ -911,6 +911,35 @@ export function withDerivedAnswers(
  *  rather than hard-coding the dependency at the call site. Rules that fail to
  *  compile are skipped (they get their own compile-error containment during
  *  evaluation). */
+/** Every question_id this rule's expressions actually READ — verdict, exclusion,
+ *  event applicability, censoring, and the attribution arms.
+ *
+ *  `supporting_questions` is a hand-written DECLARATION and it drifts: the pane
+ *  renders it as the rule's "Inputs:" row, so a reviewer is shown a list of what
+ *  supposedly decides the verdict while the engine reads something else. On the
+ *  v0.6 rubric four of twelve rules disagreed, in both directions —
+ *  R-T2-StepTherapyMatches read T1-ControlLevel WITHOUT declaring it (the input
+ *  that decides whether the rule applies at all was invisible to the reviewer),
+ *  and R-T1-ControllerForPersistent declared a control level it never read, which
+ *  is how a whole missing rule arm hid in plain sight for weeks.
+ *
+ *  Synthetic (`_`-prefixed) ids are dropped: they are engine-supplied anchor
+ *  facts, not questions anybody answers. A malformed expression contributes
+ *  nothing rather than throwing — a rule that fails to compile is reported as a
+ *  compile error elsewhere, and this must stay usable for display. */
+export function questionsReadBy(rule: RuleDefinition): string[] {
+  const out = new Set<string>();
+  const sources = [
+    rule.verdict_if, rule.excluded_if, rule.event_evaluable_if, rule.event_censored_if,
+    ...(rule.attribution_when ?? []).map((aw) => aw.when),
+  ];
+  for (const src of sources) {
+    if (!src) continue;
+    try { collectQids(parseExpression(src), out); } catch { /* see above */ }
+  }
+  return [...out].filter((q) => !q.startsWith("_")).sort();
+}
+
 export function rulesReadingQid(
   rules: RuleDefinition[],
   qid: string,
