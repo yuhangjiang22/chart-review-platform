@@ -1,6 +1,8 @@
 # Attribution taxonomy for adherence rule verdicts.
 #
-# THE ACCR DESIGN'S FIVE (2026-03-Agentic-Asthma-Adherence-Design), and not more.
+# THE ACCR DESIGN'S FIVE (2026-03-Agentic-Asthma-Adherence-Design), and not more
+# — now FOUR, one of the five having turned out to be unreachable by construction
+# (see the INSUFFICIENT_DATA note below).
 #
 # This file used to list nine: the five plus PATIENT_REFUSAL, CONTRAINDICATION,
 # PENDING_FOLLOWUP and OTHER. Its own header called the first two "domain-specific
@@ -27,6 +29,25 @@
 # Measured before the change: 290 attributions across every run, only
 # DOCUMENTATION_GAP (269) and GUIDELINE_DEVIATION (19) ever produced, plus 2 OTHER.
 #
+# INSUFFICIENT_DATA removed 2026-08-28, leaving FOUR. It described "we genuinely
+# can't tell either way — common when the lookback window is too short", and it
+# had never been produced once (613 NON_CONCORDANT verdicts across 295 stored
+# states: 665 DOCUMENTATION_GAP, 77 GUIDELINE_DEVIATION, 4 legacy OTHER, nothing
+# else). It could not be: every case it names is now handled BEFORE a verdict
+# exists, by removing the event from the denominator rather than attributing a
+# non-concordance to it —
+#   * a lookback too short for the question  -> event_censored_if
+#     (R-T1-SpirometryWithin24mo's 730-day rule)
+#   * a judgment window running past the end of observation -> _window_censored /
+#     _deadline_censored
+#   * nobody answered the question at all    -> ENGINE_UNANSWERED_REASON /
+#     ENGINE_PERIOD_UNANSWERED_REASON
+# Attributing "insufficient data" to a NON_CONCORDANT verdict would mean the
+# engine had judged a care gap it simultaneously said it could not judge. Keeping
+# the category as a REVIEWER-only option was the alternative and was rejected: an
+# option a human can pick but the engine can never produce makes the two columns
+# of an agreement study incomparable.
+#
 # THIS FILE OVERRIDES the platform default in skill-loader.ts — a task adds a
 # genuinely domain-specific category HERE, deliberately, rather than by widening
 # the platform's list. It is also what the reviewer's UI offers, so anything added
@@ -43,7 +64,6 @@ categories:
   - GUIDELINE_DEVIATION
   - PATIENT_FACTOR
   - SYSTEM_FACTOR
-  - INSUFFICIENT_DATA
 
 descriptions:
   DOCUMENTATION_GAP: >-
@@ -66,9 +86,3 @@ descriptions:
     action — formulary restriction, insurance denial or appeal in progress,
     referral delay, pharmacy stock-out, specialty access. The deviation is
     neither the patient's nor the clinician's fault.
-  INSUFFICIENT_DATA: >-
-    There isn't enough information in the available chart to make a
-    determination. Distinct from DOCUMENTATION_GAP — that implies the action
-    likely happened but wasn't written down; this means we genuinely can't tell
-    either way. Common when the lookback window is too short or the patient is
-    new to the system.
