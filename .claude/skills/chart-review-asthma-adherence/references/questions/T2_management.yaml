@@ -291,6 +291,20 @@ questions:
         - system_barrier
         - not_documented
         - not_applicable
+      description: >-
+        This question only has content when there IS a gap. not_applicable means
+        the patient IS on a controller matching step therapy, so there is nothing
+        to explain — it does NOT mean "this patient does not need a controller".
+        Whether a controller was owed is decided by the platform from the
+        exacerbation history and the per-visit control level, never by this
+        answer, and the write path rejects not_applicable when a committed answer
+        says no controller was prescribed. When there IS a gap: use
+        contraindication / patient_refusal / pending_followup / system_barrier if
+        the chart documents a reason, and not_documented if it gives none.
+        not_documented is the answer for "the chart is silent", NOT the default
+        for "I did not look" — a documented refusal filed as not_documented turns
+        a patient's own choice into the clinician's omission, which is the
+        opposite clinical reading.
     depends_on:
       - T2-StepTherapyMatch
     naepp_source: "EPR-3 Component 4, p.214 — 'In the opinion of the

@@ -38,6 +38,15 @@ beforeAll(() => {
   fs.mkdirSync(path.join(rubricRoot, "references", "questions"), { recursive: true });
   fs.writeFileSync(path.join(rubricRoot, "references", "questions", "T1.yaml"), [
     "questions:",
+    "  - question_id: T2-ContraindicationDocumented",
+    "    tier: 2",
+    "    text: is a contraindication or refusal documented",
+    "    answer_schema: { type: string, enum: [contraindication, patient_refusal, pending_followup, system_barrier, not_documented, not_applicable] }",
+    "  - question_id: T1-ControllerPrescribed",
+    "    tier: 1",
+    "    event_scoped: true",
+    "    text: was a controller prescribed",
+    "    answer_schema: { type: boolean }",
     "  - question_id: T2-SpecialtyReferral",
     "    tier: 2",
     "    text: is a specialty referral documented",
@@ -204,5 +213,71 @@ describe("\"not indicated\" cannot contradict the patient's own control levels",
     seedEventControlLevel("very_poorly_controlled");
     expect(parse(await referral("not_referred")).ok).toBe(true);
     expect(parse(await referral("referred")).ok).toBe(true);
+  });
+});
+
+// ── "not applicable" means the premise does not hold ──────────────────────
+//
+// T2-ContraindicationDocumented asks "IF the patient is NOT on a matching
+// controller, is a reason documented?" — so not_applicable means "they ARE on
+// one, nothing to explain". Measured across 33 real patients, 5 (15%) committed
+// not_applicable while also answering that no controller was prescribed, and the
+// engine resolved the contradiction silently as DOCUMENTATION_GAP.
+
+function seedControllerAnswer(where: "event" | "period" | "none", value?: boolean) {
+  const st = loadOrCreate(session.patientId, session.task);
+  st.task_kind = "adherence";
+  st.rule_events = where === "event" ? [{
+    event_id: "R-Ob@2025-11-15", rule_id: "R-Ob",
+    anchor: { type: "obligation_points", date: "2025-11-15", origin: "omop" },
+    answers: [{ question_id: "T1-ControllerPrescribed", tier: 1, answer: value }],
+  }] as never : [];
+  st.question_answers = (st.question_answers ?? []).filter(
+    (a) => a.question_id !== "T1-ControllerPrescribed");
+  if (where === "period") {
+    st.question_answers.push({
+      question_id: "T1-ControllerPrescribed", tier: 1, answer: value as never, source: "agent",
+    });
+  }
+  writeReviewState(session.patientId, TASK_ID, st);
+}
+
+const contra = (a: string) => setQuestionAnswer(session, {
+  question_id: "T2-ContraindicationDocumented", answer: a,
+} as never);
+
+describe("\"not_applicable\" cannot coexist with \"no controller prescribed\"", () => {
+  it("refused when an EVENT says no controller was prescribed", async () => {
+    seedControllerAnswer("event", false);
+    const b = parse(await contra("not_applicable"));
+    expect(b.ok).toBe(false);
+    expect(b.error_code).toBe("contradicts_controller_answer");
+    expect(b.error).toContain("not_documented");   // says what to use instead
+  });
+
+  it("refused on a LEGACY period-level answer too — that is where the real cases are", async () => {
+    // 71 stored states carry a period-level T1-ControllerPrescribed, written
+    // before the question became event-scoped. All 5 measured contradictions
+    // live in that shape.
+    seedControllerAnswer("period", false);
+    expect(parse(await contra("not_applicable")).ok).toBe(false);
+  });
+
+  it("allowed when the controller IS prescribed — that is what it means", async () => {
+    seedControllerAnswer("event", true);
+    expect(parse(await contra("not_applicable")).ok).toBe(true);
+  });
+
+  it("allowed when nothing has answered the controller question yet", async () => {
+    seedControllerAnswer("none");
+    expect(parse(await contra("not_applicable")).ok).toBe(true);
+  });
+
+  it("every OTHER value is accepted with no controller — they are the gap's reasons", async () => {
+    seedControllerAnswer("event", false);
+    for (const v of ["contraindication", "patient_refusal", "pending_followup",
+                     "system_barrier", "not_documented"]) {
+      expect(parse(await contra(v)).ok, v).toBe(true);
+    }
   });
 });

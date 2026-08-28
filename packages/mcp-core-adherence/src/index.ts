@@ -418,6 +418,49 @@ export async function setQuestionAnswer(
     }
   }
 
+  // "NOT APPLICABLE" MEANS THE PREMISE DOES NOT HOLD, NOT THAT THE RULE DOES NOT.
+  //
+  // T2-ContraindicationDocumented asks: "IF the patient is NOT on a controller
+  // that matches step therapy, is a contraindication or refusal documented?" So
+  // not_applicable means "the patient IS on one — there is no gap to explain",
+  // which normally sits beside a CONCORDANT controller verdict.
+  //
+  // Measured across 33 real patients, 5 of them (15%) committed not_applicable
+  // while ALSO answering that no controller was prescribed — the agent saying "no
+  // controller" and "the no-controller question does not apply" at the same time.
+  // The engine resolved the contradiction silently as DOCUMENTATION_GAP, so a
+  // sixth of that rule's documentation gaps rest on a self-contradictory answer,
+  // and any real patient_refusal among them is filed as the clinician's omission
+  // instead — the opposite clinical reading.
+  //
+  // Refused rather than reinterpreted. Treating it as EXCLUDED (the other obvious
+  // handling) would drop patients who genuinely have no controller out of the
+  // denominator, which is the upward bias this audit has been closing elsewhere.
+  //
+  // Reads events first — T1-ControllerPrescribed is event-scoped — then a legacy
+  // period-level answer, which is where the measured contradictions live (71
+  // stored states predate the question becoming event-scoped). Silent when
+  // neither exists: same ordering rule as the referral check above.
+  if (args.question_id === "T2-ContraindicationDocumented" && coerced === "not_applicable") {
+    const controllerSaidNo =
+      (state.rule_events ?? []).some((e) => (e.answers ?? []).some(
+        (a) => a.question_id === "T1-ControllerPrescribed" && a.answer === false))
+      || (state.question_answers ?? []).some(
+        (a) => a.question_id === "T1-ControllerPrescribed" && a.answer === false);
+    if (controllerSaidNo) {
+      return err(
+        "\"not_applicable\" here means the patient IS on a controller matching step "
+        + "therapy, so there is no gap to explain — but a committed answer says no "
+        + "controller was prescribed. If the gap has a documented reason, use "
+        + "contraindication / patient_refusal / pending_followup / system_barrier; if "
+        + "the chart gives no reason, use not_documented. Whether the patient NEEDED a "
+        + "controller is not this question — the platform decides that from the "
+        + "exacerbation history.",
+        { error_code: "contradicts_controller_answer" },
+      );
+    }
+  }
+
   const list = state.question_answers ?? [];
   const idx = list.findIndex((a) => a.question_id === args.question_id);
   const next: QuestionAnswer = {
