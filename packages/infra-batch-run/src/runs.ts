@@ -760,9 +760,34 @@ export function initialRunStatus(
   };
 }
 
+/** A patient_id becomes a DIRECTORY NAME under var/runs/<run>/per_patient/, and
+ *  that path does not go through `patientDir`, whose resolve-and-compare guard
+ *  would have caught this. So the shape is checked here, at the entry.
+ *
+ *  A single path-safe component: letters, digits, underscore, hyphen. No
+ *  whitespace (the bug this exists for), no separators, no dots — so `..` cannot
+ *  appear. All 284 ids in the corpus today are [a-z0-9_]+, so the allowlist costs
+ *  nothing and leaves room for a site that uses hyphens or capitals. */
+const PATIENT_ID_SHAPE = /^[A-Za-z0-9_-]+$/;
+
 export function startBatchRun(opts: StartBatchRunOptions): StartBatchRunResult {
   if (!opts.patient_ids || opts.patient_ids.length === 0) {
     throw new Error("patient_ids must be non-empty");
+  }
+  // Only non-emptiness was checked here, and a run died with ENAMETOOLONG after
+  // THIRTY ids arrived as one whitespace-joined string (a caller quoting its
+  // whole argument list) and the platform tried to mkdir a directory named after
+  // all of them. The message names that cause, because it is by far the likeliest
+  // and the raw ENAMETOOLONG points at the filesystem rather than the caller.
+  for (const pid of opts.patient_ids) {
+    if (typeof pid !== "string" || !PATIENT_ID_SHAPE.test(pid)) {
+      const hint = typeof pid === "string" && /\s/.test(pid)
+        ? " — it contains whitespace; did you pass a quoted list as ONE argument?"
+        : "";
+      throw new Error(
+        `invalid patient_id ${JSON.stringify(String(pid).slice(0, 80))}${hint}`,
+      );
+    }
   }
   const task = loadCompiledTask(opts.task_id);
   if (!task) {
