@@ -61,6 +61,71 @@ rules:
     judge_can_override: false
     supporting_questions: [T1-ControlLevel, T1-ExacerbationsCount, T1-ControllerPrescribed, T2-ContraindicationDocumented]
 
+  # THE OTHER ARM OF PERSISTENT ASTHMA (added 2026-08-28, study lead: option A).
+  #
+  # R-T1-ControllerForPersistent's description defines persistent asthma as
+  # "not_well_controlled / very_poorly_controlled OR >= 2 exacerbations", but it
+  # anchors on `obligation_points`, which the ETL derives from the exacerbation
+  # arm alone. The control arm was implemented NOWHERE — not in the anchor, not
+  # in the rule — so a child not well controlled at every visit who never had two
+  # OCS courses produced zero events, rolled up EXCLUDED, and dropped silently out
+  # of the study's most important measurement. That bias runs UPWARD (a missed
+  # care gap), unlike every other defect found in this audit.
+  #
+  # It could not be fixed in the ETL: control level is a judgment made FROM THE
+  # NOTES, after enumeration, and structured ACT is absent from this drop
+  # entirely (conformance act_structured = 0). No anchor list can carry it.
+  #
+  # So this rule uses the shape R-T2-FollowupScheduled and R-T2-StepTherapyMatches
+  # already use: enumerate every asthma visit as a CANDIDATE, and let the
+  # per-event control level decide whether the requirement applied there.
+  #
+  # A separate rule rather than re-anchoring the existing one, because
+  # re-anchoring would change that rule's denominator from one obligation point
+  # per patient to one per visit AND reopen the "by the deadline" semantics
+  # settled on 2026-08-27. Two rules, two denominators: report them per rule and
+  # never sum them — a patient with two exacerbations AND uncontrolled visits is
+  # measured by both, correctly, as two different requirements.
+  - rule_id: R-T1-ControllerAtUncontrolledVisit
+    description: >-
+      At a visit where asthma is NOT well controlled, a controller is prescribed.
+      This is the control-level arm of persistent asthma; the exacerbation arm
+      (>= 2 in a rolling year) is R-T1-ControllerForPersistent. Applicability is
+      decided per visit from that visit's own control level, so a patient
+      controlled at every visit contributes no events.
+    naepp_source: >-
+      EPR-3 Component 4 p.213 (Key Points: Medications) — long-term control
+      medication is used 'to achieve and maintain control of persistent asthma',
+      ICS being 'the most potent and effective anti-inflammatory medication'
+      (Evidence A). Stepwise Figure 4-5 prescribes a controller from Step 2 up,
+      and Figures 4-2a / 4-2b direct a STEP UP when control is not maintained —
+      i.e. the not-well-controlled visit is itself the indication.
+    evidence_grade: A
+    event_anchor: asthma_encounters
+    event_evaluable_if: 'T1-ControlLevel in ["not_well_controlled", "very_poorly_controlled"]'
+    # JUDGED AT THE VISIT, not by a later deadline — deliberately different from
+    # R-T1-ControllerForPersistent, and for a reason specific to this anchor. That
+    # rule's obligation is established by an exacerbation, which can happen while
+    # the patient is nowhere near a clinician, so demanding a controller that same
+    # day would fail a family that did everything right; hence its grace period to
+    # the next asthma visit. Here the patient IS in front of the clinician, and
+    # EPR-3's own instruction at a not-well-controlled visit is to step up
+    # treatment at that visit. A controller STARTED at this visit counts as
+    # prescribed for it.
+    verdict_if: "T1-ControllerPrescribed == true"
+    # Same three arms as the exacerbation rule, so an identical clinical situation
+    # is attributed identically whichever rule caught it.
+    attribution_when:
+      - when: "T1-ControllerPrescribed != true and T2-ContraindicationDocumented in [\"patient_refusal\", \"contraindication\", \"pending_followup\"]"
+        category: PATIENT_FACTOR
+      - when: "T1-ControllerPrescribed != true and T2-ContraindicationDocumented == \"system_barrier\""
+        category: SYSTEM_FACTOR
+      - when: "T1-ControllerPrescribed != true"
+        category: DOCUMENTATION_GAP
+    nuanced: true
+    judge_can_override: false
+    supporting_questions: [T1-ControlLevel, T1-ControllerPrescribed, T2-ContraindicationDocumented]
+
   - rule_id: R-T1-NoSABAOveruse
     description: >-
       No SABA over-dispensing (>= 3 canisters dispensed/year, a proxy for
