@@ -32,7 +32,7 @@ import type { CompiledTask } from "@chart-review/tasks";
 import type { QuestionAnswer } from "@chart-review/platform-types";
 import { loadOrCreate, writeReviewState } from "@chart-review/domain-review";
 import { verifyEvidence } from "@chart-review/faithfulness";
-import { readStructured } from "@chart-review/patients";
+import { readStructured, readAnchors } from "@chart-review/patients";
 import {
   loadAdherenceSkill,
   type AdherenceSkill,
@@ -269,6 +269,76 @@ export async function setQuestionAnswer(
   // the source table has data for this patient, we attach a table-level omop
   // provenance pointer ourselves (below). The agent may still cite a specific
   // row (schema accepts it) — then no upgrade is needed.
+  // ANCHOR FLOOR (BLOCKING, and deliberately so — see the note below on why this
+  // one blocks where the provenance gate above does not).
+  //
+  // A count the ETL derives deterministically is a FLOOR the answer may exceed
+  // but not fall below. The ETL cannot see everything — 85% of asthma ED visits
+  // carry no OCS row because ED-administered steroids never reach
+  // drug_exposure, and a burst can be documented only in a telephone note — so
+  // the agent reading notes is real value and must be able to add to the count.
+  // What it must not do is contradict what the structured data proves.
+  //
+  // Caught on a live run: the agent answered T1-ExacerbationsCount = 2 with the
+  // reasoning "March 2025 OCS burst and the 2025-11-15 ED/OCS episode", but the
+  // March burst fell 33 days BEFORE the 12-month window opened. The anchor list
+  // said 1. Nothing compared them, the count crossed the >= 2 persistent-asthma
+  // threshold, and a human validated it. The rubric's own retrieval hint tells
+  // the agent to "PREFER THE PRECOMPUTED COUNT" from a structured row that this
+  // corpus does not contain, so it fell through to counting dates by hand every
+  // time.
+  //
+  // Blocking is safe here in a way the OMOP-provenance reject was not: that gate
+  // demanded something the agent often could not supply, so it retried and then
+  // nulled the answer to escape. This one names the exact dates and says what to
+  // do, and nulling is refused too when the structured data proves an event.
+  const ANCHOR_FLOOR: Record<string, string> = {
+    "T1-ExacerbationsCount": "exacerbations",
+  };
+  const floorList = ANCHOR_FLOOR[args.question_id];
+  if (floorList) {
+    let anchors: Array<{ date?: string }> = [];
+    try {
+      anchors = ((readAnchors(session.patientId)[floorList] ?? []) as Array<{ date?: string }>);
+    } catch { /* no anchors on disk → no floor to enforce */ }
+    const floor = anchors.length;
+    const dates = anchors.map((a) => a.date).filter(Boolean).join(", ");
+    const committed = typeof coerced === "number" ? coerced : null;
+    if (floor > 0 && coerced === null) {
+      return err(
+        `the structured data documents ${floor} ${floorList} in the window (${dates}), `
+        + "so this cannot be answered null",
+        { error_code: "below_anchor_floor", anchor_count: floor, anchor_dates: dates },
+      );
+    }
+    if (committed !== null && committed < floor) {
+      return err(
+        `${committed} is below what the structured data proves: ${floor} ${floorList} `
+        + `in the window (${dates}). Re-count, or raise the answer to at least ${floor}.`,
+        { error_code: "below_anchor_floor", anchor_count: floor, anchor_dates: dates },
+      );
+    }
+    if (committed !== null && committed > floor) {
+      // Every event beyond the structured ones has to come from the notes. An
+      // OMOP row cannot justify the excess: if it qualified and fell inside the
+      // window, the ETL would already have counted it — so an extra backed only
+      // by OMOP evidence means a row that is out of window or does not qualify,
+      // which is exactly the error this catches.
+      const hasNote = (args.evidence ?? []).some(
+        (e) => ((e as { source?: string }).source ?? "note") === "note",
+      );
+      if (!hasNote) {
+        return err(
+          `${committed} exceeds the ${floor} ${floorList} in the structured data (${dates}), `
+          + "so the extra one(s) must be documented in the NOTES — cite the note text for each. "
+          + "An OMOP row cannot justify the excess: a qualifying in-window row would already "
+          + "be counted, so one that is not counted is out of window or does not qualify.",
+          { error_code: "unsupported_excess", anchor_count: floor, anchor_dates: dates },
+        );
+      }
+    }
+  }
+
   const STRUCTURED_SOURCED: Record<string, string> = {
     "T0-AgeOk": "demographics",
     "T0-AgeBand": "demographics",

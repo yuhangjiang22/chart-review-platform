@@ -284,22 +284,23 @@ def main():
         op12_asthma = sum(1 for e in enc if not e["is_ed"] and "Inpatient" not in e["type"]
                           and e["asthma_related"] and lo < e["start_date"] <= idx)
         ctrl_active = any(e["is_controller"] and any(lo < f["fill_date"] <= idx for f in e["fills"]) for e in drugs)
-        exac = set()
-        for e in enc:
-            if e["asthma_related"] and (e["is_ed"] or "Inpatient" in e["type"]) and lo < e["start_date"] <= idx: exac.add(e["start_date"])
-        for e in drugs:
-            if e["drug_class"] == "OCS":
-                for f in e["fills"]:
-                    if lo < f["fill_date"] <= idx: exac.add(f["fill_date"])
-        # 14-day event separation (clinical reviewers, Blake RCT definition):
-        # a new exacerbation only when >14 days from the previous event's start;
-        # markers within 14 days (second OCS course, ED visit + discharge
-        # steroids) are the SAME prolonged/undertreated exacerbation.
-        from datetime import date as _date
-        exac_events, last_start = 0, None
-        for d_ in (_date.fromisoformat(s) for s in sorted(exac)):
-            if last_start is None or (d_ - last_start).days > 14:
-                exac_events += 1; last_start = d_
+        # The exacerbation count is NOT computed here. It used to be, and this
+        # file's version drifted from derive_anchors' in two ways that both
+        # OVERCOUNT — and it is the version the rubric tells the agent to
+        # "PREFER", so its number reached answers while the anchor list (which
+        # obligation_points, and now the write-path floor, are built from) said
+        # something else:
+        #
+        #   * it windowed FIRST and then applied the 14-day separation, so an
+        #     exacerbation starting just before the window with a same-course
+        #     fill just inside it counted as a new event. derive_anchors
+        #     separates over the FULL history and restricts afterwards.
+        #   * it counted every OCS fill, with no asthma attribution. A prednisone
+        #     course for something else counted as an asthma exacerbation;
+        #     derive_anchors only counts one within 7 days of an asthma encounter.
+        #
+        # Filled in below from derive_for_patient's own count, so the precomputed
+        # row, the anchor list, and the obligation the rule reads are one number.
         demographics = [{"row_id":"dem1","age_at_index":age,"age_band":band(age),"sex":sex,
                          "lookback_outpatient_count_12mo":op12,
                          "lookback_asthma_encounter_count_12mo":enc12_asthma,
@@ -310,7 +311,7 @@ def main():
         # 6/30 patients had note-only controllers hidden by this shortcut).
         if drugs: demographics[0]["controller_active"] = ctrl_active
         observations = [{"row_id":"exa1","concept_id":9990001,"concept_name":"Asthma exacerbations, past 12 months (computed, 14-day event separation)",
-                         "value_as_number":exac_events,"date":idx}]
+                         "value_as_number":None,"date":idx}]
         # write
         anon = a.prefix + hashlib.sha256((a.salt + str(pid)).encode()).hexdigest()[:12]
         pdir = os.path.join(a.out, anon); os.makedirs(os.path.join(pdir,"omop"), exist_ok=True); os.makedirs(os.path.join(pdir,"notes"), exist_ok=True)
@@ -330,7 +331,12 @@ def main():
         # nothing runs it in CI and the standalone derive_anchors.py (which every
         # local regeneration uses) was fine. One call site cannot drift from
         # itself.
-        derive_for_patient(pdir)
+        anchor_counts = derive_for_patient(pdir)
+        # One number, one implementation: the precomputed row the rubric points
+        # the agent at IS the anchor list it will be checked against.
+        observations[0]["value_as_number"] = anchor_counts.get("exacerbations", 0)
+        json.dump(observations, open(os.path.join(pdir,"omop","observations.json"),"w"),
+                  indent=2, default=str)
         used = set(); doctypes = set()
         for r in G["notes"].get(pid, []):
             dt = str(r["note_date"])[:10]; dtp = slug(r["doc_type"]); doctypes.add(dtp)

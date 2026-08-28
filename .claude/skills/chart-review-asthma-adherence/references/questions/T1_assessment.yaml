@@ -72,7 +72,17 @@ questions:
       PREFER THE PRECOMPUTED COUNT: read_structured_data(table="observations") and
       look for a row whose concept_name contains "exacerbations, past 12 months" —
       use its value_as_number directly as the answer and cite that row
-      (source: omop, table: observations, row_id). Only if that row is ABSENT,
+      (source: omop, table: observations, row_id). THAT NUMBER IS A FLOOR: it comes
+      from the same event-anchor list the write path checks you against, so an
+      answer BELOW it is rejected, and so is null. You may go ABOVE it only for an
+      exacerbation documented in the NOTES — an ED-administered steroid course
+      never reaches the drug table, and a telephone encounter is note-only — and
+      you must cite the note text for each extra one. Citing another OMOP row will
+      NOT justify going above it: a qualifying in-window row is already counted, so
+      one that is not counted is either out of window or does not qualify. CHECK THE
+      WINDOW on anything you add: it runs from 12 months before index_date to
+      index_date, so a burst 33 days before the window opened is NOT in it.
+      Only if that row is ABSENT,
       count DISTINCT DATES with an exacerbation in the 12-month lookback (a single
       ED episode split across rows counts ONCE): (1)
       read_structured_data(table="encounters") — dates where is_ed=true (or type
