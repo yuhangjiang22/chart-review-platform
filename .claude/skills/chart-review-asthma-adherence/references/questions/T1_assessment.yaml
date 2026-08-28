@@ -329,11 +329,20 @@ questions:
       (Evidence B), OSA (Evidence D), rhinitis/sinusitis (Evidence B),
       chronic stress/depression (Evidence D).'"
     evidence_grade: B
+    # v0.6 (2026-08-28): this rationale still ended "Mark 'not_applicable' when
+    # T1-ControlLevel == well_controlled" AFTER that option was removed from the
+    # enum — `text` was updated and this field was not. It is not a harmless
+    # leftover: coerce() in mcp-core-adherence turns an off-enum answer into
+    # null rather than rejecting it, so an extractor following this line
+    # produced an UNANSWERED question, and periodRequiredQuestions then dropped
+    # the patient out of the comorbidity denominator with no failure recorded
+    # anywhere. The rationale is prompt input; history belongs in a comment.
     clinical_rationale: >-
       Uncontrolled asthma despite step-appropriate therapy is the EPR-3
-      indication for comorbidity workup. Skipping this step before
-      escalating therapy is a documented concordance gap. Mark
-      'not_applicable' when T1-ControlLevel == well_controlled.
+      indication for comorbidity workup. Skipping this step before escalating
+      therapy is a documented concordance gap. Record only what the chart shows:
+      whether this patient was EXPECTED to have a workup is decided by the engine
+      from the per-visit control levels, not by this answer.
     retrieval_hints: >-
       STRUCTURED FIRST. (1) read_structured_data(table="conditions") for
           ICD-10 codes: J30.x (allergic rhinitis), J33.x (nasal polyps),

@@ -39,12 +39,17 @@ rules:
     event_censored_reason: >-
       grace period ran past the end of observation (no asthma visit after the
       obligation date, so the deadline is censored at the index date)
-      # v0.6: collapsed to the design document's five categories.
-      # PATIENT_REFUSAL and CONTRAINDICATION were refinements of PATIENT_FACTOR,
-      # which the design defines as "documented clinical reason for deviation
-      # (allergy, contraindication, patient preference)" — all three arms of this
-      # question land there. They were the question's ENUM VALUES promoted to
-      # top-level categories, which is how a five-category taxonomy became nine.
+    # v0.6: collapsed to the design document's five categories.
+    # PATIENT_REFUSAL and CONTRAINDICATION were refinements of PATIENT_FACTOR,
+    # which the design defines as "documented clinical reason for deviation
+    # (allergy, contraindication, patient preference)" — all three arms of this
+    # question land there. They were the question's ENUM VALUES promoted to
+    # top-level categories, which is how a five-category taxonomy became nine.
+    #
+    # These lines were INSIDE the block scalar above until 2026-08-28. `#` is not
+    # a comment inside `>-`, so the reviewer-facing censoring reason was a
+    # 565-character string ending in taxonomy commentary about a different field —
+    # and evaluateRuleEvents uses that whole string as its idempotency sentinel.
     attribution_when:
       - when: "T1-ControllerPrescribed != true and T2-ContraindicationDocumented in [\"patient_refusal\", \"contraindication\", \"pending_followup\"]"
         category: PATIENT_FACTOR

@@ -14,7 +14,8 @@ import { startBatchRun } from "./runs.js";
 // all of them. These run before the task is loaded, so no fixture is needed.
 describe("startBatchRun rejects a patient_id that is not a path component", () => {
   const run = (patient_ids: unknown[]) =>
-    () => startBatchRun({ task_id: "asthma-adherence", patient_ids: patient_ids as string[] });
+    () => startBatchRun({ task_id: "asthma-adherence", patient_ids: patient_ids as string[],
+      started_by: "audit-test" });
 
   it("the actual bug: many ids joined by whitespace", () => {
     const joined = ["a414d49f29bf", "d189d08b5041", "7b2715154864"]
