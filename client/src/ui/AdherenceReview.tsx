@@ -2117,12 +2117,30 @@ function RuleRow({
           )}
           {!blind && verdict && (
             <div className="mt-1 text-[11px] flex flex-wrap items-center gap-x-3 gap-y-0.5">
-              <span className="text-muted-foreground">Engine:</span>
+              {/* Whose verdict this actually IS. The row said "Engine:" over
+                *  every verdict including a reviewer's own override, which is how
+                *  a silent replacement of one looked like it belonged there. */}
+              <span className="text-muted-foreground">
+                {verdict.source === "reviewer" ? "You:" : "Engine:"}
+              </span>
               <span className={cn(
                 verdict.verdict === "CONCORDANT" ? "text-emerald-700"
                 : verdict.verdict === "EXCLUDED" ? "text-muted-foreground"
                 : "text-[hsl(var(--oxblood))]",
               )}>{unansweredReason ? "UNANSWERED" : verdict.verdict}</span>
+              {/* A reviewer's verdict is never replaced by a recomputation
+                *  (mergeRecomputedVerdicts), so when editing events moves the
+                *  engine's own answer, BOTH are shown rather than one winning
+                *  quietly. The engine's lives on in the rule's rollup. */}
+              {verdict.source === "reviewer" && eventRollup
+                && eventRollup.period_verdict !== verdict.verdict && (
+                <span
+                  className="text-[hsl(var(--ochre))] text-[10.5px]"
+                  title="The engine recomputed this rule after an event edit and now disagrees with your verdict. Yours stands; change it if you want the engine's."
+                >
+                  engine now: {eventRollup.period_verdict}
+                </span>
+              )}
               {/* A rule can leave the denominator two ways that both roll up to
                 *  EXCLUDED, and they mean opposite things: the guideline does not
                 *  apply to this patient, or nobody answered the question. Showing

@@ -135,6 +135,35 @@ export function acceptedBasis(args: {
   };
 }
 
+/** Fold a recomputation's rule verdicts into the stored ones.
+ *
+ *  A REVIEWER'S OWN VERDICT IS NEVER REPLACED BY A RECOMPUTATION.
+ *
+ *  Saving one event re-derives that rule — and every rule whose gate reads the
+ *  derived worst control level — and this list was spliced wholesale, so a
+ *  verdict the reviewer had explicitly overridden was silently replaced by the
+ *  engine's. Three things then hid it: the row still read "✓ Accepted"
+ *  (validated_rules is not touched), the readout is labelled "Engine:" so the
+ *  substituted value looked like it belonged there, and the IAA route counts only
+ *  `source === "reviewer"` verdicts — so the rule did not become a disagreement,
+ *  it left the comparison altogether and shrank the denominator.
+ *
+ *  The reviewer's override is deliberate: they saw the engine's verdict and
+ *  disagreed. The engine's fresh value is not lost either — it stays in that
+ *  rule's rollup (`period_verdict`), which the pane renders beside the reviewer's
+ *  as "Engine now: X" when the two diverge. */
+export function mergeRecomputedVerdicts(
+  stored: RuleVerdict[], recomputed: RuleVerdict[], affected: Set<string>,
+): RuleVerdict[] {
+  const held = new Set(stored
+    .filter((v) => v.source === "reviewer" && affected.has(v.rule_id))
+    .map((v) => v.rule_id));
+  return [
+    ...stored.filter((v) => !affected.has(v.rule_id) || held.has(v.rule_id)),
+    ...recomputed.filter((v) => !held.has(v.rule_id)),
+  ];
+}
+
 /** This question's agent-draft answers, agent id order, for acceptedBasis. */
 function questionShadow(
   shadows: Record<string, QuestionAnswer[]> | undefined, qid: string,
@@ -388,16 +417,12 @@ export const adherenceRoutes: RouteEntry[] = [
           ev.ts = new Date().toISOString();
           events[idx] = ev;
           // Re-derive this rule's per-event verdicts + rollup + mirrored verdict.
-          // KNOWN GAP (Task 5 re-review #4): this unconditionally
-          // OVERWRITES state.rule_verdicts for `rule` with the engine's
-          // recomputed verdict below, even when the existing entry was
-          // source:"reviewer" (set via the separate rule-verdict route /
-          // RuleRow's Accept button) — a pre-existing overwrite, not
-          // introduced here. The NEW symptom: in blind mode, RuleRow's
-          // "Engine:" readout that would normally show the replacement is
-          // hidden, so a reviewer's own rule verdict can silently vanish
-          // with no visible signal it happened. Not fixed here — filed for
-          // the coordinator to schedule.
+          // The verdict splice goes through mergeRecomputedVerdicts, which holds
+          // a reviewer's own verdict against the recomputation (the KNOWN GAP
+          // recorded here through Task 5's re-review, now closed). Events and
+          // rollups ARE refreshed: those are derived, and a reviewer's per-event
+          // judgment lives in the event's own answers, which the recomputation
+          // reads rather than replaces.
           const rule = skill.rules.find((r) => r.rule_id === ev.rule_id);
           if (rule) {
             // Rules to recompute: the edited one, PLUS any rule whose gate reads
@@ -425,10 +450,9 @@ export const adherenceRoutes: RouteEntry[] = [
               ...(state.rule_rollups ?? []).filter((r) => !affectedIds.has(r.rule_id)),
               ...res.rule_rollups,
             ];
-            state.rule_verdicts = [
-              ...(state.rule_verdicts ?? []).filter((v) => !affectedIds.has(v.rule_id)),
-              ...res.rule_verdicts,
-            ];
+            state.rule_verdicts = mergeRecomputedVerdicts(
+              state.rule_verdicts ?? [], res.rule_verdicts, affectedIds,
+            );
             if (res.derived_answers.length > 0) {
               const derivedIds = new Set(res.derived_answers.map((a) => a.question_id));
               state.question_answers = [
