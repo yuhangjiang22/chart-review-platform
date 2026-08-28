@@ -352,8 +352,15 @@ export async function setQuestionAnswer(
   const srcTable = STRUCTURED_SOURCED[args.question_id];
   let upgradeOmopTable: string | null = null;
   if (srcTable && coerced !== null) {
-    const hasOmop = (args.evidence ?? []).some((e) => (e as { source?: string }).source === "omop");
-    if (!hasOmop) {
+    // Upgrade only an answer with NO evidence at all. It used to fire whenever
+    // there was no OMOP evidence — which stamped a drugs-table pointer onto an
+    // answer the agent had cited from a NOTE, asserting a provenance that is not
+    // just unsupported but sometimes contradicted: T1-ControllerPrescribed is
+    // true for a prescription that was never collected, and the drugs table is
+    // then empty of it precisely because it was never filled. An answer that
+    // already carries evidence needs no help identifying where it came from.
+    const hasEvidence = (args.evidence ?? []).length > 0;
+    if (!hasEvidence) {
       try {
         const s = readStructured(session.patientId) as unknown as Record<string, unknown[]>;
         if (Array.isArray(s[srcTable]) && s[srcTable].length > 0) upgradeOmopTable = srcTable;

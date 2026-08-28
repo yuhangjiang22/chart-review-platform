@@ -38,6 +38,10 @@ beforeAll(() => {
   fs.mkdirSync(path.join(rubricRoot, "references", "questions"), { recursive: true });
   fs.writeFileSync(path.join(rubricRoot, "references", "questions", "T1.yaml"), [
     "questions:",
+    "  - question_id: T1-SABAOveruse",
+    "    tier: 1",
+    "    text: is SABA overused",
+    "    answer_schema: { type: string, enum: [\"true\", \"false\", not_applicable] }",
     "  - question_id: T2-ContraindicationDocumented",
     "    tier: 2",
     "    text: is a contraindication or refusal documented",
@@ -71,6 +75,12 @@ beforeAll(() => {
   // Two in-window exacerbations, as the ETL derives them.
   const anchors = path.join(corpusRoot, session.patientId, "anchors");
   fs.mkdirSync(anchors, { recursive: true });
+  const omop = path.join(corpusRoot, session.patientId, "omop");
+  fs.mkdirSync(omop, { recursive: true });
+  // Non-empty, so the provenance upgrade has a table to point at.
+  fs.writeFileSync(path.join(omop, "drugs.json"), JSON.stringify([
+    { row_id: "drg1", concept_name: "albuterol", drug_class: "SABA", is_controller: false, fills: [] },
+  ]));
   fs.writeFileSync(path.join(anchors, "exacerbations.json"), JSON.stringify([
     { date: "2025-05-02", ref: "drugs:1" },
     { date: "2025-11-15", ref: "encounters:9" },
@@ -279,5 +289,39 @@ describe("\"not_applicable\" cannot coexist with \"no controller prescribed\"", 
                      "system_barrier", "not_documented"]) {
       expect(parse(await contra(v)).ok, v).toBe(true);
     }
+  });
+});
+
+describe("the OMOP provenance upgrade does not overwrite where an answer came from", () => {
+  // The upgrade attaches a table-level omop pointer to a structured-sourced
+  // answer that cites nothing. It used to fire whenever there was no OMOP
+  // evidence — stamping a drugs-table pointer onto an answer the agent had cited
+  // from a NOTE. For T1-ControllerPrescribed that provenance is not merely
+  // unsupported but contradicted: the answer is TRUE for a prescription that was
+  // never collected, and the drugs table is then empty of it precisely because
+  // it was never filled.
+  const readBack = (qid: string) => {
+    const st = loadOrCreate(session.patientId, session.task);
+    return (st.question_answers ?? []).find((a) => a.question_id === qid);
+  };
+
+  it("an answer citing a NOTE keeps only that note", async () => {
+    const b = parse(await setQuestionAnswer(session, {
+      question_id: "T1-SABAOveruse", answer: "true",
+      evidence: [{ note_id: "n1.txt", quote: "uses albuterol daily", start: 0, end: 10 }],
+    } as never));
+    expect(b.ok).toBe(true);
+    const stored = readBack("T1-SABAOveruse");
+    expect(stored?.evidence).toHaveLength(1);
+    expect(stored?.evidence?.[0]?.source).toBe("note");
+  });
+
+  it("an answer citing NOTHING still gets the table pointer — that is the point of it", async () => {
+    const b = parse(await setQuestionAnswer(session, {
+      question_id: "T1-SABAOveruse", answer: "false",
+    } as never));
+    expect(b.ok).toBe(true);
+    const stored = readBack("T1-SABAOveruse");
+    expect(stored?.evidence?.some((e) => e.source === "omop" && e.table === "drugs")).toBe(true);
   });
 });

@@ -106,7 +106,20 @@ questions:
   - question_id: T1-ControllerPrescribed
     text: >-
       Is at least one daily controller (ICS, ICS-LABA, LTRA, or biologic)
-      prescribed and active in the lookback window?
+      PRESCRIBED in the lookback window?
+
+      THE MEASURED ACT IS PRESCRIBING, NOT TAKING. This rule audits the
+      clinician: if a controller was prescribed, the answer is true even when the
+      chart says the prescription was never picked up, that the child is not
+      taking it, that it ran out, or that adherence is poor. Those are findings
+      about the FAMILY's execution and belong to adherence measures, not to
+      whether the guideline-concordant action was taken. Answering false because
+      the medicine was never collected files a patient-side problem as the
+      clinician's omission — the opposite clinical reading.
+
+      A prescription the CLINICIAN stopped is different: a controller
+      discontinued before the window (or before the event date) does not count,
+      because there is no longer a prescription to have.
 
       EVENT SCOPE: when this question is answered inside a rule event
       (set_event_answer), answer whether a controller was active at any point
@@ -136,9 +149,14 @@ questions:
       asthma on SABA-only therapy are under-treated by definition. The
       controller class affects T2-StepTherapyMatch grading.
     retrieval_hints: >-
-      STRUCTURED FIRST — but a NEGATIVE from structured data is NEVER final
-      (v0.5 audit: 6 of 30 patients had note-documented controllers that an
-      empty drugs table hid). (1) read_structured_data(table="demographics") →
+      STRUCTURED FIRST — but the drugs table records DISPENSING while this
+      question asks about PRESCRIBING, so a negative there is neither final nor
+      sufficient: a prescription that was never collected leaves no fill at all.
+      (v0.5 audit: 6 of 30 patients had note-documented controllers an empty
+      drugs table hid. Re-measured 2026-08-28 over the same 33 patients: 6 of the
+      30 "false" answers have a controller in an active-or-prescribed context in
+      the in-window notes, one with the note saying in as many words that the
+      inhaler was never picked up.) (1) read_structured_data(table="demographics") →
       controller_active == true → answer true, cite that row. (2) Otherwise →
       read_structured_data(table="drugs"): a row with is_controller=true and a
       fill in the 12-month lookback → true (drug_class ICS, ICS-LABA, LTRA,
@@ -154,6 +172,11 @@ questions:
       Answer false only after BOTH structured and note sweeps find nothing.
       Albuterol-only is NOT a controller; NASAL fluticasone (Flonase) is NOT
       an asthma controller.
+      NON-ADHERENCE IS NOT A NEGATIVE: "never picked up", "not taking it", "ran
+      out", "not taking ICS", "poorly adherent" all describe the family's
+      execution of a prescription that EXISTS — they make this answer TRUE, and
+      belong in the rationale. Only a controller the CLINICIAN never prescribed,
+      or discontinued, is a false.
       STALE-LIST RISK (annotator SOP v0.5): if the ONLY evidence is a
       medication-list entry carried forward from BEFORE the lookback window,
       with no in-window mention of the controller, still answer true — but say
