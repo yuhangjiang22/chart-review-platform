@@ -496,6 +496,26 @@ export const UNATTRIBUTED_RATIONALE = "rule declares no attribution";
 export const ENGINE_PERIOD_UNANSWERED_REASON =
   "question unanswered (the rule's own question was never committed)";
 
+/** Does this entry count as ANSWERED?
+ *
+ *  A committed entry whose VALUE is null does not. Null means the extractor
+ *  looked and could not determine it — or that `coerce()` nulled a value the
+ *  rubric no longer allows, which happened this month: a criterion still told
+ *  agents to use an enum value that had been deleted, and every such answer
+ *  landed as null.
+ *
+ *  The engine already defines absence this way wherever a rule can test it
+ *  directly — `X is missing` is TRUE for a committed null, `X is present` FALSE
+ *  (see evalAst) — so keying the two unanswered guards on the question_id alone
+ *  contradicted the engine's own definition, and a null slipped past them to be
+ *  read as a NEGATIVE by every comparison downstream. Measured on the real
+ *  rubric: all 6 window rules with a required question produced a verdict from
+ *  an all-null answer set, 5 of them NON_CONCORDANT. The bias is the same
+ *  one-directional one as a missing answer — silence lands on the failing side,
+ *  pushing measured adherence DOWN. */
+export const isAnswered = (a: QuestionAnswer | undefined): boolean =>
+  a !== undefined && a.answer !== null && a.answer !== undefined;
+
 /** question_ids a WINDOW rule needs answered before it can be judged: those its
  *  verdict/exclusion expressions read and could actually have been skipped.
  *
@@ -928,7 +948,8 @@ export function evaluateRuleEvents(
     // nobody established: on a live run an event with an empty answer list was
     // scored NON_CONCORDANT purely because the question was absent.
     if (e.anchor.type !== WINDOW_ANCHOR_TYPE && required.length > 0) {
-      const own = new Set((e.answers ?? []).map((a) => a.question_id));
+      // isAnswered, not presence: a committed null is not an answer.
+      const own = new Set((e.answers ?? []).filter(isAnswered).map((a) => a.question_id));
       if (!required.every((q) => own.has(q))) {
         return {
           ...e,
@@ -944,8 +965,14 @@ export function evaluateRuleEvents(
     // reading one that was never committed is exactly the case this catches. See
     // ENGINE_PERIOD_UNANSWERED_REASON for the verdict it cost.
     if (e.anchor.type === WINDOW_ANCHOR_TYPE && periodRequired.length > 0) {
-      const have = new Set(patientAnswers.map((a) => a.question_id));
-      const missing = periodRequired.filter((q) => !have.has(q));
+      const have = new Set(patientAnswers.filter(isAnswered).map((a) => a.question_id));
+      // "(null)" distinguishes "committed, but with no value" from "never
+      // committed" — the reviewer needs to know whether anybody looked. The
+      // CONSTANT's own text stays byte-stable: stored states carry it, and the
+      // short-circuit above matches on it, so an edit would freeze every
+      // already-persisted unanswered event as if a human had authored it.
+      const missing = periodRequired.filter((q) => !have.has(q))
+        .map((q) => (patientAnswers.some((a) => a.question_id === q) ? `${q} (null)` : q));
       if (missing.length > 0) {
         return {
           ...e,

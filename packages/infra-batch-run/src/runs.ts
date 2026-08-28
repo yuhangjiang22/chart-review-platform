@@ -1542,6 +1542,7 @@ async function runOneAgent(
       const {
         evaluateAllRules, evaluateAllRuleEvents, WINDOW_ANCHOR_TYPE,
         ENGINE_PERIOD_UNANSWERED_REASON, UNATTRIBUTED_RATIONALE,
+        isAnswered, periodRequiredQuestions,
       } = await import("@chart-review/rule-engine");
       let questionAnswers: QuestionAnswer[] = [];
       let committedEvents: RuleEvent[] = [];
@@ -1559,9 +1560,32 @@ async function runOneAgent(
       // to EXCLUDED, every rule (and every event) becomes EXCLUDED.
       const eligibilityRule = skill.rules.find((r) => r.rule_id === "R-T0-Eligible");
       let auditExcluded = false;
-      if (eligibilityRule) {
+      // Only when the gate can actually be DECIDED. This is the one verdict in
+      // the run that speaks for every other: EXCLUDED here makes every rule and
+      // every event EXCLUDED. An eligibility question the extractor could not
+      // determine (committed null, or never committed) satisfies no `verdict_if`,
+      // so the rule came out EXCLUDED and the patient left the denominator
+      // silently on missing data — indistinguishable, downstream, from a patient
+      // genuinely found ineligible. Undecidable now leaves the gate OPEN and lets
+      // the engine mark each rule unanswered instead, which is visible in
+      // rules_unanswered and in the transcript warning below.
+      const eligUndecidable = eligibilityRule
+        ? (() => {
+          const answered = new Set(questionAnswers.filter(isAnswered).map((a) => a.question_id));
+          return periodRequiredQuestions(eligibilityRule).filter((q) => !answered.has(q));
+        })()
+        : [];
+      if (eligibilityRule && eligUndecidable.length === 0) {
         const eligV = await evaluateAllRules([eligibilityRule], questionAnswers);
         auditExcluded = eligV[0]?.verdict === "EXCLUDED";
+      } else if (eligUndecidable.length > 0) {
+        try {
+          fs.appendFileSync(agentTranscriptPath(runId, patientId, spec.id), JSON.stringify({
+            ts: new Date().toISOString(), type: "text",
+            text: `warning: eligibility not decidable — no value for ${eligUndecidable.join(", ")}; `
+              + `the patient is NOT being excluded on that basis`,
+          }) + "\n");
+        } catch { /* ignore */ }
       }
       let ruleVerdicts: RuleVerdict[];
       let ruleEvents: RuleEvent[] = [];
