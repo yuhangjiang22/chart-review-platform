@@ -1542,7 +1542,7 @@ async function runOneAgent(
       const {
         evaluateAllRules, evaluateAllRuleEvents, WINDOW_ANCHOR_TYPE,
         ENGINE_PERIOD_UNANSWERED_REASON, UNATTRIBUTED_RATIONALE,
-        isAnswered, periodRequiredQuestions,
+        isAnswered, periodRequiredQuestions, absenceTestedQuestions,
       } = await import("@chart-review/rule-engine");
       let questionAnswers: QuestionAnswer[] = [];
       let committedEvents: RuleEvent[] = [];
@@ -1572,7 +1572,14 @@ async function runOneAgent(
       const eligUndecidable = eligibilityRule
         ? (() => {
           const answered = new Set(questionAnswers.filter(isAnswered).map((a) => a.question_id));
-          return periodRequiredQuestions(eligibilityRule).filter((q) => !answered.has(q));
+          const committed = new Set(questionAnswers.map((a) => a.question_id));
+          return [
+            ...periodRequiredQuestions(eligibilityRule).filter((q) => !answered.has(q)),
+            // An absence-tested eligibility question needs only an entry — the
+            // rule says what no-value means. Today's gate has none; kept general
+            // so a future `is present` in it cannot be satisfied by silence.
+            ...absenceTestedQuestions(eligibilityRule).period.filter((q) => !committed.has(q)),
+          ].sort();
         })()
         : [];
       if (eligibilityRule && eligUndecidable.length === 0) {

@@ -526,6 +526,9 @@ export const isAnswered = (a: QuestionAnswer | undefined): boolean =>
  *  - ABSENCE-TESTED (`X is missing` / `X is present`). The rule has already said
  *    what absence means; overruling it would break, e.g., R-T1-NoSABAOveruse's
  *    deliberate "no medication documentation at all -> leave this patient out".
+ *    Exempt from needing a VALUE — but NOT from being committed: see
+ *    `absenceTestedQuestions`, which requires an entry so that silence stays
+ *    distinguishable from a documented absence.
  *  - DERIVED. Nobody extracts these, so nobody can skip one — their absence is
  *    COMPUTED and load-bearing. The comorbidity gate is written
  *    `excluded_if: T1-WorstControlLevel == "well_controlled"` precisely so that a
@@ -546,6 +549,46 @@ export function periodRequiredQuestions(rule: RuleDefinition): string[] {
     .filter((q) => !scoped.has(q) && !absence.has(q)
       && !DERIVED_QUESTION_IDS.has(q) && !q.startsWith("_"))
     .sort();
+}
+
+/** question_ids a rule reads for ABSENCE (`X is missing` / `X is present`) in its
+ *  verdict/exclusion expressions, split period vs event-scoped.
+ *
+ *  These need a COMMITTED ENTRY but not a value. The rule has declared what "no
+ *  value" means, so a null there is DATA — what it must not be is silence. An
+ *  entry that was never written means nobody looked, and reading that as "absent
+ *  from the chart" is the same one-directional bias `isAnswered` closes for every
+ *  other question, arriving by a different door.
+ *
+ *  R-T1-SpirometryWithin24mo is the live case: `verdict_if: T1-SpirometryDate is
+ *  present`, attribution DOCUMENTATION_GAP. A chart with no spirometry and a
+ *  question the extractor skipped produced the identical care gap, so the rule
+ *  could not tell "this child has gone >24 months without spirometry" from "we
+ *  never checked". The first is a finding; the second is a hole in the run.
+ *
+ *  It also sharpens R-T1-NoSABAOveruse, whose `excluded_if: T1-SABAOveruse is
+ *  missing` deliberately drops a patient with no medication documentation: that
+ *  now requires the extractor to have LOOKED and committed nothing found, rather
+ *  than firing on a question nobody answered. Same declared behavior, no longer
+ *  reachable by silence.
+ *
+ *  DERIVED and synthetic (`_`-prefixed) ids are excluded for the same reason
+ *  periodRequiredQuestions excludes them: nobody extracts them, so nobody can
+ *  skip one, and their absence is computed and load-bearing. */
+export function absenceTestedQuestions(
+  rule: RuleDefinition,
+): { period: string[]; event: string[] } {
+  const scoped = new Set(rule.event_scoped_questions ?? []);
+  const absence = new Set<string>();
+  for (const src of [rule.verdict_if, rule.excluded_if]) {
+    if (!src) continue;
+    collectAbsenceTested(parseExpression(src), absence);
+  }
+  const keep = [...absence].filter((q) => !DERIVED_QUESTION_IDS.has(q) && !q.startsWith("_"));
+  return {
+    period: keep.filter((q) => !scoped.has(q)).sort(),
+    event: keep.filter((q) => scoped.has(q)).sort(),
+  };
 }
 
 /** Evaluate one compiled rule against the patient's answers.
@@ -902,6 +945,12 @@ export function evaluateRuleEvents(
   const scopedFor = eventScopedQuestionsFor(rule);
   const required = scopedFor.verdict;
   const periodRequired = periodRequiredQuestions(rule);
+  // Two levels of "answered". A question the rule compares a VALUE to needs one
+  // (isAnswered); a question it tests for ABSENCE needs only a committed entry,
+  // because the rule itself says what no-value means — but silence is still not
+  // an answer. See absenceTestedQuestions.
+  const absenceTested = absenceTestedQuestions(rule);
+  const absenceEvent = new Set(absenceTested.event);
   // Can the CENSORING gate be decided without any per-event answer? True when it
   // reads only patient-level answers and the synthetic anchor facts. Such a gate
   // runs BEFORE the unanswered check, or an unanswered unjudgeable event reports
@@ -948,9 +997,11 @@ export function evaluateRuleEvents(
     // nobody established: on a live run an event with an empty answer list was
     // scored NON_CONCORDANT purely because the question was absent.
     if (e.anchor.type !== WINDOW_ANCHOR_TYPE && required.length > 0) {
-      // isAnswered, not presence: a committed null is not an answer.
+      // isAnswered, not presence: a committed null is not an answer — unless the
+      // rule tests this question for absence, where an entry is enough.
       const own = new Set((e.answers ?? []).filter(isAnswered).map((a) => a.question_id));
-      if (!required.every((q) => own.has(q))) {
+      const ownEntries = new Set((e.answers ?? []).map((a) => a.question_id));
+      if (!required.every((q) => (absenceEvent.has(q) ? ownEntries.has(q) : own.has(q)))) {
         return {
           ...e,
           evaluable: false,
@@ -964,15 +1015,21 @@ export function evaluateRuleEvents(
     // "legitimately reads patient-level answers" — true, and beside the point:
     // reading one that was never committed is exactly the case this catches. See
     // ENGINE_PERIOD_UNANSWERED_REASON for the verdict it cost.
-    if (e.anchor.type === WINDOW_ANCHOR_TYPE && periodRequired.length > 0) {
+    if (e.anchor.type === WINDOW_ANCHOR_TYPE
+        && (periodRequired.length > 0 || absenceTested.period.length > 0)) {
       const have = new Set(patientAnswers.filter(isAnswered).map((a) => a.question_id));
+      const committed = new Set(patientAnswers.map((a) => a.question_id));
       // "(null)" distinguishes "committed, but with no value" from "never
       // committed" — the reviewer needs to know whether anybody looked. The
       // CONSTANT's own text stays byte-stable: stored states carry it, and the
       // short-circuit above matches on it, so an edit would freeze every
       // already-persisted unanswered event as if a human had authored it.
-      const missing = periodRequired.filter((q) => !have.has(q))
-        .map((q) => (patientAnswers.some((a) => a.question_id === q) ? `${q} (null)` : q));
+      const missing = [
+        ...periodRequired.filter((q) => !have.has(q))
+          .map((q) => (committed.has(q) ? `${q} (null)` : q)),
+        // Absence-tested: only silence counts as missing here.
+        ...absenceTested.period.filter((q) => !committed.has(q)),
+      ].sort();
       if (missing.length > 0) {
         return {
           ...e,

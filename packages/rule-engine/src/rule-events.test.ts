@@ -11,6 +11,8 @@ import {
   rulesReadingQid,
   DERIVED_WORST_CONTROL_QID,
   periodRequiredQuestions,
+  absenceTestedQuestions,
+  ENGINE_PERIOD_UNANSWERED_REASON,
   type RuleDefinition,
 } from "./index.js";
 
@@ -710,20 +712,41 @@ describe("a period rule whose own question was never answered", () => {
     expect(na.rationale).toBeUndefined();
   });
 
-  it("does NOT overrule a rule that tests for absence itself", () => {
+  it("a rule that tests for absence needs an ENTRY, but not a value", () => {
     // R-T1-NoSABAOveruse's `is missing` arm is a deliberate "no medication
-    // documentation at all -> leave this patient out". Treating that as an
-    // omission would replace a designed exclusion with a different one.
+    // documentation at all -> leave this patient out", so a COMMITTED null must
+    // still reach it: the extractor looked and found nothing, which is data.
+    //
+    // The no-entry case used to reach it too, and this test asserted that it
+    // should — wrongly. Whether a question was answered is a property of the RUN,
+    // not of the chart, so silence there reported a designed exclusion when the
+    // truth was that nobody looked; the two are indistinguishable downstream, and
+    // a study needs to count them separately. The rubric gives the extractor two
+    // ways to say "nothing found" (a null, or the explicit not_applicable enum),
+    // so nothing legitimate depends on silence. Neither reading moves the
+    // adherence rate — both leave the patient out — so this is about honesty of
+    // the denominator, not about the number.
     const saba: RuleDefinition = {
       rule_id: "R-Saba", description: "no SABA overuse",
       verdict_if: 'Saba == "false"',
       excluded_if: 'Saba == "not_applicable" or Saba is missing',
       attribution: "GUIDELINE_DEVIATION",
     };
-    expect(periodRequiredQuestions(saba)).toEqual([]);
-    const res = run(saba, []);
-    expect(res.rule_verdicts[0]!.verdict).toBe("EXCLUDED");
-    expect(res.rule_verdicts[0]!.rationale).toBeUndefined();
+    expect(periodRequiredQuestions(saba)).toEqual([]);       // no VALUE demanded
+    expect(absenceTestedQuestions(saba).period).toEqual(["Saba"]); // an ENTRY is
+
+    const committedNull = run(saba, [qa("Saba", null)]).rule_verdicts[0]!;
+    expect(committedNull.verdict).toBe("EXCLUDED");
+    expect(committedNull.rationale).toBeUndefined();
+
+    const explicit = run(saba, [qa("Saba", "not_applicable")]).rule_verdicts[0]!;
+    expect(explicit.verdict).toBe("EXCLUDED");
+    expect(explicit.rationale).toBeUndefined();
+
+    const silent = run(saba, []).rule_verdicts[0]!;
+    expect(silent.verdict).toBe("EXCLUDED");   // still out of the denominator
+    expect(silent.rationale).toContain(ENGINE_PERIOD_UNANSWERED_REASON); // but SAID
+    expect(silent.rationale).toContain("Saba");
   });
 
   it("does NOT demand a DERIVED value — its absence is computed, not skipped", () => {
