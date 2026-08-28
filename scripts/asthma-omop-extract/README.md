@@ -44,7 +44,7 @@ On RDRP-6745 it reports (illustrative of what it catches):
 | asthma_concepts | 117 | PASS | vocabulary resolves SNOMED 317009 |
 | visit_mapping_pct | 98.7 | PASS | visits mapped to 9201/9202/9203 |
 | notes_populated | 2,569,604 | PASS | note text present |
-| days_supply_pct | 43.2 | WARN | <50% → `refill_pdc_12mo` won't compute (SABA count unaffected) |
+| days_supply_pct | 43.2 | WARN | <50% → `refill_pdc_12mo` is a floor, not a rate; each affected drug row carries `refill_pdc_partial` (SABA count unaffected — it counts fills) |
 | act_structured | 0 | WARN | ACT is note-only here (typical of an HIE) |
 | drug_ingredient_rollup | 1,309 | PASS | drugs roll up to RxNorm ingredients |
 

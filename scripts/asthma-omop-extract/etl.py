@@ -94,12 +94,72 @@ def setup_adapter(con, adapter_path, rdrp, notes):
             if k in nm: rows.append((cid, cls, ctrl)); break
     con.executemany("INSERT INTO drug_class_map VALUES (?,?,?)", rows)
 
+def roll_up_drugs(drug_rows, lo, idx):
+    """Group a patient's drug_exposure rows by RxNorm ingredient and derive the
+       12-month fields. Extracted from the ETL loop so it can be tested without a
+       database — see test_derive_anchors.py's precedent.
+
+       `lo` / `idx` bound the window as (lo, idx]: lo is index_date minus 12
+       months, so a fill exactly 12 months before the index date is OUT."""
+    dby = {}
+    for r in drug_rows:
+        e = dby.setdefault(r["concept_id"], {"row_id": f"drg{r['row_id']}", "concept_id": r["concept_id"],
+             "concept_name": r["concept_name"], "rxnorm": r["rxnorm"], "drug_class": r["drug_class"],
+             "is_controller": bool(r["is_controller"]), "fills": []})
+        e["fills"].append({"fill_date": str(r["fill_date"])[:10], "days_supply": r["days_supply"], "quantity": r["quantity"]})
+    drugs = []; saba = 0; saba_qty = 0.0; saba_qty_seen = False
+    for e in dby.values():
+        e["fills"].sort(key=lambda x: x["fill_date"]); e["start_date"] = e["fills"][0]["fill_date"]; e["n_fills"] = len(e["fills"])
+        inwin = [f for f in e["fills"] if lo < f["fill_date"] <= idx]
+        # SABA "canisters" counts FILLS, not inhaler units. One dispensing = one
+        # canister is the HEDIS AMR operational proxy, and here it is the only
+        # thing available: drug_exposure.quantity is null on ALL 6,653 fills of
+        # every class (measured across the 63 extracted patients). quantity is
+        # still summed when the source carries it, but it does NOT become the
+        # number — a future drop could report grams (8.5) or actuations (200)
+        # rather than units, and guessing the units would inflate a >= 3
+        # threshold into a care gap the data does not support. Whoever gets a
+        # drop with quantity reads saba_quantity_12mo, decides what its units
+        # are, and changes this deliberately.
+        if e["drug_class"] == "SABA":
+            saba += len(inwin)
+            for f in inwin:
+                if f["quantity"] is not None:
+                    saba_qty_seen = True; saba_qty += float(f["quantity"])
+        # PDC over the fills that HAVE a days_supply. `or 0` silently treated a
+        # null as zero coverage, so a drug with 9 documented fills and 1 null one
+        # reported less coverage than it had — understating adherence, the same
+        # one-directional bias as a missing answer. days_supply is present on
+        # ~15% of SABA and ~17% of ICS fills here, so partial denominators are
+        # the norm; the conformance WARN claiming PDC "won't compute" below 50%
+        # is only true for a drug whose in-window fills are ALL null.
+        with_ds = [f for f in inwin if f["days_supply"] is not None]
+        cov = sum(f["days_supply"] for f in with_ds)
+        if e["is_controller"] and cov > 0:
+            e["refill_pdc_12mo"] = round(min(1.0, cov/365.0), 2)
+            if len(with_ds) < len(inwin):
+                e["refill_pdc_partial"] = (
+                    f"{len(inwin) - len(with_ds)} of {len(inwin)} in-window fills "
+                    f"have no days_supply — this PDC is a floor, not a rate")
+        drugs.append(e)
+    for e in drugs:
+        if e["drug_class"] == "SABA":
+            e["saba_canisters_12mo"] = saba
+            e["saba_canisters_basis"] = "fills"
+            if saba_qty_seen: e["saba_quantity_12mo"] = round(saba_qty, 2)
+    return drugs
+
+
 def conformance(con):
     THRESH = {  # name: (fail_below, warn_below, note)
       "asthma_concepts":(1,1,"vocabulary must resolve SNOMED 317009"),
       "visit_mapping_pct":(1,80,"% visits mapped to 9201/9202/9203"),
       "notes_populated":(1,1,"note table must have text (else agents have no chart)"),
-      "days_supply_pct":(0,50,"<50% → refill_pdc_12mo won't compute (SABA count ok)"),
+      # NOT "won't compute": PDC computes from whatever fills DO carry a
+      # days_supply, so a low rate here means partial denominators, which the
+      # per-drug refill_pdc_partial marker flags. The SABA count is unaffected
+      # (it counts fills, not supply).
+      "days_supply_pct":(0,50,"<50% → refill_pdc_12mo is a floor, flagged refill_pdc_partial"),
       "act_structured":(0,1,"0 → ACT is note-only here (like INPC)"),
       "drug_ingredient_rollup":(1,1,"drugs must roll up to RxNorm ingredients")}
     print("=== conformance (site readiness) ===")
@@ -158,23 +218,7 @@ def main():
                 cbyc[cid] = {"row_id": r["row_id"], "concept_id": cid, "concept_name": r["concept_name"],
                              "icd10cm": icd.group(1) if icd else None, "status": "active", "date": d}
         conditions = sorted(cbyc.values(), key=lambda x: x["date"])
-        # drugs: group by ingredient, fills
-        dby = {}
-        for r in G["drugs"].get(pid, []):
-            e = dby.setdefault(r["concept_id"], {"row_id": f"drg{r['row_id']}", "concept_id": r["concept_id"],
-                 "concept_name": r["concept_name"], "rxnorm": r["rxnorm"], "drug_class": r["drug_class"],
-                 "is_controller": bool(r["is_controller"]), "fills": []})
-            e["fills"].append({"fill_date": str(r["fill_date"])[:10], "days_supply": r["days_supply"], "quantity": r["quantity"]})
-        drugs = []; saba = 0
-        for e in dby.values():
-            e["fills"].sort(key=lambda x: x["fill_date"]); e["start_date"] = e["fills"][0]["fill_date"]; e["n_fills"] = len(e["fills"])
-            inwin = [f for f in e["fills"] if lo < f["fill_date"] <= idx]
-            if e["drug_class"] == "SABA": saba += len(inwin)
-            cov = sum((f["days_supply"] or 0) for f in inwin)
-            if e["is_controller"] and cov > 0: e["refill_pdc_12mo"] = round(min(1.0, cov/365.0), 2)
-            drugs.append(e)
-        for e in drugs:
-            if e["drug_class"] == "SABA": e["saba_canisters_12mo"] = saba
+        drugs = roll_up_drugs(G["drugs"].get(pid, []), lo, idx)
         # asthma_related sets
         avid = {str(r["vid"]) for r in G["asthma_visits"].get(pid, [])}
         adate = {str(r["d"])[:10] for r in G["asthma_visits"].get(pid, [])}

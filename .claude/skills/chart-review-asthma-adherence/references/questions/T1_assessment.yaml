@@ -202,13 +202,25 @@ questions:
     retrieval_hints: 'STRUCTURED FIRST → read_structured_data(table="drugs"). Find
       the SABA row (drug_class="SABA" or names albuterol/levalbuterol). Use
       `saba_canisters_12mo` if present; otherwise count fills[] entries whose
-      fill_date is within the past 12 months. >= 3 canisters → true. Fallback to
-      notes: HPI mentions of frequent rescue inhaler use.'
+      fill_date is within the past 12 months. >= 3 → true. NOTE: that field counts
+      DISPENSINGS in the window, one fill = one canister, which is the HEDIS AMR
+      operational proxy — `saba_canisters_basis` says which basis produced it. The
+      source data here carries no `quantity`, so a fill that dispensed 2 inhalers
+      counts once; do NOT try to infer units from `quantity` yourself, and do not
+      adjust the count. Fallback to notes: HPI mentions of frequent rescue inhaler
+      use.'
 
   - question_id: T1-ControlLevel
     text: >-
-      Composite asthma control level for the most recent assessment in the
-      window. When an age-appropriate control-test total is documented (ACT ages
+      Composite asthma control level AS OF ONE EVENT'S DATE — the control picture
+      at that visit. There is NO period-level answer to this question: the
+      patient-level value is DERIVED from the per-event answers (the WORST level
+      at any visit in the window), and both the MCP tool and the server reject a
+      period-level answer. Answering "the most recent assessment in the window"
+      once, or repeating that value at every event, defeats the derivation: a
+      patient who spent mid-year uncontrolled would read as controlled because
+      their last visit was.
+      When an age-appropriate control-test total is documented (ACT ages
       12-17 / C-ACT ages 5-11): >= 20 = well_controlled, 16-19 =
       not_well_controlled, < 16 = very_poorly_controlled. RISK OVERRIDE: if
       T1-SABAOveruse == true OR T1-ExacerbationsCount >= 2, the level is at most

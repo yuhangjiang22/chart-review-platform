@@ -210,12 +210,31 @@ export const adherenceRoutes: RouteEntry[] = [
         // Resolve tier from the skill so the caller doesn't have to re-send it.
         const skill = loadAdherenceSkill(p.taskId);
         let tier: number | undefined;
+        let def: { question_id: string; event_scoped?: boolean } | undefined;
         for (const [t, qs] of skill.questions_by_tier) {
-          if (qs.some((q) => q.question_id === b.question_id)) { tier = t; break; }
+          const hit = qs.find((q) => q.question_id === b.question_id);
+          if (hit) { tier = t; def = hit; break; }
         }
         if (tier === undefined) {
           throw httpErr(404, {
             ok: false, message: `question ${b.question_id} not found in task ${p.taskId}`,
+          });
+        }
+        // An event-scoped question has no period-level answer. The MCP tool
+        // already rejects one and the pane does not render a row for it, so this
+        // route was the one door left open — and a period answer written through
+        // it is dead: the engine withholds event-scoped patient-level answers
+        // from anchored events, `periodRequiredQuestions` skips them, and no
+        // window rule reads one. It would sit in question_answers next to the
+        // DERIVED patient-level value (T1-WorstControlLevel) with nothing to say
+        // which governs, which is precisely the contradiction the derived value
+        // was introduced to remove.
+        if (def?.event_scoped) {
+          throw httpErr(400, {
+            ok: false,
+            message: `question ${b.question_id} is answered PER EVENT, not for the period`,
+            hint: "Use the event-verdict route for each event that names it. The "
+              + "patient-level value is DERIVED from those events, never written here.",
           });
         }
         const questionIds: string[] = [];
