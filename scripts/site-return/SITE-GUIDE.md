@@ -1,35 +1,43 @@
 # Running the asthma-adherence audit at a participating site
 
-For the site's technical lead and its annotator. Four stages: install, calibrate,
-deploy, return. Nothing a patient could be identified from ever leaves the site —
-what leaves is described exactly in stage 4, and the tooling refuses to build a
-package that violates it.
+Five steps:
 
-The coordinating centre ships: this platform, a frozen rubric (the `skill`
-directory in the deployment bundle), and the OMOP extraction scripts.
+1. **Prepare your data** — get your OMOP CDM behind the view names the extraction expects
+2. **Run the ETL** — turn the CDM into a per-patient corpus
+3. **Run the pipeline** — agent draft + human annotation on a calibration sample
+4. **Export** — send the calibration package back, and freeze the rubric that passed
+5. **Deploy** — run the full cohort headless, and send the results package back
 
----
+Steps 1–2 are the site's technical lead, step 3 is mostly the annotator's, 4–5
+are the technical lead's again.
 
-## Stage 1 — install and extract
+Nothing a patient could be identified from ever leaves your site. What leaves is
+listed exactly in steps 4 and 5, and the tooling refuses to build a package that
+violates it.
 
-Requirements: Node 20+, Python 3.10+, DuckDB, and read access to your OMOP CDM.
-No internet access is required for the platform itself; the LLM endpoint your
-site is configured to use is the only outbound call, and for PHI it must be a
-HIPAA-eligible endpoint your institution approves.
+The coordinating centre ships: this platform, a frozen rubric, and the OMOP
+extraction scripts. You need Node 20+, Python 3.10+, DuckDB, read access to your
+CDM, and an LLM endpoint your institution approves for PHI.
 
 ```sh
 npm ci
 python3 -m pip install duckdb
 ```
 
-**Point the extraction at your CDM.** Exactly one file is site-specific:
-`scripts/asthma-omop-extract/adapter_rdrp.sql`. It builds standard-OMOP-named
-views over the origin site's delivery. Copy it to `adapter_<yoursite>.sql`, point
-the views at your own tables, and leave `cohort.sql`, `extracts.sql` and
-`conformance.sql` untouched — those three are the shared definition of the cohort
-and the extraction, and must not diverge between sites.
+---
 
-### What your adapter has to produce
+# Step 1 — prepare your data
+
+**What you produce:** one SQL file, `adapter_<yoursite>.sql`, creating
+standard-OMOP-named views over whatever shape your data is in.
+
+Exactly one file is site-specific. Copy
+`scripts/asthma-omop-extract/adapter_rdrp.sql`, point the views at your own
+tables, and leave `cohort.sql`, `extracts.sql` and `conformance.sql` untouched —
+those three are the shared definition of the cohort and the extraction, and must
+not diverge between sites.
+
+## What your adapter has to produce
 
 Views with these names, each carrying at least these columns. Extra columns are
 ignored; a missing one fails the query that needs it.
@@ -56,16 +64,16 @@ view (`substr(col,1,10)::DATE` or your dialect's equivalent) — the origin site
 adapter does exactly this, and a timestamp silently breaks the window arithmetic
 that decides what is inside the 12-month lookback.
 
-`person_id` must be a stable identifier of your own, and it never leaves your
-site: the extraction hashes it with your `--salt`.
+`person_id` must be a stable identifier of your own. It never leaves your site:
+the extraction hashes it with your `--salt`.
 
-### Where sites usually differ, and what to do
+## Where sites usually differ, and what to do
 
 **Notes are not in an OMOP `note` table.** Common — they are often a separate
 export. Build the view over whatever you have; only four columns are needed, and
 `doc_type` can be any short label (it becomes part of the note's filename in the
-corpus, and the agent uses it to tell a progress note from an ED note). The origin
-site maps a partitioned parquet drop this way.
+corpus, and the agent uses it to tell a progress note from an ED note). The
+origin site maps a partitioned parquet drop this way.
 
 **`days_supply` is null.** Then `refill_pdc_12mo` is computed from whatever fills
 do carry one and each affected drug is flagged `refill_pdc_partial` — treat the
@@ -96,30 +104,12 @@ the calibration round, and **send additions to the coordinating centre** rather
 than editing locally — what counts as a controller is part of the measurement,
 and it has to be the same everywhere.
 
-### Verifying the adapter beyond the six checks
-
-The conformance checks catch a broken adapter, not a subtly wrong one. Before the
-calibration round, extract ten patients and look at the corpus:
-
-```sh
-python3 scripts/asthma-omop-extract/etl.py --rdrp ... --notes ... \
-    --adapter scripts/asthma-omop-extract/adapter_<yoursite>.sql \
-    --out corpus/patients --limit 10 --salt "$YOUR_SITE_SALT"
-```
-
-For each patient directory, check that `omop/encounters.json`,
-`omop/drugs.json` and `notes/` are non-empty and that the counts look like the
-patient you expect. Then check `anchors/`: a patient you know had an asthma ED
-visit or a steroid burst should have entries in `exacerbations.json`. Empty
-anchor lists across all ten means the extraction is finding the patients but not
-their events, which the six checks will not tell you.
-
-**Check readiness before extracting anything:**
+## Check readiness before extracting anything
 
 ```sh
 python3 scripts/asthma-omop-extract/etl.py --check \
     --rdrp /path/to/your/cdm --notes /path/to/your/notes \
-    --adapter scripts/asthma-omop-extract/adapter_yoursite.sql
+    --adapter scripts/asthma-omop-extract/adapter_<yoursite>.sql
 ```
 
 Six checks print PASS / WARN / FAIL. `asthma_concepts`, `notes_populated` and
@@ -127,38 +117,57 @@ Six checks print PASS / WARN / FAIL. `asthma_concepts`, `notes_populated` and
 what the rubric asks about. `days_supply_pct` and `act_structured` may WARN;
 those paths degrade to note-reading rather than breaking.
 
-**Extract:**
+---
+
+# Step 2 — run the ETL
+
+**What you produce:** `corpus/patients/<pseudonym>/` — one directory per
+in-cohort patient, holding `meta.json`, `omop/*.json`, `anchors/*.json` and
+`notes/*.txt`.
 
 ```sh
 python3 scripts/asthma-omop-extract/etl.py \
     --rdrp /path/to/your/cdm --notes /path/to/your/notes \
-    --adapter scripts/asthma-omop-extract/adapter_yoursite.sql \
+    --adapter scripts/asthma-omop-extract/adapter_<yoursite>.sql \
     --out corpus/patients --salt "$YOUR_SITE_SALT"
 ```
 
 `--salt` is yours and must stay at your site: it is what makes the patient ids in
-the corpus pseudonymous. Use the same salt every time or the same patient gets a
+the corpus pseudonymous. Use the same salt every time, or the same patient gets a
 different id in each extraction.
 
 The run prints how many patients have fewer than 730 days of prior observation.
 Note that number — those patients are censored on the 24-month spirometry rule,
 and the coordinating centre will ask for it.
 
+## Verify the extraction before trusting it
+
+The six checks catch a broken adapter, not a subtly wrong one. Extract ten
+patients first (`--limit 10`) and look at the corpus:
+
+- `omop/encounters.json`, `omop/drugs.json` and `notes/` non-empty, with counts
+  that look like the patients you expect
+- `anchors/exacerbations.json` non-empty for a patient you know had an asthma ED
+  visit or a steroid burst
+
+Empty anchor lists across all ten means the extraction is finding patients but
+not their events — the six checks will not tell you that.
+
 ---
 
-## Stage 2 — calibrate (annotator: this is your part)
+# Step 3 — run the pipeline (agent + annotation)
 
-Draw a calibration sample, annotate it, and measure whether the agent reproduces
-your annotators before trusting it on the rest.
+**What you produce:** a session where every calibration patient has an agent
+draft and a human-adjudicated answer for every question and every event.
 
-**Sample size.** 50–60 patients. Below about 30, a rule's kappa swings by more
-than 0.1 when a single patient flips, so the number stops meaning anything.
-**Sample stratified**, not at random: roughly half well-controlled and half not.
+Draw the calibration sample first. **50–60 patients**: below about 30, a rule's
+kappa swings by more than 0.1 when a single patient flips, so the number stops
+meaning anything. **Stratify** it — roughly half well-controlled, half not.
 Several rules only apply at an uncontrolled visit, so an unstratified draw leaves
-them with almost no evaluable events and no measurable agreement.
+them with almost no evaluable events and nothing to measure.
 
 ```sh
-npm run dev            # starts the server and the UI
+npm run dev            # server + UI
 ```
 
 In the UI: create a session, add the calibration patients as its cohort, run the
@@ -176,66 +185,92 @@ What the annotator does per patient, in the order the pane presents it:
 Two things worth knowing:
 
 - Pressing **Accept** on an answer accepts the citation behind it. Where the
-  answer came from the agent's draft, the pane labels it "· from agent draft" —
-  that is honest, not a defect. Where you *change* an answer, the old citation is
+  answer came from the agent's draft the pane labels it "· from agent draft" —
+  that is honest, not a defect. Where you *change* an answer the old citation is
   dropped, because it supported the old answer.
 - The same question can appear on several rows for the same visit (different
-  rules anchor on the same day). They should agree. Nothing checks this for you
-  yet, so if you revisit a patient after a re-run, check that day's rows against
-  each other.
+  rules anchor on the same day). They should agree. Nothing checks this for you,
+  so if you revisit a patient after a re-run, compare that day's rows.
 
-**Then build the calibration package:**
+A patient reads `reviewer_validated` when nothing is left.
+
+---
+
+# Step 4 — export
+
+Two things come out of this step: the calibration package you send back, and the
+frozen rubric that step 5 runs.
+
+## 4a — the calibration package (send this)
 
 ```sh
 npx tsx scripts/site-return/build-calibration-package.ts \
     --session <your session id> --site <YOUR-SITE-CODE>
 ```
 
-It prints per-question and per-rule agreement, per-event agreement, and an
-advisory gate (default: kappa >= 0.6 and at least 20 scored pairs per rule). Send
-the package directory. **Do not send** the `*.crosswalk.LOCAL-ONLY.csv` written
-beside it — that is the map back to your patient ids, and it exists so you can
-look a subject up locally.
+Per-question and per-rule agreement, per-event agreement, and an advisory gate
+(default: kappa >= 0.6 and at least 20 scored pairs per rule). Send the package
+directory. **Do not send** the `*.crosswalk.LOCAL-ONLY.csv` written beside it —
+that is the map back to your patient ids, and it exists so you can look a subject
+up locally.
 
-Read `gate.json` before stage 3. If rules fail, do not proceed: the failures name
-themselves, and the coordinating centre revises the rubric or the guidance and
-sends a new version. That loop is the point of calibrating.
+Read `gate.json` before going further. If rules fail, do not deploy: the failures
+name themselves, and the coordinating centre revises the rubric or the guidance
+and sends a new version. That loop is the point of calibrating.
 
 `gate.json` also reports what share of the annotator's answers are identical to
 the agent's draft. The annotator worked *from* that draft, so those agree by
-construction and the agreement figures are an upper bound on what an independent
-annotator would produce. Interpret them as "the agent and the reviewer converged",
-not "the agent was independently correct".
+construction, and the agreement figures are an upper bound on what an independent
+annotator would produce. Read them as "the agent and the reviewer converged", not
+"the agent was independently correct".
 
----
+## 4b — freeze the rubric (keep this)
 
-## Stage 3 — deploy
-
-Once the gate passes, the full cohort runs without the UI:
+Once the gate passes, export the package the deployment will run:
 
 ```sh
-# patient ids are positional, space separated
-npx tsx scripts/asthma-realtest/run.ts patient_xxx patient_yyy ...
+curl -X POST "http://localhost:3002/api/export/asthma-adherence?session_id=<id>"
 ```
 
-For a whole cohort, drive `startBatchRun` from a short script of your own rather
-than pasting thousands of ids — it takes `patient_ids`, `max_concurrency` and a
-cost cap, and writes the same per-patient drafts stage 4 reads.
+It writes `var/exports/asthma-adherence/<export id>/` containing `task.json`,
+`performance.json`, `manifest.json`, and `skill/` — a frozen copy of the rubric
+as it stood when calibration passed. Step 5 runs that copy, not the live skill
+directory, so a later edit cannot silently change what is being measured.
 
-Point `CHART_REVIEW_GUIDELINES_ROOT` at the frozen rubric in the deployment
-bundle, not at the live skill directory, so the run uses the version that passed
-calibration.
-
-No human validation is expected at this stage. The agent's answers are the
-result; the calibration round is what licenses them.
+**This export directory stays at your site.** Its `gold/` subdirectory holds the
+full review states of your validated patients, note quotes included. It is a
+local snapshot, not something to send.
 
 ---
 
-## Stage 4 — return the results
+# Step 5 — deploy, and return the results
+
+**What you produce:** agent answers for the full cohort, and one package to send.
+
+```sh
+npm run deploy -- \
+    --task asthma-adherence \
+    --data-dir corpus/patients \
+    --out var/deploy-out
+```
+
+`--package` defaults to the latest export from step 4b. The runner prints the run
+id it started (`[deploy] run <run_id> started`) and records it in the out
+directory's manifest — you need it for the return package.
+
+No human validation happens here. The agent's answers are the result; the
+calibration round is what licenses them.
+
+> **Note for this task.** The deploy runner's result collector writes
+> phenotype-shaped fields and does not yet collect adherence verdicts, so treat
+> `--out` as a run log. The adherence results are in
+> `var/runs/<run_id>/per_patient/`, which is where the return package reads them.
+
+## Return the results
 
 ```sh
 npx tsx scripts/site-return/build-return-package.ts \
-    --run <run id> [--run <run id> ...] --site <YOUR-SITE-CODE>
+    --run <run_id> [--run <run_id> ...] --site <YOUR-SITE-CODE>
 ```
 
 The package contains, and can only contain:
@@ -261,7 +296,7 @@ with you.
 If the exit check finds anything, **the package is not written** and
 `phi_check.json` says what was found. Report that rather than working around it.
 
-### What to do about a value the package dropped
+### A value the package dropped
 
 `run.json` lists them by question. A dropped value means an answer did not match
 its question's declared shape — usually free text typed where an enum value
@@ -269,12 +304,19 @@ belongs. Fix it in the pane and rebuild; do not edit the CSV.
 
 ---
 
-## Questions the coordinating centre will ask
+# What to send, and what never to send
 
-Have these ready with the return package:
+| send | keep at your site |
+|---|---|
+| the calibration package directory (step 4a) | `*.crosswalk.LOCAL-ONLY.csv` |
+| the return package directory (step 5) | `var/exports/…` — holds gold with note quotes |
+| the answers below | `corpus/patients/…`, `var/runs/…`, `var/reviews/…` |
+
+Have these ready with the packages:
 
 - how many patients the cohort query matched, and how many were extracted
-- the conformance output from stage 1 (all six checks)
+- the conformance output from step 1 (all six checks)
 - how many patients have fewer than 730 days of prior observation
 - your calibration sample size and how it was stratified
 - how many annotators, and whether any patient was annotated by more than one
+- any drug ingredients you found missing from `DRUG_KW`
