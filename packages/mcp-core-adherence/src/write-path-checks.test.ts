@@ -38,6 +38,15 @@ beforeAll(() => {
   fs.mkdirSync(path.join(rubricRoot, "references", "questions"), { recursive: true });
   fs.writeFileSync(path.join(rubricRoot, "references", "questions", "T1.yaml"), [
     "questions:",
+    "  - question_id: T2-SpecialtyReferral",
+    "    tier: 2",
+    "    text: is a specialty referral documented",
+    "    answer_schema: { type: string, enum: [referred, not_referred, not_indicated] }",
+    "  - question_id: T1-ControlLevel",
+    "    tier: 1",
+    "    event_scoped: true",
+    "    text: control level at this event",
+    "    answer_schema: { type: string, enum: [well_controlled, not_well_controlled, very_poorly_controlled] }",
     "  - question_id: T1-ExacerbationsCount",
     "    tier: 1",
     "    text: how many exacerbations in the past 12 months",
@@ -131,5 +140,69 @@ describe("the floor applies only where a deterministic count exists", () => {
       question_id: "T1-Other", answer: 0,
     } as never));
     expect(b.ok).toBe(true);
+  });
+});
+
+// ── "not indicated" is an applicability claim, and it is checkable ─────────
+//
+// R-T2-SpecialtyReferralWhenIndicated takes applicability from this one answer
+// (`excluded_if: T2-SpecialtyReferral == "not_indicated"`) while its description
+// defines indication as "not well controlled OR Step 4+". So one word from the
+// extractor drops the patient out of the denominator and nothing objects — bias
+// UPWARD, a missed care gap, opposite to most of what this audit found.
+//
+// Checked rather than re-gated: the Step 4+ arm has no patient-level derived
+// value, so moving applicability into the rule would narrow the requirement. Only
+// the flat contradiction is refused.
+
+import { setEventAnswer } from "./index.js";
+import { loadOrCreate, writeReviewState } from "@chart-review/domain-review";
+
+function seedEventControlLevel(level: string | null) {
+  const st = loadOrCreate(session.patientId, session.task);
+  st.task_kind = "adherence";
+  st.rule_events = level === null ? [] : [{
+    event_id: "R-Step@2025-11-15", rule_id: "R-Step",
+    anchor: { type: "asthma_encounters", date: "2025-11-15", origin: "omop" },
+    answers: [{ question_id: "T1-ControlLevel", tier: 1, answer: level }],
+  }] as never;
+  writeReviewState(session.patientId, TASK_ID, st);
+}
+
+const referral = (a: string) => setQuestionAnswer(session, {
+  question_id: "T2-SpecialtyReferral", answer: a,
+} as never);
+
+describe("\"not indicated\" cannot contradict the patient's own control levels", () => {
+  it("refused when the events make the patient very poorly controlled", async () => {
+    seedEventControlLevel("very_poorly_controlled");
+    const b = parse(await referral("not_indicated"));
+    expect(b.ok).toBe(false);
+    expect(b.error_code).toBe("contradicts_control_level");
+    expect(b.worst_control_level).toBe("very_poorly_controlled");
+    expect(b.error).toContain("not_referred");   // says what to answer instead
+  });
+
+  it("refused for not_well_controlled too, not just the worst level", async () => {
+    seedEventControlLevel("not_well_controlled");
+    expect(parse(await referral("not_indicated")).ok).toBe(false);
+  });
+
+  it("allowed when every visit was well controlled", async () => {
+    seedEventControlLevel("well_controlled");
+    expect(parse(await referral("not_indicated")).ok).toBe(true);
+  });
+
+  it("allowed when no event carries a control level yet", async () => {
+    // The agent may answer this before working the event list. Silent here by
+    // design; the batch runner warns after its final pass, when every event is in.
+    seedEventControlLevel(null);
+    expect(parse(await referral("not_indicated")).ok).toBe(true);
+  });
+
+  it("the OTHER answers are never blocked by this check", async () => {
+    seedEventControlLevel("very_poorly_controlled");
+    expect(parse(await referral("not_referred")).ok).toBe(true);
+    expect(parse(await referral("referred")).ok).toBe(true);
   });
 });

@@ -38,7 +38,9 @@ import {
   type AdherenceSkill,
   type QuestionDefinition,
 } from "@chart-review/pipeline-extract-adherence";
-import { compileRule, type RuleDefinition } from "@chart-review/rule-engine";
+import {
+  compileRule, deriveWorstControlLevel, type RuleDefinition,
+} from "@chart-review/rule-engine";
 
 /** CallToolResult shape mirrored from the MCP spec (same shape mcp-core uses). */
 export type CallToolResult = {
@@ -382,6 +384,40 @@ export async function setQuestionAnswer(
 
   const state = loadOrCreate(session.patientId, session.task);
   state.task_kind = "adherence";
+
+  // "NOT INDICATED" IS AN APPLICABILITY CLAIM, AND IT IS CHECKABLE.
+  //
+  // R-T2-SpecialtyReferralWhenIndicated takes applicability from this answer
+  // alone (`excluded_if: T2-SpecialtyReferral == "not_indicated"`), while its
+  // description defines indication as "not well controlled OR Step 4+". So a
+  // single word from the extractor drops the patient out of the denominator and
+  // nothing objects — including for a patient whose own per-event control levels
+  // make them very_poorly_controlled. The bias runs UPWARD (a missed care gap),
+  // opposite to most of what this audit found.
+  //
+  // Checked rather than re-gated (study lead, 2026-08-28): the Step 4+ arm has no
+  // patient-level derived value, so moving applicability into the rule would
+  // narrow the requirement. This leaves the judgment with the extractor and
+  // refuses only the flat contradiction — the control level says indicated, the
+  // answer says not indicated.
+  //
+  // Silent when the control level is not yet establishable (no event carries one
+  // — the agent may answer this before working the event list). That ordering
+  // gap is why the batch runner ALSO warns after its final pass, when every
+  // event is in.
+  if (args.question_id === "T2-SpecialtyReferral" && coerced === "not_indicated") {
+    const worst = deriveWorstControlLevel(state.rule_events ?? []);
+    if (worst && worst !== "well_controlled" && worst !== "undetermined") {
+      return err(
+        `this patient's own per-event control levels make them ${worst}, so specialty `
+        + "referral IS indicated — \"not_indicated\" only applies to a patient who is well "
+        + "controlled at every visit AND below Step 4. Answer \"not_referred\" if no "
+        + "referral is documented.",
+        { error_code: "contradicts_control_level", worst_control_level: worst },
+      );
+    }
+  }
+
   const list = state.question_answers ?? [];
   const idx = list.findIndex((a) => a.question_id === args.question_id);
   const next: QuestionAnswer = {

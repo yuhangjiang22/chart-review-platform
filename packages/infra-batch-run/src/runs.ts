@@ -1546,6 +1546,7 @@ async function runOneAgent(
         evaluateAllRules, evaluateAllRuleEvents, WINDOW_ANCHOR_TYPE,
         ENGINE_PERIOD_UNANSWERED_REASON, UNATTRIBUTED_RATIONALE,
         isAnswered, periodRequiredQuestions, absenceTestedQuestions,
+        deriveWorstControlLevel,
       } = await import("@chart-review/rule-engine");
       let questionAnswers: QuestionAnswer[] = [];
       let committedEvents: RuleEvent[] = [];
@@ -1697,6 +1698,26 @@ async function runOneAgent(
         // it is no longer a wrong one.
         rulesUnanswered = ruleVerdicts.filter((v) =>
           v.rationale?.startsWith(ENGINE_PERIOD_UNANSWERED_REASON)).length;
+        // "Not indicated" claimed for a patient their own per-event control
+        // levels say IS indicated. The MCP write path refuses this, but only when
+        // the control level is already establishable — an agent that answers the
+        // period question before working the event list slips past, and the
+        // contradiction then removes the patient from the referral rule's
+        // denominator silently (bias UPWARD, a missed care gap). This is the pass
+        // where every event is in, so it is the last chance to say so.
+        const referral = questionAnswers.find((a) => a.question_id === "T2-SpecialtyReferral");
+        const worstNow = deriveWorstControlLevel(ruleEvents);
+        if (referral?.answer === "not_indicated"
+            && worstNow && worstNow !== "well_controlled" && worstNow !== "undetermined") {
+          try {
+            fs.appendFileSync(agentTranscriptPath(runId, patientId, spec.id), JSON.stringify({
+              ts: new Date().toISOString(), type: "text",
+              text: `warning: T2-SpecialtyReferral = "not_indicated" but the per-event control `
+                + `levels make this patient ${worstNow} — the referral rule dropped a patient `
+                + "for whom referral looks indicated",
+            }) + "\n");
+          } catch { /* ignore */ }
+        }
         // A NON_CONCORDANT verdict the rule could not attribute. Used to be
         // filed as attribution "OTHER", which read as a clinical category; it is
         // a rule that does not cover its own case, and belongs in the log next to
