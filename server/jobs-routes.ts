@@ -31,7 +31,11 @@ import {
 } from "./lib/infra/batch-run/index.js";
 import { sessionIdForRun } from "./lib/session-reviews.js";
 import { getSessionManifest } from "./lib/domain/iter/index.js";
-import { deriveNerReviewStatus } from "./lib/review-completion.js";
+import { deriveNerReviewStatus, deriveAdherenceReviewStatus } from "./lib/review-completion.js";
+import { loadAdherenceSkill } from "@chart-review/pipeline-extract-adherence";
+import {
+  reconcileAdherenceImport, type AdherenceMergedState,
+} from "./lib/adherence-merge.js";
 import { pathFor } from "@chart-review/storage";
 import type { RuleEvent, RuleRollup, RuleEventsProvenance } from "@chart-review/platform-types";
 
@@ -556,6 +560,7 @@ export const jobsRoutes: RouteEntry[] = [
         }
       }
 
+      let adherenceReconciled: boolean | undefined;
       if (
         questionAnswers.length > 0 || ruleVerdicts.length > 0 ||
         adherenceExcluded !== undefined || ruleEvents.length > 0
@@ -568,6 +573,38 @@ export const jobsRoutes: RouteEntry[] = [
             agentQuestionAnswers, agentRuleVerdicts, agentRuleEvents,
           }),
         );
+        // The merge folds four arrays that must agree by three different rules,
+        // which can leave the derived ones describing a different event set than
+        // the inputs (see reconcileAdherenceImport). Re-derive rather than pick a
+        // winner, and re-derive review_status too — the generic one set above is
+        // phenotype-shaped, so an adherence patient could keep reading
+        // reviewer_validated outside the pane after an import brought in new
+        // questions and events nobody has validated. NER already does this two
+        // blocks up; adherence was the one kind that didn't.
+        try {
+          const skill = loadAdherenceSkill(taskId);
+          Object.assign(reviewState, reconcileAdherenceImport(
+            reviewState as AdherenceMergedState, skill.rules,
+          ));
+          if (existing.review_status !== "locked") {
+            const questionIds: string[] = [];
+            const eventScopedQuestionIds: string[] = [];
+            for (const [, qs] of skill.questions_by_tier) for (const q of qs) {
+              questionIds.push(q.question_id);
+              if (q.event_scoped) eventScopedQuestionIds.push(q.question_id);
+            }
+            reviewState.review_status = deriveAdherenceReviewStatus(
+              reviewState as Parameters<typeof deriveAdherenceReviewStatus>[0],
+              { questionIds, ruleIds: skill.rules.map((r) => r.rule_id), eventScopedQuestionIds },
+            ) ?? "agent_drafted";
+          }
+          adherenceReconciled = true;
+        } catch {
+          // The task's adherence skill could not be loaded (renamed, removed, or
+          // this run predates it). Reported rather than swallowed: the merged
+          // arrays are still written, but they have NOT been made consistent.
+          adherenceReconciled = false;
+        }
       }
       fs.writeFileSync(reviewStatePath, JSON.stringify(reviewState, null, 2));
       return {
@@ -578,6 +615,9 @@ export const jobsRoutes: RouteEntry[] = [
         span_count: mergedSpans.size,
         question_count: questionAnswers.length,
         verdict_count: ruleVerdicts.length,
+        // false = the adherence arrays were merged but NOT reconciled (skill
+        // unloadable). Absent for a non-adherence import.
+        ...(adherenceReconciled !== undefined ? { adherence_reconciled: adherenceReconciled } : {}),
       };
     },
   },

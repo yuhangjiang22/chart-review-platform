@@ -67,6 +67,7 @@ import {
   evaluateAllRuleEvents, rulesReadingQid, DERIVED_WORST_CONTROL_QID,
 } from "@chart-review/rule-engine";
 import { deriveAdherenceReviewStatus } from "./lib/review-completion.js";
+import { mergeRecomputedVerdicts } from "./lib/adherence-merge.js";
 import { guidelineDir } from "@chart-review/rubric";
 import { computeTaskSha } from "./lib/lock.js";
 import type {
@@ -133,35 +134,6 @@ export function acceptedBasis(args: {
       : priorEvidence ? prior?.evidence_from
       : evidence ? "agent_draft" : undefined,
   };
-}
-
-/** Fold a recomputation's rule verdicts into the stored ones.
- *
- *  A REVIEWER'S OWN VERDICT IS NEVER REPLACED BY A RECOMPUTATION.
- *
- *  Saving one event re-derives that rule — and every rule whose gate reads the
- *  derived worst control level — and this list was spliced wholesale, so a
- *  verdict the reviewer had explicitly overridden was silently replaced by the
- *  engine's. Three things then hid it: the row still read "✓ Accepted"
- *  (validated_rules is not touched), the readout is labelled "Engine:" so the
- *  substituted value looked like it belonged there, and the IAA route counts only
- *  `source === "reviewer"` verdicts — so the rule did not become a disagreement,
- *  it left the comparison altogether and shrank the denominator.
- *
- *  The reviewer's override is deliberate: they saw the engine's verdict and
- *  disagreed. The engine's fresh value is not lost either — it stays in that
- *  rule's rollup (`period_verdict`), which the pane renders beside the reviewer's
- *  as "Engine now: X" when the two diverge. */
-export function mergeRecomputedVerdicts(
-  stored: RuleVerdict[], recomputed: RuleVerdict[], affected: Set<string>,
-): RuleVerdict[] {
-  const held = new Set(stored
-    .filter((v) => v.source === "reviewer" && affected.has(v.rule_id))
-    .map((v) => v.rule_id));
-  return [
-    ...stored.filter((v) => !affected.has(v.rule_id) || held.has(v.rule_id)),
-    ...recomputed.filter((v) => !held.has(v.rule_id)),
-  ];
 }
 
 /** This question's agent-draft answers, agent id order, for acceptedBasis. */
