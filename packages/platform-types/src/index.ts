@@ -221,6 +221,13 @@ export interface QuestionAnswer {
     concept_id?: number;
     concept_name?: string;
   }>;
+  /** Set when these citations were INHERITED rather than found by whoever holds
+   *  this answer: a reviewer pressed Accept on the agent's answer, so the agent's
+   *  quotes are the basis that was endorsed. Kept explicit so a gold never
+   *  presents an agent's reading as a human's own — the pane labels it, and
+   *  downstream analysis can separate "human confirmed the agent's citation"
+   *  from "human cited this themselves". Absent means the holder's own. */
+  evidence_from?: "agent_draft";
   /** Short prose explaining the extraction. */
   reasoning?: string;
   /** Did a Verifier subagent or structured-data check confirm? */

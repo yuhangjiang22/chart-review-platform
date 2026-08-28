@@ -73,6 +73,76 @@ import type {
   QuestionAnswer, RuleVerdict, AttributionCategory,
 } from "@chart-review/platform-types";
 
+/** One question answer's supporting basis, as the shapes below carry it. */
+type Basis = Pick<QuestionAnswer, "evidence" | "reasoning" | "confidence" | "evidence_from">;
+
+const sameAnswer = (a: unknown, b: unknown) =>
+  JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+
+/** ACCEPTING AN ANSWER ACCEPTS ITS BASIS.
+ *
+ * Both write routes REPLACED the whole answer entry, and the pane's Accept
+ * button sends only {question_id, answer} — so every field it does not send
+ * arrived undefined and the citation trail was erased by the act of validating.
+ * Measured on the first hand-validated patient: 13 of 14 reviewer answers had
+ * `evidence: []` while the agent shadow for those same 14 questions carried 1-4
+ * quotes each, and all 14 had been accepted UNCHANGED.
+ *
+ * The basis belongs to the answer's VALUE, so that is what this keys on:
+ *
+ *   1. an explicit body value always wins — a future citation input needs no
+ *      change here;
+ *   2. else the prior entry's own basis, when the value is UNCHANGED (a changed
+ *      answer is a different claim, and the old quotes supported the old one —
+ *      keeping them would attach a citation that contradicts the answer, which
+ *      is worse than none);
+ *   3. else the agent draft's, when the accepted value EQUALS what an agent
+ *      answered. This is what makes Accept mean anything on a first acceptance:
+ *      the reviewer is endorsing the agent's answer, and the agent's quotes are
+ *      the basis of that endorsement. Keyed on the value rather than on
+ *      "unchanged", so a reviewer who CHANGES their answer TO the agent's
+ *      inherits it too, and one who answers something neither agent said
+ *      inherits nothing — correctly, and the pane's "none cited" warning is
+ *      then accurate.
+ *
+ * Case 3 stamps evidence_from:"agent_draft" so the gold never presents the
+ * agent's reading as the human's own. Confidence is never inherited from an
+ * agent: a model's calibrated score is not a human's certainty.
+ */
+export function acceptedBasis(args: {
+  prior?: Pick<QuestionAnswer, "answer" | "evidence" | "reasoning" | "confidence" | "evidence_from">;
+  body: Partial<Pick<QuestionAnswer, "answer" | "evidence" | "reasoning" | "confidence">>;
+  /** This question's agent-draft answers, in a deterministic order. */
+  shadow?: Array<Pick<QuestionAnswer, "answer" | "evidence" | "reasoning">>;
+}): Basis {
+  const { prior, body, shadow = [] } = args;
+  const unchanged = prior !== undefined && sameAnswer(prior.answer, body.answer);
+  // An EMPTY prior evidence array is not a basis — it is the erasure this fixes,
+  // so it must fall through to the shadow rather than carry [] forward.
+  const priorEvidence = unchanged && (prior?.evidence?.length ?? 0) > 0
+    ? prior!.evidence : undefined;
+  const endorsed = shadow.find((s) => sameAnswer(s.answer, body.answer) && (s.evidence?.length ?? 0) > 0)
+    ?? shadow.find((s) => sameAnswer(s.answer, body.answer) && Boolean(s.reasoning));
+  const evidence = body.evidence ?? priorEvidence
+    ?? (endorsed?.evidence?.length ? endorsed.evidence : undefined);
+  return {
+    evidence,
+    reasoning: body.reasoning ?? (unchanged ? prior?.reasoning : undefined) ?? endorsed?.reasoning,
+    confidence: body.confidence ?? (unchanged ? prior?.confidence : undefined),
+    evidence_from: body.evidence ? undefined
+      : priorEvidence ? prior?.evidence_from
+      : evidence ? "agent_draft" : undefined,
+  };
+}
+
+/** This question's agent-draft answers, agent id order, for acceptedBasis. */
+function questionShadow(
+  shadows: Record<string, QuestionAnswer[]> | undefined, qid: string,
+): QuestionAnswer[] {
+  return Object.keys(shadows ?? {}).sort()
+    .flatMap((id) => (shadows![id] ?? []).filter((a) => a.question_id === qid));
+}
+
 function httpErr(status: number, payload: unknown): Error & { status: number; payload?: unknown } {
   const message =
     typeof payload === "object" && payload && "message" in payload
@@ -159,37 +229,15 @@ export const adherenceRoutes: RouteEntry[] = [
           const qa = state.question_answers ?? [];
           const idx = qa.findIndex((a) => a.question_id === b.question_id);
           const prior = idx >= 0 ? qa[idx] : undefined;
-          // ACCEPTING AN ANSWER ACCEPTS ITS BASIS.
-          //
-          // This route REPLACED the whole entry, and the pane's Accept button
-          // sends only {question_id, answer} — so every field it does not send
-          // arrived undefined and the citation trail was erased by the act of
-          // validating. Measured on the first hand-validated patient: 13 of 14
-          // reviewer answers had `evidence: []` while the agent shadow for the
-          // same 14 questions carried 1-4 citations each. All 14 had been accepted
-          // UNCHANGED, so the reviewer was endorsing the agent's answer — and the
-          // agent's quotes were exactly the basis being endorsed.
-          //
-          // Worse than a display bug: the pane's evidence disclosure then reads
-          // "Evidence (0) — none cited" precisely on the questions a human
-          // confirmed, a blind gold can never carry citations at all (blind mode
-          // cannot read the agent shadow, and the pane has no citation input), and
-          // the gold loses the trail a disagreement would be adjudicated from.
-          //
-          // Carried forward ONLY when the answer VALUE is unchanged. A changed
-          // answer is a different claim, and the prior quotes supported the old
-          // one — keeping them would attach a citation that contradicts the
-          // answer, which is worse than none. There they are dropped and the
-          // "none cited" warning is then accurate.
-          const unchanged = prior !== undefined
-            && JSON.stringify(prior.answer ?? null) === JSON.stringify(b.answer ?? null);
           const patched: QuestionAnswer = {
             question_id: b.question_id!,
             tier: tier!,
             answer: (b.answer ?? null) as QuestionAnswer["answer"],
-            confidence: b.confidence ?? (unchanged ? prior?.confidence : undefined),
-            evidence: b.evidence ?? (unchanged ? prior?.evidence : undefined),
-            reasoning: b.reasoning ?? (unchanged ? prior?.reasoning : undefined),
+            // Accepting an answer accepts its basis — see acceptedBasis above.
+            ...acceptedBasis({
+              prior, body: b,
+              shadow: questionShadow(state.agent_question_answers, b.question_id!),
+            }),
             verifier_status: b.verifier_status,
             source: "reviewer",
             ts: new Date().toISOString(),
@@ -313,17 +361,20 @@ export const adherenceRoutes: RouteEntry[] = [
           for (const a of b.answers ?? []) {
             const priorA = (ev.answers ?? []).find((x) => x.question_id === a.question_id);
             const answers = (ev.answers ?? []).filter((x) => x.question_id !== a.question_id);
-            // Same rule as the period route above: accepting an unchanged answer
-            // accepts the evidence it rested on; a changed answer drops it,
-            // because the prior quotes supported a different claim.
-            const same = priorA !== undefined
-              && JSON.stringify(priorA.answer ?? null) === JSON.stringify(a.answer ?? null);
+            // Same decision as the period route: accepting an answer accepts its
+            // basis. This event's own agent shadow is the endorsement source —
+            // event answers shadow patient-level ones, so a period-level draft
+            // must not supply the basis for an event's answer.
             answers.push({
               question_id: a.question_id,
               tier: qTier.get(a.question_id)!,
               answer: a.answer,
-              ...(same && priorA?.evidence ? { evidence: priorA.evidence } : {}),
-              ...(same && priorA?.reasoning ? { reasoning: priorA.reasoning } : {}),
+              ...acceptedBasis({
+                prior: priorA, body: a,
+                shadow: Object.keys(state.agent_rule_events ?? {}).sort().flatMap((id) =>
+                  ((state.agent_rule_events![id] ?? []).find((e) => e.event_id === b.event_id)
+                    ?.answers ?? []).filter((x) => x.question_id === a.question_id)),
+              }),
               source: "reviewer",
               ts: new Date().toISOString(),
             });

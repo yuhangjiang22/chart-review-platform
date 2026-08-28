@@ -76,6 +76,10 @@ interface QuestionAnswer {
   answer: string | number | boolean | null;
   confidence?: number;
   evidence?: Array<{ note_id: string; quote: string; start?: number; end?: number }>;
+  /** These citations were INHERITED, not found by whoever holds this answer: a
+   *  reviewer pressed Accept on the agent's answer, so the agent's quotes are
+   *  the basis that was endorsed. Rendered by EvidenceOrigin. */
+  evidence_from?: "agent_draft";
   reasoning?: string;
   verifier_status?: "confirmed" | "contradicted" | "no_check";
   verifier_note?: string;
@@ -232,6 +236,23 @@ function evidenceAge(noteId: string | undefined, eventDate: string | undefined):
  *  `eventDate` drives the "N months before this event" age note and its stale
  *  warning; omitted for a period-level answer, which has no single date to be
  *  early or late relative to. */
+/** "· from agent draft" — these citations were INHERITED when a reviewer pressed
+ *  Accept on the agent's answer, not found by the reviewer themselves (server
+ *  stamps evidence_from; see acceptedBasis in adherence-routes). Shown on the
+ *  COLLAPSED summary, so a gold reader never has to expand to learn that a
+ *  human-sourced answer is resting on the agent's reading. */
+function EvidenceOrigin({ from }: { from?: "agent_draft" }) {
+  if (from !== "agent_draft") return null;
+  return (
+    <span
+      className="ml-1 opacity-70"
+      title="Citations inherited from the agent draft this answer accepted — not the reviewer's own reading"
+    >
+      · from agent draft
+    </span>
+  );
+}
+
 function AnswerEvidence({ evidence, reasoning, eventDate, onJumpToSource }: {
   evidence?: NonNullable<RuleEvent["answers"]>[number]["evidence"];
   reasoning?: string;
@@ -1944,6 +1965,7 @@ function QuestionRow({
             {(answer.evidence?.length ?? 0) === 0 && (
               <span className="ml-1 text-[hsl(var(--ochre))]">— none cited</span>
             )}
+            <EvidenceOrigin from={answer.evidence_from} />
           </summary>
           <div className="pl-4 border-l-2 border-[hsl(var(--sage))]/40">
             <AnswerEvidence
@@ -2437,6 +2459,7 @@ function EventRowImpl({
                       <details className="col-span-12 mt-0.5">
                         <summary className="cursor-pointer text-[11px] text-muted-foreground hover:text-foreground">
                           Evidence{committed.evidence?.length ? ` (${committed.evidence.length})` : " — none cited"}
+                          <EvidenceOrigin from={committed.evidence_from} />
                         </summary>
                         <div className="mt-1 pl-4 border-l-2 border-[hsl(var(--sage))]/40">
                           <AnswerEvidence

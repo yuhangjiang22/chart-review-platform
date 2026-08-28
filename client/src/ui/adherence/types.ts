@@ -30,6 +30,10 @@ export interface RuleEvent {
       note_id?: string; quote?: string; start?: number; end?: number;
       table?: string; row_id?: string; concept_name?: string;
     }>;
+    /** These citations were INHERITED when a reviewer accepted the agent's
+     *  answer for this event, not found by the reviewer (server stamps it; see
+     *  acceptedBasis in adherence-routes). Rendered by EvidenceOrigin. */
+    evidence_from?: "agent_draft";
     reasoning?: string;
   }>;
   verdict?: "CONCORDANT" | "NON_CONCORDANT" | "EXCLUDED";
