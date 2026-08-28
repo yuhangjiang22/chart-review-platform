@@ -158,13 +158,38 @@ export const adherenceRoutes: RouteEntry[] = [
           state.task_kind = "adherence";
           const qa = state.question_answers ?? [];
           const idx = qa.findIndex((a) => a.question_id === b.question_id);
+          const prior = idx >= 0 ? qa[idx] : undefined;
+          // ACCEPTING AN ANSWER ACCEPTS ITS BASIS.
+          //
+          // This route REPLACED the whole entry, and the pane's Accept button
+          // sends only {question_id, answer} — so every field it does not send
+          // arrived undefined and the citation trail was erased by the act of
+          // validating. Measured on the first hand-validated patient: 13 of 14
+          // reviewer answers had `evidence: []` while the agent shadow for the
+          // same 14 questions carried 1-4 citations each. All 14 had been accepted
+          // UNCHANGED, so the reviewer was endorsing the agent's answer — and the
+          // agent's quotes were exactly the basis being endorsed.
+          //
+          // Worse than a display bug: the pane's evidence disclosure then reads
+          // "Evidence (0) — none cited" precisely on the questions a human
+          // confirmed, a blind gold can never carry citations at all (blind mode
+          // cannot read the agent shadow, and the pane has no citation input), and
+          // the gold loses the trail a disagreement would be adjudicated from.
+          //
+          // Carried forward ONLY when the answer VALUE is unchanged. A changed
+          // answer is a different claim, and the prior quotes supported the old
+          // one — keeping them would attach a citation that contradicts the
+          // answer, which is worse than none. There they are dropped and the
+          // "none cited" warning is then accurate.
+          const unchanged = prior !== undefined
+            && JSON.stringify(prior.answer ?? null) === JSON.stringify(b.answer ?? null);
           const patched: QuestionAnswer = {
             question_id: b.question_id!,
             tier: tier!,
             answer: (b.answer ?? null) as QuestionAnswer["answer"],
-            confidence: b.confidence,
-            evidence: b.evidence,
-            reasoning: b.reasoning,
+            confidence: b.confidence ?? (unchanged ? prior?.confidence : undefined),
+            evidence: b.evidence ?? (unchanged ? prior?.evidence : undefined),
+            reasoning: b.reasoning ?? (unchanged ? prior?.reasoning : undefined),
             verifier_status: b.verifier_status,
             source: "reviewer",
             ts: new Date().toISOString(),
@@ -286,11 +311,19 @@ export const adherenceRoutes: RouteEntry[] = [
           if (idx < 0) throw httpErr(404, { ok: false, message: `event ${b.event_id} not found` });
           const ev = { ...events[idx] };
           for (const a of b.answers ?? []) {
+            const priorA = (ev.answers ?? []).find((x) => x.question_id === a.question_id);
             const answers = (ev.answers ?? []).filter((x) => x.question_id !== a.question_id);
+            // Same rule as the period route above: accepting an unchanged answer
+            // accepts the evidence it rested on; a changed answer drops it,
+            // because the prior quotes supported a different claim.
+            const same = priorA !== undefined
+              && JSON.stringify(priorA.answer ?? null) === JSON.stringify(a.answer ?? null);
             answers.push({
               question_id: a.question_id,
               tier: qTier.get(a.question_id)!,
               answer: a.answer,
+              ...(same && priorA?.evidence ? { evidence: priorA.evidence } : {}),
+              ...(same && priorA?.reasoning ? { reasoning: priorA.reasoning } : {}),
               source: "reviewer",
               ts: new Date().toISOString(),
             });
