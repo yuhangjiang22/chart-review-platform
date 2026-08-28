@@ -417,7 +417,10 @@ import type { QuestionAnswer, RuleVerdict, RuleEvent, RuleRollup } from "@chart-
 import { computeTaskSha } from "@chart-review/lock";
 import { guidelineDir, phenotypeSkillDir, resolveRubricRoot, baselineRubricRoot } from "@chart-review/rubric";
 import { getActiveVersion, snapshotVersion, draftDiffersFromActive } from "@chart-review/rubric-versions";
-import { patientDir, listNotes, isPhiPatient, patientPersonId, readAnchors } from "@chart-review/patients";
+import {
+  patientDir, listNotes, isPhiPatient, patientPersonId, readAnchors,
+  patientDaysObservedBeforeIndex,
+} from "@chart-review/patients";
 import { resolveRolePrompt, validateAgentSpec } from "@chart-review/agent-specs";
 import { extractSpansDirect } from "@chart-review/pipeline-extract-ner";
 import { extractLabelsForNote, parseVaccineTables, type VaccineCatalog } from "@chart-review/pipeline-extract-pernote";
@@ -1555,6 +1558,30 @@ async function runOneAgent(
           questionAnswers = state.question_answers ?? [];
           committedEvents = state.rule_events ?? [];
         } catch { /* leave empty */ }
+      }
+      // HOW MUCH CHART THERE WAS TO READ. Carried as a reserved `_`-prefixed
+      // patient answer rather than computed inside the engine, which is pure and
+      // cannot read the corpus. Injected once here so every later pass — the
+      // event-save route's recompute and the import reconciliation — sees it
+      // through the persisted answers instead of each re-reading meta.json.
+      //
+      // A rule whose lookback is LONGER than this cannot tell "never done" from
+      // "done before our data starts": the cohort admits patients at 365 days of
+      // prior observation while the spirometry question looks back 24 months.
+      // cohort.sql emits the number precisely so those patients can be dropped
+      // from that rule at analysis time rather than from the cohort. Undefined
+      // (hand-authored patient, or an extract predating the field) means NO
+      // censoring — a comparison against a missing answer is false, so absent
+      // information cannot manufacture an exclusion.
+      const daysObserved = patientDaysObservedBeforeIndex(patientId);
+      if (typeof daysObserved === "number") {
+        questionAnswers = [
+          ...questionAnswers.filter((a) => a.question_id !== "_days_observed_before_index"),
+          {
+            question_id: "_days_observed_before_index", tier: -1,
+            answer: daysObserved, source: "derived", ts: new Date().toISOString(),
+          },
+        ];
       }
       // Eligibility gate — if the conventional `R-T0-Eligible` rule resolves
       // to EXCLUDED, every rule (and every event) becomes EXCLUDED.

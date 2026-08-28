@@ -70,6 +70,13 @@ interface CorpusMeta {
    *  patient maps to in the shared CSV cohort. Bound into the task's plugin
    *  tools so they read the right rows. */
   person_id?: number;
+  /** Days of observation available BEFORE index_date, from cohort.sql. Decides
+   *  whether "not documented" means absent-from-care or absent-from-the-extract
+   *  for any question with a lookback longer than it — see
+   *  patientDaysObservedBeforeIndex. */
+  days_observed_before_index?: number;
+  /** Notes in the 12-month lookback, from cohort.sql. */
+  n_notes_12mo?: number;
 }
 
 /** #46 — surface the patient's PHI flag without exposing the rest of meta. */
@@ -78,6 +85,24 @@ export function isPhiPatient(patientId: string): boolean {
     return readMeta(patientId)?.phi === true;
   } catch {
     return false;
+  }
+}
+
+/** How much chart there was to read BEFORE index_date (cohort.sql's
+ *  `days_observed_before_index`), or undefined when the extract predates the
+ *  field or the patient is hand-authored.
+ *
+ *  A rule whose lookback is LONGER than this cannot distinguish "never done"
+ *  from "done before our data starts" — the 24-month spirometry question is the
+ *  live case, and the cohort admits patients at 365 days of prior observation.
+ *  Undefined must therefore mean "do not censor": absent information is not
+ *  evidence that the chart is short. */
+export function patientDaysObservedBeforeIndex(patientId: string): number | undefined {
+  try {
+    const v = readMeta(patientId)?.days_observed_before_index;
+    return typeof v === "number" ? v : undefined;
+  } catch {
+    return undefined;
   }
 }
 

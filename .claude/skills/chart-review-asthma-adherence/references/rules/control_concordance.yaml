@@ -156,6 +156,28 @@ rules:
       prolonged loss of control, and at least every 1-2 years'.
     evidence_grade: B
     verdict_if: "T1-SpirometryDate is present"
+    # A CHART TOO SHORT TO HOLD THE ANSWER IS NOT A CARE GAP (study lead,
+    # 2026-08-28). The cohort admits a patient at 365 days of prior observation
+    # while this question looks back 730, so for a patient in between, "no
+    # spirometry found" may mean it was done before the extract begins. Judging it
+    # anyway reports an artifact of the extract window as a documentation gap.
+    #
+    # cohort.sql emits `days_observed_before_index` for exactly this — its own note
+    # says to "exclude the short-lookback patients from the spirometry rule at
+    # analysis time rather than from the cohort" — but the ETL dropped the field
+    # before meta.json, so the mitigation had nothing to work with until 2026-08-28.
+    #
+    # ASYMMETRIC, like R-T2-FollowupScheduled's unobserved tail: a spirometry that
+    # IS documented settles the event no matter how short the chart is, and no
+    # further observation could unsettle it. Only the NEGATIVE is inconclusive. A
+    # patient whose extract predates the field carries no value, and a comparison
+    # against a missing answer is false — so absent information cannot manufacture
+    # an exclusion.
+    event_censored_if: '_days_observed_before_index < 730 and T1-SpirometryDate is missing'
+    event_censored_reason: >-
+      the 24-month lookback runs past the start of observation (this chart covers
+      fewer than 730 days before the index date), so it cannot show whether
+      spirometry was done in the part that is not covered
     attribution: DOCUMENTATION_GAP
     supporting_questions: [T1-SpirometryDate]
 
