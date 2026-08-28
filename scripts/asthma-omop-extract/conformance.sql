@@ -19,7 +19,9 @@ FROM @cdm_database_schema.visit_occurrence;
 -- ==NAME notes_populated==  (0 → no notes = the agents have no chart to read)
 SELECT COUNT(*) AS v FROM @cdm_database_schema.note WHERE note_text IS NOT NULL;
 
--- ==NAME days_supply_pct==  (low → refill_pdc_12mo won't compute; SABA count still ok)
+-- ==NAME days_supply_pct==  (low → refill_pdc_12mo is a FLOOR, not a rate: it is computed
+--   from whatever fills do carry one, and each affected drug row is flagged
+--   refill_pdc_partial. The SABA count is unaffected — it counts dispensings.)
 SELECT 100.0 * SUM(CASE WHEN days_supply IS NOT NULL THEN 1 ELSE 0 END)
              / NULLIF(COUNT(*),0) AS v
 FROM @cdm_database_schema.drug_exposure;

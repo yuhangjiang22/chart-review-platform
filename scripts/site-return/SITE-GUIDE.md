@@ -22,12 +22,97 @@ npm ci
 python3 -m pip install duckdb
 ```
 
-**Point the extraction at your CDM.** One file is site-specific:
-`scripts/asthma-omop-extract/adapter_rdrp.sql` builds standard-OMOP-named views
-over the origin site's delivery. Copy it, adapt the view definitions to your own
-column names and file locations, and leave `cohort.sql`, `extracts.sql` and
-`conformance.sql` untouched — those are the shared definition of the cohort and
-must not diverge between sites.
+**Point the extraction at your CDM.** Exactly one file is site-specific:
+`scripts/asthma-omop-extract/adapter_rdrp.sql`. It builds standard-OMOP-named
+views over the origin site's delivery. Copy it to `adapter_<yoursite>.sql`, point
+the views at your own tables, and leave `cohort.sql`, `extracts.sql` and
+`conformance.sql` untouched — those three are the shared definition of the cohort
+and the extraction, and must not diverge between sites.
+
+### What your adapter has to produce
+
+Views with these names, each carrying at least these columns. Extra columns are
+ignored; a missing one fails the query that needs it.
+
+| view | columns required |
+|---|---|
+| `person` | `person_id`, `year_of_birth`, `gender_concept_id` |
+| `observation_period` | `person_id`, `observation_period_start_date` |
+| `visit_occurrence` | `person_id`, `visit_occurrence_id`, `visit_concept_id`, `visit_start_date`, `visit_end_date` |
+| `condition_occurrence` | `person_id`, `condition_occurrence_id`, `condition_concept_id`, `condition_start_date`, `condition_source_value`, `visit_occurrence_id` |
+| `drug_exposure` | `person_id`, `drug_exposure_id`, `drug_concept_id`, `drug_exposure_start_date`, `days_supply`, `quantity` |
+| `measurement` | `person_id`, `measurement_id`, `measurement_concept_id`, `measurement_date`, `value_as_number`, `unit_source_value` |
+| `procedure_occurrence` | `person_id`, `procedure_occurrence_id`, `procedure_concept_id`, `procedure_date`, `procedure_source_value` |
+| `note` | `person_id`, `note_date`, `doc_type`, `note_text` |
+| `concept` | `concept_id`, `concept_name`, `concept_code`, `concept_class_id`, `vocabulary_id` |
+| `concept_ancestor` | `ancestor_concept_id`, `descendant_concept_id` |
+
+No `observation` view is needed: the audit's one computed observation (the
+12-month exacerbation count) is derived by the extraction itself, not read from
+your CDM.
+
+Dates must be DATE, not timestamp. If yours carry a time component, cast in the
+view (`substr(col,1,10)::DATE` or your dialect's equivalent) — the origin site's
+adapter does exactly this, and a timestamp silently breaks the window arithmetic
+that decides what is inside the 12-month lookback.
+
+`person_id` must be a stable identifier of your own, and it never leaves your
+site: the extraction hashes it with your `--salt`.
+
+### Where sites usually differ, and what to do
+
+**Notes are not in an OMOP `note` table.** Common — they are often a separate
+export. Build the view over whatever you have; only four columns are needed, and
+`doc_type` can be any short label (it becomes part of the note's filename in the
+corpus, and the agent uses it to tell a progress note from an ED note). The origin
+site maps a partitioned parquet drop this way.
+
+**`days_supply` is null.** Then `refill_pdc_12mo` is computed from whatever fills
+do carry one and each affected drug is flagged `refill_pdc_partial` — treat the
+number as a floor, not a rate. The SABA count is unaffected: it counts
+dispensings, not supply. Nothing else in the rubric depends on it.
+
+**No structured ACT / C-ACT.** Expected — it is note-only at the origin site too.
+`T1-ACTScore` then comes from the notes, and the `act_structured` check WARNs
+rather than fails. No action needed.
+
+**`condition_source_value` has a different shape.** It does not matter for cohort
+selection: patients are matched on the STANDARD `condition_concept_id` (SNOMED
+317009 and its descendants via `concept_ancestor`), never on the source string.
+The source value is only parsed for a display ICD-10 code, and an unparsed one
+leaves that field null.
+
+**Visits are not mapped to 9201 / 9202 / 9203.** This one is load-bearing: the
+cohort counts asthma encounters and distinguishes ED from outpatient by those
+standard concept ids, and several rules anchor on ED visits. If
+`visit_mapping_pct` comes back low, map them in the view before going further.
+
+**Your formulary uses drugs the classifier does not know.** Drug class is decided
+by keyword match against RxNorm ingredient names — 20 keywords covering ICS,
+ICS-LABA, LTRA, LAMA, biologics, SABA and OCS (`DRUG_KW` in `etl.py`). An
+ingredient outside that list is invisible to the audit: a controller nobody sees
+reads as no controller. Check the list against your own dispensing data before
+the calibration round, and **send additions to the coordinating centre** rather
+than editing locally — what counts as a controller is part of the measurement,
+and it has to be the same everywhere.
+
+### Verifying the adapter beyond the six checks
+
+The conformance checks catch a broken adapter, not a subtly wrong one. Before the
+calibration round, extract ten patients and look at the corpus:
+
+```sh
+python3 scripts/asthma-omop-extract/etl.py --rdrp ... --notes ... \
+    --adapter scripts/asthma-omop-extract/adapter_<yoursite>.sql \
+    --out corpus/patients --limit 10 --salt "$YOUR_SITE_SALT"
+```
+
+For each patient directory, check that `omop/encounters.json`,
+`omop/drugs.json` and `notes/` are non-empty and that the counts look like the
+patient you expect. Then check `anchors/`: a patient you know had an asthma ED
+visit or a steroid burst should have entries in `exacerbations.json`. Empty
+anchor lists across all ten means the extraction is finding the patients but not
+their events, which the six checks will not tell you.
 
 **Check readiness before extracting anything:**
 
