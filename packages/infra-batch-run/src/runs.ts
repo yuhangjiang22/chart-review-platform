@@ -117,6 +117,11 @@ export interface RunStatus {
    *  a single patient takes minutes, so transitions are too sparse to prove
    *  liveness). Absent on legacy runs. */
   heartbeat_at?: string;
+  /** Why the startup reconciler declared this run dead. The per-patient
+   *  entries carry their own message, but a run whose patients were already
+   *  terminal gets none, and the startup log scrolls away — so a run dir
+   *  that outlives the session should still explain itself. */
+  reaped_reason?: string;
 }
 
 /** Heartbeat cadence while a run is live. */
@@ -373,6 +378,16 @@ export function reconcileOrphanedRunsOnStartup(now: Date = new Date()): string[]
     const finalState: RunState =
       nComplete === 0 && nError > 0 ? "failed" : nError > 0 ? "complete_with_errors" : "complete";
 
+    const why =
+      status.owner_pid === undefined
+        ? "reconciled at startup: run predates owner tracking, so liveness could not be checked"
+        : !ownerAlive(status.owner_pid)
+          ? `reconciled at startup: owner pid ${status.owner_pid} is gone` +
+            (status.heartbeat_at ? `, last heartbeat ${status.heartbeat_at}` : "")
+          : `reconciled at startup: owner pid ${status.owner_pid} is alive but its last heartbeat ` +
+            `(${status.heartbeat_at ?? "none"}) is stale beyond ${HEARTBEAT_STALE_MS / 60_000} min — ` +
+            "treated as a recycled pid";
+
     atomicWriteJson(statusPath(name), {
       ...status,
       state: finalState,
@@ -382,6 +397,7 @@ export function reconcileOrphanedRunsOnStartup(now: Date = new Date()): string[]
       n_complete: nComplete,
       n_error: nError,
       per_patient: perPatient,
+      reaped_reason: why,
     } satisfies RunStatus);
     reconciled.push(name);
   }

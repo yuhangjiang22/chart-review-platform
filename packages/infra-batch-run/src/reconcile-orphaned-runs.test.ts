@@ -241,3 +241,42 @@ describe("a live run's status survives a reconciler pass", () => {
     expect(src.match(/owner_pid: process\.pid/g) ?? []).toHaveLength(1);
   });
 });
+
+// A reaped run dir outlives the startup log that named it. Per-patient entries
+// carry their own message, but a run whose patients were already terminal gets
+// none — so the run itself must say why it was declared dead, or a three-day-old
+// dir reads as a bare "failed" with no reason. That silence is what let the
+// reaper hide behind two wrong root-cause theories.
+describe("reconcileOrphanedRunsOnStartup — records why", () => {
+  it("names the dead owner and its last heartbeat", () => {
+    writeStatus(
+      "run_why_dead",
+      baseStatus("run_why_dead", {
+        owner_pid: 4194304,
+        heartbeat_at: "2026-06-15T19:55:00.000Z",
+      }),
+    );
+    reconcileOrphanedRunsOnStartup(NOW);
+    const why = getRunStatus("run_why_dead")!.reaped_reason ?? "";
+    expect(why).toContain("4194304");
+    expect(why).toContain("2026-06-15T19:55:00.000Z");
+  });
+
+  it("distinguishes a stale heartbeat on a live pid from a dead owner", () => {
+    writeStatus(
+      "run_why_stale",
+      baseStatus("run_why_stale", {
+        owner_pid: process.pid,
+        heartbeat_at: new Date(NOW.getTime() - 60 * 60_000).toISOString(),
+      }),
+    );
+    reconcileOrphanedRunsOnStartup(NOW);
+    expect(getRunStatus("run_why_stale")!.reaped_reason).toMatch(/recycled pid/);
+  });
+
+  it("says so when the run predates owner tracking", () => {
+    writeStatus("run_why_legacy", baseStatus("run_why_legacy"));
+    reconcileOrphanedRunsOnStartup(NOW);
+    expect(getRunStatus("run_why_legacy")!.reaped_reason).toMatch(/predates owner tracking/);
+  });
+});
