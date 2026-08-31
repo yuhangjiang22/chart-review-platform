@@ -113,9 +113,6 @@ paths RDRP can't: `refill_pdc_12mo` computes (0.99 / 0.16), ACT comes from the
 measurement table, and notes come from the OMOP `note` table. So the portable SQL runs
 unchanged where RDRP's quirks don't exist.
 
-Both runs used the DuckDB stand-in to render the SQL. A first run through real OHDSI
-SqlRender against a live CDM is what the WCM pilot adds.
-
 ## RDRP real-data adaptations (documented in `adapter_rdrp.sql`)
 Composite `CONDITION_SOURCE_VALUE` (`1284^^J45.50^`) → `icd10cm` regex-parsed (cohort
 matches the standard `condition_concept_id`, not the composite); notes as parquet →
