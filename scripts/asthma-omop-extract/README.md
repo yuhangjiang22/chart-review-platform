@@ -89,33 +89,32 @@ Writes `corpus/patients/<patient_real_asthma_HASH>/{meta.json, omop/*.json, note
 `person_id` is salted-hash anonymized (`--salt`); output ids use the gitignored
 `patient_real_*` prefix (PHI stays local). Only SQL/config travels between sites — no PHI.
 
-## Validation (reproducible)
+## Validation — RDRP-6745 (real site, via the DuckDB stand-in)
 Run against RDRP-6745 (via the DuckDB stand-in): cohort = **57,235** eligible pediatric-
 asthma patients — measured BEFORE the prior-observation floor, the study window and the
 asthma-linked-encounter definition were added, so read it as an upper bound on the
-current criteria rather than as today's number. The full rendered ETL reproduces the two hand-built fixtures **exactly**
-on every field — conditions, encounters + `asthma_related`, `age_band`, `controller_active`,
+current criteria rather than as today's number.
+
+The full rendered ETL reproduces the two hand-built fixtures **exactly** on every field
+— conditions, encounters + `asthma_related`, `age_band`, `controller_active`,
 `lookback_outpatient_count_12mo`, `saba_canisters_12mo`, `exacerbations_12mo`, notes:
 ```
 patient_real_asthma_01: ALL MATCH ✓  age_band=age_12_17 lb=9 saba=14 exac=2 conds=17 enc=26 ar=22 notes=25
 patient_real_asthma_03: ALL MATCH ✓  age_band=age_5_11  lb=3 saba=0  exac=1 conds=13 enc=21 ar=11 notes=24
 ```
 
-## Cross-site portability — tested on a second (synthetic) OMOP site
+## Cross-site portability — a second, synthetic OMOP site (also via the stand-in)
 The identical `cohort.sql` / `extracts.sql` / `conformance.sql` were run against a
 **synthetic standard-OMOP site** (different patients, standard column names, a
 populated `note` table, and `days_supply` present) by swapping ONLY the adapter
 (`adapter_synthetic.sql`). Result: conformance PASSES all 6 checks (vs RDRP's 2 WARNs),
 and extraction produced correct corpora across all three age bands — exercising the
 paths RDRP can't: `refill_pdc_12mo` computes (0.99 / 0.16), ACT comes from the
-measurement table, and notes come from the OMOP `note` table. This proves the portable
-SQL runs unchanged where RDRP's quirks don't exist.
+measurement table, and notes come from the OMOP `note` table. So the portable SQL runs
+unchanged where RDRP's quirks don't exist.
 
-## Remaining limitation (stated plainly)
-Validated on ONE real site (RDRP-6745) + ONE synthetic standard-OMOP site, both via the
-DuckDB SqlRender stand-in. The final production proof is a run against a **real second
-site's live CDM** (e.g. WCM) through **real OHDSI SqlRender** — not yet done. The
-conformance check is the tool a new site uses to gauge readiness before that run.
+Both runs used the DuckDB stand-in to render the SQL. A first run through real OHDSI
+SqlRender against a live CDM is what the WCM pilot adds.
 
 ## RDRP real-data adaptations (documented in `adapter_rdrp.sql`)
 Composite `CONDITION_SOURCE_VALUE` (`1284^^J45.50^`) → `icd10cm` regex-parsed (cohort
