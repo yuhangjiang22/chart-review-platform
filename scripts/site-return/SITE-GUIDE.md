@@ -34,8 +34,12 @@ standard-OMOP-named views over whatever shape your data is in.
 Exactly one file is site-specific. Copy
 `scripts/asthma-omop-extract/adapter_rdrp.sql`, point the views at your own
 tables, and leave `cohort.sql`, `extracts.sql` and `conformance.sql` untouched —
-those three are the shared definition of the cohort and the extraction, and must
-not diverge between sites.
+those three are the shared definition of the cohort and the extraction. Who is in
+the denominator cannot be a local decision, so they must be byte-identical
+everywhere. What IS yours to set is the parameters: `@min_notes_12mo` especially,
+since note volume in OMOP differs by an order of magnitude between a hospital CDM
+and an HIE. `scripts/asthma-omop-extract/README.md` lists them all and
+`cohort.sql`'s own header explains the reasoning behind each.
 
 ## What your adapter has to produce
 
@@ -89,6 +93,35 @@ selection: patients are matched on the STANDARD `condition_concept_id` (SNOMED
 317009 and its descendants via `concept_ancestor`), never on the source string.
 The source value is only parsed for a display ICD-10 code, and an unparsed one
 leaves that field null.
+
+**There is no `observation_period` table.** Reported by the first partner site.
+The cohort requires 365 days of prior observation before the index date, so that
+the absence of a controller or a spirometry can be read as absence of care rather
+than absence of data. Synthesize the view in your adapter from the earliest dated
+event you hold — do not edit `cohort.sql`:
+
+```sql
+CREATE OR REPLACE VIEW observation_period AS
+SELECT person_id, MIN(d) AS observation_period_start_date,
+                  MAX(d) AS observation_period_end_date
+FROM (
+  SELECT person_id, visit_start_date      AS d FROM <your visit_occurrence>
+  UNION ALL SELECT person_id, condition_start_date     FROM <your condition_occurrence>
+  UNION ALL SELECT person_id, drug_exposure_start_date FROM <your drug_exposure>
+  UNION ALL SELECT person_id, measurement_date         FROM <your measurement>
+  UNION ALL SELECT person_id, procedure_date           FROM <your procedure_occurrence>
+  UNION ALL SELECT person_id, note_date                FROM <your note>
+) t WHERE d IS NOT NULL GROUP BY person_id;
+```
+
+Say so when you send results: earliest-record is not the same claim as
+`observation_period`, and it errs in both directions — one visit three years ago
+gives a long span with no real coverage, while a long-enrolled patient whose
+first record is recent gets excluded. Pair it with `@min_notes_12mo`, which
+measures what the criterion is actually for. It also feeds the 730-day spirometry
+censoring, so with a proxy that censoring becomes conservative (fewer flagged
+gaps) and that rule's denominator is not comparable to a site with real
+`observation_period` data.
 
 **Visits are not mapped to 9201 / 9202 / 9203.** This one is load-bearing: the
 cohort counts asthma encounters and distinguishes ED from outpatient by those

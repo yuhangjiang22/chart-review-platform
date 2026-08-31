@@ -16,7 +16,8 @@
 --   * Notes are a partitioned PARQUET drop (REPORT_TYPE / PHYSIOLOGIC_TIME /
 --     REPORT_TEXT), NOT an OMOP `note` table -> see the notes view below. A
 --     standard site would instead map the OMOP `note` table.
---   * DAYS_SUPPLY is absent (all null) -> refill_pdc_12mo is not computed here.
+--   * DAYS_SUPPLY is absent (all null) -> refill_pdc_12mo comes out of whatever fills
+--     carry one, flagged refill_pdc_partial. Here that is none, so no PDC is emitted.
 --
 -- Run against DuckDB:  duckdb -c ".read adapter_rdrp.sql" ...   (see run_duckdb.py)
 -- {RD} is substituted with the RDRP-6745 directory path.

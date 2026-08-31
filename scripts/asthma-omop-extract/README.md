@@ -7,32 +7,60 @@ validated end-to-end against the real **RDRP-6745** (Indiana HIE / INPC) deliver
 ## Files
 | File | Purpose |
 |---|---|
-| `cohort.sql` | **Portable, OHDSI SQL.** Eligibility: SNOMED 317009 asthma, age 2–17 at index, index = most-recent pediatric outpatient visit, ≥2 outpatient visits in the 12-mo lookback. `@cdm_database_schema`, `@min_age`, `@max_age`, `@min_lookback_visits`. |
+| `cohort.sql` | **Portable, OHDSI SQL.** Eligibility, and the one file that must be byte-identical across sites — who is in the denominator cannot be a local decision. SNOMED 317009 asthma; age 2–17 at index; index = most recent pediatric OUTPATIENT visit (9202); ≥ `@min_asthma_encounters` asthma-related non-inpatient encounters in the 12-month lookback with at least one non-ED; ≥ `@min_prior_observation_days` of prior observation; ≥ `@min_notes_12mo` notes in the lookback. Params: `@cdm_database_schema`, `@min_age`, `@max_age`, `@min_asthma_encounters`, `@min_prior_observation_days`, `@min_notes_12mo`, `@study_start`, `@study_end`. Read its header for the reasoning behind each. |
 | `extracts.sql` | **Portable, OHDSI SQL.** Flat per-table SELECTs (conditions, drugs→ingredient, asthma_visits, encounters, measurements, procedures, notes) joined to the cohort table. |
-| `conformance.sql` | **Portable, OHDSI SQL.** Pre-flight checks — run FIRST to see if your site will produce comparable data. |
+| `conformance.sql` | **Portable, OHDSI SQL.** Six pre-flight checks — run FIRST. They report which of your site's data dimensions are populated well enough for the questions that depend on them. |
 | `adapter_rdrp.sql` | **Site-specific.** The ONLY file you replace per site: maps RDRP CSV/parquet → standard OMOP view names. A standard warehouse points `@cdm_database_schema` at its CDM instead. |
 | `etl.py` | Runner: renders the SQL, runs it, applies the Python transform (drug fills, foundations, `asthma_related`, salted-hash anonymize), writes `corpus/patients/<anon>/`. Also `--check` (conformance). |
+| `derive_anchors.py` | Derives the four event-anchor lists (`asthma_encounters`, `ocs_bursts`, `exacerbations`, `obligation_points`) from the per-patient OMOP JSON the ETL just wrote. Called by `etl.py`; also runnable standalone over an existing corpus. The event-level rules are enumerated from these, so their definitions are part of the measurement. |
+| `test_derive_anchors.py`, `test_roll_up_drugs.py` | `pytest`. Cover the anchor derivations and the 12-month drug fields (window boundaries, SABA counting basis, days_supply completeness). Run them after touching either file. |
+| `screen_v05.py` | One-off cohort screening helper. Not part of the extraction path. |
 
-## Can another site get comparable data? — the honest answer
-**Not the same *records*** (each site has its own patients) — the **same cohort
-definition + extraction logic**, applied to each site's data. Portability rests on
-three things, all now addressed:
+## Comparability across sites
 
-1. **Dialect** — `cohort.sql` / `extracts.sql` / `conformance.sql` are OHDSI SqlRender
-   source (standard schema `@`-params, `DATEADD`/`YEAR`, no dialect-specific syntax).
-   A site renders them with real OHDSI SqlRender:
-   ```r
-   SqlRender::translate(
-     SqlRender::render(readr::read_file("cohort.sql"),
-       cdm_database_schema="omop_cdm", min_age=2, max_age=17, min_lookback_visits=2),
-     targetDialect="postgresql")   # or 'sql server','bigquery','redshift','spark',…
-   ```
-   `etl.py` ships a **DuckDB render stand-in** (`render_duckdb`) so we can validate on
-   the RDRP files here; **at your site use OHDSI SqlRender**, not the stand-in.
-2. **Warehouse specifics** — everything site-specific is isolated in
-   `adapter_rdrp.sql`. Swap it for your CDM; the cohort/extracts are unchanged.
-3. **Data-population reality** — the biggest driver of "same or not." Run
-   `conformance.sql` first; it reports where your corpus will differ (and why).
+Each site has its own patients, so the *records* are never the same. What is the
+same — by construction, not by hope — is the **cohort definition and the
+extraction logic**: `cohort.sql`, `extracts.sql` and `conformance.sql` are shared
+and must not be edited per site. Only two things are allowed to vary:
+
+1. **Where the data lives.** Everything site-specific is isolated in one adapter
+   file that maps the site's tables to standard OMOP view names.
+   `adapter_rdrp.sql` is the reference implementation; a standard warehouse can
+   often just point `@cdm_database_schema` at its CDM instead.
+2. **The parameters.** `@min_notes_12mo` in particular is set per site, because
+   note volume in OMOP differs by an order of magnitude between a hospital CDM
+   and an HIE.
+
+**Dialect** is handled by writing the SQL as OHDSI SqlRender source (standard
+`@`-params, `DATEADD`/`YEAR`, no dialect-specific syntax), so a site renders it
+for its own database:
+
+```r
+SqlRender::translate(
+  SqlRender::render(readr::read_file("cohort.sql"),
+    cdm_database_schema="omop_cdm", min_age=2, max_age=17,
+    min_asthma_encounters=2, min_prior_observation_days=365, min_notes_12mo=0,
+    study_start="2021-01-01", study_end="2100-01-01"),
+  targetDialect="postgresql")   # or 'sql server','bigquery','redshift','spark',…
+```
+
+`etl.py` ships a **DuckDB render stand-in** (`render_duckdb`) so this repo can be
+validated against the RDRP files; **at your site use real OHDSI SqlRender**, not
+the stand-in.
+
+### What genuinely differs, and how it is measured
+
+Identical logic over differently-populated data does not produce identical
+corpora, and that is the part worth being concrete about rather than assuming
+away. Observed so far: RDRP-6745 has `days_supply` null on every one of 6,653
+drug fills and no structured ACT at all; another site has no
+`observation_period` table. Each of those changes what some question can be
+answered from.
+
+`conformance.sql` exists to surface exactly this before any extraction runs — six
+checks, reported as PASS / WARN / FAIL, with the WARNs naming which downstream
+value degrades. Run it first, keep its output, and send it with the results: a
+rate is only comparable next to the population facts behind it.
 
 ## Conformance check (run this first)
 ```
@@ -63,7 +91,9 @@ Writes `corpus/patients/<patient_real_asthma_HASH>/{meta.json, omop/*.json, note
 
 ## Validation (reproducible)
 Run against RDRP-6745 (via the DuckDB stand-in): cohort = **57,235** eligible pediatric-
-asthma patients. The full rendered ETL reproduces the two hand-built fixtures **exactly**
+asthma patients — measured BEFORE the prior-observation floor, the study window and the
+asthma-linked-encounter definition were added, so read it as an upper bound on the
+current criteria rather than as today's number. The full rendered ETL reproduces the two hand-built fixtures **exactly**
 on every field — conditions, encounters + `asthma_related`, `age_band`, `controller_active`,
 `lookback_outpatient_count_12mo`, `saba_canisters_12mo`, `exacerbations_12mo`, notes:
 ```
@@ -90,4 +120,6 @@ conformance check is the tool a new site uses to gauge readiness before that run
 ## RDRP real-data adaptations (documented in `adapter_rdrp.sql`)
 Composite `CONDITION_SOURCE_VALUE` (`1284^^J45.50^`) → `icd10cm` regex-parsed (cohort
 matches the standard `condition_concept_id`, not the composite); notes as parquet →
-mapped to the `note` view; `DAYS_SUPPLY` absent → PDC skipped; year-precision age.
+mapped to the `note` view; `DAYS_SUPPLY` absent → `refill_pdc_12mo` is computed from whatever fills carry one and
+each affected drug row is flagged `refill_pdc_partial` (a floor, not a rate); the SABA
+count is unaffected because it counts dispensings; year-precision age.
