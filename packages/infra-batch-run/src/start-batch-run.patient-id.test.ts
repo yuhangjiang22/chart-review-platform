@@ -1,4 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { startBatchRun } from "./runs.js";
 
 // A patient_id becomes a DIRECTORY NAME under var/runs/<run>/per_patient/, and
@@ -12,6 +15,29 @@ import { startBatchRun } from "./runs.js";
 // Thirty ids had arrived as ONE whitespace-joined string — a caller quoting its
 // entire argument list — and the platform tried to create a directory named after
 // all of them. These run before the task is loaded, so no fixture is needed.
+// A THROWAWAY RUNS ROOT, because the last case below passes VALID ids — and
+// getting past the id guard is exactly what it asserts, which means
+// startBatchRun really starts. Without this, every full-suite execution left
+// three run directories in the developer's OWN var/runs, marked running and then
+// abandoned when the task load failed: 22 of them accumulated in one day, showing
+// as phantom RUNNING badges in the UI and needing the orphan reconciler to clear
+// them. A test that manufactures the exact stale-state problem the reconciler
+// exists to fix is not a cost worth paying for coverage.
+let runsRoot: string;
+let prevRunsRoot: string | undefined;
+
+beforeAll(() => {
+  runsRoot = fs.mkdtempSync(path.join(os.tmpdir(), "runs-patient-id-"));
+  prevRunsRoot = process.env.CHART_REVIEW_RUNS_ROOT;
+  process.env.CHART_REVIEW_RUNS_ROOT = runsRoot;
+});
+
+afterAll(() => {
+  if (prevRunsRoot === undefined) delete process.env.CHART_REVIEW_RUNS_ROOT;
+  else process.env.CHART_REVIEW_RUNS_ROOT = prevRunsRoot;
+  fs.rmSync(runsRoot, { recursive: true, force: true });
+});
+
 describe("startBatchRun rejects a patient_id that is not a path component", () => {
   const run = (patient_ids: unknown[]) =>
     () => startBatchRun({ task_id: "asthma-adherence", patient_ids: patient_ids as string[],
