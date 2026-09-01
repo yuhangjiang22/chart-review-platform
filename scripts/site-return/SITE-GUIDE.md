@@ -24,6 +24,34 @@ npm ci
 python3 -m pip install duckdb
 ```
 
+## Before anything else: confirm the rubric version
+
+The rubric is under active development and a change to it changes the answers. If
+you annotate against one version and we analyse against another, the annotation
+round has to be redone — so pull, then check the version you have against the one
+we told you to run:
+
+```sh
+git pull
+npx tsx -e 'import("./server/lib/lock.js").then(async m => { \
+  const r = await import("@chart-review/rubric"); \
+  console.log(m.computeTaskSha(r.guidelineDir("asthma-adherence"))); })'
+```
+
+That SHA is recorded in every package you send back, so drift is detectable
+afterwards — but afterwards is after the annotator's time is spent. Check it
+before step 3, and again if you pull mid-round.
+
+Two changes worth knowing about specifically, because they move answers rather
+than wording:
+
+- `T1-ControllerPrescribed` measures **prescribing, not taking**. A controller
+  that was prescribed and never collected, or that the family is not taking, is
+  still TRUE — those are adherence findings, not gaps in care.
+- `R-T1-ControllerAtUncontrolledVisit` is new, so every asthma visit now carries a
+  candidate event for it. Both the annotation volume and that rule's denominator
+  changed.
+
 ---
 
 # Step 1 — prepare your data
