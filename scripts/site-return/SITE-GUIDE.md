@@ -207,11 +207,9 @@ structured facts that predict it, and check the draw before annotating:
   toddlers cannot calibrate that branch at all. Aim for several in each of
   `age_2_4`, `age_5_11`, `age_12_17`.
 - **Exacerbation history.** `R-T1-ControllerForPersistent` anchors on obligation
-  points, which require a SECOND exacerbation within a rolling year. Count
-  `anchors/obligation_points.json` across your draw before you start: if it is
-  empty for everyone, that rule has no denominator and the calibration cannot
-  measure the study's most important requirement. Same check for
-  `anchors/exacerbations.json` and `anchors/ocs_bursts.json`.
+  points, which require a SECOND exacerbation within a rolling year. If no patient
+  in the draw has one, that rule has no denominator and the calibration cannot
+  measure the study's most important requirement.
 - **ED contact.** Several event-level rules only apply where control was poor, and
   an ED visit is the strongest structured proxy for that. A draw where almost
   nobody has one leaves those rules with nothing evaluable.
@@ -220,6 +218,22 @@ structured facts that predict it, and check the draw before annotating:
   chart is thin, not because the care was — which reports as DOCUMENTATION_GAP.
   Raise `@min_notes_12mo` once you can see your own distribution rather than
   leaving it at the floor.
+
+**Check the draw before annotating** — two minutes, no agent run needed:
+
+```sh
+python3 scripts/asthma-omop-extract/check_draw.py --prefix patient_real_asthma_<yoursite>_
+```
+
+It prints each patient's age band, note volume, prior observation and four anchor
+counts, then the checks: whether any patient has an obligation point, whether each
+age band has enough patients to calibrate its branch, whether the notes are thin
+enough to manufacture documentation gaps, and whether anyone has no notes at all.
+It exits non-zero when something needs resolving. Counts and pseudonymous ids
+only, so its output is safe to send with your questions.
+
+For reference, the origin site's 63 extracted patients: 25 have an obligation
+point, and the age bands run 12 / 21 / 30.
 
 ```sh
 npm run dev            # server + UI
