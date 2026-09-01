@@ -261,7 +261,36 @@ It exits non-zero when something needs resolving. Counts and pseudonymous ids
 only, so its output is safe to send with your questions.
 
 For reference, the origin site's 63 extracted patients: 25 have an obligation
-point, and the age bands run 12 / 21 / 30.
+point (40%), and the age bands run 12 / 21 / 30.
+
+### If the check fails, re-draw before annotating — not after
+
+Do not re-run the ETL with a new random seed and hope. Extract a POOL two or three
+times the size of the sample, run `check_draw.py` over the pool, and choose the 30
+from it deliberately:
+
+```sh
+# a pool, not a sample
+python3 scripts/asthma-omop-extract/etl.py --rdrp … --notes … \
+    --adapter scripts/asthma-omop-extract/adapter_<yoursite>.sql \
+    --out corpus/patients --salt "$YOUR_SITE_SALT" --limit 90
+
+python3 scripts/asthma-omop-extract/check_draw.py --prefix patient_real_asthma_<yoursite>_
+```
+
+Then pick the 30 so that each age band has at least three patients and enough of
+them carry an obligation point to give `R-T1-ControllerForPersistent` a
+denominator. The anchors are already computed per patient, so the selection is a
+table lookup rather than another extraction — and the session's cohort is just the
+list of ids you enter when you create it, so the other patients simply stay
+unannotated in the corpus.
+
+**If the whole POOL has no obligation points, that is a fact about your data, not
+a bad draw.** No sample fixes it: it means your site has few or no patients with a
+second exacerbation inside a rolling year, and the honest response is to tell us
+so we record that your site does not contribute to that rule — not to keep drawing
+until a denominator appears. Send the `check_draw.py` output and we will decide
+together which rules your site can calibrate.
 
 ```sh
 npm run dev            # server + UI
