@@ -263,34 +263,38 @@ only, so its output is safe to send with your questions.
 For reference, the origin site's 63 extracted patients: 25 have an obligation
 point (40%), and the age bands run 12 / 21 / 30.
 
-### If the check fails, re-draw before annotating — not after
+### Stratify from the cohort table, not by re-extracting
 
-Do not re-run the ETL with a new random seed and hope. Extract a POOL two or three
-times the size of the sample, run `check_draw.py` over the pool, and choose the 30
-from it deliberately:
+Most of what you need to draw well is in the cohort query's own output, before any
+notes are extracted: `age_band_naepp`, `n_ed_12mo`, `n_asthma_encounters_12mo`,
+`n_notes_12mo`, `days_observed_before_index`. Select on those first, then extract
+only the patients you selected — it keeps the number of charts on disk equal to
+the number you will actually annotate.
 
-```sh
-# a pool, not a sample
-python3 scripts/asthma-omop-extract/etl.py --rdrp … --notes … \
-    --adapter scripts/asthma-omop-extract/adapter_<yoursite>.sql \
-    --out corpus/patients --salt "$YOUR_SITE_SALT" --limit 90
+Only one fact needs the extraction to exist: the anchor counts, and among them
+`obligation_points`. So the order is:
 
-python3 scripts/asthma-omop-extract/check_draw.py --prefix patient_real_asthma_<yoursite>_
-```
+1. select ~30 from the cohort table, balanced across age bands and including
+   patients with ED contact
+2. extract exactly those (`--patients <id,id,…>`)
+3. `check_draw.py` — the anchors now exist, so obligation points can be counted
 
-Then pick the 30 so that each age band has at least three patients and enough of
-them carry an obligation point to give `R-T1-ControllerForPersistent` a
-denominator. The anchors are already computed per patient, so the selection is a
-table lookup rather than another extraction — and the session's cohort is just the
-list of ids you enter when you create it, so the other patients simply stay
-unannotated in the corpus.
+**If you already extracted a sample, start at 3.** Run the check on what you have
+before extracting anything more; a draw that passes needs no re-draw.
 
-**If the whole POOL has no obligation points, that is a fact about your data, not
-a bad draw.** No sample fixes it: it means your site has few or no patients with a
-second exacerbation inside a rolling year, and the honest response is to tell us
-so we record that your site does not contribute to that rule — not to keep drawing
-until a denominator appears. Send the `check_draw.py` output and we will decide
-together which rules your site can calibrate.
+If it fails on obligation points, top up rather than start over: go back to the
+cohort table, pick additional patients with `n_ed_12mo >= 1` or several asthma
+encounters (the available structured proxies for exacerbation history), extract
+just those, and re-run the check. A session's cohort is the list of ids you enter
+when you create it, so extra extracted patients simply stay unannotated.
+
+**If topping up does not produce obligation points either, that is a fact about
+your data, not a bad draw.** It means your site has few or no patients with a
+second exacerbation inside a rolling year. The honest response is to send us the
+`check_draw.py` output and let us record that your site does not contribute to
+that rule — not to keep drawing until a denominator appears. A site that draws
+until the number looks right has selected on the outcome, which is worse than
+having no denominator.
 
 ```sh
 npm run dev            # server + UI
