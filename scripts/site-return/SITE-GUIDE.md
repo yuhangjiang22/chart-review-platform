@@ -193,11 +193,33 @@ not their events — the six checks will not tell you that.
 **What you produce:** a session where every calibration patient has an agent
 draft and a human-adjudicated answer for every question and every event.
 
-Draw the calibration sample first. **50–60 patients**: below about 30, a rule's
-kappa swings by more than 0.1 when a single patient flips, so the number stops
-meaning anything. **Stratify** it — roughly half well-controlled, half not.
-Several rules only apply at an uncontrolled visit, so an unstratified draw leaves
-them with almost no evaluable events and nothing to measure.
+Draw the calibration sample first: **30 patients**. Report each rule's `n`
+alongside its kappa and read the two together — at this size one patient flipping
+moves a rule's kappa by roughly 0.1, so a rule with few evaluable events is a
+number to interpret, not to act on alone.
+
+**How you draw them matters more than how many.** Control level is a judgment made
+during annotation, so you cannot stratify on it up front — stratify on the
+structured facts that predict it, and check the draw before annotating:
+
+- **Age band.** The 2–4 band has its own guideline logic (its own stepwise table,
+  no ACT, ICS-formoterol not applicable below 4), so a sample with one or two
+  toddlers cannot calibrate that branch at all. Aim for several in each of
+  `age_2_4`, `age_5_11`, `age_12_17`.
+- **Exacerbation history.** `R-T1-ControllerForPersistent` anchors on obligation
+  points, which require a SECOND exacerbation within a rolling year. Count
+  `anchors/obligation_points.json` across your draw before you start: if it is
+  empty for everyone, that rule has no denominator and the calibration cannot
+  measure the study's most important requirement. Same check for
+  `anchors/exacerbations.json` and `anchors/ocs_bursts.json`.
+- **ED contact.** Several event-level rules only apply where control was poor, and
+  an ED visit is the strongest structured proxy for that. A draw where almost
+  nobody has one leaves those rules with nothing evaluable.
+- **Note volume.** `n_notes_12mo` is in the cohort output. A patient with two or
+  three notes will answer "not documented" to most of the T2 questions because the
+  chart is thin, not because the care was — which reports as DOCUMENTATION_GAP.
+  Raise `@min_notes_12mo` once you can see your own distribution rather than
+  leaving it at the floor.
 
 ```sh
 npm run dev            # server + UI
@@ -350,6 +372,7 @@ Have these ready with the packages:
 - how many patients the cohort query matched, and how many were extracted
 - the conformance output from step 1 (all six checks)
 - how many patients have fewer than 730 days of prior observation
-- your calibration sample size and how it was stratified
+- your calibration sample size, and the draw's distribution across age bands,
+  obligation points, ED contact and `n_notes_12mo`
 - how many annotators, and whether any patient was annotated by more than one
 - any drug ingredients you found missing from `DRUG_KW`
