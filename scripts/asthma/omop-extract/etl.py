@@ -56,16 +56,39 @@ DRUG_KW = {"albuterol":("SABA",False),"levalbuterol":("SABA",False),"fluticasone
 STUDY_START = "2021-01-01"
 STUDY_END   = "2100-01-01"
 
-def render_duckdb(sql, schema_prefix=""):
+# COHORT PARAMETERS. cohort.sql is byte-identical at every site — who is in the
+# denominator cannot be a local decision — but the knobs its header documents ARE
+# the site's to set, and every one of them used to be hardcoded in the substitution
+# below. The guide told sites to set @min_notes_12mo and not to edit cohort.sql,
+# which left no way to do either: the only route was to edit this file. Defaults
+# match cohort.sql's own documented defaults, so an unflagged run is unchanged.
+PARAMS = {
+    "min_age": "2",
+    "max_age": "17",
+    "min_asthma_encounters": "2",
+    "min_prior_observation_days": "365",
+    # 0 = no note floor, matching cohort.sql's default. The local corpus is the
+    # place to see the n_notes_12mo distribution before filtering on it.
+    "min_notes_12mo": "0",
+}
+# Schema qualifier for a real warehouse: "" leaves @cdm_database_schema.person as
+# `person`, which is what the adapter views provide. --cdm-schema omop_cdm makes it
+# `omop_cdm.person`. Was a parameter of render_duckdb that no caller ever passed,
+# so the README's "a standard warehouse points @cdm_database_schema at its CDM
+# instead" had no code path.
+SCHEMA_PREFIX = ""
+
+def render_duckdb(sql, schema_prefix=None):
     """Stand-in for OHDSI SqlRender: substitute @params + translate the OHDSI
        functions we use to DuckDB. A real site uses SqlRender.translate() instead."""
     s = strip_comments(sql)
-    s = s.replace("@cdm_database_schema.", schema_prefix)
+    s = s.replace("@cdm_database_schema.",
+                  SCHEMA_PREFIX if schema_prefix is None else schema_prefix)
     s = s.replace("@cohort_table", "cohort").replace("@drug_class_table", "drug_class_map")
-    s = s.replace("@min_age", "2").replace("@max_age", "17").replace("@min_asthma_encounters", "2").replace("@min_prior_observation_days", "365")
-    # 0 = no note floor, matching cohort.sql's default. The local corpus is the
-    # place to see the n_notes_12mo distribution, not to filter on it.
-    s = s.replace("@min_notes_12mo", "0")
+    # Longest name first: @min_notes_12mo must not be reached by a shorter key
+    # that happens to be its prefix if one is ever added.
+    for k in sorted(PARAMS, key=len, reverse=True):
+        s = s.replace(f"@{k}", PARAMS[k])
     s = s.replace("@study_start", STUDY_START).replace("@study_end", STUDY_END)
     s = re.sub(r"DATEADD\(MONTH,\s*-12,\s*([^)]+)\)", r"(\1 - INTERVAL 12 MONTH)", s)
     s = re.sub(r"DATEADD\(DAY,\s*-(\d+),\s*([^)]+)\)", r"(\2 - INTERVAL \1 DAY)", s)
@@ -81,10 +104,44 @@ def named_blocks(sql):
         out[name] = render_duckdb(body)
     return out
 
+# The OMOP views cohort.sql + extracts.sql read. A site's adapter must provide
+# every one; `observation` is deliberately absent (nothing reads it), which the
+# adapter contract table in SITE-GUIDE.md states.
+REQUIRED_VIEWS = [
+    "person", "visit_occurrence", "condition_occurrence", "drug_exposure",
+    "measurement", "procedure_occurrence", "observation_period", "note", "concept",
+]
+
 def setup_adapter(con, adapter_path, rdrp, notes):
+    """Run the site's adapter, then build the RxNorm ingredient → drug-class map.
+
+    Adapter errors are reported by NAME rather than as a DuckDB traceback. Writing
+    the adapter is the one task every site does itself, first, and getting it
+    wrong on the first try is the normal case — a raw CatalogException from three
+    frames down does not say which view is missing or which statement failed.
+    """
     adapter = open(adapter_path).read().replace("{RD}", rdrp).replace("{RD_NOTES}", notes)
     for stmt in [x.strip() for x in strip_comments(adapter).split(";") if x.strip()]:
-        con.execute(stmt)
+        try:
+            con.execute(stmt)
+        except Exception as e:
+            first = stmt.split("\n", 1)[0][:90]
+            sys.exit(f"[etl] adapter {os.path.basename(adapter_path)} failed on:\n"
+                     f"        {first}\n"
+                     f"      {type(e).__name__}: {str(e).splitlines()[0][:160]}")
+    missing = [v for v in REQUIRED_VIEWS
+               if not con.execute("SELECT count(*) FROM duckdb_views() WHERE view_name=?"
+                                  " UNION ALL SELECT count(*) FROM duckdb_tables()"
+                                  " WHERE table_name=?", [v, v]).fetchall()[0][0]
+               and not con.execute("SELECT count(*) FROM duckdb_tables() WHERE table_name=?",
+                                   [v]).fetchone()[0]]
+    if missing:
+        sys.exit(f"[etl] adapter {os.path.basename(adapter_path)} defines no "
+                 f"{'view' if len(missing) == 1 else 'views'} for: {', '.join(missing)}\n"
+                 f"      cohort.sql and extracts.sql read all of "
+                 f"{', '.join(REQUIRED_VIEWS)}. See the adapter contract table in "
+                 f"scripts/asthma/SITE-GUIDE.md, and adapter_rdrp.sql for a worked "
+                 f"example. (`observation` is not required — nothing reads it.)")
     ings = con.execute("SELECT concept_id, lower(concept_name) FROM concept "
                        "WHERE concept_class_id='Ingredient' AND vocabulary_id='RxNorm'").fetchall()
     con.execute("CREATE TABLE drug_class_map(ingredient_concept_id BIGINT, drug_class VARCHAR, is_controller BOOLEAN)")
@@ -129,18 +186,40 @@ def roll_up_drugs(drug_rows, lo, idx):
         # PDC over the fills that HAVE a days_supply. `or 0` silently treated a
         # null as zero coverage, so a drug with 9 documented fills and 1 null one
         # reported less coverage than it had — understating adherence, the same
-        # one-directional bias as a missing answer. days_supply is present on
-        # ~15% of SABA and ~17% of ICS fills here, so partial denominators are
-        # the norm; the conformance WARN claiming PDC "won't compute" below 50%
-        # is only true for a drug whose in-window fills are ALL null.
+        # one-directional bias as a missing answer.
+        #
+        # THREE DIFFERENT DENOMINATORS GET QUOTED FOR days_supply, AND ONLY ONE
+        # MATTERS. Measured on the origin site's extract:
+        #   43.2%  of rows in the whole drug_exposure table  (what --check reports)
+        #   15%    of all fills in the extracted corpus       (what this comment
+        #                                                      used to claim)
+        #   0%     of the 2,366 IN-WINDOW fills — 0/1000 ICS, 0/989 SABA, 0/248
+        #          OCS, 0/111 LTRA, 0/13 LAMA, 0/5 biologic
+        # The last one is the denominator PDC actually uses, so at this site
+        # refill_pdc_12mo is emitted for NOBODY, and refill_pdc_partial — the
+        # marker the conformance WARN points at as the mitigation — never fires
+        # either. Not a floor and not a flag: silence. A rubric question that
+        # depends on PDC has to be answered from the notes here, and a site whose
+        # in-window rate is non-zero is the exception rather than the norm.
         with_ds = [f for f in inwin if f["days_supply"] is not None]
         cov = sum(f["days_supply"] for f in with_ds)
         if e["is_controller"] and cov > 0:
+            # min(1.0, …) over a fixed 365: the denominator is the observation
+            # year, not the treatment period, so a controller started mid-window
+            # reads low. Harmless while no site emits days_supply in-window; it
+            # will need the treatment period the first time one does.
             e["refill_pdc_12mo"] = round(min(1.0, cov/365.0), 2)
             if len(with_ds) < len(inwin):
                 e["refill_pdc_partial"] = (
                     f"{len(inwin) - len(with_ds)} of {len(inwin)} in-window fills "
                     f"have no days_supply — this PDC is a floor, not a rate")
+        elif e["is_controller"] and inwin:
+            # Distinguish "no coverage documented" from "no fills": the first is a
+            # data-availability fact, and without it an absent PDC reads as an
+            # adherence finding.
+            e["refill_pdc_unavailable"] = (
+                f"none of the {len(inwin)} in-window fills carry days_supply, "
+                f"so no PDC can be computed for this drug")
         drugs.append(e)
     for e in drugs:
         if e["drug_class"] == "SABA":
@@ -155,36 +234,103 @@ def conformance(con):
       "asthma_concepts":(1,1,"vocabulary must resolve SNOMED 317009"),
       "visit_mapping_pct":(1,80,"% visits mapped to 9201/9202/9203"),
       "notes_populated":(1,1,"note table must have text (else agents have no chart)"),
-      # NOT "won't compute": PDC computes from whatever fills DO carry a
-      # days_supply, so a low rate here means partial denominators, which the
-      # per-drug refill_pdc_partial marker flags. The SABA count is unaffected
-      # (it counts fills, not supply).
-      "days_supply_pct":(0,50,"<50% → refill_pdc_12mo is a floor, flagged refill_pdc_partial"),
+      # MEASURED OVER THE WHOLE TABLE, WHICH IS NOT THE DENOMINATOR PDC USES.
+      # This counts every drug_exposure row; PDC uses the 12-month IN-WINDOW
+      # fills, and the two can differ completely — at the origin site this
+      # reports 43.2% while 0 of 2,366 in-window fills carry a days_supply, so
+      # no PDC is emitted for anybody and refill_pdc_partial never fires. Read
+      # this as "does the column exist at all", and read the per-drug
+      # refill_pdc_unavailable marker for whether PDC was actually computable.
+      # The SABA count is unaffected either way (it counts fills, not supply).
+      "days_supply_pct":(0,50,"whole-table rate; check refill_pdc_unavailable for the in-window one"),
       "act_structured":(0,1,"0 → ACT is note-only here (like INPC)"),
       "drug_ingredient_rollup":(1,1,"drugs must roll up to RxNorm ingredients")}
     print("=== conformance (site readiness) ===")
+    # SITE-GUIDE says these "must PASS", and the exit code has to be able to say
+    # so: a site scripting `--check` in CI had nothing to gate on, because this
+    # printed its verdict and returned 0 either way. A per-query ERROR counts as a
+    # failure too — an absent table is the loudest possible readiness problem
+    # (cohort.sql INNER JOINs observation_period, and a partner site does not
+    # have it), and it used to print one line and pass.
+    failures = []
     for name, q in named_blocks(load("conformance.sql")).items():
         try: v = con.execute(q).fetchone()[0]
-        except Exception as e: print(f"  {name:24} ERROR ({str(e)[:40]}) — table missing?"); continue
+        except Exception as e:
+            print(f"  {name:24} {'ERROR':>10}   FAIL  ({str(e)[:40]}) — table missing?")
+            failures.append(name)
+            continue
         v = 0 if v is None else v
         fail, warn, note = THRESH.get(name, (0,0,""))
         status = "FAIL" if v < fail else ("WARN" if v < warn else "PASS")
+        if status == "FAIL": failures.append(name)
         print(f"  {name:24} {str(round(v,1)):>10}   {status:4}  {note}")
+    if failures:
+        print(f"\n  FAILED: {', '.join(failures)} — do not extract until these pass.")
+    return 1 if failures else 0
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--rdrp", required=True); ap.add_argument("--notes", required=True)
     ap.add_argument("--out", default="corpus/patients"); ap.add_argument("--limit", type=int)
     ap.add_argument("--patients"); ap.add_argument("--salt", default=os.environ.get("ETL_SALT","rdrp6745"))
-    ap.add_argument("--prefix", default="patient_real_asthma_"); ap.add_argument("--check", action="store_true")
+    ap.add_argument("--site", metavar="CODE",
+                    help="your site code, e.g. wcm. Sets the patient-id prefix to "
+                         "patient_real_asthma_<CODE>_ so ids are unique across "
+                         "sites when results are pooled. --prefix overrides it.")
+    ap.add_argument("--prefix", default=None,
+                    help="patient-id prefix (default: patient_real_asthma_, or "
+                         "patient_real_asthma_<site>_ when --site is given)")
+    ap.add_argument("--check", action="store_true")
     ap.add_argument("--adapter", default=os.path.join(HERE,"adapter_rdrp.sql"))
     ap.add_argument("--study-start", default="2021-01-01", help="index_date >= this (post-2020 = 2020 NAEPP edition)")
     ap.add_argument("--study-end", default="2100-01-01", help="index_date <= this")
+    # cohort.sql's own parameters. Its header explains the reasoning behind each;
+    # these defaults are the ones it documents, so omitting them changes nothing.
+    ap.add_argument("--cdm-schema", default="",
+                    help="schema qualifying the OMOP tables, e.g. omop_cdm. "
+                         "Empty (default) uses the adapter's unqualified views.")
+    ap.add_argument("--min-age", type=int, default=2, help="age at index >= this")
+    ap.add_argument("--max-age", type=int, default=17, help="age at index <= this")
+    ap.add_argument("--min-asthma-encounters", type=int, default=2,
+                    help="asthma-related non-inpatient encounters in the lookback")
+    ap.add_argument("--min-prior-observation-days", type=int, default=365,
+                    help="days of observation before index")
+    ap.add_argument("--cohort-csv", metavar="PATH",
+                    help="write the cohort table to PATH and stop, without "
+                         "extracting any charts. This is how SITE-GUIDE step 3's "
+                         "stratified selection is done. LOCAL ONLY: contains "
+                         "person_id.")
+    ap.add_argument("--min-notes-12mo", type=int, default=0,
+                    help="notes in the lookback window. 0 = no floor. Raise it once "
+                         "you can see your own n_notes_12mo distribution — a chart "
+                         "with no notes cannot answer a note-based question, and it "
+                         "reads as 'not documented' rather than 'not observed'.")
     a = ap.parse_args()
-    global STUDY_START, STUDY_END
+    if a.prefix is None:
+        a.prefix = f"patient_real_asthma_{a.site}_" if a.site else "patient_real_asthma_"
+    # THE SALT IS NOT A DEFAULT ANYONE ELSE SHOULD ACCEPT. The pseudonymous id is
+    # sha256(salt + person_id), so two sites sharing a salt produce colliding ids
+    # for different children, and results pooled across them are silently wrong.
+    # The built-in value is the origin site's; it stays the default so IU's
+    # existing corpora still reproduce, but it cannot pass unremarked.
+    if a.salt == "rdrp6745":
+        print("[etl] WARNING: using the built-in salt 'rdrp6745' (the origin "
+              "site's). Set --salt or $ETL_SALT to a value chosen at YOUR site, "
+              "or your patient ids will collide with another site's.",
+              file=sys.stderr)
+    global STUDY_START, STUDY_END, SCHEMA_PREFIX
     STUDY_START, STUDY_END = a.study_start, a.study_end
+    # cohort.sql writes `@cdm_database_schema.person`, so the qualifier carries its
+    # own trailing dot — a site passes the bare schema name and never has to know.
+    SCHEMA_PREFIX = f"{a.cdm_schema}." if a.cdm_schema else ""
+    PARAMS.update({
+        "min_age": str(a.min_age), "max_age": str(a.max_age),
+        "min_asthma_encounters": str(a.min_asthma_encounters),
+        "min_prior_observation_days": str(a.min_prior_observation_days),
+        "min_notes_12mo": str(a.min_notes_12mo),
+    })
     con = duckdb.connect(); setup_adapter(con, a.adapter, a.rdrp, a.notes)
-    if a.check: conformance(con); return
+    if a.check: return conformance(con)
 
     # cohort → table (limit/patients filter here so extracts join only these)
     where = ""
@@ -192,6 +338,42 @@ def main():
     lim = f" LIMIT {a.limit}" if a.limit else ""
     coh = render_duckdb(load("cohort.sql")).strip().rstrip(";")
     con.execute(f"CREATE TABLE cohort AS SELECT * FROM ({coh}) t{where}{lim}")
+
+    # LIST THE COHORT WITHOUT EXTRACTING IT.
+    #
+    # SITE-GUIDE step 3 says to "select ~30 from the cohort table, balanced across
+    # age bands and including patients with ED contact", then extract only those
+    # with --patients. Every column that instruction names is right here — and
+    # nothing exposed the table, so the step could not be followed: the cohort was
+    # built in memory and immediately extracted. Two of its columns (n_ed_12mo and
+    # age_band_plan, the study plan's own sampling bands) were not merely hidden
+    # but unreachable, since the per-patient meta.json does not carry them.
+    #
+    # LOCAL ONLY: person_id is a direct identifier. This file is the input to your
+    # own --patients selection and never leaves the site — the same rule as the
+    # return package's crosswalk.
+    if a.cohort_csv:
+        con.execute(
+            f"COPY (SELECT * FROM cohort ORDER BY person_id) "
+            f"TO '{a.cohort_csv}' (HEADER, DELIMITER ',')")
+        n = con.execute("SELECT count(*) FROM cohort").fetchone()[0]
+        print(f"[etl] cohort: {n} patients -> {a.cohort_csv}")
+        print("      LOCAL ONLY — contains person_id. Do not send this file.\n")
+        for col in ("age_band_plan", "age_band_naepp"):
+            rows = con.execute(
+                f"SELECT {col}, count(*) FROM cohort GROUP BY 1 ORDER BY 1").fetchall()
+            print(f"      {col:16} " + "  ".join(f"{k}={v}" for k, v in rows))
+        for col, label in (("n_ed_12mo", "with >=1 ED visit"),
+                           ("n_notes_12mo", "with >=5 notes")):
+            thr = 1 if col == "n_ed_12mo" else 5
+            v = con.execute(
+                f"SELECT count(*) FROM cohort WHERE {col} >= {thr}").fetchone()[0]
+            print(f"      {label:24} {v}/{n}")
+        short = con.execute(
+            "SELECT count(*) FROM cohort WHERE days_observed_before_index < 730").fetchone()[0]
+        print(f"      {'< 730d prior observation':24} {short}/{n}"
+              "   (censored on the spirometry rule)")
+        return 0
     # OBSERVABILITY FIELDS carried through to meta.json. cohort.sql emits both
     # and NOTHING downstream could see them, because the ETL dropped them here —
     # so the mitigation cohort.sql documents ("exclude the short-lookback
@@ -359,4 +541,4 @@ def main():
         n += 1
     print(f"[etl] done — {n} patient corpora written under {a.out}/")
 
-if __name__ == "__main__": main()
+if __name__ == "__main__": sys.exit(main() or 0)

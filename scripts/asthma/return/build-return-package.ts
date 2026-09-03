@@ -7,10 +7,14 @@
 // neither may carry PHI. This builds the second one — the concordance results.
 //
 // WHITELIST, NOT REDACTION. Every column emitted is named in COLUMNS below and
-// every value passes a type check for that column. A field nobody listed does
-// not appear, so a new field added upstream (an extra evidence shape, a new
-// reviewer note) cannot leak by being forgotten — the failure mode of every
-// "strip the PHI" pass. What is deliberately excluded:
+// every value passes the shape declared for that column in redact.ts's
+// COLUMN_SHAPES — an enum member, an integer in range, a bounded identifier, a
+// subject id, or a value safeAnswer/reasonCode already cleared. A value that
+// does not match becomes a marker and is counted in phi_check.json.
+//
+// A field nobody listed does not appear, so a new field added upstream (an extra
+// evidence shape, a new reviewer note) cannot leak by being forgotten — the
+// failure mode of every "strip the PHI" pass. What is deliberately excluded:
 //
 //   evidence quotes   verbatim note text
 //   reasoning         free text, unbounded
@@ -32,7 +36,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { loadAdherenceSkill } from "@chart-review/pipeline-extract-adherence";
 import { DERIVED_WORST_CONTROL_QID } from "@chart-review/rule-engine";
-import { daysBefore, reasonCode, safeAnswer, scanForLeaks } from "./redact.js";
+import {
+  daysBefore, reasonCode, safeAnswer, safeColumn, scanForLeaks, MAX_CELL_CHARS,
+} from "./redact.js";
 import { PLATFORM_ROOT } from "@chart-review/patients";
 
 // ── argv ────────────────────────────────────────────────────────────────────
@@ -85,12 +91,23 @@ interface PatientResult {
 
 // ── csv ─────────────────────────────────────────────────────────────────────
 
-function csv(rows: Array<Record<string, string | number>>, columns: string[]): string {
-  const esc = (v: string | number) => {
-    const s = String(v ?? "");
-    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+/** Rejections from the per-column check, reported in the manifest. Non-zero is a
+ *  defect somewhere upstream, not a reason to send the package anyway. */
+const columnRejections: Array<{ file: string; column: string; value: string }> = [];
+
+function csv(
+  rows: Array<Record<string, string | number>>, columns: string[], file = "",
+): string {
+  const esc = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+  // EVERY column goes through its declared shape, not just `answer` and
+  // `reason_code`. See COLUMN_SHAPES for why the other 38 slots being
+  // structurally safe was not the same thing as being checked.
+  const cell = (c: string, raw: unknown) => {
+    const [v, ok] = safeColumn(c, raw);
+    if (!ok) columnRejections.push({ file, column: c, value: String(raw ?? "").slice(0, 40) });
+    return esc(v);
   };
-  return [columns.join(","), ...rows.map((r) => columns.map((c) => esc(r[c] ?? "")).join(","))]
+  return [columns.join(","), ...rows.map((r) => columns.map((c) => cell(c, r[c])).join(","))]
     .join("\n") + "\n";
 }
 
@@ -280,11 +297,11 @@ function main(): void {
   fs.mkdirSync(dir, { recursive: true });
 
   const files: Record<string, string> = {
-    "verdicts.csv": csv(verdicts, [...COLUMNS.verdicts]),
-    "rollups.csv": csv(rollups, [...COLUMNS.rollups]),
-    "events.csv": csv(events, [...COLUMNS.events]),
-    "answers.csv": csv(answers, [...COLUMNS.answers]),
-    "by_rule.csv": csv(byRule, [...COLUMNS.by_rule]),
+    "verdicts.csv": csv(verdicts, [...COLUMNS.verdicts], "verdicts.csv"),
+    "rollups.csv": csv(rollups, [...COLUMNS.rollups], "rollups.csv"),
+    "events.csv": csv(events, [...COLUMNS.events], "events.csv"),
+    "answers.csv": csv(answers, [...COLUMNS.answers], "answers.csv"),
+    "by_rule.csv": csv(byRule, [...COLUMNS.by_rule], "by_rule.csv"),
   };
 
   // ── exit check ────────────────────────────────────────────────────────────
@@ -312,13 +329,23 @@ function main(): void {
     checked_files: Object.keys(files).filter((f) => f.endsWith(".csv")),
     rules_applied: [
       "whitelist: only the columns declared in COLUMNS are emitted",
+      "every column: checked against its declared shape in COLUMN_SHAPES "
+        + "(enum / int / number / bool / bounded id / subject id); a value that "
+        + "does not match becomes a marker and is counted below",
       "answers: booleans, finite numbers, and values declared in the question's enum only",
       "dates: converted to days_before_index, never emitted as calendar dates",
       "free text (evidence quotes, reasoning, reviewer-authored reasons): never emitted",
       "patient ids: sequential subject ids; the crosswalk stays on site",
+      "exit check: every cell re-parsed with CSV quoting honoured, then measured "
+        + `against ${MAX_CELL_CHARS} chars and scanned for date shapes`,
     ],
+    // Non-zero means a value reached a column it does not fit. The package is
+    // still safe — the value was replaced by a marker — but something upstream
+    // is wrong and the coordinating centre needs to know which column.
+    column_rejections: columnRejections.length,
+    column_rejection_detail: columnRejections.slice(0, 50),
     findings,
-    passed: findings.length === 0,
+    passed: findings.length === 0 && columnRejections.length === 0,
   }, null, 2) + "\n";
 
   if (findings.length > 0) {

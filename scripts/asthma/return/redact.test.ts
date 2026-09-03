@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  daysBefore, reasonCode, safeAnswer, scanForLeaks, MAX_CELL_CHARS,
+  MAX_CELL_CHARS, daysBefore, reasonCode, safeAnswer, safeColumn, scanForLeaks, splitCsvLine,
 } from "./redact.js";
 import {
   ENGINE_UNANSWERED_REASON, ENGINE_PERIOD_UNANSWERED_REASON, ENGINE_NOT_EVALUABLE_REASON,
@@ -111,5 +111,95 @@ describe("scanForLeaks — the alarm on the whitelist", () => {
     // run.json legitimately carries a generated_at timestamp; it is machine
     // metadata about the export, not about a patient.
     expect(scanForLeaks({ "run.json": '{"generated_at":"2026-08-28T00:00:00Z"}' })).toEqual([]);
+  });
+});
+
+// THE TWO CHECKS THAT WERE CLAIMED BUT NOT PERFORMED.
+//
+// The file header promises a whitelist. For one version two of the 40 column
+// slots kept that promise (`answer` and `reason_code`); the other 38 were
+// `String(v)` pass-throughs, safe by argument rather than by check. And the exit
+// scan split each line on a raw comma while the writer QUOTES any value
+// containing one — so MAX_CELL_CHARS only ever bounded prose with no commas in
+// it, which is the unusual kind of prose.
+describe("splitCsvLine honours the quoting the writer emits", () => {
+  it("keeps a quoted cell whole, commas and all", () => {
+    expect(splitCsvLine('S0001,"a, b, c",3')).toEqual(["S0001", "a, b, c", "3"]);
+  });
+
+  it("unescapes a doubled quote", () => {
+    expect(splitCsvLine('S0001,"he said ""hi""",3')).toEqual(["S0001", 'he said "hi"', "3"]);
+  });
+
+  it("measures a long quoted cell as ONE cell", () => {
+    // The leak this reopens if it regresses: 300 chars of note prose, quoted
+    // because it contains commas, scored as a dozen short cells.
+    const prose = "Janet, a 9-year-old, presented with wheeze, cough, and chest tightness, "
+      + "reported nightly albuterol use, and her mother, who accompanied her, described "
+      + "school absences, exercise limitation, and disturbed sleep over several weeks.";
+    expect(prose.length).toBeGreaterThan(MAX_CELL_CHARS);
+    const body = `subject_id,answer\nS0001,"${prose}"\n`;
+    const findings = scanForLeaks({ "answers.csv": body });
+    expect(findings.some((f) => f.why.includes("chars"))).toBe(true);
+  });
+
+  it("still catches a date inside a quoted cell", () => {
+    const findings = scanForLeaks({ "events.csv": 'subject_id,answer\nS0001,"seen 2025-06-15, again later"\n' });
+    expect(findings.some((f) => f.why === "date-shaped value")).toBe(true);
+  });
+
+  it("passes a clean file", () => {
+    expect(scanForLeaks({ "verdicts.csv": "subject_id,rule_id,verdict\nS0001,R-T0-Eligible,CONCORDANT\n" }))
+      .toEqual([]);
+  });
+});
+
+describe("safeColumn checks every column, not just the answer", () => {
+  const ok = (c: string, v: unknown) => safeColumn(c, v)[1];
+
+  it("accepts the shapes each column really carries", () => {
+    expect(safeColumn("subject_id", "S0001")).toEqual(["S0001", true]);
+    expect(safeColumn("verdict", "NON_CONCORDANT")).toEqual(["NON_CONCORDANT", true]);
+    expect(safeColumn("rule_id", "R-T1-ControllerAtUncontrolledVisit")[1]).toBe(true);
+    expect(safeColumn("days_before_index", 300)).toEqual(["300", true]);
+    expect(safeColumn("days_before_index", -5)).toEqual(["-5", true]);
+    expect(safeColumn("rate", 0.75)).toEqual(["0.75", true]);
+    expect(safeColumn("evaluable", true)).toEqual(["true", true]);
+    expect(safeColumn("tier", 2)).toEqual(["2", true]);
+  });
+
+  it("replaces a value that does not fit, and says so", () => {
+    // Chart text arriving in a column nobody thought could carry it.
+    expect(safeColumn("rule_id", "Janet is a 9-year-old girl with persistent asthma"))
+      .toEqual(["(BAD_ID)", false]);
+    expect(safeColumn("verdict", "probably concordant")).toEqual(["(OFF_ENUM)", false]);
+    expect(safeColumn("source", "reviewer (Dr Smith)")).toEqual(["(OFF_ENUM)", false]);
+    expect(safeColumn("n_events", "many")).toEqual(["(NOT_AN_INT)", false]);
+    expect(safeColumn("n_events", -1)).toEqual(["(OUT_OF_RANGE)", false]);
+    expect(safeColumn("evaluable", "yes")).toEqual(["(NOT_A_BOOL)", false]);
+    // A corpus id in the subject column: the shape this package exists to
+    // replace. The hash below is invented — a real one is a pseudonym, and a
+    // pseudonym is not an anonym, which is the whole reason for subject ids.
+    expect(safeColumn("subject_id", "patient_real_asthma_000000000000"))
+      .toEqual(["(BAD_SUBJECT_ID)", false]);
+    // A date is not an id, however short.
+    expect(safeColumn("anchor_type", "2025-06-15")[1]).toBe(true);   // shape-valid…
+    expect(scanForLeaks({ "events.csv": "anchor_type\n2025-06-15\n" }).length)
+      .toBeGreaterThan(0);                                           // …and the date scan catches it
+  });
+
+  it("refuses a column nobody declared", () => {
+    // A new column must declare what it may hold before it can ship.
+    expect(safeColumn("reviewer_note", "call mum")).toEqual(["(UNDECLARED_COLUMN)", false]);
+  });
+
+  it("bounds a checked value's length too", () => {
+    expect(ok("answer", "x".repeat(MAX_CELL_CHARS))).toBe(true);
+    expect(safeColumn("answer", "x".repeat(MAX_CELL_CHARS + 1))).toEqual(["(TOO_LONG)", false]);
+  });
+
+  it("allows empty where empty is meaningful", () => {
+    expect(safeColumn("attribution", "")).toEqual(["", true]);   // concordant events have none
+    expect(safeColumn("rate", "")).toEqual(["", true]);          // null rate
   });
 });

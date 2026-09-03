@@ -21,7 +21,12 @@ Usage (from chart-review-platform root):
 """
 import argparse, hashlib, json, os, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, HERE)
+# etl.py lives with the rest of the extraction path, not here: this script is an
+# IU-specific one-off (it excludes already-materialized patients by OUR salt), so
+# it was moved out of the site-facing folder and its `sys.path.insert(0, HERE)`
+# stopped finding etl. A site does not need this file — SITE-GUIDE step 3's
+# stratification is done with `etl.py --cohort-csv`.
+sys.path.insert(0, os.path.join(HERE, "..", "asthma", "omop-extract"))
 import etl  # reuse adapter/render/load
 
 def main():

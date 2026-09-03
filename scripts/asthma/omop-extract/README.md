@@ -10,11 +10,11 @@ validated end-to-end against the real **RDRP-6745** (Indiana HIE / INPC) deliver
 | `cohort.sql` | **Portable, OHDSI SQL.** Eligibility, and the one file that must be byte-identical across sites — who is in the denominator cannot be a local decision. SNOMED 317009 asthma; age 2–17 at index; index = most recent pediatric OUTPATIENT visit (9202); ≥ `@min_asthma_encounters` asthma-related non-inpatient encounters in the 12-month lookback with at least one non-ED; ≥ `@min_prior_observation_days` of prior observation; ≥ `@min_notes_12mo` notes in the lookback. Params: `@cdm_database_schema`, `@min_age`, `@max_age`, `@min_asthma_encounters`, `@min_prior_observation_days`, `@min_notes_12mo`, `@study_start`, `@study_end`. Read its header for the reasoning behind each. |
 | `extracts.sql` | **Portable, OHDSI SQL.** Flat per-table SELECTs (conditions, drugs→ingredient, asthma_visits, encounters, measurements, procedures, notes) joined to the cohort table. |
 | `conformance.sql` | **Portable, OHDSI SQL.** Six pre-flight checks — run FIRST. They report which of your site's data dimensions are populated well enough for the questions that depend on them. |
-| `adapter_rdrp.sql` | **Site-specific.** The ONLY file you replace per site: maps RDRP CSV/parquet → standard OMOP view names. A standard warehouse points `@cdm_database_schema` at its CDM instead. |
+| `adapter_rdrp.sql` | **Site-specific.** The ONLY file you replace per site: maps RDRP CSV/parquet → standard OMOP view names. A standard warehouse can instead pass `etl.py --cdm-schema <schema>`, which qualifies `@cdm_database_schema` and needs no view definitions. |
 | `etl.py` | Runner: renders the SQL, runs it, applies the Python transform (drug fills, foundations, `asthma_related`, salted-hash anonymize), writes `corpus/patients/<anon>/`. Also `--check` (conformance). |
 | `derive_anchors.py` | Derives the four event-anchor lists (`asthma_encounters`, `ocs_bursts`, `exacerbations`, `obligation_points`) from the per-patient OMOP JSON the ETL just wrote. Called by `etl.py`; also runnable standalone over an existing corpus. The event-level rules are enumerated from these, so their definitions are part of the measurement. |
 | `test_derive_anchors.py`, `test_roll_up_drugs.py` | `pytest`. Cover the anchor derivations and the 12-month drug fields (window boundaries, SABA counting basis, days_supply completeness). Run them after touching either file. |
-| `screen_v05.py` | One-off cohort screening helper. Not part of the extraction path. |
+
 
 ## Comparability across sites
 
@@ -72,7 +72,7 @@ On RDRP-6745 it reports (illustrative of what it catches):
 | asthma_concepts | 117 | PASS | vocabulary resolves SNOMED 317009 |
 | visit_mapping_pct | 98.7 | PASS | visits mapped to 9201/9202/9203 |
 | notes_populated | 2,569,604 | PASS | note text present |
-| days_supply_pct | 43.2 | WARN | <50% → `refill_pdc_12mo` is a floor, not a rate; each affected drug row carries `refill_pdc_partial` (SABA count unaffected — it counts fills) |
+| days_supply_pct | 43.2 | WARN | **Whole-table rate, not the one PDC uses.** PDC reads the 12-month in-window fills, and here 0 of 2,366 of those carry a `days_supply` (0/1000 ICS, 0/989 SABA, 0/248 OCS) — so `refill_pdc_12mo` is emitted for nobody and `refill_pdc_partial` never fires. Read this row as "does the column exist", and the per-drug `refill_pdc_unavailable` marker for whether PDC was computable. SABA count unaffected — it counts fills. |
 | act_structured | 0 | WARN | ACT is note-only here (typical of an HIE) |
 | drug_ingredient_rollup | 1,309 | PASS | drugs roll up to RxNorm ingredients |
 

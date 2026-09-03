@@ -16,13 +16,32 @@ listed exactly in steps 4 and 5, and the tooling refuses to build a package that
 violates it.
 
 The coordinating centre ships: this platform, a frozen rubric, and the OMOP
-extraction scripts. You need Node 20+, Python 3.10+, DuckDB, read access to your
-CDM, and an LLM endpoint your institution approves for PHI.
+extraction scripts.
 
-```sh
-npm ci
-python3 -m pip install duckdb
-```
+## What you need before step 1
+
+**Steps 1–2 (extraction) need only Node, Python and DuckDB.** Step 3 runs the
+agent, and that needs the model endpoint and the Python sidecar as well — a site
+can do the extraction and check the draw before any of the LLM setup exists,
+which is the sensible order.
+
+| | |
+|---|---|
+| Node 20+ | `npm ci` |
+| Python 3.9+ with DuckDB | `python3 -m pip install duckdb` — the extraction scripts only |
+| read access to your CDM | plus the note text; see the adapter contract below |
+
+For step 3 additionally:
+
+| | |
+|---|---|
+| **Python 3.11+** for the agent sidecar | a separate venv from the one above: `cd python && uv venv .venv --python 3.11 && uv pip install -e .` |
+| an LLM endpoint your institution approves for PHI | Azure OpenAI or a local vLLM |
+| a `.env` at the platform root | copy `.env.example`. The variables that must be set: `CHART_REVIEW_PLATFORM_ROOT`, `DEEPAGENTS_PYTHON` (absolute path to that venv's python), `DEEPAGENTS_LLM_BACKEND`, the `AZURE_OPENAI_*` (or `VLLM_*`) block, and `CHART_REVIEW_PHI_MODEL` — real patients route to it, and a run fails rather than silently using the default model. |
+
+The sidecar needs 3.11+; the extraction does not. Keeping them separate means a
+site whose analytics box is on an older Python can still produce and check a
+corpus.
 
 ## Before anything else: confirm the rubric version
 
@@ -33,9 +52,7 @@ we told you to run:
 
 ```sh
 git pull
-npx tsx -e 'import("./server/lib/lock.js").then(async m => { \
-  const r = await import("@chart-review/rubric"); \
-  console.log(m.computeTaskSha(r.guidelineDir("asthma-adherence"))); })'
+npx tsx scripts/asthma/rubric-sha.ts
 ```
 
 That SHA is recorded in every package you send back, so drift is detectable
@@ -173,10 +190,18 @@ python3 scripts/asthma/omop-extract/etl.py --check \
     --adapter scripts/asthma/omop-extract/adapter_<yoursite>.sql
 ```
 
-Six checks print PASS / WARN / FAIL. `asthma_concepts`, `notes_populated` and
-`drug_ingredient_rollup` must PASS — a FAIL there means the extraction cannot see
-what the rubric asks about. `days_supply_pct` and `act_structured` may WARN;
-those paths degrade to note-reading rather than breaking.
+Six checks print PASS / WARN / FAIL, and **the exit code is 1 if any FAILs** — so
+you can gate a scripted run on it. `asthma_concepts`, `notes_populated` and
+`drug_ingredient_rollup` must PASS: a FAIL there means the extraction cannot see
+what the rubric asks about. `days_supply_pct` and `act_structured` may WARN; those
+paths degrade to note-reading rather than breaking.
+
+A table your adapter does not define is reported by name before any check runs,
+and also exits 1. `observation_period` is the one to watch — `cohort.sql` inner
+joins it, so without it the cohort is empty rather than wrong.
+
+If your warehouse holds the OMOP tables in a schema rather than as bare views,
+pass `--cdm-schema <schema>` instead of writing view definitions for them.
 
 ---
 
@@ -190,12 +215,37 @@ in-cohort patient, holding `meta.json`, `omop/*.json`, `anchors/*.json` and
 python3 scripts/asthma/omop-extract/etl.py \
     --rdrp /path/to/your/cdm --notes /path/to/your/notes \
     --adapter scripts/asthma/omop-extract/adapter_<yoursite>.sql \
-    --out corpus/patients --salt "$YOUR_SITE_SALT"
+    --site <yoursite> --salt "$YOUR_SITE_SALT" \
+    --out corpus/patients
 ```
 
-`--salt` is yours and must stay at your site: it is what makes the patient ids in
-the corpus pseudonymous. Use the same salt every time, or the same patient gets a
-different id in each extraction.
+`--site` prefixes your patient ids (`patient_real_asthma_<yoursite>_…`) so two
+sites' ids cannot collide when results are pooled. Pass the same value to
+`check_draw.py --prefix` in step 3.
+
+`--salt` is yours and must stay at your site: it is what makes the patient ids
+pseudonymous. Use the same salt every time, or the same patient gets a different
+id in each extraction. **The ETL warns if you leave it unset** — the built-in
+default is the origin site's, and sharing a salt means two sites produce the same
+id for different children.
+
+## Cohort parameters
+
+`cohort.sql` is byte-identical at every site and must not be edited — it defines
+who is in the denominator, which cannot be a local decision. Its parameters are
+yours, and they are flags:
+
+| flag | default | |
+|---|---|---|
+| `--min-notes-12mo` | 0 | notes in the lookback. Raise it once you can see your own distribution — see step 3. |
+| `--min-age` / `--max-age` | 2 / 17 | age at index |
+| `--min-asthma-encounters` | 2 | asthma-related non-inpatient encounters in the lookback |
+| `--min-prior-observation-days` | 365 | observation before index |
+| `--study-start` / `--study-end` | 2021-01-01 / 2100-01-01 | index date range. The 2021 floor is deliberate: the 2020 NAEPP update applies to the whole window. |
+| `--cdm-schema` | *(none)* | schema qualifying the OMOP tables |
+
+Record which values you used. A package built with different parameters is not
+poolable with one built at the defaults, and nothing downstream can tell.
 
 The run prints how many patients have fewer than 730 days of prior observation.
 Note that number — those patients are censored on the 24-month spirometry rule,
@@ -260,8 +310,26 @@ enough to manufacture documentation gaps, and whether anyone has no notes at all
 It exits non-zero when something needs resolving. Counts and pseudonymous ids
 only, so its output is safe to send with your questions.
 
-For reference, the origin site's 63 extracted patients: 25 have an obligation
-point (40%), and the age bands run 12 / 21 / 30.
+For reference, the origin site. The useful comparison is the **whole cohort**,
+because it does not depend on how one sample was drawn — from
+`etl.py --cohort-csv` over 12,639 eligible patients:
+
+| | |
+|---|---|
+| `age_band_plan` (2-5 / 6-11 / 12-17) | 1,573 / 5,199 / 5,867 |
+| at least one ED visit in the lookback | 1,859 (15%) |
+| under 730 days of prior observation | 231 (1.8%) |
+
+The ED share is the one worth checking against your own: at 15%, a 30-patient
+draw taken without stratifying will average four or five patients with ED
+contact, and can easily contain none.
+
+Among the 51 extracted patients who have at least one asthma visit anchor, 25
+have an obligation point (49%), with age bands 11 / 16 / 24. That figure was
+previously quoted as 40% over all 63 extracted patients — but 12 of those 63 were
+drawn under an earlier cohort definition and have no asthma visit in the window
+at all, so they cannot produce an obligation point and do not belong in the
+denominator. Use 49% when judging your own draw.
 
 ### Stratify from the cohort table, not by re-extracting
 
@@ -274,10 +342,24 @@ the number you will actually annotate.
 Only one fact needs the extraction to exist: the anchor counts, and among them
 `obligation_points`. So the order is:
 
-1. select ~30 from the cohort table, balanced across age bands and including
-   patients with ED contact
-2. extract exactly those (`--patients <id,id,…>`)
-3. `check_draw.py` — the anchors now exist, so obligation points can be counted
+1. list the cohort — this writes the table and stops, extracting no charts:
+
+   ```sh
+   python3 scripts/asthma/omop-extract/etl.py \
+       --rdrp /path/to/your/cdm --notes /path/to/your/notes \
+       --adapter scripts/asthma/omop-extract/adapter_<yoursite>.sql \
+       --cohort-csv var/cohort.csv
+   ```
+
+   It prints your age-band split, how many patients have ED contact, and how many
+   have under 730 days of prior observation. **`var/cohort.csv` contains
+   `person_id` and stays at your site** — it is the input to the next step, not
+   something you send.
+
+2. select ~30 from that file, balanced across `age_band_plan` and including
+   patients with `n_ed_12mo >= 1`
+3. extract exactly those (`--patients <id,id,…>`)
+4. `check_draw.py` — the anchors now exist, so obligation points can be counted
 
 **If you already extracted a sample, start at 3.** Run the check on what you have
 before extracting anything more; a draw that passes needs no re-draw.
@@ -415,13 +497,31 @@ The package contains, and can only contain:
 | `run.json` | rubric SHA, counts, and any values that were dropped |
 | `phi_check.json` | what the exit check scanned and found |
 
-Everything else is refused by construction. A value leaves only by being a
-boolean, a finite number, a value the question's own enum declares, or a date
-rewritten as `days_before_index`. Free text never leaves — not evidence quotes,
-not agent reasoning, not a reviewer's own explanation of why a patient could not
-be judged. Calendar dates never leave. Note filenames never leave. Your patient
-ids never leave: the package uses sequential subject ids and the crosswalk stays
-with you.
+Those columns are the whole list, and each one is checked against a declared
+shape before it is written: an enum member, an integer in range, a bounded
+identifier, a sequential subject id, or an answer value the question's own enum
+declares. A value that does not match is replaced by a marker and counted in
+`phi_check.json`; a column nobody declared is refused outright, so a field added
+upstream later cannot ship by being forgotten.
+
+Free text is not emitted at all — not evidence quotes, not agent reasoning, not a
+reviewer's own explanation of why a patient could not be judged. Calendar dates
+are rewritten as `days_before_index`. Note filenames are not emitted. Your
+patient ids are not emitted: the package uses sequential subject ids and the
+crosswalk is written outside the package directory and stays with you.
+
+Then the built package is re-read and every cell is measured again — CSV quoting
+honoured, so a long quoted value is one cell rather than a dozen short ones — and
+scanned for anything date-shaped. `phi_check.json` records what was scanned, what
+it found, and whether it passed. **Read that file before you send anything**; if
+`passed` is false, tell us rather than sending it.
+
+What this is not: a proof. It is a whitelist with a check on every column and an
+exit scan over the result, which is a much stronger position than a redaction
+pass, and it is what your IRB can be shown. `redact.test.ts` drives it with
+hostile input — chart prose in a rule_id column, a date inside a quoted cell, an
+undeclared column — and is worth reading if you are asked what crosses the
+boundary.
 
 If the exit check finds anything, **the package is not written** and
 `phi_check.json` says what was found. Report that rather than working around it.
