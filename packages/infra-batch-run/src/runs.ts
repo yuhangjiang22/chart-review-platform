@@ -1815,7 +1815,14 @@ async function runOneAgent(
         // Identity only. The endpoint and the key are the site's own and are
         // irrelevant to comparability.
         agent_model: effectiveModel,
-        agent_backend: process.env.DEEPAGENTS_LLM_BACKEND,
+        // The RESOLVED backend, not $DEEPAGENTS_LLM_BACKEND. That variable is
+        // the global default for a model the registry has no entry for; a model
+        // it DOES know routes by its own entry, so reading the variable recorded
+        // "vllm" for a gpt-5.4-mini call that went to Azure. A wrong backend is
+        // worse than none — it is exactly the field a reader would trust to tell
+        // two sites' results apart. Caught on the first real run that used it.
+        agent_backend: resolveModelEndpoint(effectiveModel ?? "")?.mode
+          ?? process.env.DEEPAGENTS_LLM_BACKEND,
       });
       adherenceDraftWritten = true;
       return;

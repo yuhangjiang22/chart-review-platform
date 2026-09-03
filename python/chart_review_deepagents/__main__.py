@@ -382,11 +382,21 @@ def _log_usage(spec: dict, msgs) -> None:
     if not log_path:
         return
     inp = out = tot = cached = reasoning = 0
+    # PER-TURN input, not just the patient total. Azure enforces TPM over a short
+    # window (~10s), not over the minute, so what trips a 429 is the size of ONE
+    # request — and a per-patient sum cannot show that. Diagnosing the luna 429s
+    # needs the peak: at a 500K TPM limit the window allows roughly 83K tokens, so
+    # a peak near that says our prompts are too big (fixable by us), while a peak
+    # far below it says the shared Data Zone capacity was busy (not fixable by us).
+    per_turn_input: list[int] = []
     from langchain_core.messages import AIMessage
     for m in msgs:
         if isinstance(m, AIMessage):
             u = getattr(m, "usage_metadata", None) or {}
-            inp += int(u.get("input_tokens", 0) or 0)
+            turn_in = int(u.get("input_tokens", 0) or 0)
+            inp += turn_in
+            if turn_in:
+                per_turn_input.append(turn_in)
             out += int(u.get("output_tokens", 0) or 0)
             tot += int(u.get("total_tokens", 0) or 0)
             # cost-relevant splits: cached input bills far cheaper; reasoning
@@ -395,8 +405,18 @@ def _log_usage(spec: dict, msgs) -> None:
             reasoning += int((u.get("output_token_details") or {}).get("reasoning", 0) or 0)
     rec = {"model": spec.get("model"), "input_tokens": inp,
            "cached_input_tokens": cached, "output_tokens": out,
-           "reasoning_tokens": reasoning, "total_tokens": tot or (inp + out)}
+           "reasoning_tokens": reasoning, "total_tokens": tot or (inp + out),
+           "n_turns": len(per_turn_input),
+           "max_turn_input_tokens": max(per_turn_input) if per_turn_input else 0,
+           "per_turn_input_tokens": per_turn_input}
     try:
+        # The sidecar's cwd is <root>/python, so a relative path lands somewhere
+        # the caller did not mean and the parent may not exist. Create it rather
+        # than warning after the tokens are already gone — this log exists to be
+        # read after the fact, and a run that has finished cannot be re-measured.
+        parent = os.path.dirname(os.path.abspath(log_path))
+        if parent:
+            os.makedirs(parent, exist_ok=True)
         with open(log_path, "a", encoding="utf-8") as f:
             f.write(json.dumps(rec) + "\n")
     except OSError as e:
