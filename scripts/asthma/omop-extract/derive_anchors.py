@@ -98,6 +98,31 @@ study documents, so each carries its source:
    day is linked, which is what the fallback exists for. `meta.kind_from`
    records which of the two applied.
 
+   As of 2026-09-03 this label is also LOAD-BEARING FOR A RULE, not only for
+   reporting: R-T1-ControllerAtUncontrolledVisit and R-T2-StepTherapyMatches gate
+   on `_anchor_kind != "ed"` (study lead's decision 7 — stepping up daily
+   controller therapy is an outpatient decision; see those rules' comments). Until
+   an extract carries `asthma_dx_linked`, every label rests on the date fallback
+   and understates ED, so that gate is only partly effective.
+
+5b. THE ED AND INPATIENT EXACERBATION ARMS NEED ENCOUNTER-LEVEL ATTRIBUTION TOO
+   (study lead 2026-09-03). Decision 5 attributed OCS courses only, because croup
+   made dexamethasone the acute problem; the other two arms of decision 3 kept the
+   day-level `asthma_related` flag and therefore kept the same shape of false
+   positive. A same-day procedure admission inherits the flag from an asthma
+   CLINIC visit and becomes a fabricated exacerbation, then a fabricated
+   obligation_point, then a controller gap that never happened. In this cohort 71%
+   of in-window asthma-inpatient days share their date with a non-inpatient asthma
+   encounter and 72% of all "Inpatient Visit" rows are zero-length-of-stay, so it
+   is not a small population. The test is now: an unlinked ED/inpatient row is
+   dropped when some encounter that day IS linked (the diagnosis demonstrably
+   points elsewhere); when nothing that day is linked the flag still decides.
+   LENGTH OF STAY IS DELIBERATELY NOT THE TEST — zero-LOS is a proxy for the data
+   artifact, attribution is the actual question, and an LOS floor would also drop
+   real short admissions (whose OCS-at-discharge usually catches them anyway).
+   Use LOS >= 1 day as the *reporting* definition of "hospitalisation" instead.
+   Counted in stats["exac_not_linked"].
+
 Every date is normalized through parse_date().isoformat() before it becomes
 part of an anchor's identity; rows/fills whose date can't be parsed are
 skipped and counted rather than silently defaulted.
@@ -325,6 +350,28 @@ def _attributable_to_asthma(d, asthma_dates):
     return any(abs((d - a).days) <= OCS_ASTHMA_ATTRIBUTION_DAYS for a in asthma_dates)
 
 
+def _dx_linked_dates(encounters):
+    """Dates where an asthma diagnosis demonstrably points at a specific visit.
+
+    The evidence for decision 5b. `asthma_dx_linked` is set by etl.py when the
+    condition row carries that encounter's visit_occurrence_id, so it says "the
+    diagnosis is about THIS visit" — unlike `asthma_related`, which is a
+    day-level flag that spreads to every visit sharing the date.
+
+    Empty when the extract predates the field, which makes decision 5b's test
+    vacuous and preserves the pre-5b behaviour rather than silently dropping
+    every ED and inpatient exacerbation.
+    """
+    out = set()
+    for r in encounters:
+        if r.get("asthma_dx_linked") is not True:
+            continue
+        d = parse_date(r.get("start_date"))
+        if d is not None:
+            out.add(d)
+    return out
+
+
 def _ocs_fill_dates(drugs, stats, asthma_dates=None):
     fills = []
     for e in drugs:
@@ -401,6 +448,7 @@ def exacerbation_anchors(drugs, encounters, win, stats=None, asthma_dates=None):
     if stats is None:
         stats = {}
     marks = [(d, f"drugs:{ref}") for d, ref in _ocs_fill_dates(drugs, stats, asthma_dates)]
+    linked_dates = _dx_linked_dates(encounters)
     for r in encounters:
         if not r.get("asthma_related", False):
             continue
@@ -410,6 +458,26 @@ def exacerbation_anchors(drugs, encounters, win, stats=None, asthma_dates=None):
         d = parse_date(r.get("start_date"))
         if d is None:
             stats["skipped"] = stats.get("skipped", 0) + 1
+            continue
+        # DECISION 5b (study lead 2026-09-03): when the day's asthma diagnosis
+        # demonstrably points at SOME visit, an unlinked ED/inpatient row that day
+        # is not that visit. Decision 5 attributed OCS courses because croup made
+        # dexamethasone unattributable; these two arms kept the day-level flag, and
+        # it has the same shape of false positive: a same-day procedure admission
+        # inherits `asthma_related` from an asthma CLINIC visit and becomes a
+        # fabricated exacerbation -> a fabricated obligation_point -> a controller
+        # gap that never happened. 71% of this cohort's in-window asthma-inpatient
+        # days share the date with a non-inpatient asthma encounter, and 72% of its
+        # "Inpatient Visit" rows are zero-length-of-stay, so the population is not
+        # small. LOS is deliberately NOT the test: it is a proxy for the artifact,
+        # attribution is the actual question, and an LOS floor would also drop real
+        # short admissions. Report hospitalisation-vs-ED with LOS instead.
+        # When NOTHING that day is linked (the 5.7% of asthma-dx days whose
+        # diagnosis row carries no visit link at all) the flag is the best evidence
+        # available and still decides — the fallback's whole purpose, and what keeps
+        # an extract predating `asthma_dx_linked` behaving as before.
+        if r.get("asthma_dx_linked") is not True and d in linked_dates:
+            stats["exac_not_linked"] = stats.get("exac_not_linked", 0) + 1
             continue
         marks.append((d, f"encounters:{r.get('row_id')}"))
     marks.sort(key=lambda x: (x[0], str(x[1])))

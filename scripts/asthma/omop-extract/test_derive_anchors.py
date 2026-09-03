@@ -32,18 +32,29 @@ def _ocs(row_id, fill_date):
     return {"drug_class": "OCS", "row_id": row_id, "fills": [{"fill_date": fill_date}]}
 
 
-def _enc(row_id, start_date, asthma_related=True, typ="Outpatient Visit"):
-    return {"row_id": row_id, "start_date": start_date, "type": typ, "asthma_related": asthma_related}
+# `dx_linked=None` OMITS the key, which is what an extract predating
+# `asthma_dx_linked` looks like — the pre-decision-5b shape every test above
+# relies on. Pass True/False only when a test is about decision 5b.
+def _dx(row, dx_linked):
+    if dx_linked is not None:
+        row["asthma_dx_linked"] = dx_linked
+    return row
 
 
-def _ed(row_id, start_date, asthma_related=True):
-    return {"row_id": row_id, "start_date": start_date, "type": "Emergency Room Visit",
-            "is_ed": True, "asthma_related": asthma_related}
+def _enc(row_id, start_date, asthma_related=True, typ="Outpatient Visit", dx_linked=None):
+    return _dx({"row_id": row_id, "start_date": start_date, "type": typ,
+                "asthma_related": asthma_related}, dx_linked)
 
 
-def _inpatient(row_id, start_date, asthma_related=True):
-    return {"row_id": row_id, "start_date": start_date, "type": "Inpatient Visit",
-            "asthma_related": asthma_related}
+def _ed(row_id, start_date, asthma_related=True, dx_linked=None):
+    return _dx({"row_id": row_id, "start_date": start_date, "type": "Emergency Room Visit",
+                "is_ed": True, "asthma_related": asthma_related}, dx_linked)
+
+
+def _inpatient(row_id, start_date, asthma_related=True, dx_linked=None, end_date=None):
+    return _dx({"row_id": row_id, "start_date": start_date, "type": "Inpatient Visit",
+                "end_date": end_date or start_date,
+                "asthma_related": asthma_related}, dx_linked)
 
 
 # --- (a) 14-day boundary: day-14 merges, day-15 splits -----------------
@@ -231,6 +242,89 @@ def test_ocs_bursts_stay_ocs_only_when_an_ed_visit_exists():
     bursts = ocs_burst_anchors([], WIN)
     assert bursts == []
     assert len(exacerbation_anchors([], [_ed("e1", "2025-09-06")], WIN)) == 1
+
+
+# --- (i2) decision 5b: encounter-level attribution on the ED/inpatient arms ---
+#
+# Decision 5 attributed OCS courses only. These two arms kept the DAY-level
+# `asthma_related` flag and so kept the same shape of false positive: a same-day
+# procedure admission inherits the flag from an asthma CLINIC visit and becomes a
+# fabricated exacerbation. 71% of this cohort's in-window asthma-inpatient days
+# share their date with a non-inpatient asthma encounter, so it is not rare.
+
+def test_unlinked_inpatient_is_dropped_when_the_day_points_at_a_clinic_visit():
+    """The false positive decision 5b exists to kill.
+
+    A zero-day 'Inpatient Visit' (a procedure) on the same date as an asthma
+    clinic visit that the diagnosis genuinely points at. Only the clinic visit is
+    asthma; the admission is not an exacerbation.
+    """
+    encounters = [
+        _enc("clinic", "2025-06-10", dx_linked=True),
+        _inpatient("procedure", "2025-06-10", dx_linked=False),
+    ]
+    stats = {}
+    assert exacerbation_anchors([], encounters, WIN, stats=stats) == []
+    assert stats["exac_not_linked"] == 1
+
+
+def test_linked_ed_visit_still_counts():
+    encounters = [_ed("e1", "2025-06-10", dx_linked=True)]
+    exac = exacerbation_anchors([], encounters, WIN)
+    assert [e["date"] for e in exac] == ["2025-06-10"]
+
+
+def test_unlinked_ed_visit_counts_when_nothing_that_day_is_linked():
+    """The fallback's whole purpose: 5.7% of asthma-dx days carry no visit link
+    at all, and there the day-level flag is the best evidence available."""
+    encounters = [_ed("e1", "2025-06-10", dx_linked=False)]
+    exac = exacerbation_anchors([], encounters, WIN)
+    assert [e["date"] for e in exac] == ["2025-06-10"]
+
+
+def test_a_linked_day_does_not_reach_back_to_other_days():
+    """Attribution is decided per DAY. A linked clinic visit in June says nothing
+    about an unlinked ED visit in September."""
+    encounters = [
+        _enc("clinic", "2025-06-10", dx_linked=True),
+        _ed("ed", "2025-09-10", dx_linked=False),
+    ]
+    exac = exacerbation_anchors([], encounters, WIN)
+    assert [e["date"] for e in exac] == ["2025-09-10"]
+
+
+def test_5b_extract_predating_the_field_keeps_the_old_behaviour():
+    """The regression guard. No row carries `asthma_dx_linked`, which is every
+    corpus extracted before it existed — the arms must behave exactly as before
+    rather than silently emptying.
+
+    (Decision 6 has its own same-shaped guard for the SETTING label further down;
+    the two are separate assertions about the same absent field.)"""
+    encounters = [_enc("clinic", "2025-06-10"), _inpatient("adm", "2025-06-10")]
+    exac = exacerbation_anchors([], encounters, WIN)
+    assert [e["date"] for e in exac] == ["2025-06-10"]
+
+
+def test_decision_5b_removes_the_fabricated_obligation_point():
+    """The harm, end to end. Pre-5b the fabricated June admission was a second
+    exacerbation within a rolling year, which established a controller
+    OBLIGATION and scored a care gap that never happened."""
+    encounters = [
+        _enc("clinic", "2025-06-10", dx_linked=True),
+        _inpatient("procedure", "2025-06-10", dx_linked=False),
+    ]
+    real_burst = [_ocs("d1", "2025-01-10")]
+
+    exac = exacerbation_anchors(real_burst, encounters, WIN)
+    assert [e["date"] for e in exac] == ["2025-01-10"]
+    assert obligation_point_anchors(exac, [], WIN) == []
+
+    # Same input with the admission genuinely asthma-linked: two exacerbations,
+    # and the obligation is real.
+    encounters[1]["asthma_dx_linked"] = True
+    exac2 = exacerbation_anchors(real_burst, encounters, WIN)
+    assert [e["date"] for e in exac2] == ["2025-01-10", "2025-06-10"]
+    assert [p["date"] for p in obligation_point_anchors(exac2, [], WIN)] == ["2025-06-10"]
 
 
 # --- (j) obligation point (decisions 3 + 4) ----------------------------

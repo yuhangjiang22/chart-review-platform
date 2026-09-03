@@ -125,3 +125,68 @@ describe("attribution matches the exacerbation arm, so the same situation reads 
     expect(b.attribution_when).toEqual(a.attribution_when);
   });
 });
+
+// DECISION 7 (study lead 2026-09-03). `asthma_encounters` includes ED-only days.
+// Stepping up daily controller therapy belongs to the clinician managing the
+// chronic disease; an ED physician's task is acute stabilisation and ED discharge
+// routinely defers the controller decision to the PCP, so scoring the gap here
+// filed it against the wrong clinician. It also counted one visit twice — an
+// asthma ED visit is ALREADY an exacerbation (feeding obligation_points, with its
+// grace deadline) and already a follow-up trigger.
+describe("decision 7: the controller-at-visit rules judge OUTPATIENT visits only", () => {
+  const atKind = (kind: string | undefined, ruleId: string, control = "not_well_controlled"): RuleEvent => ({
+    event_id: `${ruleId}@2025-03-02`, rule_id: ruleId,
+    anchor: {
+      type: "asthma_encounters", date: "2025-03-02", origin: "omop",
+      ...(kind ? { meta: { kind } } : {}),
+    },
+    // Each of the three rules' OWN question is answered, so every case below
+    // turns on the ED/outpatient gate rather than on the unanswered check that
+    // precedes it.
+    answers: [
+      { question_id: "T1-ControlLevel", tier: 1, answer: control },
+      { question_id: "T1-ControllerPrescribed", tier: 1, answer: false },
+      { question_id: "T2-StepTherapyMatch", tier: 2, answer: "under_treated" },
+      { question_id: "T2-FollowupScheduled", tier: 2, answer: true },
+    ],
+  } as RuleEvent);
+
+  const judgeRule = (ruleId: string, e: RuleEvent) =>
+    evaluateAllRuleEvents(skill.rules.filter((r) => r.rule_id === ruleId), [], [e]).rule_events[0]!;
+
+  it("an ED-only uncontrolled visit is NOT evaluable", () => {
+    expect(judgeRule(RULE_ID, atKind("ed", RULE_ID)).evaluable).toBe(false);
+    expect(judgeRule("R-T2-StepTherapyMatches", atKind("ed", "R-T2-StepTherapyMatches")).evaluable)
+      .toBe(false);
+  });
+
+  it("an outpatient uncontrolled visit is still judged", () => {
+    const e = judgeRule(RULE_ID, atKind("outpatient", RULE_ID));
+    expect(e.evaluable).toBe(true);
+    expect(e.verdict).toBe("NON_CONCORDANT");
+  });
+
+  // Decision 6: a day carrying BOTH an ED visit and a clinic visit is labelled
+  // "outpatient", because the clinician in clinic could have adjusted therapy.
+  // Decision 7 rests on that label, so the mixed day stays in the denominator.
+  it("a mixed ED+clinic day is labelled outpatient and stays judged", () => {
+    expect(judgeRule(RULE_ID, atKind("outpatient", RULE_ID)).evaluable).toBe(true);
+  });
+
+  // Same convention as `_window_censored`: absent information is not evidence.
+  // An anchor list with no setting concept (ocs_bursts) and an extract predating
+  // `meta.kind` both keep their behaviour rather than silently emptying.
+  it("an anchor carrying no kind at all is judged, as before", () => {
+    expect(judgeRule(RULE_ID, atKind(undefined, RULE_ID)).evaluable).toBe(true);
+  });
+
+  it("R-T2-FollowupScheduled deliberately KEEPS ED anchors", () => {
+    // Post-ED follow-up IS an EPR-3 requirement, and the responsible party there
+    // is the system — which is exactly what that rule audits. The asymmetry is
+    // the decision, so it is pinned rather than left to be tidied away later.
+    const e = judgeRule("R-T2-FollowupScheduled", atKind("ed", "R-T2-FollowupScheduled"));
+    expect(e.evaluable).toBe(true);
+    expect(skill.rules.find((r) => r.rule_id === "R-T2-FollowupScheduled")!.event_evaluable_if)
+      .not.toContain("_anchor_kind");
+  });
+});

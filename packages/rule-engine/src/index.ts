@@ -753,6 +753,21 @@ function mergedAnswers(
   }
   for (const a of event.answers ?? []) map.set(a.question_id, a);
   map.set("_anchor_type", { question_id: "_anchor_type", tier: -1, answer: event.anchor.type });
+  // The care SETTING of this anchor ("outpatient" | "ed"), so a rule can state
+  // its own scope instead of taking whatever the anchor list happens to hold.
+  // Two rules need it: stepping up daily controller therapy is a LONGITUDINAL
+  // OUTPATIENT decision, and scoring that gap against an ED encounter both
+  // double-counts the visit (already an exacerbation, already a follow-up
+  // trigger) and files it against a clinician whose task was acute
+  // stabilisation. Post-ED follow-up IS a guideline requirement, so
+  // R-T2-FollowupScheduled deliberately keeps ED anchors.
+  // Absent -> null, which is not "ed": an anchor list with no setting concept
+  // (ocs_bursts) and an extract predating the field both keep their behaviour,
+  // the same convention `_window_censored` follows below.
+  map.set("_anchor_kind", {
+    question_id: "_anchor_kind", tier: -1,
+    answer: (event.anchor.meta?.kind as string | undefined) ?? null,
+  });
   map.set("_deadline_censored", {
     question_id: "_deadline_censored", tier: -1,
     answer: event.anchor.meta?.deadline_censored === true,

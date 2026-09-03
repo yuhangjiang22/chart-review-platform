@@ -102,7 +102,23 @@ rules:
       i.e. the not-well-controlled visit is itself the indication.
     evidence_grade: A
     event_anchor: asthma_encounters
-    event_evaluable_if: 'T1-ControlLevel in ["not_well_controlled", "very_poorly_controlled"]'
+    # OUTPATIENT VISITS ONLY (decision 7, study lead 2026-09-03). `asthma_encounters`
+    # includes ED-only days. Stepping up daily controller therapy is a longitudinal
+    # decision belonging to the clinician managing the chronic disease; an ED
+    # physician's task is acute stabilisation, and ED discharge routinely and
+    # deliberately DEFERS the controller decision to the PCP. Scoring the gap here
+    # would file it against the wrong clinician, and audit-and-feedback would go to
+    # the wrong service. The signal is not lost: an asthma ED visit is already an
+    # exacerbation (feeding obligation_points, where the deadline model gives the
+    # family a fair grace period) and already a follow-up trigger — judging it here
+    # too counted one visit twice. R-T2-FollowupScheduled keeps ED anchors on
+    # purpose; post-ED follow-up IS an EPR-3 requirement and the responsible party
+    # there is the system, which is what that rule audits.
+    # NOTE: `meta.kind` currently understates ED — it is decided by the date
+    # fallback until the extract carries `asthma_dx_linked` (see
+    # asthma_encounter_anchors' docstring), so this gate is only partly effective
+    # until the ETL is re-run.
+    event_evaluable_if: 'T1-ControlLevel in ["not_well_controlled", "very_poorly_controlled"] and _anchor_kind != "ed"'
     # JUDGED AT THE VISIT, not by a later deadline — deliberately different from
     # R-T1-ControllerForPersistent, and for a reason specific to this anchor. That
     # rule's obligation is established by an exacerbation, which can happen while

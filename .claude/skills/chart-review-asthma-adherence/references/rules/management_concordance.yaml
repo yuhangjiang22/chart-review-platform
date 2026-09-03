@@ -23,7 +23,11 @@ rules:
     # Per-event: judge only visits where a control picture is ascertainable.
     # undetermined = "no control picture ascertainable" too, so it is
     # excluded from evaluability the same as an absent answer.
-    event_evaluable_if: "T1-ControlLevel is present and T1-ControlLevel != \"undetermined\""
+    # OUTPATIENT VISITS ONLY (decision 7, study lead 2026-09-03) — same reasoning as
+    # R-T1-ControllerAtUncontrolledVisit: matching the stepwise ladder is a
+    # longitudinal management decision, not one an ED encounter is accountable for.
+    # `meta.kind` understates ED until the extract carries `asthma_dx_linked`.
+    event_evaluable_if: "T1-ControlLevel is present and T1-ControlLevel != \"undetermined\" and _anchor_kind != \"ed\""
     verdict_if: "T2-StepTherapyMatch == \"matches\""
     excluded_if: "T2-StepTherapyMatch == \"unknown\""
       # v0.6: collapsed to the design document's five categories.
