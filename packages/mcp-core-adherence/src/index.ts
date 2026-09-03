@@ -33,7 +33,7 @@ import type { QuestionAnswer } from "@chart-review/platform-types";
 import { loadOrCreate, writeReviewState } from "@chart-review/domain-review";
 import type { ReviewState } from "@chart-review/domain-review";
 import { verifyEvidence } from "@chart-review/faithfulness";
-import { readStructured, readAnchors } from "@chart-review/patients";
+import { readStructured, readAnchors, patientIndexDate } from "@chart-review/patients";
 import {
   loadAdherenceSkill,
   type AdherenceSkill,
@@ -282,6 +282,67 @@ function writeGuards(opts: {
   // demanded something the agent often could not supply, so it retried and then
   // nulled the answer to escape. This one names the exact dates and says what to
   // do, and nulling is refused too when the structured data proves an event.
+  // A DATE ANSWER MUST BE A DATE, AND MUST BE INSIDE THE WINDOW ITS RULE NAMES.
+  //
+  // R-T1-SpirometryWithin24mo is named for a 24-month window, its description
+  // says "within the past 24 months", and its verdict is
+  // `T1-SpirometryDate is present` over an `answer_schema` of bare
+  // `type: string`. So nothing anywhere checked either half: any string at all
+  // scored CONCORDANT. Measured over the stored corpus, 3 of 25 non-null answers
+  // (12%) were spurious — two spirometry dates outside the window, the furthest
+  // 2224 days (6.1 years) before index, and one answer that was not a date at
+  // all ("well_controlled"). Direction: OVERSTATES care quality.
+  //
+  // Checked here rather than in the rule (study lead, 2026-09-03) because the
+  // expression language has no date arithmetic — "within 24 months" cannot be
+  // written as a rule at all. Same shape as the referral applicability check
+  // below: the judgment stays with the extractor, and only a flat contradiction
+  // of the question's own definition is refused.
+  //
+  // Blocking is safe: the agent always has a correct alternative. "No spirometry
+  // in the window" is answered NULL, which the rule reads as non-concordant (or
+  // censored, on a chart too short to see 24 months). The message says so, so
+  // this cannot become the kind of gate an agent escapes by guessing.
+  const DATE_WINDOW_DAYS: Record<string, number> = {
+    // 730 days mirrors control_concordance.yaml's own censoring gate for this
+    // rule (`_days_observed_before_index < 730`); the two must agree or a
+    // patient could be censored for a window this check would have accepted.
+    "T1-SpirometryDate": 730,
+  };
+  const windowDays = DATE_WINDOW_DAYS[opts.questionId];
+  if (windowDays !== undefined && opts.coerced !== null) {
+    const idx = patientIndexDate(opts.patientId);
+    // Silent when the corpus carries no index_date (hand-authored fixtures):
+    // absent information is not evidence of a bad answer.
+    if (idx) {
+      const raw = String(opts.coerced);
+      const iso = /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : null;
+      const asDate = iso ? new Date(`${iso}T00:00:00Z`) : null;
+      if (!asDate || Number.isNaN(asDate.getTime())) {
+        return err(
+          `'${raw}' is not a date. Answer this question with an ISO date `
+          + "(YYYY-MM-DD), or null if no spirometry is documented in the window.",
+          { error_code: "not_a_date", question_id: opts.questionId },
+        );
+      }
+      const days = Math.round(
+        (new Date(`${idx}T00:00:00Z`).getTime() - asDate.getTime()) / 86_400_000,
+      );
+      if (days < 0 || days > windowDays) {
+        return err(
+          `${raw} is ${days < 0 ? `${-days} days AFTER` : `${days} days before`} the index date `
+          + `(${idx}), outside this question's ${windowDays}-day window. A spirometry outside `
+          + "the window does not satisfy the requirement — answer null if none is documented "
+          + "INSIDE it, and the platform will record that correctly.",
+          {
+            error_code: "date_outside_window",
+            days_before_index: days, window_days: windowDays, index_date: idx,
+          },
+        );
+      }
+    }
+  }
+
   const ANCHOR_FLOOR: Record<string, string> = {
     "T1-ExacerbationsCount": "exacerbations",
   };

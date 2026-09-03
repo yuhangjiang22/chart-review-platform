@@ -64,6 +64,10 @@ beforeAll(() => {
     "    tier: 1",
     "    text: how many exacerbations in the past 12 months",
     "    answer_schema: { type: number }",
+    "  - question_id: T1-SpirometryDate",
+    "    tier: 1",
+    "    text: date of the most recent spirometry",
+    "    answer_schema: { type: string }",
     "  - question_id: T1-Other",
     "    tier: 1",
     "    text: an unfloored question",
@@ -75,6 +79,9 @@ beforeAll(() => {
   // Two in-window exacerbations, as the ETL derives them.
   const anchors = path.join(corpusRoot, session.patientId, "anchors");
   fs.mkdirSync(anchors, { recursive: true });
+  // The date-window check measures back from index_date, so the fixture needs one.
+  fs.writeFileSync(path.join(corpusRoot, session.patientId, "meta.json"),
+    JSON.stringify({ patient_id: session.patientId, index_date: "2025-12-31" }));
   const omop = path.join(corpusRoot, session.patientId, "omop");
   fs.mkdirSync(omop, { recursive: true });
   // Non-empty, so the provenance upgrade has a table to point at.
@@ -174,7 +181,6 @@ describe("the floor applies only where a deterministic count exists", () => {
 // value, so moving applicability into the rule would narrow the requirement. Only
 // the flat contradiction is refused.
 
-import { setEventAnswer } from "./index.js";
 import { loadOrCreate, writeReviewState } from "@chart-review/domain-review";
 
 function seedEventControlLevel(level: string | null) {
@@ -400,5 +406,72 @@ describe("the same guards apply to set_event_answer", () => {
       event_id: EVENT, answers: [{ question_id: "T1-Other", answer: 7 }],
     } as never));
     expect(b.ok).toBe(true);
+  });
+});
+
+// A DATE ANSWER MUST BE A DATE, AND INSIDE THE WINDOW ITS RULE NAMES.
+//
+// R-T1-SpirometryWithin24mo is named for a 24-month window and its verdict is
+// `T1-SpirometryDate is present` over a bare `type: string`. Nothing checked
+// either half, so any string at all scored CONCORDANT. Measured over the stored
+// corpus: 3 of 25 non-null answers (12%) were spurious — two dates outside the
+// window (furthest 2224 days = 6.1 years before index) and one that was not a
+// date ("well_controlled"). The window cannot be expressed as a rule: the
+// expression language has no date arithmetic.
+describe("a date answer must be a date, inside its window", () => {
+  const spiro = (v: unknown) => setQuestionAnswer(session, {
+    question_id: "T1-SpirometryDate", answer: v as never,
+  } as never);
+
+  it("accepts a date inside the 730-day window", async () => {
+    expect(parse(await spiro("2025-06-15")).ok).toBe(true);
+  });
+
+  it("accepts the far edge of the window exactly", async () => {
+    // index 2025-12-31 minus 730 days. The boundary is inclusive, matching the
+    // censoring gate's `< 730`.
+    expect(parse(await spiro("2024-01-01")).ok).toBe(true);
+  });
+
+  it("rejects a date outside the window, naming how far out it is", async () => {
+    const b = parse(await spiro("2019-11-22"));
+    expect(b.ok).toBe(false);
+    expect(b.error_code).toBe("date_outside_window");
+    expect(b.days_before_index).toBe(2231);
+    // The message must name the correct alternative, or this becomes a gate the
+    // agent escapes by guessing a plausible in-window date.
+    expect(b.error).toContain("null");
+  });
+
+  it("rejects a date AFTER the index date", async () => {
+    const b = parse(await spiro("2026-03-01"));
+    expect(b.ok).toBe(false);
+    expect(b.error_code).toBe("date_outside_window");
+  });
+
+  it("rejects an answer that is not a date at all", async () => {
+    // The real stored case.
+    const b = parse(await spiro("well_controlled"));
+    expect(b.ok).toBe(false);
+    expect(b.error_code).toBe("not_a_date");
+  });
+
+  it("accepts null — that is how 'none in the window' is recorded", async () => {
+    expect(parse(await spiro(null)).ok).toBe(true);
+  });
+
+  it("holds on the event route too", async () => {
+    const st = loadOrCreate(session.patientId, session.task);
+    st.task_kind = "adherence";
+    st.rule_events = [{
+      event_id: "R-S@window", rule_id: "R-S", anchor: { type: "window" }, answers: [],
+    }] as never;
+    writeReviewState(session.patientId, session.task.task_id, st);
+    const b = parse(await setEventAnswer(session, {
+      event_id: "R-S@window",
+      answers: [{ question_id: "T1-SpirometryDate", answer: "2019-11-22" }],
+    } as never));
+    expect(b.ok).toBe(false);
+    expect(b.error_code).toBe("date_outside_window");
   });
 });

@@ -171,6 +171,20 @@ rules:
       symptoms have stabilized, during a period of progressive or
       prolonged loss of control, and at least every 1-2 years'.
     evidence_grade: B
+    # THE 24 MONTHS ARE ENFORCED AT THE WRITE PATH, NOT HERE (study lead,
+    # 2026-09-03). `is present` is all this expression can say: the expression
+    # language has no date arithmetic, and `T1-SpirometryDate`'s answer_schema is a
+    # bare `type: string`, so for one version any string whatsoever scored
+    # CONCORDANT. Measured over the stored corpus: 3 of 25 non-null answers (12%)
+    # were spurious — two dates outside the window, the furthest 2224 days (6.1
+    # years) before index, and one answer that was not a date at all. Direction:
+    # OVERSTATES care quality.
+    #
+    # `writeGuards` (packages/mcp-core-adherence) now rejects a non-date and a
+    # date outside 730 days, naming null as the correct answer when nothing is
+    # documented inside the window. Its 730 and the censoring gate's 730 below
+    # must stay equal — a patient censored for a window the write path accepted
+    # would be counted two different ways.
     verdict_if: "T1-SpirometryDate is present"
     # A CHART TOO SHORT TO HOLD THE ANSWER IS NOT A CARE GAP (study lead,
     # 2026-08-28). The cohort admits a patient at 365 days of prior observation

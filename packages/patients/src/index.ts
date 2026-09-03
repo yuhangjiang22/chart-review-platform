@@ -88,6 +88,23 @@ export function isPhiPatient(patientId: string): boolean {
   }
 }
 
+/** The patient's index date as an ISO `YYYY-MM-DD` string, or undefined when
+ *  the corpus does not carry one (hand-authored fixtures).
+ *
+ *  Every lookback window in an adherence rubric is measured back from here, so a
+ *  write-path check that needs to ask "is this date inside the window?" needs
+ *  this and nothing else. Undefined means the question cannot be answered, and
+ *  callers must stay SILENT rather than reject — the same convention
+ *  `patientDaysObservedBeforeIndex` documents below. */
+export function patientIndexDate(patientId: string): string | undefined {
+  try {
+    const v = readMeta(patientId)?.index_date;
+    return typeof v === "string" && /^\d{4}-\d{2}-\d{2}/.test(v) ? v.slice(0, 10) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /** How much chart there was to read BEFORE index_date (cohort.sql's
  *  `days_observed_before_index`), or undefined when the extract predates the
  *  field or the patient is hand-authored.
