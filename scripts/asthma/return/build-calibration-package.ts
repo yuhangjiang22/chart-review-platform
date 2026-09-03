@@ -136,10 +136,26 @@ function main(): void {
       perRule.set(e.rule_id, n);
       seqOf.set(e.event_id, `${e.rule_id}#${n}`);
     }
+    // `anchored` and `origin` are REQUIRED by EventSide and are what the matcher
+    // keys on; this used to build an `anchor` field instead and reach EventSide
+    // through `as unknown as`, which is exactly the cast that let it compile.
+    // `(av?.anchored ?? bv?.anchored) === true` was therefore always false, so
+    // computePerEventMetrics classified every anchored event as a window stub and
+    // skipped it: per_event.csv came out with a row per rule and every count 0,
+    // event_disagreements.csv empty, and event_verdict_kappa null. Not an empty
+    // file — a file of zeros, which reads as perfect agreement. Measured on
+    // session_130: 13 anchored events, all 13 validated, all 13 dropped.
     const asSide = (evs: RuleEvent[]): EventSide[] => evs.map((e) => ({
-      patient_id: sid, event_id: e.event_id, rule_id: e.rule_id,
-      anchor: e.anchor, verdict: e.verdict, evaluable: e.evaluable,
-    } as unknown as EventSide));
+      patient_id: sid,
+      event_id: e.event_id,
+      rule_id: e.rule_id,
+      // Window stubs are constants on both sides and are reported separately —
+      // see EventSide.anchored.
+      anchored: e.anchor.type !== "window" && Boolean(e.anchor.date),
+      origin: e.anchor.origin === "note" ? "note" : "omop",
+      verdict: e.verdict,
+      evaluable: e.evaluable,
+    }));
     revEvents.push(...asSide((d.rule_events ?? []).filter((e) => e.source === "reviewer")));
     if (firstAgent) agentEvents.push(...asSide(d.agent_rule_events?.[firstAgent] ?? []));
   }

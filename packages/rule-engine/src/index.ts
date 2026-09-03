@@ -882,11 +882,38 @@ const CONTROL_LEVEL_SEVERITY: Record<string, number> = {
  *  patient IN the denominator and the requirement in force. That matches the
  *  v0.5 instruction it replaces ("when T1-ControlLevel is undetermined, do NOT
  *  answer not_applicable — still record what the chart documents"), and it fails
- *  toward measuring rather than toward silently dropping patients. */
+ *  toward measuring rather than toward silently dropping patients.
+ *
+ *  A HUMAN'S STRIKE IS HONOURED; THE ENGINE'S APPLICABILITY GATE IS NOT.
+ *
+ *  This used to read every event's answers regardless of `evaluable`, so an event
+ *  a reviewer had explicitly struck still decided the denominator — measured on 20
+ *  stored patients, and in all 20 the struck event moved the derived value across
+ *  `R-T1-ComorbidityAssessedWhenUncontrolled`'s `well_controlled` exclusion line,
+ *  flipping that rule between EXCLUDED and judged. That is the reviewer's
+ *  judgment being discarded, the same defect as the `evaluable:true` one, and it
+ *  is fixed the same way: the human holds (study lead, 2026-09-03).
+ *
+ *  But "skip every non-evaluable event" would be WRONG, and wrong in the
+ *  gap-inflating direction. Most non-evaluability here is the engine's own
+ *  applicability gate, and for the controller rule that gate is
+ *  `T1-ControlLevel in ["not_well_controlled", "very_poorly_controlled"]` — so
+ *  its non-evaluable events are exactly the WELL-CONTROLLED visits. Dropping
+ *  those would systematically delete the well-controlled observations from a MAX,
+ *  pushing the derived worst upward, keeping more patients in the comorbidity
+ *  denominator and reporting more gaps. A censored event is the same: the
+ *  observation happened, only the judgment window was truncated.
+ *
+ *  So the test is WHO said not-evaluable, not THAT it is not evaluable. A
+ *  reviewer's strike (source "reviewer" + `evaluable: false`) says "this is not a
+ *  real judgment point", which applies to its annotation too. An engine sentinel
+ *  says only "this rule does not reach this visit", which says nothing about
+ *  whether the visit was observed. */
 export function deriveWorstControlLevel(events: RuleEvent[]): string | null {
   let worst: string | null = null;
   let severity = 0;
   for (const e of events) {
+    if (e.evaluable === false && e.source === "reviewer") continue;
     for (const a of e.answers ?? []) {
       if (a.question_id !== CONTROL_LEVEL_QID) continue;
       const s = CONTROL_LEVEL_SEVERITY[String(a.answer)];
@@ -1088,6 +1115,7 @@ export function evaluateRuleEvents(
     // Applicability BEFORE censoring: an event the requirement does not apply to
     // is not "censored", and saying so would misreport why it left the
     // denominator.
+    //
     if (!holds(evaluableAst, merged)) return notEvaluable();
     if (!censoringIsStructural && censored(merged)) {
       return notEvaluable(rule.event_censored_reason);

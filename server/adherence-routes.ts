@@ -271,6 +271,48 @@ export const adherenceRoutes: RouteEntry[] = [
           if (idx >= 0) qa[idx] = patched;
           else qa.push(patched);
           state.question_answers = qa;
+
+          // RECOMPUTE, LIKE THE EVENT ROUTE DOES.
+          //
+          // Editing an EVENT re-derived that rule plus every derived reader;
+          // editing a PERIOD answer re-derived nothing, so the pane went on
+          // showing a verdict computed from the agent's answer, under the label
+          // "Engine:". A reviewer who corrected T1-ComorbidityAssessed or
+          // T2-ComorbidityAddressed saw their correction stored and the verdict
+          // it decides unchanged.
+          //
+          // Scoped to the rules that actually READ this question (plus the
+          // derived-value readers, same as the event route): recomputing
+          // everything would re-derive rules whose inputs did not move, and
+          // mergeRecomputedVerdicts holds a reviewer's own verdict either way,
+          // but a narrower blast radius is easier to reason about.
+          const readers = skill.rules.filter(
+            (r) => questionsReadBy(r).includes(b.question_id!),
+          );
+          if (readers.length > 0) {
+            const affected = [
+              ...readers,
+              ...rulesReadingQid(skill.rules, DERIVED_WORST_CONTROL_QID)
+                .filter((r) => !readers.some((x) => x.rule_id === r.rule_id)),
+            ];
+            const affectedIds = new Set(affected.map((r) => r.rule_id));
+            const events = state.rule_events ?? [];
+            const res = evaluateAllRuleEvents(affected, state.question_answers ?? [], events);
+            const byId = new Map(res.rule_events.map((e) => [e.event_id, e]));
+            state.rule_events = events.map((e) =>
+              affectedIds.has(e.rule_id)
+                ? { ...(byId.get(e.event_id) ?? e), source: e.source, ts: e.ts }
+                : e,
+            );
+            state.rule_rollups = [
+              ...(state.rule_rollups ?? []).filter((r) => !affectedIds.has(r.rule_id)),
+              ...res.rule_rollups,
+            ];
+            state.rule_verdicts = mergeRecomputedVerdicts(
+              state.rule_verdicts ?? [], res.rule_verdicts, affectedIds,
+            );
+          }
+
           const validated = new Set(state.validated_questions ?? []);
           validated.add(b.question_id!);
           state.validated_questions = [...validated];

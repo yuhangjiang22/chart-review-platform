@@ -448,6 +448,48 @@ describe("derived patient-level answers (worst control level)", () => {
     expect(deriveWorstControlLevel([])).toBeNull();
   });
 
+  // WHO said not-evaluable decides whether the annotation still counts.
+  //
+  // This reduction used to read every event regardless of `evaluable`, so an
+  // event a reviewer had explicitly struck still decided the denominator —
+  // measured on 20 stored patients, and in all 20 it moved the derived value
+  // across the comorbidity rule's `well_controlled` exclusion line.
+  it("skips an event a REVIEWER struck", () => {
+    const struck = (id: string, level: string): RuleEvent =>
+      ({ ...visit(id, level), evaluable: false, source: "reviewer",
+        evaluable_reason: "not a real judgment point" });
+    expect(deriveWorstControlLevel([
+      struck("e1", "very_poorly_controlled"),
+      visit("e2", "well_controlled"),
+    ])).toBe("well_controlled");
+    // And in the other direction: striking the only well-controlled visit
+    // cannot invent a worse level.
+    expect(deriveWorstControlLevel([struck("e1", "well_controlled")])).toBeNull();
+  });
+
+  it("KEEPS an event the engine's own gate excluded", () => {
+    // Skipping these too would be wrong in the gap-inflating direction. The
+    // controller rule's gate is `T1-ControlLevel in [not_well, very_poorly]`, so
+    // its non-evaluable events are exactly the WELL-CONTROLLED visits; dropping
+    // them from a MAX would delete the well-controlled observations, push the
+    // derived worst upward, and keep more patients in the comorbidity
+    // denominator. A censored event is the same: it was observed, only the
+    // judgment window was truncated.
+    const gated = (id: string, level: string): RuleEvent =>
+      ({ ...visit(id, level), evaluable: false,
+        evaluable_reason: ENGINE_NOT_EVALUABLE_REASON });
+    expect(deriveWorstControlLevel([
+      gated("e1", "well_controlled"),
+      gated("e2", "well_controlled"),
+    ])).toBe("well_controlled");
+    // An agent-authored strike is not a human's, and is also kept: the agent
+    // saying "I could not work this event" says nothing about the visit.
+    expect(deriveWorstControlLevel([
+      { ...visit("e1", "very_poorly_controlled"), evaluable: false,
+        source: "agent", evaluable_reason: "could not locate the visit note" },
+    ])).toBe("very_poorly_controlled");
+  });
+
   it("EXCLUDES a patient well controlled at EVERY visit", () => {
     const res = evaluateAllRuleEvents(
       [COMORBID_RULE],
