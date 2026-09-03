@@ -6,7 +6,7 @@
 // number Task 6's compare view shows visually can be checked numerically.
 //
 // Usage:
-//   npx tsx scripts/asthma/annotate/iaa-events.ts \
+//   npx tsx scripts/asthma-annotate/iaa-events.ts \
 //     --session-a <sid> --session-b <sid> \
 //     [--task asthma-adherence] [--agent-id <id>] [--patients p1,p2] \
 //     [--json] [--force] [--allow-incomplete] [--allow-non-blind-gold]
@@ -53,7 +53,7 @@ const TOOL_VERSION = "2.1.0"; // bumped for the Task 7 re-review fixes (new exit
 const HELP = `iaa-events — per-event inter-annotator agreement for an adherence task
 
 Usage:
-  npx tsx scripts/asthma/annotate/iaa-events.ts --session-a <sid> --session-b <sid> [options]
+  npx tsx scripts/asthma-annotate/iaa-events.ts --session-a <sid> --session-b <sid> [options]
 
 Options:
   --task <id>            Task id (default: asthma-adherence)

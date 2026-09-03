@@ -3,7 +3,7 @@
 // never OpenRouter. Prints only run status (no PHI).
 //
 // Usage (from concur root):
-//   npx tsx scripts/asthma/realtest/run.ts [patient_id]
+//   npx tsx scripts/asthma-realtest/run.ts [patient_id]
 import dotenv from "dotenv";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

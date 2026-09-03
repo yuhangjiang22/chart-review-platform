@@ -10,8 +10,8 @@ summary, and the rule-verdict distribution. No PHI is printed — only patient
 ids (already salted hashes), question ids, and enum/numeric answers.
 
 Usage (from the platform root):
-  python3 scripts/asthma/realtest/compare.py --runs 2026-08-24T14-52-09-413Z ...
-  python3 scripts/asthma/realtest/compare.py --all-runs   # scan every run dir
+  python3 scripts/asthma-realtest/compare.py --runs 2026-08-24T14-52-09-413Z ...
+  python3 scripts/asthma-realtest/compare.py --all-runs   # scan every run dir
 """
 import argparse
 import json

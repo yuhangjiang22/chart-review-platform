@@ -369,7 +369,7 @@ export function computeAdherenceIaa(input: AdherenceIaaInput): AdherenceIaaRepor
 // failure mode the both-unscored fix above was raised to kill: measured,
 // dropping ONE gold verdict out of three moved verdict_agreement from
 // 33.3% (n=3) to 50.0% (n=2) — the incomplete pass reads BETTER than the
-// complete one. The CLI's completeness gate (scripts/asthma/annotate/
+// complete one. The CLI's completeness gate (scripts/asthma-annotate/
 // iaa-events.ts) is the ONLY thing standing between this function and that
 // outcome reaching a report: it refuses to print the headline kappa/
 // agreement whenever completeness_a or completeness_b < 1, and

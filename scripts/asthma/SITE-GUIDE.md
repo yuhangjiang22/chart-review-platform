@@ -334,7 +334,7 @@ frozen rubric that step 5 runs.
 ## 4a — the calibration package (send this)
 
 ```sh
-npx tsx scripts/asthma/site/build-calibration-package.ts \
+npx tsx scripts/asthma/return/build-calibration-package.ts \
     --session <your session id> --site <YOUR-SITE-CODE>
 ```
 
@@ -399,7 +399,7 @@ calibration round is what licenses them.
 ## Return the results
 
 ```sh
-npx tsx scripts/asthma/site/build-return-package.ts \
+npx tsx scripts/asthma/return/build-return-package.ts \
     --run <run_id> [--run <run_id> ...] --site <YOUR-SITE-CODE>
 ```
 

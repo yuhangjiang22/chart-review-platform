@@ -16,7 +16,7 @@ Prints ONLY counts/aggregates; the candidate person_id list is written to
 var/asthma-v05-screen.json (gitignored).
 
 Usage (from chart-review-platform root):
-  python3 scripts/asthma/omop-extract/screen_v05.py \
+  python3 scripts/asthma-realtest/screen_v05.py \
       --rdrp ../RDRP-6745 --notes "../RDRP-6745 Notes/r6745 Notes"
 """
 import argparse, hashlib, json, os, sys

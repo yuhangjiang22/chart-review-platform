@@ -34,7 +34,7 @@ const NOTE_LEAD_IN_DAYS = 90;
  *  `judge through <date>` printed on each event line stays the judgment end
  *  (`judgmentEnd`); this only widens which notes are offered as evidence for it.
  *
- *  Mirrored by NOTE_DOC_LAG_DAYS in scripts/asthma/realtest/check-evidence-span.py
+ *  Mirrored by NOTE_DOC_LAG_DAYS in scripts/asthma-realtest/check-evidence-span.py
  *  — the audit that measures compliance has to use the same span the prompt
  *  promises, or it reports violations the agent was never told about. */
 const NOTE_DOC_LAG_DAYS = 3;

@@ -381,7 +381,7 @@ function writeReviewState(
 
 function runCli(fixture: Fixture, args: string[]): { status: number | null; stdout: string; stderr: string } {
   const tsxBin = path.join(REPO_ROOT, "node_modules", ".bin", "tsx");
-  const scriptPath = path.join(REPO_ROOT, "scripts", "asthma", "annotate", "iaa-events.ts");
+  const scriptPath = path.join(REPO_ROOT, "scripts", "asthma-annotate", "iaa-events.ts");
   const res = spawnSync(tsxBin, [scriptPath, ...args], {
     cwd: REPO_ROOT,
     env: {

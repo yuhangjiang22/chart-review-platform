@@ -1,65 +1,66 @@
-# Asthma guideline-adherence
+# Asthma guideline-adherence — participating site
 
-**If you are at a participating site, read [`site/SITE-GUIDE.md`](site/SITE-GUIDE.md) and follow it.**
-Everything below is that guide's five steps with the file you touch at each one —
-the map, not the instructions.
+**Read [`SITE-GUIDE.md`](SITE-GUIDE.md) and follow it.** Everything in this folder
+is something you run; nothing here is optional reading.
 
-You will only ever open two of these folders: `omop-extract/` and `site/`.
+Two subfolders, matching the halves of the workflow:
+
+| | |
+|---|---|
+| `omop-extract/` | steps 1–3: get your data in, check the draw |
+| `return/` | steps 4–5: build the two packages you send back |
 
 ---
 
-## The five steps, and what you touch
-
-**1. Prepare your data** — `omop-extract/`
+## `omop-extract/` — your data in
 
 You write **one** file: `adapter_<yoursite>.sql`. Copy `adapter_rdrp.sql` and point
-its views at your own tables. Then check readiness:
+its views at your own tables.
+
+**Do not edit** `cohort.sql`, `extracts.sql` or `conformance.sql`. Those define who
+is eligible and what is pulled, and they are byte-identical at every site — that
+is what makes the sites comparable. Their parameters *are* yours to set;
+`cohort.sql`'s header explains each one.
 
 ```sh
+# readiness — six checks against your data, extracts nothing
 python3 scripts/asthma/omop-extract/etl.py --check --rdrp … --notes … \
     --adapter scripts/asthma/omop-extract/adapter_<yoursite>.sql
-```
 
-**Do not edit** `cohort.sql`, `extracts.sql` or `conformance.sql`. Those three
-define who is eligible and what is pulled, and they are byte-identical at every
-site — that is what makes the sites comparable. `cohort.sql`'s header explains
-every parameter, and the parameters *are* yours to set.
+# extract
+python3 scripts/asthma/omop-extract/etl.py --rdrp … --notes … \
+    --adapter scripts/asthma/omop-extract/adapter_<yoursite>.sql \
+    --out corpus/patients --salt "$YOUR_SITE_SALT"
 
-**2. Run the ETL** — `omop-extract/etl.py`
-
-Same command without `--check`. Writes `corpus/patients/<pseudonym>/`.
-
-**3. Run the pipeline** — `omop-extract/check_draw.py`, then the review UI
-
-Check the draw before anyone annotates:
-
-```sh
+# can the patients you drew actually exercise the rules? run before annotating
 python3 scripts/asthma/omop-extract/check_draw.py --prefix patient_real_asthma_<yoursite>_
 ```
 
-Then `npm run dev` and work through the patients in the review pane.
+`derive_anchors.py` runs as part of the extraction — it derives the event anchors
+the rules are evaluated at, so its definitions are part of the measurement rather
+than a utility. `README.md` there covers portability details and the conformance
+thresholds.
 
-**4. Export** — `site/build-calibration-package.ts`
+## `return/` — your results out
 
-Builds the agreement statistics you send back. Read its `gate.json` before
-deploying.
+```sh
+# after the annotation round
+npx tsx scripts/asthma/return/build-calibration-package.ts --session <id> --site <CODE>
 
-**5. Deploy and return** — `site/build-return-package.ts`
+# after the deployment run
+npx tsx scripts/asthma/return/build-return-package.ts --run <run_id> --site <CODE>
+```
 
-`npm run deploy` runs the cohort, then this builds the results package you send
-back. Both packages go through `site/redact.ts`, which is the whitelist that
-decides what may leave — worth reading if your IRB asks.
+Both go through `redact.ts`, the whitelist that decides what may leave your site: a
+value is emitted only if it is a boolean, a number, or a value the rubric's own
+enumeration declares. Worth reading if your IRB asks what crosses the boundary —
+`redact.test.ts` drives it with the cases we planted to try to get PHI through.
 
 ---
 
-## Not yours
-
-`realtest/` and `annotate/` are the coordinating centre's tooling — running the
-agent on our own patients, scoring annotator agreement, one-off state migrations.
-Nothing in the site workflow calls them.
-
-The rubric is not here either. It lives in
+The rubric itself is not in this folder. It lives in
 `.claude/skills/chart-review-asthma-adherence/references/` — questions, rules, and
-the attribution taxonomy. These scripts read it; they do not define it. If a
-question's wording doesn't fit how your clinicians document, that is a message to
-the coordinating centre, not a file to edit.
+the attribution taxonomy. These scripts read it. If a question's wording doesn't
+fit how your clinicians document, that is a message to the coordinating centre
+rather than a file to edit: the rubric has to stay identical across sites for the
+results to pool.

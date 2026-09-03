@@ -42,9 +42,9 @@ quote text or note bodies. Safe to paste into a report; the same filenames alrea
 appear in the reviewer's UI.
 
 Usage (from chart-review-platform/):
-  python3 scripts/asthma/realtest/check-evidence-span.py                # newest run
-  python3 scripts/asthma/realtest/check-evidence-span.py <run_id> [...]
-  python3 scripts/asthma/realtest/check-evidence-span.py --all          # every run
+  python3 scripts/asthma-realtest/check-evidence-span.py                # newest run
+  python3 scripts/asthma-realtest/check-evidence-span.py <run_id> [...]
+  python3 scripts/asthma-realtest/check-evidence-span.py --all          # every run
 """
 import glob
 import json

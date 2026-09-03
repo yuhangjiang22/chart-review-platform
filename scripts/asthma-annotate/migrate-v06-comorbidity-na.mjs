@@ -32,9 +32,9 @@
  * visible in the UI and reversible by hand.
  *
  * Usage (from chart-review-platform/):
- *   node scripts/asthma/annotate/migrate-v06-comorbidity-na.mjs                  # dry run
- *   node scripts/asthma/annotate/migrate-v06-comorbidity-na.mjs --apply          # live states
- *   node scripts/asthma/annotate/migrate-v06-comorbidity-na.mjs --include-runs   # also historical drafts
+ *   node scripts/asthma-annotate/migrate-v06-comorbidity-na.mjs                  # dry run
+ *   node scripts/asthma-annotate/migrate-v06-comorbidity-na.mjs --apply          # live states
+ *   node scripts/asthma-annotate/migrate-v06-comorbidity-na.mjs --include-runs   # also historical drafts
  */
 import fs from "node:fs";
 import path from "node:path";
