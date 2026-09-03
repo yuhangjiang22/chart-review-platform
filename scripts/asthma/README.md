@@ -1,65 +1,65 @@
-# Asthma guideline-adherence — scripts
+# Asthma guideline-adherence
 
-Everything for the pediatric asthma adherence study, in the order you'd use it.
+**If you are at a participating site, read [`site/SITE-GUIDE.md`](site/SITE-GUIDE.md) and follow it.**
+Everything below is that guide's five steps with the file you touch at each one —
+the map, not the instructions.
 
-| you want to… | go to |
-|---|---|
-| **hand this to a participating site** | [`site/SITE-GUIDE.md`](site/SITE-GUIDE.md) — the whole workflow, five steps, written for someone at another institution |
-| turn an OMOP CDM into a corpus | `omop-extract/` |
-| check a calibration draw before annotating | `omop-extract/check_draw.py` |
-| run the agent on real patients here | `realtest/run.ts` |
-| score agreement between two annotators | `annotate/iaa-events.ts` |
-| build the packages a site sends back | `site/build-calibration-package.ts`, `site/build-return-package.ts` |
+You will only ever open two of these folders: `omop-extract/` and `site/`.
 
 ---
 
-## `site/` — what a participating site does, and what comes back
+## The five steps, and what you touch
 
-`SITE-GUIDE.md` is the one file to send another institution. It carries the five
-steps (prepare data → ETL → pipeline → export → deploy), the adapter contract, and
-the list of what may and may not leave a site.
+**1. Prepare your data** — `omop-extract/`
 
-The two builders produce the artifacts that come back: `build-calibration-package`
-(agreement statistics after the annotation round) and `build-return-package`
-(concordance results after deployment). Both go through `redact.ts`, which is the
-whitelist — a value leaves only by matching a declared shape. `redact.test.ts`
-drives it with the hostile inputs that were actually found in real states.
+You write **one** file: `adapter_<yoursite>.sql`. Copy `adapter_rdrp.sql` and point
+its views at your own tables. Then check readiness:
 
-The builders take `--task` and are not asthma-specific in themselves; they live
-here because the guide they serve is. Move them up a level if a second task needs
-them.
+```sh
+python3 scripts/asthma/omop-extract/etl.py --check --rdrp … --notes … \
+    --adapter scripts/asthma/omop-extract/adapter_<yoursite>.sql
+```
 
-## `omop-extract/` — CDM to corpus
+**Do not edit** `cohort.sql`, `extracts.sql` or `conformance.sql`. Those three
+define who is eligible and what is pulled, and they are byte-identical at every
+site — that is what makes the sites comparable. `cohort.sql`'s header explains
+every parameter, and the parameters *are* yours to set.
 
-`etl.py` is the entry point: it renders and runs the three shared SQL files, applies
-the Python transform, and writes `corpus/patients/<pseudonym>/`.
+**2. Run the ETL** — `omop-extract/etl.py`
 
-- `cohort.sql` — **who is eligible.** Byte-identical across sites; who is in the
-  denominator cannot be a local decision. Read its header for the reasoning behind
-  each parameter.
-- `extracts.sql`, `conformance.sql` — the per-table pulls, and six pre-flight
-  readiness checks. Also shared and unedited.
-- `adapter_rdrp.sql` — **the only site-specific file.** Standard-OMOP views over
-  one site's actual tables. A new site copies it.
-- `derive_anchors.py` — the four event-anchor lists the event-level rules are
-  enumerated from, so its definitions are part of the measurement.
-- `check_draw.py` — run before annotating: can the patients you drew actually
-  exercise the rules?
-- `README.md` — portability details, conformance thresholds, validation runs.
+Same command without `--check`. Writes `corpus/patients/<pseudonym>/`.
 
-## `realtest/` — running it here
+**3. Run the pipeline** — `omop-extract/check_draw.py`, then the review UI
 
-`run.ts` drives a batch on real (PHI) patients, routed to the HIPAA-eligible model.
-`compare.py` scores agent drafts against a human export. `check-evidence-span.py`
-audits whether cited evidence falls inside each event's judgment window.
+Check the draw before anyone annotates:
 
-## `annotate/` — annotation and agreement
+```sh
+python3 scripts/asthma/omop-extract/check_draw.py --prefix patient_real_asthma_<yoursite>_
+```
 
-`iaa-events.ts` computes per-event agreement between two sessions (the blind-gold
-comparison). `migrate-v06-comorbidity-na.mjs` is a one-off state migration.
+Then `npm run dev` and work through the patients in the review pane.
+
+**4. Export** — `site/build-calibration-package.ts`
+
+Builds the agreement statistics you send back. Read its `gate.json` before
+deploying.
+
+**5. Deploy and return** — `site/build-return-package.ts`
+
+`npm run deploy` runs the cohort, then this builds the results package you send
+back. Both packages go through `site/redact.ts`, which is the whitelist that
+decides what may leave — worth reading if your IRB asks.
 
 ---
 
-The rubric itself is not here — it lives in
-`.claude/skills/chart-review-asthma-adherence/references/` (questions, rules,
-attribution taxonomy). These scripts read it; they do not define it.
+## Not yours
+
+`realtest/` and `annotate/` are the coordinating centre's tooling — running the
+agent on our own patients, scoring annotator agreement, one-off state migrations.
+Nothing in the site workflow calls them.
+
+The rubric is not here either. It lives in
+`.claude/skills/chart-review-asthma-adherence/references/` — questions, rules, and
+the attribution taxonomy. These scripts read it; they do not define it. If a
+question's wording doesn't fit how your clinicians document, that is a message to
+the coordinating centre, not a file to edit.
