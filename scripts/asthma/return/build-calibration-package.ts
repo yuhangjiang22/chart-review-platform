@@ -71,6 +71,10 @@ interface StateFile {
   agent_rule_verdicts?: Record<string, RuleVerdict[]>;
   agent_rule_events?: Record<string, RuleEvent[]>;
   review_status?: string;
+  /** Stamped by the batch runner. Absent on a draft written before the field
+   *  existed, which the package reports as "(unrecorded)" rather than omitting. */
+  agent_model?: string;
+  agent_backend?: string;
 }
 
 function main(): void {
@@ -87,6 +91,8 @@ function main(): void {
   if (!fs.existsSync(dir)) { console.error(`session not found: ${args.session}`); process.exit(1); }
 
   const subjectOf = new Map<string, string>();
+  const models = new Set<string>();
+  const backends = new Set<string>();
   const agentQ = new Map<string, QuestionAnswer[]>();
   const revQ = new Map<string, QuestionAnswer[]>();
   const agentR = new Map<string, RuleVerdict[]>();
@@ -106,6 +112,15 @@ function main(): void {
     if (d.review_status === "reviewer_validated") validated++;
     const sid = `S${String(subjectOf.size + 1).padStart(4, "0")}`;
     subjectOf.set(pid, sid);
+
+    // Which model produced the agent side of this comparison. A kappa is
+    // agent-vs-human, so it is a property of the MODEL as much as of the rubric
+    // — and a site configures its own endpoint. Without this, pooling two sites'
+    // kappas can average different models with no way to separate them after.
+    if (d.agent_model) models.add(String(d.agent_model));
+    else models.add("(unrecorded)");
+    if (d.agent_backend) backends.add(String(d.agent_backend));
+    else backends.add("(unrecorded)");
 
     const agentIds = Object.keys(d.agent_question_answers ?? {}).sort();
     const firstAgent = agentIds[0];
@@ -222,6 +237,8 @@ function main(): void {
   files["gate.json"] = JSON.stringify({
     schema_version: "1",
     package_id: pkgId, site: args.site, task_id: args.task, generated_at: stamp,
+    agent_model: [...models].sort(),
+    agent_backend: [...backends].sort(),
     session: args.session,
     n_subjects: subjectOf.size, n_reviewer_validated: validated, n_states: total,
     thresholds: { kappa_min: args.kappaMin, min_n_per_rule: args.minN },

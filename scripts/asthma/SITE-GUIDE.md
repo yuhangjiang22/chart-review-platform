@@ -124,10 +124,16 @@ export. Build the view over whatever you have; only four columns are needed, and
 corpus, and the agent uses it to tell a progress note from an ED note). The
 origin site maps a partitioned parquet drop this way.
 
-**`days_supply` is null.** Then `refill_pdc_12mo` is computed from whatever fills
-do carry one and each affected drug is flagged `refill_pdc_partial` — treat the
-number as a floor, not a rate. The SABA count is unaffected: it counts
-dispensings, not supply. Nothing else in the rubric depends on it.
+**`days_supply` is null.** Expect no PDC at all, and note that the `--check` row
+for this does not measure what you need. It reports the rate over your whole
+`drug_exposure` table; PDC uses the 12-month IN-WINDOW fills, and the two can
+differ completely — at the origin site the check says 43.2% while **0 of 2,366
+in-window fills carry a `days_supply`** (0/1000 ICS, 0/989 SABA, 0/248 OCS). So
+`refill_pdc_12mo` is emitted for nobody there and `refill_pdc_partial` never
+fires either. Each affected drug instead carries `refill_pdc_unavailable`, so an
+absent PDC reads as missing data rather than as poor adherence. The SABA count is
+unaffected: it counts dispensings, not supply. Nothing in the rubric requires
+PDC — it is corroboration, and the notes are the primary source.
 
 **No structured ACT / C-ACT.** Expected — it is note-only at the origin site too.
 `T1-ACTScore` then comes from the notes, and the `act_structured` check WARNs
@@ -436,6 +442,20 @@ construction, and the agreement figures are an upper bound on what an independen
 annotator would produce. Read them as "the agent and the reviewer converged", not
 "the agent was independently correct".
 
+**And it names the model.** `agent_model` / `agent_backend` record which model
+produced the drafts, for the same reason the rubric SHA is recorded: a kappa is
+agent-versus-human, so it is a property of the model as much as of the rubric, and
+you configure your own endpoint. Without it, pooling two sites' kappas could
+average one site's gpt-4o against another's local model with no way to separate
+them afterwards. If the value is `(unrecorded)` the drafts predate the field —
+tell us which model you used. If there is more than one value, the package mixes
+models and we need to know before pooling it.
+
+Tell us if you use anything other than gpt-4o. The rubric's wording was tuned
+against it, so a different model may need different guidance — which is a finding
+worth having, not a problem with your site, and it is exactly what a 30-patient
+calibration round exists to surface.
+
 ## 4b — freeze the rubric (keep this)
 
 Once the gate passes, export the package the deployment will run:
@@ -494,7 +514,7 @@ The package contains, and can only contain:
 | `rollups.csv` | per subject per rule, the event counts and rate |
 | `events.csv` | every event: sequence number, anchor type, days before index, evaluable, reason code, verdict |
 | `answers.csv` | subject, question, answer value |
-| `run.json` | rubric SHA, counts, and any values that were dropped |
+| `run.json` | rubric SHA, **which model produced the drafts**, counts, and any values that were dropped |
 | `phi_check.json` | what the exit check scanned and found |
 
 Those columns are the whole list, and each one is checked against a declared

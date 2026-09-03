@@ -1801,6 +1801,21 @@ async function runOneAgent(
         // are written as transcript warnings a few lines above.
         adherence_excluded: auditExcluded || undefined,
         lock_task_sha: manifest.guideline_sha,
+        // WHICH MODEL PRODUCED THIS DRAFT.
+        //
+        // `lock_task_sha` exists so two sites' results can be checked for having
+        // come from the same rubric — a change to the rubric changes the answers,
+        // so pooling across versions is wrong. Exactly the same is true of the
+        // model, and nothing recorded it: the rubric's prompts were tuned against
+        // gpt-4o, a site configures its own endpoint (correctly — that is what
+        // makes step 3 portable), and so a pooled kappa could silently average
+        // one site's gpt-4o against another's local Llama with no way to
+        // separate them afterwards.
+        //
+        // Identity only. The endpoint and the key are the site's own and are
+        // irrelevant to comparability.
+        agent_model: effectiveModel,
+        agent_backend: process.env.DEEPAGENTS_LLM_BACKEND,
       });
       adherenceDraftWritten = true;
       return;

@@ -85,6 +85,7 @@ interface Rollup {
 interface PatientResult {
   patient_id: string; source_kind: "session" | "run"; source_id: string;
   index_date?: string; review_status?: string; guideline_sha?: string;
+  agent_model?: string; agent_backend?: string;
   question_answers: Answer[]; rule_events: Event[];
   rule_verdicts: Verdict[]; rule_rollups: Rollup[];
 }
@@ -155,6 +156,11 @@ function collect(args: Args): PatientResult[] {
       // A package that cannot name its rubric is not poolable across sites.
       guideline_sha: (d.lock_task_sha as string | undefined)
         ?? (d.rule_events_provenance as { guideline_sha?: string } | undefined)?.guideline_sha,
+      // Which MODEL produced it, for the same reason as the rubric SHA: a site
+      // configures its own endpoint, so a pooled kappa can otherwise average one
+      // site's gpt-4o against another's local model with no way to separate them.
+      agent_model: d.agent_model as string | undefined,
+      agent_backend: d.agent_backend as string | undefined,
       question_answers: (d.question_answers as Answer[]) ?? [],
       rule_events: (d.rule_events as Event[]) ?? [],
       rule_verdicts: (d.rule_verdicts as Verdict[]) ?? [],
@@ -314,6 +320,12 @@ function main(): void {
     package_id: pkgId, site: args.site, task_id: args.task, generated_at: stamp,
     sources: { sessions: args.sessions, runs: args.runs },
     guideline_sha: [...new Set(patients.map((p) => p.guideline_sha).filter(Boolean))],
+    // More than one value here means the package pools results from different
+    // models, which is a comparability problem the coordinating centre has to
+    // know about. "(unrecorded)" means the draft predates the field — also
+    // something to know, and better than an absent key that reads as "one model".
+    agent_model: [...new Set(patients.map((p) => p.agent_model ?? "(unrecorded)"))],
+    agent_backend: [...new Set(patients.map((p) => p.agent_backend ?? "(unrecorded)"))],
     n_subjects: subjectOf.size,
     n_results: patients.length,
     review_status_counts: patients.reduce<Record<string, number>>((m, p) => {

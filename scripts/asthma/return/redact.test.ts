@@ -203,3 +203,25 @@ describe("safeColumn checks every column, not just the answer", () => {
     expect(safeColumn("rate", "")).toEqual(["", true]);          // null rate
   });
 });
+
+// WHICH MODEL PRODUCED A RESULT IS PART OF WHETHER IT POOLS.
+//
+// `lock_task_sha` travels with a package because a rubric change changes the
+// answers, so pooling across versions is wrong. The model is the same kind of
+// fact and nothing recorded it: the rubric's prompts were tuned against gpt-4o,
+// and a site configures its own endpoint — correctly, that is what makes step 3
+// portable — so a pooled kappa could average one site's gpt-4o against another's
+// local model with no way to separate them afterwards.
+describe("a package names the model that produced it", () => {
+  it("treats an absent value as (unrecorded), not as agreement", () => {
+    // The distinction that matters: an omitted key reads as "one model, and we
+    // know which". A draft written before the field must not read that way.
+    const seen = new Set<string>();
+    for (const d of [{ agent_model: "gpt-4o" }, {}, { agent_model: "qwen3-32b" }]) {
+      seen.add((d as { agent_model?: string }).agent_model ?? "(unrecorded)");
+    }
+    expect([...seen].sort()).toEqual(["(unrecorded)", "gpt-4o", "qwen3-32b"]);
+    // More than one entry is the signal a reader has to act on.
+    expect(seen.size).toBeGreaterThan(1);
+  });
+});
