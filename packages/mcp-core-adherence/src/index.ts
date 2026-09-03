@@ -31,6 +31,7 @@ import { z } from "zod";
 import type { CompiledTask } from "@chart-review/tasks";
 import type { QuestionAnswer } from "@chart-review/platform-types";
 import { loadOrCreate, writeReviewState } from "@chart-review/domain-review";
+import type { ReviewState } from "@chart-review/domain-review";
 import { verifyEvidence } from "@chart-review/faithfulness";
 import { readStructured, readAnchors } from "@chart-review/patients";
 import {
@@ -231,6 +232,185 @@ function coerce(raw: unknown, q: QuestionDefinition): QuestionAnswer["answer"] {
   return null;
 }
 
+/** The three write-path guards, shared by BOTH write paths.
+ *
+ *  They lived inline in `setQuestionAnswer` and nowhere else, which made them
+ *  routable-around: `mergedAnswers` writes patient answers first and event
+ *  answers second, so an event answer SHADOWS the period answer for any question
+ *  that is not `event_scoped`; `eventQuestionScope` admits everything in
+ *  `supporting_questions`; and `expandEventWorklist` seeds a real `<rule>@window`
+ *  event for every anchor-free rule. So every period question of every period
+ *  rule was addressable through `set_event_answer`, where none of these ran and
+ *  the write returned ok:true. Measured on patient_fake_asthma_01, the same three
+ *  claims each guard refuses were accepted through that route, and two verdicts
+ *  moved: a real care gap became EXCLUDED, and an attribution moved from
+ *  DOCUMENTATION_GAP to GUIDELINE_DEVIATION. That is what eb7d1359 and 9c353af6
+ *  were written to stop, so the guards now live in one place and both paths call
+ *  it. Returns a CallToolResult to REJECT the write, or null to allow it. */
+function writeGuards(opts: {
+  patientId: string;
+  state: ReviewState;
+  questionId: string;
+  coerced: QuestionAnswer["answer"];
+  evidence?: unknown[];
+  /** Answers being committed in the SAME call. `set_event_answer` takes an
+   *  array, so without this a caller could pair a contradiction across two
+   *  entries of one call and neither would see the other. */
+  inFlight?: QuestionAnswer[];
+}): CallToolResult | null {
+  // ANCHOR FLOOR (BLOCKING, and deliberately so — see the note on the OMOP
+  // provenance gate in setQuestionAnswer for why this one blocks where that one
+  // does not).
+  //
+  // A count the ETL derives deterministically is a FLOOR the answer may exceed
+  // but not fall below. The ETL cannot see everything — 85% of asthma ED visits
+  // carry no OCS row because ED-administered steroids never reach
+  // drug_exposure, and a burst can be documented only in a telephone note — so
+  // the agent reading notes is real value and must be able to add to the count.
+  // What it must not do is contradict what the structured data proves.
+  //
+  // Caught on a live run: the agent answered T1-ExacerbationsCount = 2 with the
+  // reasoning "March 2025 OCS burst and the 2025-11-15 ED/OCS episode", but the
+  // March burst fell 33 days BEFORE the 12-month window opened. The anchor list
+  // said 1. Nothing compared them, the count crossed the >= 2 persistent-asthma
+  // threshold, and a human validated it. The rubric's own retrieval hint tells
+  // the agent to "PREFER THE PRECOMPUTED COUNT" from a structured row that this
+  // corpus does not contain, so it fell through to counting dates by hand every
+  // time.
+  //
+  // Blocking is safe here in a way the OMOP-provenance reject was not: that gate
+  // demanded something the agent often could not supply, so it retried and then
+  // nulled the answer to escape. This one names the exact dates and says what to
+  // do, and nulling is refused too when the structured data proves an event.
+  const ANCHOR_FLOOR: Record<string, string> = {
+    "T1-ExacerbationsCount": "exacerbations",
+  };
+  const floorList = ANCHOR_FLOOR[opts.questionId];
+  if (floorList) {
+    let anchors: Array<{ date?: string }> = [];
+    try {
+      anchors = ((readAnchors(opts.patientId)[floorList] ?? []) as Array<{ date?: string }>);
+    } catch { /* no anchors on disk → no floor to enforce */ }
+    const floor = anchors.length;
+    const dates = anchors.map((a) => a.date).filter(Boolean).join(", ");
+    const committed = typeof opts.coerced === "number" ? opts.coerced : null;
+    if (floor > 0 && opts.coerced === null) {
+      return err(
+        `the structured data documents ${floor} ${floorList} in the window (${dates}), `
+        + "so this cannot be answered null",
+        { error_code: "below_anchor_floor", anchor_count: floor, anchor_dates: dates },
+      );
+    }
+    if (committed !== null && committed < floor) {
+      return err(
+        `${committed} is below what the structured data proves: ${floor} ${floorList} `
+        + `in the window (${dates}). Re-count, or raise the answer to at least ${floor}.`,
+        { error_code: "below_anchor_floor", anchor_count: floor, anchor_dates: dates },
+      );
+    }
+    if (committed !== null && committed > floor) {
+      // Every event beyond the structured ones has to come from the notes. An
+      // OMOP row cannot justify the excess: if it qualified and fell inside the
+      // window, the ETL would already have counted it — so an extra backed only
+      // by OMOP evidence means a row that is out of window or does not qualify,
+      // which is exactly the error this catches.
+      const hasNote = (opts.evidence ?? []).some(
+        (e) => ((e as { source?: string }).source ?? "note") === "note",
+      );
+      if (!hasNote) {
+        return err(
+          `${committed} exceeds the ${floor} ${floorList} in the structured data (${dates}), `
+          + "so the extra one(s) must be documented in the NOTES — cite the note text for each. "
+          + "An OMOP row cannot justify the excess: a qualifying in-window row would already "
+          + "be counted, so one that is not counted is out of window or does not qualify.",
+          { error_code: "unsupported_excess", anchor_count: floor, anchor_dates: dates },
+        );
+      }
+    }
+  }
+  // "NOT INDICATED" IS AN APPLICABILITY CLAIM, AND IT IS CHECKABLE.
+  //
+  // R-T2-SpecialtyReferralWhenIndicated takes applicability from this answer
+  // alone (`excluded_if: T2-SpecialtyReferral == "not_indicated"`), while its
+  // description defines indication as "not well controlled OR Step 4+". So a
+  // single word from the extractor drops the patient out of the denominator and
+  // nothing objects — including for a patient whose own per-event control levels
+  // make them very_poorly_controlled. The bias runs UPWARD (a missed care gap),
+  // opposite to most of what this audit found.
+  //
+  // Checked rather than re-gated (study lead, 2026-08-28): the Step 4+ arm has no
+  // patient-level derived value, so moving applicability into the rule would
+  // narrow the requirement. This leaves the judgment with the extractor and
+  // refuses only the flat contradiction — the control level says indicated, the
+  // answer says not indicated.
+  //
+  // Silent when the control level is not yet establishable (no event carries one
+  // — the agent may answer this before working the event list). That ordering
+  // gap is why the batch runner ALSO warns after its final pass, when every
+  // event is in.
+  if (opts.questionId === "T2-SpecialtyReferral" && opts.coerced === "not_indicated") {
+    const worst = deriveWorstControlLevel(opts.state.rule_events ?? []);
+    if (worst && worst !== "well_controlled" && worst !== "undetermined") {
+      return err(
+        `this patient's own per-event control levels make them ${worst}, so specialty `
+        + "referral IS indicated — \"not_indicated\" only applies to a patient who is well "
+        + "controlled at every visit AND below Step 4. Answer \"not_referred\" if no "
+        + "referral is documented.",
+        { error_code: "contradicts_control_level", worst_control_level: worst },
+      );
+    }
+  }
+
+  // "NOT APPLICABLE" MEANS THE PREMISE DOES NOT HOLD, NOT THAT THE RULE DOES NOT.
+  //
+  // T2-ContraindicationDocumented asks: "IF the patient is NOT on a controller
+  // that matches step therapy, is a contraindication or refusal documented?" So
+  // not_applicable means "the patient IS on one — there is no gap to explain",
+  // which normally sits beside a CONCORDANT controller verdict.
+  //
+  // Measured across 33 real patients, 5 of them (15%) committed not_applicable
+  // while ALSO answering that no controller was prescribed — the agent saying "no
+  // controller" and "the no-controller question does not apply" at the same time.
+  // The engine resolved the contradiction silently as DOCUMENTATION_GAP, so a
+  // sixth of that rule's documentation gaps rest on a self-contradictory answer,
+  // and any real patient_refusal among them is filed as the clinician's omission
+  // instead — the opposite clinical reading.
+  //
+  // Refused rather than reinterpreted. Treating it as EXCLUDED (the other obvious
+  // handling) would drop patients who genuinely have no controller out of the
+  // denominator, which is the upward bias this audit has been closing elsewhere.
+  //
+  // Reads events first — T1-ControllerPrescribed is event-scoped — then a legacy
+  // period-level answer, which is where the measured contradictions live (71
+  // stored states predate the question becoming event-scoped). `inFlight` closes
+  // the last hole: set_event_answer takes an ARRAY, so both halves of the
+  // contradiction can arrive in one call, where neither is on disk yet for the
+  // other to find. Silent when none of the three carries it: same ordering rule
+  // as the referral check above.
+  if (opts.questionId === "T2-ContraindicationDocumented" && opts.coerced === "not_applicable") {
+    const saysNoController = (a: { question_id: string; answer?: unknown }) =>
+      a.question_id === "T1-ControllerPrescribed" && a.answer === false;
+    const controllerSaidNo =
+      (opts.state.rule_events ?? []).some(
+        (e: { answers?: QuestionAnswer[] }) => (e.answers ?? []).some(saysNoController))
+      || (opts.state.question_answers ?? []).some(saysNoController)
+      || (opts.inFlight ?? []).some(saysNoController);
+    if (controllerSaidNo) {
+      return err(
+        "\"not_applicable\" here means the patient IS on a controller matching step "
+        + "therapy, so there is no gap to explain — but a committed answer says no "
+        + "controller was prescribed. If the gap has a documented reason, use "
+        + "contraindication / patient_refusal / pending_followup / system_barrier; if "
+        + "the chart gives no reason, use not_documented. Whether the patient NEEDED a "
+        + "controller is not this question — the platform decides that from the "
+        + "exacerbation history.",
+        { error_code: "contradicts_controller_answer" },
+      );
+    }
+  }
+  return null;
+}
+
 export async function setQuestionAnswer(
   session: AdherenceMcpSession,
   args: SetQuestionAnswerArgs,
@@ -271,76 +451,6 @@ export async function setQuestionAnswer(
   // the source table has data for this patient, we attach a table-level omop
   // provenance pointer ourselves (below). The agent may still cite a specific
   // row (schema accepts it) — then no upgrade is needed.
-  // ANCHOR FLOOR (BLOCKING, and deliberately so — see the note below on why this
-  // one blocks where the provenance gate above does not).
-  //
-  // A count the ETL derives deterministically is a FLOOR the answer may exceed
-  // but not fall below. The ETL cannot see everything — 85% of asthma ED visits
-  // carry no OCS row because ED-administered steroids never reach
-  // drug_exposure, and a burst can be documented only in a telephone note — so
-  // the agent reading notes is real value and must be able to add to the count.
-  // What it must not do is contradict what the structured data proves.
-  //
-  // Caught on a live run: the agent answered T1-ExacerbationsCount = 2 with the
-  // reasoning "March 2025 OCS burst and the 2025-11-15 ED/OCS episode", but the
-  // March burst fell 33 days BEFORE the 12-month window opened. The anchor list
-  // said 1. Nothing compared them, the count crossed the >= 2 persistent-asthma
-  // threshold, and a human validated it. The rubric's own retrieval hint tells
-  // the agent to "PREFER THE PRECOMPUTED COUNT" from a structured row that this
-  // corpus does not contain, so it fell through to counting dates by hand every
-  // time.
-  //
-  // Blocking is safe here in a way the OMOP-provenance reject was not: that gate
-  // demanded something the agent often could not supply, so it retried and then
-  // nulled the answer to escape. This one names the exact dates and says what to
-  // do, and nulling is refused too when the structured data proves an event.
-  const ANCHOR_FLOOR: Record<string, string> = {
-    "T1-ExacerbationsCount": "exacerbations",
-  };
-  const floorList = ANCHOR_FLOOR[args.question_id];
-  if (floorList) {
-    let anchors: Array<{ date?: string }> = [];
-    try {
-      anchors = ((readAnchors(session.patientId)[floorList] ?? []) as Array<{ date?: string }>);
-    } catch { /* no anchors on disk → no floor to enforce */ }
-    const floor = anchors.length;
-    const dates = anchors.map((a) => a.date).filter(Boolean).join(", ");
-    const committed = typeof coerced === "number" ? coerced : null;
-    if (floor > 0 && coerced === null) {
-      return err(
-        `the structured data documents ${floor} ${floorList} in the window (${dates}), `
-        + "so this cannot be answered null",
-        { error_code: "below_anchor_floor", anchor_count: floor, anchor_dates: dates },
-      );
-    }
-    if (committed !== null && committed < floor) {
-      return err(
-        `${committed} is below what the structured data proves: ${floor} ${floorList} `
-        + `in the window (${dates}). Re-count, or raise the answer to at least ${floor}.`,
-        { error_code: "below_anchor_floor", anchor_count: floor, anchor_dates: dates },
-      );
-    }
-    if (committed !== null && committed > floor) {
-      // Every event beyond the structured ones has to come from the notes. An
-      // OMOP row cannot justify the excess: if it qualified and fell inside the
-      // window, the ETL would already have counted it — so an extra backed only
-      // by OMOP evidence means a row that is out of window or does not qualify,
-      // which is exactly the error this catches.
-      const hasNote = (args.evidence ?? []).some(
-        (e) => ((e as { source?: string }).source ?? "note") === "note",
-      );
-      if (!hasNote) {
-        return err(
-          `${committed} exceeds the ${floor} ${floorList} in the structured data (${dates}), `
-          + "so the extra one(s) must be documented in the NOTES — cite the note text for each. "
-          + "An OMOP row cannot justify the excess: a qualifying in-window row would already "
-          + "be counted, so one that is not counted is out of window or does not qualify.",
-          { error_code: "unsupported_excess", anchor_count: floor, anchor_dates: dates },
-        );
-      }
-    }
-  }
-
   const STRUCTURED_SOURCED: Record<string, string> = {
     "T0-AgeOk": "demographics",
     "T0-AgeBand": "demographics",
@@ -392,81 +502,11 @@ export async function setQuestionAnswer(
   const state = loadOrCreate(session.patientId, session.task);
   state.task_kind = "adherence";
 
-  // "NOT INDICATED" IS AN APPLICABILITY CLAIM, AND IT IS CHECKABLE.
-  //
-  // R-T2-SpecialtyReferralWhenIndicated takes applicability from this answer
-  // alone (`excluded_if: T2-SpecialtyReferral == "not_indicated"`), while its
-  // description defines indication as "not well controlled OR Step 4+". So a
-  // single word from the extractor drops the patient out of the denominator and
-  // nothing objects — including for a patient whose own per-event control levels
-  // make them very_poorly_controlled. The bias runs UPWARD (a missed care gap),
-  // opposite to most of what this audit found.
-  //
-  // Checked rather than re-gated (study lead, 2026-08-28): the Step 4+ arm has no
-  // patient-level derived value, so moving applicability into the rule would
-  // narrow the requirement. This leaves the judgment with the extractor and
-  // refuses only the flat contradiction — the control level says indicated, the
-  // answer says not indicated.
-  //
-  // Silent when the control level is not yet establishable (no event carries one
-  // — the agent may answer this before working the event list). That ordering
-  // gap is why the batch runner ALSO warns after its final pass, when every
-  // event is in.
-  if (args.question_id === "T2-SpecialtyReferral" && coerced === "not_indicated") {
-    const worst = deriveWorstControlLevel(state.rule_events ?? []);
-    if (worst && worst !== "well_controlled" && worst !== "undetermined") {
-      return err(
-        `this patient's own per-event control levels make them ${worst}, so specialty `
-        + "referral IS indicated — \"not_indicated\" only applies to a patient who is well "
-        + "controlled at every visit AND below Step 4. Answer \"not_referred\" if no "
-        + "referral is documented.",
-        { error_code: "contradicts_control_level", worst_control_level: worst },
-      );
-    }
-  }
-
-  // "NOT APPLICABLE" MEANS THE PREMISE DOES NOT HOLD, NOT THAT THE RULE DOES NOT.
-  //
-  // T2-ContraindicationDocumented asks: "IF the patient is NOT on a controller
-  // that matches step therapy, is a contraindication or refusal documented?" So
-  // not_applicable means "the patient IS on one — there is no gap to explain",
-  // which normally sits beside a CONCORDANT controller verdict.
-  //
-  // Measured across 33 real patients, 5 of them (15%) committed not_applicable
-  // while ALSO answering that no controller was prescribed — the agent saying "no
-  // controller" and "the no-controller question does not apply" at the same time.
-  // The engine resolved the contradiction silently as DOCUMENTATION_GAP, so a
-  // sixth of that rule's documentation gaps rest on a self-contradictory answer,
-  // and any real patient_refusal among them is filed as the clinician's omission
-  // instead — the opposite clinical reading.
-  //
-  // Refused rather than reinterpreted. Treating it as EXCLUDED (the other obvious
-  // handling) would drop patients who genuinely have no controller out of the
-  // denominator, which is the upward bias this audit has been closing elsewhere.
-  //
-  // Reads events first — T1-ControllerPrescribed is event-scoped — then a legacy
-  // period-level answer, which is where the measured contradictions live (71
-  // stored states predate the question becoming event-scoped). Silent when
-  // neither exists: same ordering rule as the referral check above.
-  if (args.question_id === "T2-ContraindicationDocumented" && coerced === "not_applicable") {
-    const controllerSaidNo =
-      (state.rule_events ?? []).some((e) => (e.answers ?? []).some(
-        (a) => a.question_id === "T1-ControllerPrescribed" && a.answer === false))
-      || (state.question_answers ?? []).some(
-        (a) => a.question_id === "T1-ControllerPrescribed" && a.answer === false);
-    if (controllerSaidNo) {
-      return err(
-        "\"not_applicable\" here means the patient IS on a controller matching step "
-        + "therapy, so there is no gap to explain — but a committed answer says no "
-        + "controller was prescribed. If the gap has a documented reason, use "
-        + "contraindication / patient_refusal / pending_followup / system_barrier; if "
-        + "the chart gives no reason, use not_documented. Whether the patient NEEDED a "
-        + "controller is not this question — the platform decides that from the "
-        + "exacerbation history.",
-        { error_code: "contradicts_controller_answer" },
-      );
-    }
-  }
+  const guarded = writeGuards({
+    patientId: session.patientId, state, questionId: args.question_id,
+    coerced, evidence: args.evidence,
+  });
+  if (guarded) return guarded;
 
   const list = state.question_answers ?? [];
   const idx = list.findIndex((a) => a.question_id === args.question_id);
@@ -644,6 +684,21 @@ export async function setEventAnswer(
     });
   }
   const stored = [...storedByQuestion.values()];
+
+  // THE SAME GUARDS AS THE PERIOD PATH. They used to run only in
+  // setQuestionAnswer, which made them routable-around: an event answer shadows
+  // the period answer for any question that is not `event_scoped`, and every
+  // period question of every period rule is addressable here via the
+  // `<rule>@window` stub. Run AFTER the loop so `inFlight` is the whole
+  // deduped set — a contradiction split across two entries of one call is seen.
+  for (const s of stored) {
+    const guarded = writeGuards({
+      patientId: session.patientId, state, questionId: s.question_id,
+      coerced: s.answer, evidence: s.evidence,
+      inFlight: stored.filter((o) => o.question_id !== s.question_id),
+    });
+    if (guarded) return guarded;
+  }
 
   const prev = events[idx];
   const prevAnswers = prev.answers ?? [];

@@ -9,7 +9,7 @@ vi.mock("@chart-review/faithfulness", () => ({
   })),
 }));
 
-import { setQuestionAnswer, type AdherenceMcpSession } from "./index.js";
+import { setQuestionAnswer, setEventAnswer, type AdherenceMcpSession } from "./index.js";
 
 // A count the ETL derives deterministically is a FLOOR: the answer may exceed it
 // (the ETL cannot see a burst documented only in a telephone note, and 85% of
@@ -323,5 +323,82 @@ describe("the OMOP provenance upgrade does not overwrite where an answer came fr
     expect(b.ok).toBe(true);
     const stored = readBack("T1-SABAOveruse");
     expect(stored?.evidence?.some((e) => e.source === "omop" && e.table === "drugs")).toBe(true);
+  });
+});
+
+// THE GUARDS ABOVE USED TO RUN ON ONE WRITE PATH ONLY, AND WERE ROUTABLE-AROUND.
+//
+// `mergedAnswers` writes patient answers first and event answers second, so an
+// event answer SHADOWS the period answer for any question that is not
+// `event_scoped`; `eventQuestionScope` admits everything in
+// `supporting_questions`; and `expandEventWorklist` seeds a real `<rule>@window`
+// event for every anchor-free rule. So every period question of every period
+// rule was addressable through `set_event_answer`, where none of these ran and
+// the write returned ok:true. Measured: the same three claims each guard refuses
+// were accepted there, and two verdicts moved — a real care gap became EXCLUDED,
+// and an attribution moved from DOCUMENTATION_GAP to GUIDELINE_DEVIATION.
+describe("the same guards apply to set_event_answer", () => {
+  const EVENT = "R-X@window";
+  const seedEvent = (answers: unknown[] = []) => {
+    const st = loadOrCreate(session.patientId, session.task);
+    st.task_kind = "adherence";
+    st.rule_events = [{
+      event_id: EVENT, rule_id: "R-X",
+      anchor: { type: "window" }, answers,
+    }] as never;
+    writeReviewState(session.patientId, session.task.task_id, st);
+  };
+
+  it("the floor holds on the event route too", async () => {
+    seedEvent();
+    const b = parse(await setEventAnswer(session, {
+      event_id: EVENT, answers: [{ question_id: "T1-ExacerbationsCount", answer: 0 }],
+    } as never));
+    expect(b.ok).toBe(false);
+    expect(b.error_code).toBe("below_anchor_floor");
+  });
+
+  it("the controller contradiction holds against an answer already stored", async () => {
+    seedEvent([{ question_id: "T1-ControllerPrescribed", tier: 1, answer: false }]);
+    const b = parse(await setEventAnswer(session, {
+      event_id: EVENT,
+      answers: [{ question_id: "T2-ContraindicationDocumented", answer: "not_applicable" }],
+    } as never));
+    expect(b.ok).toBe(false);
+    expect(b.error_code).toBe("contradicts_controller_answer");
+  });
+
+  it("the contradiction is caught even when BOTH halves arrive in one call", async () => {
+    // set_event_answer takes an ARRAY. Without `inFlight` neither half is on
+    // disk yet for the other to find, so pairing them in a single call was a
+    // clean way past a guard that had just been added to this path.
+    seedEvent();
+    const b = parse(await setEventAnswer(session, {
+      event_id: EVENT, answers: [
+        { question_id: "T1-ControllerPrescribed", answer: false },
+        { question_id: "T2-ContraindicationDocumented", answer: "not_applicable" },
+      ],
+    } as never));
+    expect(b.ok).toBe(false);
+    expect(b.error_code).toBe("contradicts_controller_answer");
+  });
+
+  it("the referral applicability check holds on the event route", async () => {
+    seedEvent([{ question_id: "T1-ControlLevel", tier: 1, answer: "very_poorly_controlled" }]);
+    const b = parse(await setEventAnswer(session, {
+      event_id: EVENT, answers: [{ question_id: "T2-SpecialtyReferral", answer: "not_indicated" }],
+    } as never));
+    expect(b.ok).toBe(false);
+    expect(b.error_code).toBe("contradicts_control_level");
+  });
+
+  it("a legitimate event answer is still accepted", async () => {
+    // The guards must not become a blanket block on this path: an over-broad
+    // gate is how the earlier OMOP-provenance reject drove agents to null.
+    seedEvent();
+    const b = parse(await setEventAnswer(session, {
+      event_id: EVENT, answers: [{ question_id: "T1-Other", answer: 7 }],
+    } as never));
+    expect(b.ok).toBe(true);
   });
 });
