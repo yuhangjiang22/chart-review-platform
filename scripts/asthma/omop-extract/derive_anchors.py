@@ -106,7 +106,7 @@ Anchor-list on-disk order is part of the event-identity contract — entries
 are emitted date-ascending and stable.
 
 Usage (from chart-review-platform/):
-  python3 scripts/asthma-omop-extract/derive_anchors.py --prefix patient_fake_asthma [--corpus corpus/patients]
+  python3 scripts/asthma/omop-extract/derive_anchors.py --prefix patient_fake_asthma [--corpus corpus/patients]
 """
 import argparse, json, os, sys
 from datetime import date, timedelta

@@ -60,13 +60,13 @@ than wording:
 standard-OMOP-named views over whatever shape your data is in.
 
 Exactly one file is site-specific. Copy
-`scripts/asthma-omop-extract/adapter_rdrp.sql`, point the views at your own
+`scripts/asthma/omop-extract/adapter_rdrp.sql`, point the views at your own
 tables, and leave `cohort.sql`, `extracts.sql` and `conformance.sql` untouched —
 those three are the shared definition of the cohort and the extraction. Who is in
 the denominator cannot be a local decision, so they must be byte-identical
 everywhere. What IS yours to set is the parameters: `@min_notes_12mo` especially,
 since note volume in OMOP differs by an order of magnitude between a hospital CDM
-and an HIE. `scripts/asthma-omop-extract/README.md` lists them all and
+and an HIE. `scripts/asthma/omop-extract/README.md` lists them all and
 `cohort.sql`'s own header explains the reasoning behind each.
 
 ## What your adapter has to produce
@@ -168,9 +168,9 @@ and it has to be the same everywhere.
 ## Check readiness before extracting anything
 
 ```sh
-python3 scripts/asthma-omop-extract/etl.py --check \
+python3 scripts/asthma/omop-extract/etl.py --check \
     --rdrp /path/to/your/cdm --notes /path/to/your/notes \
-    --adapter scripts/asthma-omop-extract/adapter_<yoursite>.sql
+    --adapter scripts/asthma/omop-extract/adapter_<yoursite>.sql
 ```
 
 Six checks print PASS / WARN / FAIL. `asthma_concepts`, `notes_populated` and
@@ -187,9 +187,9 @@ in-cohort patient, holding `meta.json`, `omop/*.json`, `anchors/*.json` and
 `notes/*.txt`.
 
 ```sh
-python3 scripts/asthma-omop-extract/etl.py \
+python3 scripts/asthma/omop-extract/etl.py \
     --rdrp /path/to/your/cdm --notes /path/to/your/notes \
-    --adapter scripts/asthma-omop-extract/adapter_<yoursite>.sql \
+    --adapter scripts/asthma/omop-extract/adapter_<yoursite>.sql \
     --out corpus/patients --salt "$YOUR_SITE_SALT"
 ```
 
@@ -250,7 +250,7 @@ structured facts that predict it, and check the draw before annotating:
 **Check the draw before annotating** — two minutes, no agent run needed:
 
 ```sh
-python3 scripts/asthma-omop-extract/check_draw.py --prefix patient_real_asthma_<yoursite>_
+python3 scripts/asthma/omop-extract/check_draw.py --prefix patient_real_asthma_<yoursite>_
 ```
 
 It prints each patient's age band, note volume, prior observation and four anchor
@@ -334,7 +334,7 @@ frozen rubric that step 5 runs.
 ## 4a — the calibration package (send this)
 
 ```sh
-npx tsx scripts/site-return/build-calibration-package.ts \
+npx tsx scripts/asthma/site/build-calibration-package.ts \
     --session <your session id> --site <YOUR-SITE-CODE>
 ```
 
@@ -399,7 +399,7 @@ calibration round is what licenses them.
 ## Return the results
 
 ```sh
-npx tsx scripts/site-return/build-return-package.ts \
+npx tsx scripts/asthma/site/build-return-package.ts \
     --run <run_id> [--run <run_id> ...] --site <YOUR-SITE-CODE>
 ```
 

@@ -1,6 +1,6 @@
 """Unit tests for derive_anchors.py.
 
-Run: python3 -m pytest scripts/asthma-omop-extract/test_derive_anchors.py -q
+Run: python3 -m pytest scripts/asthma/omop-extract/test_derive_anchors.py -q
 
 Originally written for the Task 6 code review (adjudicated item 10); extended
 2026-08-27 for the four document-alignment fixes — observation window,

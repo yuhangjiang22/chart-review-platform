@@ -16,9 +16,9 @@ v0.4 foundations. Load: corpus/patients/<anon>/{meta.json,omop/*.json,notes/*.tx
 
 Usage (from concur root):
   pip install duckdb
-  python3 scripts/asthma-omop-extract/etl.py --check \
+  python3 scripts/asthma/omop-extract/etl.py --check \
       --rdrp /path/to/RDRP-6745 --notes "/path/to/RDRP-6745 Notes/r6745 Notes"
-  python3 scripts/asthma-omop-extract/etl.py \
+  python3 scripts/asthma/omop-extract/etl.py \
       --rdrp /path/to/RDRP-6745 --notes "/path/to/RDRP-6745 Notes/r6745 Notes" \
       --out corpus/patients --limit 25          # omit --limit for the whole cohort
 
@@ -353,7 +353,7 @@ def main():
                    # tell those apart.
                    "days_observed_before_index": pmeta[pid].get("days_observed_before_index"),
                    "n_notes_12mo": pmeta[pid].get("n_notes_12mo"),
-                   "source":"OMOP ETL (scripts/asthma-omop-extract) — real de-identified EHR",
+                   "source":"OMOP ETL (scripts/asthma/omop-extract) — real de-identified EHR",
                    "note":"Real patient; PHI — gitignored. Chart filtered to date <= index_date."},
                   open(os.path.join(pdir,"meta.json"),"w"), indent=2)
         n += 1

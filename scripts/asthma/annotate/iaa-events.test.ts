@@ -41,7 +41,20 @@ import type { PerEventReport } from "@chart-review/eval-adherence-iaa";
 import type { RuleEvent } from "@chart-review/platform-types";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = path.resolve(__dirname, "../..");
+// Walk up to the platform root rather than counting "../.." — this file moved one
+// level deeper when the asthma scripts were consolidated, and a hard-coded depth
+// silently pointed the spawned CLI at a path that no longer existed.
+const REPO_ROOT = (() => {
+  let dir = __dirname;
+  for (let i = 0; i < 8; i++) {
+    if (fs.existsSync(path.join(dir, "package.json"))
+        && fs.existsSync(path.join(dir, "node_modules", ".bin", "tsx"))) return dir;
+    const up = path.dirname(dir);
+    if (up === dir) break;
+    dir = up;
+  }
+  throw new Error(`could not locate the platform root above ${__dirname}`);
+})();
 
 // ── parseArgs mutates process.exitCode as a side effect on failure paths —
 //    always restore it so a failing-arg unit test can't leak an exit code
@@ -368,7 +381,7 @@ function writeReviewState(
 
 function runCli(fixture: Fixture, args: string[]): { status: number | null; stdout: string; stderr: string } {
   const tsxBin = path.join(REPO_ROOT, "node_modules", ".bin", "tsx");
-  const scriptPath = path.join(REPO_ROOT, "scripts", "asthma-annotate", "iaa-events.ts");
+  const scriptPath = path.join(REPO_ROOT, "scripts", "asthma", "annotate", "iaa-events.ts");
   const res = spawnSync(tsxBin, [scriptPath, ...args], {
     cwd: REPO_ROOT,
     env: {

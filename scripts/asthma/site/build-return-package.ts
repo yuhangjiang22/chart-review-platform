@@ -24,8 +24,8 @@
 // offset from an unpublished anchor is not an identifier.
 //
 // Usage (from the platform root):
-//   npx tsx scripts/site-return/build-return-package.ts --session session_130
-//   npx tsx scripts/site-return/build-return-package.ts --run <run_id> [--run ...]
+//   npx tsx scripts/asthma/site/build-return-package.ts --session session_130
+//   npx tsx scripts/asthma/site/build-return-package.ts --run <run_id> [--run ...]
 //   ... [--task asthma-adherence] [--out var/return-packages] [--site SITE-CODE]
 
 import fs from "node:fs";

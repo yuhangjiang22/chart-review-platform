@@ -17,7 +17,7 @@
 // than letting a site read 0.9 as independent agreement.
 //
 // Usage (from the platform root):
-//   npx tsx scripts/site-return/build-calibration-package.ts --session <id> \
+//   npx tsx scripts/asthma/site/build-calibration-package.ts --session <id> \
 //       [--task asthma-adherence] [--site SITE] [--kappa-min 0.6] [--min-n 20]
 
 import fs from "node:fs";

@@ -18,8 +18,8 @@ Prints counts and pseudonymous ids only — no dates, no note text, no PHI. The
 output is safe to send to the coordinating centre.
 
 Usage (from the platform root):
-    python3 scripts/asthma-omop-extract/check_draw.py
-    python3 scripts/asthma-omop-extract/check_draw.py --corpus corpus/patients --prefix patient_real_asthma_wcm_
+    python3 scripts/asthma/omop-extract/check_draw.py
+    python3 scripts/asthma/omop-extract/check_draw.py --corpus corpus/patients --prefix patient_real_asthma_wcm_
 """
 import argparse
 import glob
@@ -65,15 +65,20 @@ def read_patient(pdir):
     out["days_observed"] = meta.get("days_observed_before_index")
     out["notes_12mo"] = meta.get("n_notes_12mo")
 
+    # demographics.json is a one-row LIST from the ETL, but the hand-authored
+    # fixtures store a bare OBJECT. Accept both rather than crashing on whichever
+    # corpus the site happens to point this at.
     demo = os.path.join(pdir, "omop", "demographics.json")
     out["age_band"] = None
     if os.path.exists(demo):
         try:
             with open(demo) as f:
-                rows = json.load(f)
-            if rows:
-                out["age_band"] = rows[0].get("age_band")
-        except (json.JSONDecodeError, OSError):
+                d = json.load(f)
+            if isinstance(d, list):
+                d = d[0] if d else {}
+            if isinstance(d, dict):
+                out["age_band"] = d.get("age_band")
+        except (json.JSONDecodeError, OSError, IndexError):
             pass
 
     out["n_notes_files"] = len(glob.glob(os.path.join(pdir, "notes", "*.txt")))
