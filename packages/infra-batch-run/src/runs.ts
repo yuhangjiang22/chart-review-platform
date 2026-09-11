@@ -50,6 +50,19 @@ export interface PerPatientStatus {
    *  field_assessments. Populated on completion. */
   confidence_summary?: ConfidenceSummary;
   error?: string;
+  /** The draft was PROMOTED but is not complete: rules whose own question the
+   *  agent never committed, so the engine could not judge them.
+   *
+   *  `state` stays "complete" — the draft is real work and a reviewer can use
+   *  it — but a half-finished round must not read as a clean one. Measured
+   *  case: a model wrote 8 of 14 period answers, called set_review_status, and
+   *  reported "Completed chart review"; the platform named the 6 unjudged rules
+   *  in the transcript and the run still said complete with zero errors. From
+   *  the outside that is indistinguishable from a full round.
+   *
+   *  Model-independent: the gap predates any model change and is only exposed
+   *  by whichever model happens to stop early. */
+  incomplete_rules?: string[];
 }
 
 export interface RunManifest {
@@ -968,10 +981,23 @@ async function driveRun(
             ...(out.patient_status === "failed"
               ? { error: "all agents failed to produce a draft" }
               : {}),
+            ...(out.incomplete_rules?.length
+              ? { incomplete_rules: out.incomplete_rules }
+              : {}),
           };
           s.n_running = Math.max(0, s.n_running - 1);
           if (out.patient_status !== "failed") s.n_complete += 1;
           if (out.patient_status !== "complete") s.n_error += 1;
+          // A PROMOTED BUT INCOMPLETE DRAFT COUNTS AGAINST THE RUN.
+          //
+          // The patient stays "complete" — the draft is real work a reviewer can
+          // use, and failing it would discard answers the faithfulness gate
+          // already verified. But the RUN must not report clean: n_error is what
+          // decides `complete` vs `complete_with_errors` below, and a round where
+          // the agent stopped early is not a clean round. Without this, a model
+          // that writes 8 of 14 answers and declares itself done is
+          // indistinguishable from one that finished.
+          else if (out.incomplete_rules?.length) s.n_error += 1;
           s.total_cost_usd = +(s.total_cost_usd + (out.cost_usd ?? 0)).toFixed(6);
         });
 
@@ -1028,6 +1054,9 @@ interface OneAgentOutput {
   field_count?: number;
   confidence_summary?: ConfidenceSummary;
   error?: string;
+  /** Rules this agent left unjudged because their question was never committed.
+   *  Not an error — the draft is promoted — but see PerPatientStatus. */
+  incomplete_rules?: string[];
 }
 
 /** A patient's rolled-up result across all its agents (B2). `patient_status`
@@ -1037,6 +1066,7 @@ interface OnePatientOutput {
   cost_usd?: number;
   field_count?: number;
   confidence_summary?: ConfidenceSummary;
+  incomplete_rules?: string[];
 }
 
 async function runOnePatient(
@@ -1047,10 +1077,14 @@ async function runOnePatient(
   let totalCost = 0;
   let totalFieldCount = 0;
   let mergedConfidence: ConfidenceSummary | undefined;
+  // Union across agents: if ANY agent left a rule unjudged, the patient's draft
+  // is incomplete for that rule, whichever agent was supposed to cover it.
+  const incompleteRules = new Set<string>();
   const agentOutcomes: Array<{ status: "ok" | "error" }> = [];
   for (const spec of specs) {
     const out = await runOneAgent(manifest, patientId, spec);
     agentOutcomes.push({ status: out.status });
+    for (const r of out.incomplete_rules ?? []) incompleteRules.add(r);
     totalCost += out.cost_usd ?? 0;
     totalFieldCount += out.field_count ?? 0;
     // Combine confidence summaries by summing buckets across agents.
@@ -1064,7 +1098,11 @@ async function runOnePatient(
   }
   maybeWriteLegacyDraft(manifest, patientId);
   const patient_status = rollupPatientStatus(agentOutcomes);
-  return { patient_status, cost_usd: totalCost, field_count: totalFieldCount, confidence_summary: mergedConfidence };
+  return {
+    patient_status, cost_usd: totalCost, field_count: totalFieldCount,
+    confidence_summary: mergedConfidence,
+    ...(incompleteRules.size > 0 ? { incomplete_rules: [...incompleteRules].sort() } : {}),
+  };
 }
 
 /**
@@ -1098,6 +1136,13 @@ async function runOneAgent(
   const { run_id: runId, task_id: taskId } = manifest;
   const task = loadCompiledTask(taskId);
   if (!task) throw new Error(`task ${taskId} not found at runtime`);
+
+  // Rules left unjudged because their own question was never committed. Computed
+  // deep in the adherence branch below; held at function scope so it can reach
+  // this agent's result, where it becomes the run's honest status. Before this
+  // it existed only as a transcript line, so a half-finished round reported
+  // exactly like a complete one.
+  let incompleteRules: string[] = [];
 
   // PHI patients run on the HIPAA-eligible model, never the default backend.
   // Throws (patient errors loudly) if PHI but CHART_REVIEW_PHI_MODEL is unset.
@@ -1753,6 +1798,7 @@ async function runOneAgent(
           const which = ruleVerdicts
             .filter((v) => v.rationale?.startsWith(ENGINE_PERIOD_UNANSWERED_REASON))
             .map((v) => v.rule_id);
+          incompleteRules = which;
           try {
             fs.appendFileSync(agentTranscriptPath(runId, patientId, spec.id), JSON.stringify({
               ts: new Date().toISOString(), type: "text",
@@ -2083,7 +2129,11 @@ async function runOneAgent(
     }
   } catch { /* leave unset */ }
 
-  return { status: "ok", cost_usd: cost, field_count: fieldCount, confidence_summary: confidenceSummary };
+  return {
+    status: "ok", cost_usd: cost, field_count: fieldCount,
+    confidence_summary: confidenceSummary,
+    ...(incompleteRules.length > 0 ? { incomplete_rules: incompleteRules } : {}),
+  };
 }
 
 /** When a manifest has exactly one agent, also write the agent's draft to the legacy
