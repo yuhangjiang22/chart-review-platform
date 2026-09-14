@@ -90,6 +90,35 @@ export function expandEventWorklist(
   return out;
 }
 
+/** The anchor-list names this rule set reads, deduplicated and sorted. */
+export function requiredAnchorLists(rules: RuleDefinition[]): string[] {
+  const out = new Set<string>();
+  for (const rule of rules) {
+    if (!rule.event_anchor) continue;
+    const lists = Array.isArray(rule.event_anchor) ? rule.event_anchor : [rule.event_anchor];
+    for (const name of lists) out.add(name);
+  }
+  return [...out].sort();
+}
+
+/** Required anchor lists that are ABSENT from `anchors` — the key is missing,
+ *  not merely empty.
+ *
+ *  The distinction is the whole point. A list that is present but empty is a
+ *  legitimate fact about the patient: no exacerbations, no obligation point,
+ *  and every rule anchored on it correctly gets zero events and rolls up
+ *  EXCLUDED. A list that is missing means the ETL did not produce it (or the
+ *  corpus predates it, or the anchors dir was never written), and the same
+ *  EXCLUDED roll-up is then a denominator that silently collapsed — measured:
+ *  four of twelve rules vanished from a run that reported complete, with every
+ *  answer at high confidence and no line anywhere saying why. */
+export function missingAnchorLists(
+  rules: RuleDefinition[],
+  anchors: Record<string, AnchorEntry[]>,
+): string[] {
+  return requiredAnchorLists(rules).filter((name) => !(name in anchors));
+}
+
 /** Stable hash of a work-list's sorted event_ids — the cheap "did the two
  *  seeds land on the same denominator" signal stamped into
  *  RuleEventsProvenance.worklist_hash by both seed sites (the agent

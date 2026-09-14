@@ -1382,13 +1382,46 @@ async function runOneAgent(
       // same lexical scope, no need to re-load/re-derive.
       const {
         loadAdherenceSkill, expandEventWorklist, toAnchorEntries, buildEventWorklistBlock,
-        computeWorklistHash,
+        computeWorklistHash, missingAnchorLists,
       } = await import("@chart-review/pipeline-extract-adherence");
       const skill = loadAdherenceSkill(taskId);
       const rawAnchors = readAnchors(patientId);
       const anchorEntries = Object.fromEntries(
         Object.entries(rawAnchors).map(([k, v]) => [k, toAnchorEntries(v)]),
       );
+      // REFUSE TO RUN WITHOUT THE ANCHOR LISTS THE RULES READ. Same shape as the
+      // PHI-model check above: fail this patient loudly before any model time is
+      // spent, rather than produce an artifact that is wrong in a way nothing
+      // downstream can see.
+      //
+      // What happened without this, measured on a stripped copy of a real
+      // patient: readAnchors returned {} in silence, every anchored rule expanded
+      // to zero events and rolled up EXCLUDED, the per-event step dropped out of
+      // the prompt while the instructions still pointed at it, and the run
+      // reported complete — 14 answers, all high confidence, a third of the
+      // rubric gone. The `incomplete_rules` check does not catch it, because it
+      // counts questions never committed, not rules that had nothing to judge.
+      // A site whose ETL did not write anchors would ship that as a clean run.
+      //
+      // Only ABSENT lists refuse. A list the ETL produced as [] is a fact about
+      // the patient (no exacerbations, no obligation point) and its rules are
+      // correctly EXCLUDED — see missingAnchorLists.
+      const missingAnchors = missingAnchorLists(skill.rules, anchorEntries);
+      if (missingAnchors.length > 0) {
+        // Count RULES, not lists: four rules read these three lists.
+        const affected = skill.rules.filter((r) => {
+          const lists = Array.isArray(r.event_anchor) ? r.event_anchor : r.event_anchor ? [r.event_anchor] : [];
+          return lists.some((l) => missingAnchors.includes(l));
+        });
+        throw new Error(
+          `patient ${patientId} has no anchor list(s) ${missingAnchors.join(", ")} but ` +
+            `task ${taskId} has rules anchored on them — ${affected.length} of ` +
+            `${skill.rules.length} rules would silently roll up EXCLUDED. Run the ETL ` +
+            "(derive_anchors.py writes anchors/<name>.json); check " +
+            "rule_events_provenance.anchor_lists on any existing draft to see what the " +
+            "seed actually received.",
+        );
+      }
       const eventWorklist = expandEventWorklist(skill.rules, anchorEntries);
       // Provenance stamp (spec 2026-08-24 Task 5 review, Important 2): an
       // ETL re-run or rubric bump between THIS agent seed and a later

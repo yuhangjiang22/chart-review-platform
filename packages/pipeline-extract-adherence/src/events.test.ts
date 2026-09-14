@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 import type { RuleDefinition } from "@chart-review/rule-engine";
-import { expandEventWorklist, toAnchorEntries, type AnchorEntry } from "./events.js";
+import {
+  expandEventWorklist, toAnchorEntries, requiredAnchorLists, missingAnchorLists,
+  type AnchorEntry,
+} from "./events.js";
 
 const anchoredRule: RuleDefinition = {
   rule_id: "R-Step",
@@ -181,5 +184,40 @@ describe("occasion invariant over the real rubric + corpus anchors", () => {
       ],
     });
     expect(wl.map((e) => e.event_id)).toEqual(["R-Step@2025-11-15@encounters:1"]);
+  });
+});
+
+// A MISSING anchor list is not an EMPTY one, and only the first is an error.
+//
+// With no anchors at all, every anchored rule expands to zero events, rolls up
+// EXCLUDED, and the run reports complete — every answer high-confidence, a
+// third of the rubric gone, and nothing anywhere saying so. That is a
+// denominator that collapsed silently. But a list the ETL produced as [] is a
+// real fact about the patient (no exacerbations), and refusing it would fail
+// every healthy child. The seed step refuses only the first.
+describe("requiredAnchorLists / missingAnchorLists", () => {
+  const rules = [anchoredRule, multiAnchorRule, windowRule];
+
+  it("lists the anchor names the rules read, deduplicated and sorted", () => {
+    expect(requiredAnchorLists(rules)).toEqual(["bursts", "visits"]);
+  });
+
+  it("a window-only rule set requires nothing", () => {
+    expect(requiredAnchorLists([windowRule])).toEqual([]);
+    expect(missingAnchorLists([windowRule], {})).toEqual([]);
+  });
+
+  it("reports a list whose key is absent", () => {
+    expect(missingAnchorLists(rules, { visits: anchors.visits })).toEqual(["bursts"]);
+    expect(missingAnchorLists(rules, {})).toEqual(["bursts", "visits"]);
+  });
+
+  it("does NOT report a list that is present but empty", () => {
+    // The ETL ran and found nothing — a legitimate patient, not a broken corpus.
+    expect(missingAnchorLists(rules, { visits: [], bursts: [] })).toEqual([]);
+  });
+
+  it("nothing missing when every list is present", () => {
+    expect(missingAnchorLists(rules, anchors)).toEqual([]);
   });
 });
