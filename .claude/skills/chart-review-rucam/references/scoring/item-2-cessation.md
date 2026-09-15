@@ -9,53 +9,58 @@
 - D_stop is the relevant episode's `end_day` (or earlier note-based stop if documented)
 
 **IMPORTANT — what "drug continued" means**:
-- "Drug continued" means the drug was **NEVER stopped** within the observation window — i.e., NO end date for the relevant episode at any point through the available follow-up. This is the only case that maps to `dechallenge_outcome = not_stopped`.
+- "Drug continued" means the drug was **NEVER stopped** within the observation window — i.e., NO end date for the relevant episode at any point through the available follow-up. This is the only case that triggers `score = 0, stop`.
 - `ACTIVE_AT_LIVER_INJURY=1` alone does **NOT** mean "drug continued" — it only flags active-at-T0. If the drug was stopped LATER (any time after T0), dechallenge IS assessable.
 - A drug `ongoing_at_t0` with a finite `end_day` (e.g., end_day=+46) = stopped after onset → proceed to scoring with D_stop = end_day.
 
-If drug truly continued (no end_day in any episode AND no note evidence of cessation): **commit `dechallenge_outcome = not_stopped` and stop** (no peak/nadir work needed).
+If drug truly continued (no end_day in any episode AND no note evidence of cessation): **score = 0, stop.**
 
 Otherwise — including drug stopped before OR after T0 — proceed to Step 2.
 
 ### Step 2 — Get peak anchor lab(s) — use `get_lab_extremum`
 Anchor labs per track:
 - Hepatocellular: `ALT`
-- **Cholestatic/Mixed: BOTH `ALP` AND `bilirubin_total` — compute score for each and take the best (highest).** Do not skip bilirubin just because ALP is available.
+- **Cholestatic/Mixed: BOTH ALP AND total bilirubin — compute score for each and take the best (highest).** Do not skip bilirubin just because ALP is available.
+
+**Lab names vary by dataset** (bilirubin may be `BILI`, `bilirubin`, `TBILI`, …). Call `get_lft_series(person_id)` without a `lab_name` filter to see the actual `LAB_NAME` values, then use the exact string present. Never conclude a lab is missing without checking the real names first.
 
 ULN defaults: ALT = 52, ALP = 125 (the tool returns per-row `uln` from the data when present).
 
 **Peak call (let `D_stop` = drug stop day from T0; negative if stopped before onset):**
 - Drug stopped **after** onset (D_stop ≥ 0): `get_lab_extremum(lab_name=<anchor>, stat="max", day_min=0, day_max=D_stop)`
-- Drug stopped **before** onset (D_stop < 0): `get_lab_extremum(lab_name=<anchor>, stat="max", day_min=D_stop+1, day_max=0)`
+- Drug stopped **before** onset (D_stop < 0): peak = **onset value** (the lab value at T0, not the post-stop maximum). Use `get_lab_extremum(stat="max", day_min=0, day_max=0)`; if no value at day 0, use the nearest available value within ±3 days of T0 from `get_lft_series`.
 
-### Step 3 — Find the nadir in the dechallenge window — use `get_lab_extremum`
-**Use the minimum anchor-lab value inside each applicable dechallenge window.** The window starts at the later of the drug stop date or T0. If the drug was stopped before liver injury onset, start at T0 so that pre-onset laboratory values are not included. Use the tool directly — do not scan the series manually.
+### Step 3 — Check each scoring window independently — use `get_lab_extremum`
 
-Define:
-- `W_start=max(D_stop+1, 0)`
-Window (in days from T0, i.e. DAYS_FROM_LIVER_INJURY) for each scoring tier:
-- Hepatocellular +3: `day_min=W_start, day_max=D_stop+8` → `get_lab_extremum("ALT","min",...)`
-- Hepatocellular +2: `day_min=W_start, day_max=D_stop+30`
-- Hepatocellular >30: `day_min=max(W_start, D_stop+1)` (no upper bound)
-- Cholestatic/Mixed: `day_min=W_start, day_max=D_stop+180` (run once for ALP, once for bilirubin_total)
+**Key principle:** Check each tier's window independently, from most strict to least strict. A tier is met if **any** value in that window achieves ≥50% decrease from peak. Use `get_lab_extremum(stat="min")` for each window separately — if the minimum of a window achieves ≥50% decrease, at least one value in that window meets the threshold.
 
-% decrease = (peak − nadir) / peak × 100. Compare to 50% threshold.
+% decrease = (peak − value) / peak × 100.
 
-**Important:** The overall nadir may occur much later than the first value that reaches a ≥ 50% decrease. Use the minimum value to determine whether the threshold was reached within each window, but use the **earliest laboratory date within that window that meets the ≥ 50% threshold** to determine the outcome bucket.
+**Hepatocellular — check in this order, stop at first tier met:**
+1. +3 window `[D_stop+1, D_stop+8]`: `get_lab_extremum("ALT","min", day_min=D_stop+1, day_max=D_stop+8)` — if min achieves ≥50% decrease → **+3**
+2. +2 window `[D_stop+9, D_stop+30]`: `get_lab_extremum("ALT","min", day_min=D_stop+9, day_max=D_stop+30)` — if min achieves ≥50% decrease → **+2**
+3. >30 window `[D_stop+31, ∞]`: `get_lab_extremum("ALT","min", day_min=D_stop+31)` — if min achieves ≥50% decrease → **0**
+4. If no window achieves ≥50% decrease, or no follow-up data → **−2** (recurrent increase or no improvement) or **0** (truly no data)
 
-### Step 4 — Commit the component (do NOT score)
-From the peak → follow-up % decrease and the **earliest date on which a ≥ 50% decrease is reached** (measured from the drug stop date), determine ONE outcome bucket. If the drug was stopped before T0, begin evaluating the course at T0, but retain the drug stop date for determining the elapsed dechallenge interval. The platform's `item_2_course` derivation applies the track-specific score. For cholestatic/mixed, evaluate ALP and bilirubin separately and report the **best** qualifying bucket based on the earliest ≥ 50% decrease; if neither reaches 50%, use the larger observed decrease.
+**Cholestatic/Mixed — run for ALP AND total bilirubin separately (use the exact lab names found in the data); take the BEST score:**
+- `get_lab_extremum(<anchor>,"min", day_min=D_stop+1, day_max=D_stop+180)` — if any value achieves ≥50% decrease in this window → **+2**
+- <50% decrease in both within 180 days → **+1**
+- Persistence/increase in both, or no follow-up data for **both** → **0**
 
-→ **Commit `dechallenge_outcome`** =
-- `ge50_le8d` — ≥ 50% decrease first reached within 8 days of drug stop
-- `ge50_le30d` — ≥ 50% decrease first reached within 30 days of drug stop, but not within 8 days
-- `ge50_le180d` — ≥ 50% decrease first reached after 30 days but within 180 days of drug stop
-- `lt50_with_data` — follow-up data exist but the decrease stays < 50%
-- `increase` — the anchor lab rises / recurs after the drug stop
-- `no_followup` — the drug was stopped but there are no follow-up labs to judge the course
-- (`not_stopped` was already handled in Step 1 if the drug never stopped)
+### Step 4 — Score by track
 
-Report the bucket only — the +3/+2/0/−2/+1 mapping is the platform's job.
+**Hepatocellular (ALT):**
+- ≥50% decrease achieved by any value within 8 days of drug stop → **+3**
+- ≥50% decrease achieved by any value within 30 days (not within 8) → **+2**
+- ≥50% decrease achieved only after 30 days, OR no follow-up data → **0**
+- <50% decrease after 30 days, OR recurrent increase → **−2**
+
+**Cholestatic/Mixed (ALP and total bilirubin, take BEST):**
+- ≥50% decrease in ALP OR bilirubin achieved by any value within 180 days → **+2**
+- <50% decrease in both ALP and bilirubin within 180 days → **+1**
+- Persistence/increase in both, or no follow-up data for **both** → **0**
+
+**If only one anchor has data**, score from that anchor alone — do not drop to 0 because the other is missing.
 
 ### Note review — Item 2
 - Keywords: drug name, "discontinued", "stopped", "held", "DC'd", "resumed", "restarted", "STOP taking"
@@ -65,7 +70,18 @@ Report the bucket only — the +3/+2/0/−2/+1 mapping is the platform's job.
 ### Common mistakes
 - **Treating `ACTIVE_AT_LIVER_INJURY=1` as "drug continued"**: this flag only means active at T0. If the drug stopped LATER (e.g., end_day=+46), dechallenge IS assessable — use D_stop = end_day. "Drug continued" only applies when the drug was never stopped.
 - Peak = all post-T0 max: wrong — peak is capped at drug stop date (for drug stopped after onset).
-- Assuming T0 value is the peak when drug stopped before onset: always scan the full post-stop series — a later value may be higher.
+- **Wrong peak for D_stop < 0**: when drug stopped before onset, peak = onset value (T0), NOT the post-stop maximum. Use `get_lab_extremum(stat="max", day_min=0, day_max=0)`.
 - Counting days from T0 instead of from drug stop: dechallenge window starts at drug stop.
-- **Picking an arbitrary follow-up value instead of the nadir**: the % decrease is (peak − MIN value in window) / peak. Scan every value in the window — a later value may be lower than the one you first looked at.
+- **Checking one combined window instead of tier windows separately**: run `get_lab_extremum("min")` for each tier's specific window ([D_stop+1, D_stop+8], then [D_stop+9, D_stop+30], then [D_stop+31, ∞]) in order and stop at the first that achieves ≥50% decrease.
 - **Skipping bilirubin for cholestatic/mixed**: the guideline says "ALP or total bilirubin" — check BOTH and use whichever gives the better score. Do not skip bilirubin just because ALP is available.
+- **Declaring a lab unavailable because of its name**: a name mismatch is not missing data. List the actual `LAB_NAME` values first.
+- **Scoring 0 because one anchor is missing**: score from the anchor that has data; 0 requires both to lack follow-up.
+
+## Committing this item on the platform
+
+**Do not answer `item_2_course` — it is computed.** The scoring thresholds above tell you
+what the score *will* be; the platform applies them. What you commit is
+`dechallenge_outcome`, and the `item_2_course` derivation turns
+those into the score. `list_criteria` shows the exact leaf fields and their
+allowed values. Calling `set_field_assessment` on `item_2_course`,
+`rucam_total_score` or `rucam_causality_category` is always wrong.

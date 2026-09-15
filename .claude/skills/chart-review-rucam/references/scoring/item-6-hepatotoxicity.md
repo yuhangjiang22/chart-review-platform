@@ -6,34 +6,37 @@
 
 ### Step 1 — Get drug name
 - `get_suspect_drug` → `SELECTED_DRUG`
-- If no suspect drug is available (e.g. `no_dili_drug_records` stratum) → commit `hepatotoxicity_class = none`.
+- If no suspect drug is available (e.g. `no_dili_drug_records` stratum) → score 0.
 
 ### Step 2 — Look up LiverTox category
 - `get_hepatotoxicity_category(drug_name)` → returns `{drug, brand, category, score, chapter, matched_on}`
 - The masterlist is the complete LiverTox catalog (1,715 drugs as of Jan 2026). Substring-matches ingredient or brand; handles combination drugs (e.g. `Sulfamethoxazole/Trimethoprim`) by splitting on `/` and returning the highest-scoring component.
 
-### Step 3 — Commit the component (do NOT score)
-Map the LiverTox category the tool returned to the `hepatotoxicity_class` bucket;
-the platform's `item_6_hepatotoxicity` derivation applies the +2/+1/0 score.
+### Step 3 — Score
 
-→ **Commit `hepatotoxicity_class`** =
-| LiverTox Category | `hepatotoxicity_class` | Meaning |
+| LiverTox Category | RUCAM Score | Meaning |
 |---|---|---|
-| **A** | `labeled` | Well-known hepatotoxin — FDA-labeled |
-| **B** | `probable` | Probable — published case reports, not on label |
-| **C, D, E, E\*** | `none` | Possible / unlikely / no convincing evidence |
-| Not listed | `none` | Drug absent from LiverTox |
+| **A** | **+2** | Well-known hepatotoxin — FDA-labeled |
+| **B** | **+1** | Probable — published case reports, not on label |
+| **C, D, E, E*** | **0** | Possible / unlikely / no convincing evidence |
+| Not listed | **0** | Drug absent from LiverTox — score 0 |
 
-**Read the category off the tool directly.** The masterlist is authoritative. No
-internet lookup is available, so do not claim FDA label or literature evidence that
-isn't in the masterlist or explicitly documented in the patient's notes.
+**Use the `score` field returned by the tool directly.** The masterlist is authoritative. No internet lookup is available, so do not claim FDA label or literature evidence that isn't in the masterlist or explicitly documented in the patient's notes.
 
 ### Step 4 — Optional note review
 - Keywords: drug name + "hepatotoxic", "liver injury", "DILI", "transaminase"
 - Notes rarely change the score (the masterlist is authoritative). The only situation where notes can upgrade the score: a clinician in this patient's chart explicitly documents the drug is known to cause DILI (e.g. "held Bactrim given known hepatotoxicity"). Parametric recall is not evidence.
 
 ### Common mistakes
-- Mapping Category B to `labeled`: B → `probable` (published but not labeled).
-- Committing `labeled`/`probable` for a drug not in the masterlist based on memory — commit `none` and note the drug was not found.
+- Scoring +2 for Category B: B → +1 (published but not labeled).
+- Assigning +1 or +2 for a drug not in the masterlist based on memory — score 0 and note the drug was not found.
 - Forgetting to split combination drugs on `/` — the tool handles this automatically.
-- Trying to output a +1/+2 score: commit the `hepatotoxicity_class` bucket only.
+
+## Committing this item on the platform
+
+**Do not answer `item_6_hepatotoxicity` — it is computed.** The scoring thresholds above tell you
+what the score *will* be; the platform applies them. What you commit is
+`hepatotoxicity_class`, and the `item_6_hepatotoxicity` derivation turns
+those into the score. `list_criteria` shows the exact leaf fields and their
+allowed values. Calling `set_field_assessment` on `item_6_hepatotoxicity`,
+`rucam_total_score` or `rucam_causality_category` is always wrong.

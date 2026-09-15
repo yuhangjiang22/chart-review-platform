@@ -5,30 +5,50 @@
 ### Step 1 — Check structured flag
 - `get_patient_summary` → `rechallenge_flag`
 
-### Step 2 — Always check notes regardless of flag
-- The structured flag may be miscoded (false negatives are common)
-- Keywords: "rechallenge", "re-exposure", "restarted", "resumed", "inadvertent", "took again", drug name + "again"
+### Step 2 — Identify re-exposure episodes from both structured data and notes
+- **Structured**: `get_drug_episodes(drug_name=<SELECTED_DRUG>)` — any episode after the original T0 episode is a potential re-exposure
+- **Notes**: search regardless of flag (may be miscoded). Keywords: "rechallenge", "re-exposure", "restarted", "resumed", "inadvertent", "took again", drug name + "again"
 
-### Step 3 — Validate rechallenge gap
-- Valid rechallenge requires **≥ 45 days** between T0 and re-exposure
-- Re-exposure within 45 days of T0 does NOT qualify (may be continuation of injury)
+There may be multiple re-exposure episodes — check **each one** independently.
 
-### Step 4 — Commit the component (do NOT score)
-Determine ONE rechallenge outcome; the platform's `item_7_rechallenge` derivation
-applies the +3/+1/−2/0 score. Anchor lab: ALT for hepatocellular; ALP (or
-bilirubin) for cholestatic/mixed.
+**Key terms:**
+- **D_stop_prev** = the stop date of the drug episode immediately preceding each re-exposure (could be the original T0 stop, or the stop after a prior re-exposure)
+- **D_stop_rechallenge** = the stop date of that specific re-exposure episode (when the drug was stopped again after re-exposure)
 
-→ **Commit `rechallenge_result`** =
-- `none_or_insufficient` — `rechallenge_flag=0` AND no note evidence; OR re-exposure confirmed but the lab data are insufficient to judge (this is the default)
-- `positive_alone` — re-exposure confirmed (gap ≥ 45 days from T0), anchor lab doubled, suspect drug **alone**
-- `positive_with_codrug` — same, but a co-drug was also present at re-exposure
-- `below_uln` — re-exposure with an increase that stays below ULN
+### Step 3 — Validate rechallenge gap (per re-exposure)
+For each re-exposure episode:
+- Gap = re-exposure start date − **D_stop_prev**
+- Valid rechallenge requires gap **> 45 days**
+- Gap ≤ 45 days → continuous use, not a true rechallenge → skip this episode
 
-Only `positive_*` / `below_uln` require a confirmed re-exposure with a ≥ 45-day gap;
-everything else is `none_or_insufficient`.
+### Step 4 — Score
+If `rechallenge_flag=0` AND no note evidence → **score = 0**, stop.
+
+For each valid re-exposure episode (gap > 45 days), assess the lab response and assign the best score across all episodes:
+
+| Condition | Score |
+|---|---|
+| Anchor lab doubled; suspect drug alone | +3 |
+| Anchor lab doubled; co-drug also present | +1 |
+| Any uptick in anchor lab after re-exposure but remains below ULN | -2 |
+| Re-exposure confirmed; lab data insufficient | 0 |
+
+Anchor lab: ALT for hepatocellular; ALP (or bilirubin) for cholestatic/mixed.
+
+**Definitions:**
+- **Baseline**: the closest anchor-lab record within 180 days before each re-exposure start. Use `get_lft_series(lab_name=<anchor>, day_max=<re-exposure start day - 1>)` and pick the record nearest to re-exposure.
+- **"Doubled"**: the anchor lab rises to ≥2× the baseline. Check lab values in the window [re-exposure start, **D_stop_rechallenge**] — after the drug is restarted and before it is stopped again.
 
 ### Common mistakes
 - Skipping notes when `rechallenge_flag=0`: inadvertent re-exposure is often only documented in notes.
-- Committing a `positive_*` result without verifying the 45-day gap.
+- Scoring without verifying the 45-day gap.
 - Using ALT for cholestatic/mixed track: use ALP or bilirubin.
-- Trying to output a +3/+1/−2 score: commit the `rechallenge_result` bucket only.
+
+## Committing this item on the platform
+
+**Do not answer `item_7_rechallenge` — it is computed.** The scoring thresholds above tell you
+what the score *will* be; the platform applies them. What you commit is
+`rechallenge_result`, and the `item_7_rechallenge` derivation turns
+those into the score. `list_criteria` shows the exact leaf fields and their
+allowed values. Calling `set_field_assessment` on `item_7_rechallenge`,
+`rucam_total_score` or `rucam_causality_category` is always wrong.

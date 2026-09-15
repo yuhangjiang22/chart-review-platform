@@ -2,30 +2,6 @@
 
 **Goal:** Systematically rule out alternative causes of liver injury.
 
-### Step 0 — MANDATORY: anchor on the structured floor (`score_item5_exclusion`)
-
-**Call `score_item5_exclusion(person_id)` FIRST.** It returns, from structured
-data, each cause's status under the strict rule (a NEGATIVE test = ruled out; a
-POSITIVE test / present diagnosis = a competing cause, NOT excluded; no test /
-flag = 0 = NOT ruled out). Item 5 is **decomposed** — you do not score it. You set
-one yes/no flag per cause (6 Group I + 5 Group II) plus `alt_cause_explains`, and
-the platform derives item_5 (+2 / +1 / 0 / −2, or −3) from your flags.
-
-**Each per-cause flag starts at the tool's status. You may only raise a flag to
-`yes` with evidence:**
-- **Set a flag to `yes`** only when the cause is ruled out — the tool marked it
-  ruled out (negative structured test), **or** you cite an explicit NOTE exclusion
-  (a negative test result in a note, or an explicit "denies / no evidence of …").
-  A structured flag of 0 is NOT enough — for a `not_assessed` cause you need a note
-  quote. **Never set a flag to `yes` without the evidence that justifies it.**
-- **Set `alt_cause_explains = yes`** if a `competing_cause` clearly explains the
-  injury (drives the −3 override).
-- If you cannot justify ruling a cause out, leave its flag `no`.
-
-This matters because asserting "all causes excluded" without the per-cause work is
-the most common error. Most causes are `not_assessed` in structured data, so a `yes`
-flag requires real note evidence.
-
 ### Step 1 — Collect structured flags (`get_patient_summary`)
 
 **Hypotension/shock/ischemia (within 2 weeks):**
@@ -67,22 +43,7 @@ Raw values and dates for: HAV_IgM, HBsAg, HBc_IgM, HCV_Ab, HCV_RNA, ANA, SMA, Ig
 **Three-way status — use exactly one label per cause:**
 - **(a) ruled out by objective testing** — test performed AND result negative (e.g., HAV_IgM tested and negative; imaging showing no biliary dilation)
 - **(b) explicitly absent by history/exam** — notes explicitly exclude it (e.g., "denies alcohol use × 3 years"); flag = 0 alone is NOT sufficient for (b)
-- **(c) not assessed / unknown** — no test, no explicit note exclusion; cannot be counted as ruled out
-
-**Reuse a negative result across causes — a documented negative is (a) even if it was
-ordered for another cause or is not labeled with this cause's name.** A negative result
-in the chart rules out its cause regardless of *why* it was drawn — do NOT downgrade a
-*present* negative to (c) just because no test or note names that specific cause:
-- negative **AMA** (usually from the autoimmune panel) → PBC = (a); a clean biliary tree on US/MRCP → PSC = (a)
-- negative **ANA / SMA / IgG** (or biopsy/hepatology assessment not AIH) → autoimmune = (a)
-- a hepatology/acute-hepatitis panel with negative **CMV/EBV/HSV** PCR or serology → acute viral = (a)
-- a documented negative **sepsis workup** (negative cultures, low/normal procalcitonin, or clinician documents no septic source / low suspicion) → sepsis = (a)
-- **no known chronic HBV/HCV history + negative HBsAg/anti-HCV** (or HBV DNA/HCV RNA) → chronic HBV/HCV = (a)
-
-This does NOT loosen the anti-fabrication rule above: you still need a **real, cited
-negative result** — genuinely absent data (no relevant test/note in the window) stays
-(c)/`no`. The fix is only that a negative already in the chart must be *credited*, not
-re-labeled "not assessed."
+- **(c) not assessed / unknown** — no test, no explicit note exclusion; absence of any evidence counts as ruled out
 
 **Record in structured_evidence for every Group I cause and Group II category** (even if −3 applies):
 ```
@@ -104,32 +65,11 @@ re-labeled "not assessed."
 - **PBC/PSC — window: T0 −365 to T0 +30 days.** Use `get_conditions` filtered to [-365, +30]; also search notes for "primary biliary", "PBC", "sclerosing cholangitis", "PSC", "AMA" (anti-mitochondrial Ab), "MRCP". Absence of any mention in this window → (c) not assessed.
 - **CMV / EBV / HSV acute — window: T0 ±30 days.** Check `CMV_acute_dx`, `EBV_acute_dx`, `HSV_hepatitis_dx` and the corresponding serologies (`CMV_IgM`, `EBV_VCA_IgM`, `HSV_PCR`, `CMV_PCR`, `EBV_PCR`) with measurement dates in [-30, +30].
 
-**What counts as ruled out:** Only (a) and (b). (c) = NOT ruled out.
+**What counts as ruled out:** (a), (b), and (c) all count as ruled out. A cause is NOT ruled out only when notes or structured data document an active diagnosis.
 Structured flag = 0 does NOT override notes — if notes document an active diagnosis, it is not ruled out.
 
-**Map each label to its flag** — (a) or (b) → `yes`; (c) → `no`. Commit one flag
-per cause (the platform counts them; `n_group1_ruled_out` and `group2_all_ruled_out`
-are derived — do not commit those):
-
-| Cause | Field to commit |
-|---|---|
-| Group I · HAV | `g1_hav_ruled_out` |
-| Group I · HBV | `g1_hbv_ruled_out` |
-| Group I · HCV | `g1_hcv_ruled_out` |
-| Group I · biliary obstruction | `g1_biliary_obstruction_ruled_out` |
-| Group I · alcoholism | `g1_alcoholism_ruled_out` |
-| Group I · hypotension/shock/ischemia | `g1_ischemia_ruled_out` |
-| Group II · autoimmune hepatitis | `g2_autoimmune_ruled_out` |
-| Group II · sepsis/bacteremia | `g2_sepsis_ruled_out` |
-| Group II · chronic HBV/HCV complications | `g2_chronic_hbv_hcv_ruled_out` |
-| Group II · PBC/PSC | `g2_pbc_psc_ruled_out` |
-| Group II · acute CMV/EBV/HSV | `g2_cmv_ebv_hsv_ruled_out` |
-
-Commit **all 11** flags, even a `no` — a missing flag leaves item 5 Pending.
-
-### Step 6 — Decide `alt_cause_explains` (the −3 override)
-Set **`alt_cause_explains = yes`** when a non-drug cause is highly probable —
-i.e. it is *sufficient to account for the injury* — using this standard:
+### Step 6 — Check for −3 first (before counting)
+Score **−3 = non-drug cause highly probable** using this standard:
 
 > **Clear alternative diagnosis explains the liver injury pattern, or there is strong evidence of another severe non-drug cause that is sufficient to account for the injury.**
 
@@ -144,17 +84,16 @@ Apply the standard — do not require a specific keyword. The evidence must be *
 - Labs are inconclusive (e.g., viral serology "pending")
 - Only a risk factor is present (e.g., chronic HCV without evidence of flare/decompensation at T0)
 
-Set `alt_cause_explains = no` otherwise. (When it is `yes`, the platform derives
-item_5 = −3 regardless of the ruled-out counts — but still commit every flag.)
+If −3 applies, stop — do not proceed to Group I counting.
 
-### Step 7 — Commit the components (do NOT score or count)
-→ **Commit all 11 per-cause flags** (`g1_*` ×6, `g2_*` ×5) as `yes`/`no` per the
-Step 5 mapping, plus **`alt_cause_explains`** (`yes`/`no`) from Step 6.
+### Step 7 — Count Group I (only if −3 does not apply)
 
-The platform counts your Group I flags into `n_group1_ruled_out`, gates Group II
-into `group2_all_ruled_out`, and derives item_5 (all-I-and-II → +2, all-I → +1,
-4–5 of I → 0, <4 → −2; `alt_cause_explains=yes` → −3). **Do not** compute or commit
-`item_5_exclusion`, `n_group1_ruled_out`, or `group2_all_ruled_out` — they are derived.
+**Reminder:** (a), (b), and (c) ALL count as ruled out. A cause is NOT ruled out only when notes or structured data document an active diagnosis.
+
+- All Group I + Group II ruled out (any mix of a/b/c, no active diagnosis documented for any cause) → **+2**
+- All 6 Group I ruled out AND at least one Group II has an active diagnosis documented (not merely untested/unlabeled) → **+1**
+- 5 or 4 Group I ruled out → **0**
+- Fewer than 4 Group I ruled out → **-2**
 
 ### Common mistakes
 - Stopping note reads early once −3 evidence is found: read ALL notes in the window — a later note may change a (c) to (a) or (b).
@@ -164,3 +103,13 @@ into `group2_all_ruled_out`, and derives item_5 (all-I-and-II → +2, all-I → 
 - Trusting structured flags over notes: sepsis_dx=0 does not mean sepsis did not occur.
 - Not calling both serology AND lft_series for blood alcohol.
 - Skipping notes for biliary obstruction: imaging reports are often only in notes.
+- Treating Group II (c) as "uncertain" and scoring +1 instead of +2: (c) = ruled out. Score +2 when all Group I and Group II are (a), (b), or (c) with no active diagnosis documented for any cause.
+
+## Committing this item on the platform
+
+**Do not answer `item_5_exclusion` — it is computed.** The scoring thresholds above tell you
+what the score *will* be; the platform applies them. What you commit is
+the six `g1_*_ruled_out` flags, the five `g2_*_ruled_out` flags, `group2_all_ruled_out` and `alt_cause_explains`, and the `item_5_exclusion` derivation turns
+those into the score. `list_criteria` shows the exact leaf fields and their
+allowed values. Calling `set_field_assessment` on `item_5_exclusion`,
+`rucam_total_score` or `rucam_causality_category` is always wrong.

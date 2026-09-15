@@ -28,25 +28,27 @@ Pick the episode containing T0 (`ongoing_at_t0`); if none, pick the most recent 
 
 **NOT CALCULABLE (scoreable=False):** All episodes are `started_after` (reaction before drug started)
 
-### Step 4 — Commit the components (do NOT score)
-Map the path you chose in Step 3 to the two component fields; the platform's
-`item_1_time_to_onset` derivation applies the latency bands per track.
+### Step 4 — Score by track
 
-→ **Commit `onset_path`** =
-- `initial_treatment` — Path A, initial treatment (episode `ongoing_at_t0`, single episode or `n_fills > 1`)
-- `re_exposure` — Path A, re-exposure (a second `ongoing_at_t0` episode after an earlier `stopped_before` episode, gap > 45 days)
-- `from_cessation` — Path B (relevant episode is `stopped_before`)
-- `not_calculable` — all episodes `started_after` T0, or no suspect drug
+**Hepatocellular (R > 5):**
+| Path | Latency | Score |
+|---|---|---|
+| A, initial treatment | 5–90 days | +2 |
+| A, initial treatment | <5 or >90 days | +1 |
+| A, re-exposure | 1–15 days | +2 |
+| A, re-exposure | >15 days | +1 |
+| B | ≤15 days | +1 |
+| B | >15 days | NOT CALCULABLE |
 
-→ **Commit `onset_latency_days`** = the raw latency in days — **ALWAYS a concrete
-integer, NEVER null**:
-- Path A: `-start_day` (episode start → T0)
-- Path B: `-end_day` (drug stop → T0)
-- `not_calculable`: commit **`0`**. (Item 1 scores 0 regardless of the number, but a
-  **null** here leaves Item 1 — and therefore `rucam_total_score` and
-  `rucam_causality_category` — stuck at *Pending*. Always commit `0`, not null.)
-
-Report the raw number — do **not** bucket it or convert it to a score.
+**Cholestatic/Mixed (R ≤ 5):**
+| Path | Latency | Score |
+|---|---|---|
+| A, initial treatment | 5–90 days | +2 |
+| A, initial treatment | <5 or >90 days | +1 |
+| A, re-exposure | 1–90 days | +2 |
+| A, re-exposure | >90 days | +1 |
+| B | ≤30 days | +1 |
+| B | >30 days | NOT CALCULABLE |
 
 ### Note review — Item 1
 - Search notes for drug start/stop dates that may differ from structured data
@@ -58,3 +60,12 @@ Report the raw number — do **not** bucket it or convert it to a score.
 - Building episodes manually from `get_medications`: use `get_drug_episodes` instead — it applies the 45-day gap rule, DAYS_SUPPLY_VAL fallback, and combination-drug splitting deterministically.
 - Ignoring Path B: if the relevant episode is `stopped_before`, do NOT default to Path A.
 - Search for alternative suspect drug: Do not search for an alternative suspect drug if no suspect drug is provided. If no suspect drug is available, mark the case as `NOT CALCULABLE`.
+
+## Committing this item on the platform
+
+**Do not answer `item_1_time_to_onset` — it is computed.** The scoring thresholds above tell you
+what the score *will* be; the platform applies them. What you commit is
+`injury_track` and `onset_timing_band` (plus `rechallenge_flag` where the episode is a re-exposure), and the `item_1_time_to_onset` derivation turns
+those into the score. `list_criteria` shows the exact leaf fields and their
+allowed values. Calling `set_field_assessment` on `item_1_time_to_onset`,
+`rucam_total_score` or `rucam_causality_category` is always wrong.

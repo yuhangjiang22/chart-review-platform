@@ -14,7 +14,8 @@ role: intermediate
 
 Group I cause 2 of 6 — **acute hepatitis B** within T0 ± 30 days. `yes` only if
 **(a)** ruled out by objective testing (HBsAg and anti-HBc IgM negative) or **(b)**
-explicitly excluded by a note. `no` if not assessed, indeterminate, or present.
+explicitly excluded by a note. `no` ONLY when an active diagnosis is documented. Untested / not assessed
+counts as ruled out — see `references/scoring/item-5-exclusion.md` ((c)).
 
 ## Extraction guidance
 

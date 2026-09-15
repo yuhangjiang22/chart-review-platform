@@ -14,8 +14,8 @@ role: intermediate
 
 Group II cause 1 of 5 — **autoimmune hepatitis**, window T0 − 365 to T0 + 30 days.
 `yes` only if **(a)** ruled out by objective testing (negative ANA / SMA / IgG, or
-a biopsy not consistent with AIH) or **(b)** explicitly excluded by a note. `no` if
-not assessed, indeterminate, or present.
+a biopsy not consistent with AIH) or **(b)** explicitly excluded by a note. `no` ONLY when an active diagnosis is documented. Untested / not assessed
+counts as ruled out — see `references/scoring/item-5-exclusion.md` ((c)).
 
 ## Extraction guidance
 

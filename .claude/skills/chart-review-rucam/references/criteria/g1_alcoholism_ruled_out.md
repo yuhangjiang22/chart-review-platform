@@ -15,7 +15,8 @@ role: intermediate
 Group I cause 5 of 6 — **alcoholism / alcoholic liver injury**, window T0 − 365 to
 T0 + 30 days. `yes` only if **(a)** ruled out by objective evidence (e.g. negative
 blood alcohol, AST:ALT < 2 with no alcohol history) or **(b)** explicitly excluded by
-a note ("denies alcohol use"). `no` if not assessed, indeterminate, or present.
+a note ("denies alcohol use"). `no` ONLY when an active diagnosis is documented. Untested / not assessed
+counts as ruled out — see `references/scoring/item-5-exclusion.md` ((c)).
 
 ## Extraction guidance
 

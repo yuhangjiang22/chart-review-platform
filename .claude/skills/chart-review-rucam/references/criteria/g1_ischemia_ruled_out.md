@@ -15,7 +15,8 @@ role: intermediate
 Group I cause 6 of 6 — **hypotension / shock / ischemic hepatitis ("shock liver")**
 within T0 ± 2 weeks. `yes` only if **(a)** ruled out by objective evidence (no
 hypotension/shock episode in the window) or **(b)** explicitly excluded by a note.
-`no` if not assessed, indeterminate, or present (a documented hypotensive/shock event).
+`no` ONLY when an active diagnosis is documented. Untested / not assessed
+counts as ruled out — see `references/scoring/item-5-exclusion.md` ((c)). A documented hypotensive / shock event IS an active diagnosis.
 
 ## Extraction guidance
 

@@ -15,7 +15,8 @@ role: intermediate
 Group II cause 4 of 5 — **primary biliary cholangitis (PBC) / primary sclerosing
 cholangitis (PSC)**, window T0 − 365 to T0 + 30 days. `yes` only if **(a)** ruled out
 by objective evidence (negative AMA, MRCP without PSC changes) or **(b)** explicitly
-excluded by a note. `no` if not assessed, indeterminate, or present. Absence of any
+excluded by a note. `no` ONLY when an active diagnosis is documented. Untested / not assessed
+counts as ruled out — see `references/scoring/item-5-exclusion.md` ((c)). Absence of any
 mention in the window is "not assessed" → `no`.
 
 ## Extraction guidance

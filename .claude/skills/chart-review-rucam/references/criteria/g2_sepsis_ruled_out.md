@@ -15,7 +15,8 @@ role: intermediate
 Group II cause 2 of 5 — **sepsis / bacteremia** (a plausible non-drug cause of a
 transaminitis), window T0 − 365 to T0 + 30 days. `yes` only if **(a)** ruled out by
 workup (no septic episode / negative cultures in the window) or **(b)** explicitly
-excluded by a note. `no` if not assessed, indeterminate, or present.
+excluded by a note. `no` ONLY when an active diagnosis is documented. Untested / not assessed
+counts as ruled out — see `references/scoring/item-5-exclusion.md` ((c)).
 
 ## Extraction guidance
 

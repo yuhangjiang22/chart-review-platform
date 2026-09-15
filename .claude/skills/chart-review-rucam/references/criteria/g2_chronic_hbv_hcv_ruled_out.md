@@ -14,9 +14,8 @@ role: intermediate
 
 Group II cause 3 of 5 — **chronic hepatitis B/C complications** (flare, decompensation,
 cirrhosis of a known chronic HBV/HCV), window T0 − 365 to T0 + 30 days. `yes` only if
-**(a)** ruled out by objective evidence or **(b)** explicitly excluded by a note. `no`
-if not assessed, indeterminate, or present (a recent flare/decompensation in the window
-is a plausible non-drug cause).
+**(a)** ruled out by objective evidence or **(b)** explicitly excluded by a note. `no` ONLY when an active diagnosis is documented. Untested / not assessed
+counts as ruled out — see `references/scoring/item-5-exclusion.md` ((c)). A recent flare / decompensation in the window IS an active diagnosis.
 
 ## Extraction guidance
 

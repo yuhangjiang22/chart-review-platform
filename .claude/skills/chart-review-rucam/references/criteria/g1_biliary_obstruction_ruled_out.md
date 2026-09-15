@@ -14,8 +14,8 @@ role: intermediate
 
 Group I cause 4 of 6 — **biliary obstruction** within T0 ± 30 days. `yes` only if
 **(a)** ruled out by objective testing (imaging showing no biliary dilation /
-obstruction) or **(b)** explicitly excluded by a note. `no` if not assessed,
-indeterminate, or present.
+obstruction) or **(b)** explicitly excluded by a note. `no` ONLY when an active diagnosis is documented. Untested / not assessed
+counts as ruled out — see `references/scoring/item-5-exclusion.md` ((c)).
 
 ## Extraction guidance
 

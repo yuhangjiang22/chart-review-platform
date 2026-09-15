@@ -14,8 +14,8 @@ role: intermediate
 
 Group II cause 5 of 5 — **acute CMV / EBV / HSV hepatitis**, window T0 ± 30 days.
 `yes` only if **(a)** ruled out by objective testing (negative CMV/EBV/HSV serologies
-or PCR in the window) or **(b)** explicitly excluded by a note. `no` if not assessed,
-indeterminate, or present.
+or PCR in the window) or **(b)** explicitly excluded by a note. `no` ONLY when an active diagnosis is documented. Untested / not assessed
+counts as ruled out — see `references/scoring/item-5-exclusion.md` ((c)).
 
 ## Extraction guidance
 
