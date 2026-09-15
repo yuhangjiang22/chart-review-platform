@@ -10,7 +10,7 @@ group: step1_criteria
 # Criterion A: imaging (window <=1 year)
 
 ## Definition
-Imaging (CT / MRI / ultrasound) **within 1 year** before index showing a
+Imaging (CT / MRI / ultrasound) **within 1 year** before the reference date showing a
 **nodular liver** together with **either splenomegaly or a recanalized
 umbilical vein**. (LCN Table 2, criterion A.)
 
@@ -19,7 +19,7 @@ umbilical vein**. (LCN Table 2, criterion A.)
 (splenomegaly OR recanalized/patent umbilical vein). Nodular liver alone ->
 `not_met`. Splenomegaly alone -> `not_met`. Radiology impressions are the
 primary source. Cite the report span; state the imaging date and that it is
-within 1 year of index.
+within 1 year of the reference date.
 
 Wording rules (v2 ops 2, 13, 14):
 - **Nodular**: accept "nodular contour" / "surface nodularity". "Irregular"
@@ -31,10 +31,10 @@ Wording rules (v2 ops 2, 13, 14):
   Caput medusae is supportive but is NOT the same finding.
 
 ## Examples
-- "CT: cirrhotic, nodular liver contour; spleen 16 cm (splenomegaly)" (8mo before index) -> `met`
+- "CT: cirrhotic, nodular liver contour; spleen 16 cm (splenomegaly)" (8 months before the reference date) -> `met`
 - "US: nodular liver echotexture; recanalized paraumbilical vein" -> `met`
 - "MRI: nodular liver; spleen normal size; no varices" -> `not_met` (nodularity alone)
-- Qualifying CT but 2 years before index -> `not_met` (out of window)
+- Qualifying CT but 2 years before the reference date -> `not_met` (out of window)
 
 ## Window anchor (v0.4)
 The lookback window for THIS met/not_met answer is anchored to the

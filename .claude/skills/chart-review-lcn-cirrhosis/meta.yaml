@@ -1,7 +1,7 @@
 task_type: phenotype_validation
 uses_structured_data: true
 review_unit: patient
-manual_version: 0.6.0
+manual_version: 0.6.2
 status: draft
 final_output: lcn_compensated_cirrhosis
 source_documents:
@@ -40,7 +40,8 @@ overview_prose: >-
   or imaging), D blood biomarker <=6mo (FIB-4 >2.67 or platelet count <150),
   E cirrhotic biopsy OLDER than 5 years. Excluded: documented cardiac
   cirrhosis; Fontan-associated liver disease (FALD). STEP 2 - was the patient
-  COMPENSATED at index? Any of these disqualifies: hepatic decompensation
+  COMPENSATED at the date being evaluated (the reference date for the snapshot
+  enums; each candidate date for the outcome scan)? Any of these disqualifies: hepatic decompensation
   (ascites/hydrothorax, overt hepatic encephalopathy, variceal bleeding) within
   365 days or present; current MELD-Na >=15; current Child-Turcotte-Pugh B or C;
   TIPS / BRTO / porto-systemic shunt surgery at any time. Decompensation events
@@ -110,6 +111,19 @@ overview_prose: >-
   (v0.7) matches decomp codes on source values as well and feeds OHE
   codes/fills into the CTP encephalopathy component plus non-blocking review
   warnings. Blocking remains agent tier grading (op-6 fidelity).
+
+  v0.6 -> v0.6.2 (2026-09-15): the six criterion ENUMS (biopsy_recent_cirrhosis,
+  crit_a/b/c/d, crit_e) said "within N of the INDEX date" throughout their
+  Definition, guidance and examples, while the v0.4 anchor note appended to the
+  same files said the window is anchored to the REFERENCE date. Same file,
+  opposite instructions. Index-anchoring is a leftover from the retired pilot
+  design (index = first cirrhosis code + 90d, chart truncated at index); under
+  the AUD forward-scan it is simply wrong — the source spec defines index as
+  time zero for follow-up and asks for the FIRST date the phenotype holds, so
+  criterion windows are measured from the date being evaluated, never from
+  cohort entry. Bodies rewritten to the reference date. No effect on computed
+  outcomes (the scanner reads only the windowless _date fields) — this governs
+  the calibration snapshots and, more importantly, what a human annotator reads.
 
   The agent extracts 16 evidence leaves; the Step-1 count, Step-1 verdict,
   decompensation roll-up, Step-2 verdict, and the final phenotype are COMPUTED

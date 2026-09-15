@@ -7,10 +7,10 @@ cardinality: one
 group: step1_criteria
 ---
 
-# Criterion E: old biopsy (>=5 years before index)
+# Criterion E: old biopsy (>=5 years before the reference date)
 
 ## Definition
-A liver biopsy **5 or more years before index** demonstrating **METAVIR 4 or
+A liver biopsy **5 or more years before the reference date** demonstrating **METAVIR 4 or
 Ishak 5-6**. Unlike the recent-biopsy rule this is NOT sufficient alone - it
 counts as ONE of the >=2 criteria. (LCN Table 2, criterion E.)
 
@@ -20,8 +20,8 @@ the only difference is age of the biopsy. A biopsy WITHIN 5 years belongs to
 `biopsy_recent_cirrhosis`, not here.
 
 ## Examples
-- "Liver biopsy 2016: Ishak stage 5" with index 2025 -> `met`
-- Only a 2023 biopsy exists (index 2025) -> `not_met` (that one is recent)
+- "Liver biopsy 2016: Ishak stage 5" with reference date 2025 -> `met`
+- Only a 2023 biopsy exists (reference date 2025) -> `not_met` (that one is recent)
 
 ## Window anchor (v0.4)
 The lookback window for THIS met/not_met answer is anchored to the

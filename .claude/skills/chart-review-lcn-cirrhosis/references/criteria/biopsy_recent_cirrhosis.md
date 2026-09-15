@@ -1,6 +1,6 @@
 ---
 field_id: biopsy_recent_cirrhosis
-prompt: Liver biopsy within 5 years of index showing METAVIR stage 4 or Ishak stage 5-6?
+prompt: Liver biopsy within 5 years of the reference date showing METAVIR stage 4 or Ishak stage 5-6?
 answer_schema:
   enum: [yes, no]
 cardinality: one
@@ -10,23 +10,23 @@ group: step1
 # Criterion: biopsy_recent_cirrhosis
 
 ## Definition
-A **liver biopsy within 5 years** of the index date demonstrating **METAVIR
+A **liver biopsy within 5 years** of the reference date demonstrating **METAVIR
 stage 4** or **Ishak stage 5-6** (cirrhosis). Per the LCN definition this is
 **sufficient alone** to establish Step-1 cirrhosis — no other criterion needed.
 
 ## Extraction guidance
 **Always commit one value:**
 - **`yes`** — a pathology report (or a clinician's citation of one) dated
-  within 5 years BEFORE the index date stages the liver METAVIR 4 or Ishak 5-6.
+  within 5 years BEFORE the reference date stages the liver METAVIR 4 or Ishak 5-6.
 - **`no`** — no such biopsy in the window (including: biopsy exists but stage
   below the threshold, or biopsy older than 5 years — that belongs to
   `crit_e_biopsy_old`).
 Cite the pathology note span (stage wording verbatim) or the procedure row +
-note. State the biopsy date and confirm it is within 5 years of index.
+note. State the biopsy date and confirm it is within 5 years of the reference date.
 
 ## Examples
-- "Liver biopsy (2023-04): stage 4/4 fibrosis (METAVIR), consistent with cirrhosis", index 2025-06 -> `yes`
-- "Biopsy 2015: Ishak 6" with index 2025 -> `no` (older than 5y; see crit_e_biopsy_old)
+- "Liver biopsy (2023-04): stage 4/4 fibrosis (METAVIR), consistent with cirrhosis", reference date 2025-06 -> `yes`
+- "Biopsy 2015: Ishak 6" with reference date 2025 -> `no` (older than 5y; see crit_e_biopsy_old)
 - "Biopsy: METAVIR F3" -> `no` (below threshold)
 
 ## Window anchor (v0.4)

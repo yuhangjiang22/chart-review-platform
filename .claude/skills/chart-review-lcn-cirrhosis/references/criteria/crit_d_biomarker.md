@@ -10,7 +10,7 @@ group: step1_criteria
 # Criterion D: blood-based biomarker (window <=6 months)
 
 ## Definition
-Within 6 months before index: **FIB-4 >2.67** or **platelet count <150**
+Within 6 months before the reference date: **FIB-4 >2.67** or **platelet count <150**
 (the source doc reproduces the paper's "<150/mL" [sic]; operationally
 <150 x10^9/L). (LCN Table 2, criterion D.)
 
@@ -26,10 +26,10 @@ ONLY when all inputs are within the window - say `computed` in the rationale
 and cite the input rows. Either branch (FIB-4 OR platelets) suffices.
 
 ## Examples
-- Platelets 112 (2mo before index) -> `met`
+- Platelets 112 (2mo before the reference date) -> `met`
 - "FIB-4 = 3.4" in a hepatology note (in window) -> `met`
 - Platelets 210 and FIB-4 1.9 -> `not_met`
-- Platelets 130 but 9 months before index -> `not_met` (out of window)
+- Platelets 130 but 9 months before the reference date -> `not_met` (out of window)
 
 ## Window anchor (v0.4)
 The lookback window for THIS met/not_met answer is anchored to the

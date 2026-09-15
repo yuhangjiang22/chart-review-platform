@@ -10,7 +10,7 @@ group: step1_criteria
 # Criterion C: varices (window <=3 years [sic])
 
 ## Definition
-**Varices seen on endoscopy or imaging** within 3 years before index.
+**Varices seen on endoscopy or imaging** within 3 years before the reference date.
 (LCN Table 2, criterion C; the source doc reproduces the paper's "<=3 year"
 wording.) The varices merely need to EXIST - bleeding is a Step-2 matter.
 
@@ -29,7 +29,7 @@ criteria must come from distinct studies, and the reviewer will not count
 both from one study.
 
 ## Examples
-- "EGD: small esophageal varices, no stigmata" (1y before index) -> `met`
+- "EGD: small esophageal varices, no stigmata" (1y before the reference date) -> `met`
 - "CT: gastroesophageal varices" -> `met`
 - "EGD: no varices" -> `not_met`
 
