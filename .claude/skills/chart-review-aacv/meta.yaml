@@ -1,0 +1,17 @@
+task_type: trial_eligibility_prescreen
+uses_structured_data: true
+review_unit: patient
+manual_version: 2026-09-24
+source_protocol: I5T-MC-AACV Amendment (a), approved 19 Mar 2026
+source_workbook: AACV_Atomic_Criteria_Reference_v1.0_20260901.xlsx
+overview_prose: >-
+  Pre-screening against the eligibility criteria of Lilly trial I5T-MC-AACV
+  (donanemab, TRAILBLAZER-ALZ 7). Each criterion file is one ATOM from the
+  atomic-criteria workbook, not one protocol criterion — the AND/OR structure
+  between atoms lives in the workbook's logic tree and is applied at
+  aggregation, not by the agent. The agent answers one small factual question
+  per atom and cites the evidence it used. It never decides eligibility.
+phases:
+  - author
+  - try
+  - validate

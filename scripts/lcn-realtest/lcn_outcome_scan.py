@@ -32,7 +32,7 @@ v0.3 semantics retained (Compensated_CP_v2 ops):
 
 v0.6 (from the pilot audit — 3 of 5 MET were lab-refutable false positives):
  - MELD-Na and the CTP LAB floor are SCANNER-COMPUTED from measurements.json
-   at EVERY candidate date (labs valid 90d back; same-day duplicates -> median).
+   at EVERY candidate date (labs valid W_LAB=180d back; same-day duplicates -> median).
    A candidate is disqualified when computed MELD-Na >= 15 or when the three
    lab components ALONE force CTP >= 7 (class B even with no ascites/OHE).
    The agent's reference-anchored meld_na_ge_15 / ctp_class answers remain as
@@ -130,8 +130,12 @@ def lab_series(pid):
             if lo <= v <= hi: out[k].append((d_, v))
     return {k: sorted(vs) for k, vs in out.items()}
 
-def _latest_within(series, t, days=90):
+W_LAB = 180   # "current" MELD-Na / CTP labs: latest panel within 180 d — the LCN cohort's 6-month visit
+              # cadence (Tapper 2025); was 90 d (our own choice) until 2026-09-20
+
+def _latest_within(series, t, days=None):
     """Median of the values on the most recent lab date in (t-days, t]."""
+    if days is None: days = W_LAB
     vals = [(d_, v) for d_, v in series if t - timedelta(days=days) < d_ <= t]
     if not vals: return None
     dmax = max(d_ for d_, _ in vals)
@@ -185,7 +189,11 @@ def decomp_code_dates(pid):
             out["ascites"].append(d_)
         if code.startswith(("K72.9", "K72.0", "K72.1")) or "encephalopath" in nm or "hepatic failure" in nm:
             out["ohe"].append(d_)
-        if code.startswith(("I85.01", "I85.11")) or ("varice" in nm and ("bleed" in nm or "hemorrh" in nm)):
+        # "Esophageal varices WITHOUT bleeding" contains "bleed" — the name
+        # branch must exclude negations, or every varices code reads as a haemorrhage
+        if code.startswith(("I85.01", "I85.11")) or (
+            "varice" in nm and ("bleed" in nm or "hemorrh" in nm) and "without" not in nm and " no " not in f" {nm} "
+        ):
             out["vbleed"].append(d_)
     return {k: sorted(set(v)) for k, v in out.items()}
 
@@ -316,7 +324,14 @@ def scan(pid, aud_map=None):
         # = a highly_likely-equivalent OHE event -> blocks (op-6 blocks OHE at
         # definite OR highly_likely). Ascites stays warning-only: its blocking
         # bar is definite, which codes+drugs cannot establish.
-        # PENDING Tapper/Hao confirmation of the codes+therapy equivalence.
+        # NOTE ON PROVENANCE: this rule is OURS, not the protocol's. The spec
+        # grades OHE from a documented episode: symptoms, improvement on
+        # directed therapy, and a provider's documentation — the drug is the
+        # vehicle, the evidence is the improvement, and one such episode is
+        # enough for any tier. Counting fills is a proxy for the case the spec
+        # cannot see: a patient maintained on therapy whose episodes were never
+        # written up. Kept deliberately (user decision 2026-09-15) as a
+        # safety net over chart-documentation gaps.
         w365 = lambda ds: [d for d in ds if t - timedelta(days=W_DECOMP) < d <= t]
         # blocks when (a) an OHE code is corroborated by >=2 HE-drug fills, or
         # (b) >=2 rifaximin fills alone — in a cirrhosis cohort rifaximin

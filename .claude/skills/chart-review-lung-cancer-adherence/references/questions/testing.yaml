@@ -15,7 +15,7 @@ questions:
     tier: 1
     answer_schema: { type: string, enum: [yes, no, unclear] }
     depends_on: [MT0a]
-    retrieval_hints: "Pathology / IHC report for a PD-L1 / 22C3 / SP263 result."
+    retrieval_hints: "Pathology / IHC report for a PD-L1 / 22C3 / SP263 RESULT. yes requires a documented result, or an explicit statement that the assay was run. An order with no result (\"pending\", \"sent out\", \"will obtain\") is NOT yes — answer unclear."
 
   - question_id: MT2
     text: "Was comprehensive genomic profiling (CGP / large NGS panel) performed, and on which platform?"
@@ -27,11 +27,11 @@ questions:
     retrieval_hints: "Name the CGP vendor: Tempus, Caris, Foundation (FoundationOne), in_house institutional panel, or other. not_performed if no broad panel was run."
 
   - question_id: MT3
-    text: "If CGP was NOT performed, was single-gene testing or a targeted lung panel performed? Name the specific genes in the rationale."
+    text: "Was single-gene testing or a targeted lung panel performed — whether instead of, or in addition to, CGP? Name the specific genes in the rationale."
     tier: 2
     answer_schema: { type: string, enum: [yes, no, not_applicable, unclear] }
     depends_on: [MT1, MT2]
-    retrieval_hints: "EGFR/ALK/ROS1 single-gene or small-panel results. not_applicable if CGP was done."
+    retrieval_hints: "EGFR/ALK/ROS1 single-gene or small-panel results. Answer yes whenever such testing is documented, EVEN IF comprehensive genomic profiling was also done — this question is not conditional on CGP. Reserve not_applicable for a patient in whom no molecular testing of any kind was indicated."
 
   - question_id: MT4
     text: "Was genomic profiling done on tumor tissue, liquid biopsy (blood/ctDNA), or both?"
@@ -45,21 +45,21 @@ questions:
     tier: 2
     answer_schema: { type: string, enum: [before_1L, same_date, after_1L, no_systemic_therapy, unclear] }
     depends_on: [MT1]
-    retrieval_hints: "Compare the molecular test ORDER date to the first-line therapy start date. no_systemic_therapy if surgery-only / palliative."
+    retrieval_hints: "Compare the molecular test ORDER date to the first-line therapy START date. THERAPY START = the date a drug was ADMINISTERED (cycle 1 day 1, an infusion/administration record, \"started today\"). A plan or intent (\"will start\", \"plan to start\", \"tentatively\", \"scheduled for\", \"recommended\") is NOT a start date — if only a plan is documented, the start date is undocumented, so answer unclear rather than using the planned date. Answer no_systemic_therapy ONLY when the chart AFFIRMATIVELY documents that no systemic therapy was given or intended (surgery-only with no planned systemic agent, hospice/comfort care, or an explicit statement to that effect). If the chart is merely SILENT about first-line systemic therapy, answer unclear — never no_systemic_therapy. This distinction matters: no_systemic_therapy exempts three separate concordance rules, so inferring it from silence silently exempts the patient."
 
   - question_id: MT6
     text: "Were genomic testing RESULTS available before first-line therapy was initiated?"
     tier: 2
     answer_schema: { type: string, enum: [yes, no, unclear] }
     depends_on: [MT1]
-    retrieval_hints: "Compare the molecular RESULT date to the first-line therapy start date."
+    retrieval_hints: "Compare the molecular RESULT date to the first-line therapy START date. Use the therapy start date the chart documents, however it is stated — a formal administration record is NOT required here, and a note saying therapy had begun is enough. Answer unclear only when NO therapy start can be placed in time at all. \"RESULTS AVAILABLE\" means the molecular work-up was COMPLETE before that date: if a comprehensive/CGP report landed after therapy started, answer no even though earlier single-gene results were already back. Say in the rationale which result you treated as the last one."
 
   - question_id: MT7a
     text: "If PD-L1 testing was performed, what was the result (TPS band)?"
     tier: 3
     answer_schema: { type: string, enum: [lt_1, 1_to_49, gte_50, cps_reported, not_tested, unclear] }
     depends_on: [MT7]
-    retrieval_hints: "PD-L1 TPS: lt_1 = <1%, 1_to_49 = 1-49%, gte_50 = >=50%. cps_reported if only a CPS score is given."
+    retrieval_hints: "PD-L1 TPS: lt_1 = <1%, 1_to_49 = 1-49%, gte_50 = >=50%. cps_reported if only a CPS (combined positive score) is given — a CPS is NOT a TPS, do not band it as one. A chart may hold SEVERAL TPS results from different specimens (about 1 patient in 10): PD-L1 is genuinely heterogeneous, so a block that scores 0% does not rule out expression elsewhere, and the values are all real. Find every TPS result before answering, list them in the rationale with their dates and specimens, and band the HIGHEST of them. Do not band the first one you find. Ignore the band thresholds printed in a report's interpretation table (the stock \"<1% / 1-49% / >=50%\" legend) — those are not results."
 
   - question_id: MT8
     text: "What were the genomic testing results? Report each actionable finding with the exact gene and variant."

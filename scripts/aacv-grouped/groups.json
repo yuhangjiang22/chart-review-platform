@@ -1,0 +1,98 @@
+{
+  "task_id": "aacv",
+  "note": "38 AACV notes-side criteria split into nine retrieval groups. Criteria in a group are answered from the same part of the chart, so one search pass serves all of them. WHY: handed all 38 at once the agent searches a handful of topics and then writes every answer without looking anything else up; in two separate ten-patient runs it issued no search at all for the illness group or the DLB group and still answered all twelve of those criteria. Scoping a pass guarantees its group is searched (5.9x more searches per criterion on the one patient measured both ways). WHAT THIS DOES NOT DO: the agent still writes every answer after its last retrieval call \u2014 266 of 266 in the grouped passes \u2014 so the loop is unchanged, only the criteria-per-search-burst ratio. COST: completing all 38 costs ~69 retrieval calls grouped vs ~12 single-pass (5.8x MORE, not fewer); wall clock was lower on the one patient measured (423s vs 529s) but that is n=1 and token cost is unmeasured. NOT A CONTROLLED COMPARISON: the single-pass and grouped runs used different rubric versions, and an earlier single-pass run on the same patient already decided 2/6 DLB features \u2014 the same as the scoped pass \u2014 so run-to-run variance matches the claimed effect. Treat this split as reasoned engineering, not as a measured improvement.",
+  "groups": [
+    {
+      "id": "allergy",
+      "label": "Allergy list and reactions",
+      "fields": [
+        "aacv_exc_026_a1",
+        "aacv_exc_026_a2",
+        "aacv_exc_026_a3",
+        "aacv_exc_027_a1",
+        "aacv_exc_027_a2",
+        "aacv_exc_027_a3",
+        "aacv_exc_027_a4",
+        "aacv_exc_033_a1"
+      ]
+    },
+    {
+      "id": "lp",
+      "label": "Lumbar-puncture safety",
+      "fields": [
+        "aacv_exc_033_a2",
+        "aacv_exc_033_a3",
+        "aacv_exc_033_a4"
+      ]
+    },
+    {
+      "id": "illness",
+      "label": "Serious / unstable illness and liver chemistry",
+      "fields": [
+        "aacv_exc_018_a1",
+        "aacv_exc_018_a2",
+        "aacv_exc_018_a3",
+        "aacv_exc_024_a8"
+      ]
+    },
+    {
+      "id": "cancer",
+      "label": "Cancer history and recurrence risk",
+      "fields": [
+        "aacv_exc_025_a1",
+        "aacv_exc_025_a2",
+        "aacv_exc_025_a3"
+      ]
+    },
+    {
+      "id": "substance",
+      "label": "Alcohol and drug use disorder",
+      "fields": [
+        "aacv_exc_028_a1",
+        "aacv_exc_028_a2"
+      ]
+    },
+    {
+      "id": "imaging",
+      "label": "Amyloid PET procedure and tracer",
+      "fields": [
+        "aacv_exc_031_a1",
+        "aacv_exc_031_a2"
+      ]
+    },
+    {
+      "id": "demographics",
+      "label": "Sex assigned at birth, childbearing potential, age",
+      "fields": [
+        "aacv_inc_002_a1",
+        "aacv_inc_002_a2",
+        "aacv_inc_002_a3",
+        "aacv_inc_003_a1"
+      ]
+    },
+    {
+      "id": "cognition",
+      "label": "Cognitive decline: course, duration, reporter",
+      "fields": [
+        "aacv_inc_009_a1",
+        "aacv_inc_009_a2",
+        "aacv_inc_009_a3",
+        "aacv_inc_009_a4",
+        "aacv_inc_009_a5",
+        "aacv_inc_009_a6"
+      ]
+    },
+    {
+      "id": "dlb",
+      "label": "DLB core clinical features",
+      "fields": [
+        "aacv_inc_010_a1",
+        "aacv_inc_010_a2",
+        "aacv_inc_010_a3",
+        "aacv_inc_010_a4",
+        "aacv_inc_010_a5",
+        "aacv_inc_010_a6"
+      ]
+    }
+  ]
+}

@@ -23,7 +23,7 @@ answer directly.
 
 ## Extraction guidance
 
-Answer each of the five per-cause flags (each `yes` only when that cause is ruled out
-by a negative test or an explicit note exclusion). This gate derives from them; a
+Answer each of the five per-cause flags (each `yes` unless an active diagnosis of that cause is documented — a negative
+test, an explicit note exclusion, or no assessment at all each count as ruled out). This gate derives from them; a
 missing flag leaves it — and Item 5 — **Pending**, so every Group II cause must be
 assessed. See `references/scoring/item-5-exclusion.md`.

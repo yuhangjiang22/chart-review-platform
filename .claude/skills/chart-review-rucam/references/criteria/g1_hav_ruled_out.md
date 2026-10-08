@@ -1,6 +1,6 @@
 ---
 field_id: g1_hav_ruled_out
-prompt: For Item 5 (Group I), is acute hepatitis A ruled out — by a negative test or an explicit note exclusion?
+prompt: For Item 5 (Group I), is acute hepatitis A ruled out? (`no` only when an active diagnosis is documented; untested / not assessed counts as ruled out)
 answer_schema:
   enum: [yes, no]
 cardinality: one
@@ -12,9 +12,7 @@ role: intermediate
 
 ## Definition
 
-Group I cause 1 of 6 — **acute hepatitis A** within T0 ± 30 days. `yes` only if it is
-**(a)** ruled out by objective testing (anti-HAV IgM tested and negative) or **(b)**
-explicitly excluded by a note. `no` ONLY when an active diagnosis is documented in notes or structured
+Group I cause 1 of 6 — **acute hepatitis A** within T0 ± 30 days. `yes` when it is **(a)** ruled out by objective testing (anti-HAV IgM tested and negative), **(b)** explicitly excluded by a note, or **(c)** simply not assessed. `no` ONLY when an active diagnosis is documented in notes or structured
 data. Untested / not assessed / unlabeled counts as ruled out — see
 `references/scoring/item-5-exclusion.md`, which labels it (c) and counts
 (a), (b) and (c) alike.

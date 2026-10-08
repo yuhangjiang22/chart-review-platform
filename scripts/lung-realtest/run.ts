@@ -33,7 +33,7 @@ const { run_id } = startBatchRun({
   started_by: "lung-realtest",
   max_concurrency: 1,
   max_turns_per_patient: Number(process.env.RUN_MAX_TURNS ?? 120),
-  agent_specs: [{ id: "agent_1", search_mode_preset: "smart-search", interpretation_preset: "default" }],
+  agent_specs: [{ id: "agent_1", search_mode_preset: process.env.SEARCH_MODE ?? "smart-search", interpretation_preset: "default" }],
 });
 console.log(`[run] run_id=${run_id}`);
 

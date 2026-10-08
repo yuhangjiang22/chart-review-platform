@@ -17,6 +17,14 @@ outcome scanner separately computes a lab-based CTP floor at every candidate
 date.
 
 ## Extraction guidance
+**Start from the `fnd_severity_ref` foundation row** (first rows of the
+`observations` table): it gives the most recent bilirubin, INR, creatinine,
+sodium and albumin within 180 days of the reference date, with their dates and
+measurement row ids, and the Child-Pugh lab points already computed from them. Verify it
+against the cited measurement rows and answer from it unless a note documents
+a different value at reference. If the row is ABSENT, the labs are not charted
+near reference and `not_assessable` is correct.
+
 **Always commit one value.** Prefer a documented class ("Child-Pugh A/B/C",
 "CTP 7 = B").
 
@@ -31,6 +39,14 @@ present is a wrong answer (a confirmed pilot false positive — labs alone
 scored 5 points and a CT showed ascites, i.e. at least class B — passed
 through as `not_assessable`).
 
+**The two clinical components must agree with your own grading.**
+Encephalopathy points count HEPATIC encephalopathy only — the same condition
+you grade in `ohe_365d`. Encephalopathy from alcohol withdrawal, sedatives or
+opioids, sepsis, stroke, hypoxia or another metabolic cause is 1 point (absent).
+If you answered `ohe_365d` = `none`, the encephalopathy component is 1. Likewise
+the ascites component is 1 unless ascites is documented at or near the
+reference date.
+
 `not_assessable` only when the chart genuinely lacks the inputs — does NOT
 disqualify.
 
@@ -38,4 +54,5 @@ disqualify.
 - "Child-Pugh class A (5 points)" -> `A`
 - "CTP-B cirrhosis" at reference -> `B`
 - Bili 2.2 (2) + albumin 3.5 (2) + INR 1.22 (1) + CT ascites (2) + no HE (1) = 8 -> `B` (computed)
+- Labs 4 points + "encephalopathy due to alcohol withdrawal and opioids" (not hepatic) + no ascites = 4 + 1 + 1 = 6 -> `A`
 - No class documented, no bilirubin/albumin/INR anywhere near reference -> `not_assessable`

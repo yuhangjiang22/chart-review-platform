@@ -14,18 +14,18 @@ questions:
     tier: 4
     answer_schema: { type: number }
     depends_on: [MT0a]
-    retrieval_hints: "Diagnosis date → first systemic therapy start date, in days. Leave unanswered if either date is undocumented."
+    retrieval_hints: "Diagnosis date -> first systemic therapy START date, in days. Answer this in two steps and show BOTH in the rationale as \"dx=YYYY-MM-DD; 1L=YYYY-MM-DD\". (1) DIAGNOSIS DATE = the date of the pathology report that first established the lung cancer diagnosis (its report/result date). Use the specimen-collection date ONLY when no report date is documented, and say so. Do NOT use the date of initial presentation, imaging, or symptom onset. (2) FIRST-LINE START DATE as defined below. THERAPY START = the date a drug was ADMINISTERED (cycle 1 day 1, an infusion/administration record, \"started today\"); a planned or intended start (\"will start\", \"plan to start\", \"scheduled\") is NOT a start date. Leave unanswered if either date is undocumented — do NOT substitute a planned date. Report the exact calendar difference between the two dates you cite: never round, hedge, or adjust the number for uncertainty. If you are unsure which date anchors the interval, state both candidates in the rationale and answer with the one the question defines."
 
   - question_id: MT11
     text: "What was the turnaround time for genomic testing (order/specimen to result), in DAYS?"
     tier: 4
     answer_schema: { type: number }
     depends_on: [MT1]
-    retrieval_hints: "Molecular test order/collection date → result date, in days."
+    retrieval_hints: "Molecular test order/collection date -> result date, in days. Report the exact calendar difference between the two dates you cite: never round, hedge, or adjust the number for uncertainty. If several assays were run, use the assay with the LONGEST order-to-result interval — that is the date the molecular work-up became usable for a treatment decision — and name that assay in the rationale. Show both dates as \"ordered=YYYY-MM-DD; resulted=YYYY-MM-DD\"."
 
   - question_id: MT12
-    text: "If CGP was NOT performed, were at minimum EGFR, ALK, ROS1, BRAF, KRAS, and PD-L1 all tested (the essential NSCLC biomarkers)?"
+    text: "Were at minimum EGFR, ALK, ROS1, BRAF, KRAS, and PD-L1 all tested (the essential NSCLC biomarkers) — by any means, whether through CGP or individually?"
     tier: 4
     answer_schema: { type: string, enum: [yes, no, not_applicable, unclear] }
     depends_on: [MT2]
-    retrieval_hints: "Check each essential biomarker was covered. not_applicable if CGP (a named MT2 vendor) was done."
+    retrieval_hints: "Check that each essential biomarker was covered. A CGP panel that reports these genes COUNTS as testing them — answer yes, not not_applicable. Answer no when one or more essential biomarkers has no documented result."

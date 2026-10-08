@@ -1,7 +1,7 @@
 task_type: phenotype_validation
 uses_structured_data: true
 review_unit: patient
-manual_version: 0.6.2
+manual_version: 0.6.5
 status: draft
 final_output: lcn_compensated_cirrhosis
 source_documents:
@@ -124,6 +124,45 @@ overview_prose: >-
   cohort entry. Bodies rewritten to the reference date. No effect on computed
   outcomes (the scanner reads only the windowless _date fields) — this governs
   the calibration snapshots and, more importantly, what a human annotator reads.
+
+  v0.6.2 -> v0.6.3 (2026-09-16): SKILL.md — the master procedure, read before
+  any criterion file — was still the retired pilot design end to end: "every
+  assessment is made AS OF the index date", "index_date — the candidate
+  outcome date", "IGNORE EVIDENCE DATED AFTER THE INDEX DATE", "window
+  discipline relative to the index date", crit dates "blank when not_met",
+  decomp dates "up to index". Zero mentions of the reference date; the v0.4
+  forward-scan design existed only as notes appended to individual criterion
+  files, so the agent read two contradictory rule sets with the wrong one on
+  top. Measured on the 40-patient batch: of 44 patient x decomp-type cases
+  with post-index codes, the agent dated 40 correctly (following the criterion
+  notes) and capped 4 at index (following SKILL.md) — the "agent variance"
+  fought since August was this contradiction. Rewritten: a "two dates, two
+  kinds of field" section states the design once (index = follow-up start,
+  reference = chart end, enums = reference snapshots, dates = windowless,
+  scanner owns all windows, post-index evidence is the point); every
+  field-level anchor, the window-discipline rule, the FIB-4 and
+  not_assessable rules, and the read-budget foundation list brought in line.
+  SKILL.md is read from the baseline (sessions fork only references/), so this
+  reaches every new session immediately.
+
+  v0.6.3 -> v0.6.4 (2026-10-05, from the 210-batch pilot and the 40-batch
+  chart-read audit): (1) shunt_ever counts PROCEDURES only — a spontaneous
+  splenorenal / portosystemic shunt on imaging, a planned or declined TIPS,
+  and a transjugular liver biopsy are `no` (the 40-batch had one false `yes`
+  that removed a patient's outcome, and one missed TIPS). (2) meld_na_ge_15
+  and ctp_class start from a new fnd_severity_ref foundation row — the
+  latest bilirubin / INR / creatinine / sodium / albumin within 180 days of
+  reference with MELD-Na and CTP lab points computed by the ETL; the
+  'mandatory computation' wording alone had not stopped `not_assessable`
+  answers with labs present (still seen in the 210 pilot).
+
+  v0.6.4 -> v0.6.5 (2026-10-05, 210-batch pilot rerun): (1) the CTP
+  encephalopathy component counts hepatic encephalopathy only and must agree
+  with the agent's own ohe_365d grade (a withdrawal/opioid encephalopathy had
+  been scored 2 points, turning class A into B); ascites component likewise
+  only for ascites at/near reference. (2) A fnd_dates foundation row states
+  the index and reference dates; SKILL.md points snapshot windows at it (one
+  pilot answer measured the 6-month platelet window from index again).
 
   The agent extracts 16 evidence leaves; the Step-1 count, Step-1 verdict,
   decompensation roll-up, Step-2 verdict, and the final phenotype are COMPUTED

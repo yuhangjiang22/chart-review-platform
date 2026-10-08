@@ -24,8 +24,8 @@ Feeds Item 5. Do NOT answer directly.
 
 ## Extraction guidance
 
-Answer each of the six per-cause flags (each `yes` only when that cause is ruled out
-by a negative test or an explicit note exclusion). This count derives from them; a
+Answer each of the six per-cause flags (each `yes` unless an active diagnosis of that cause is documented — a negative
+test, an explicit note exclusion, or no assessment at all each count as ruled out). This count derives from them; a
 missing flag leaves the count — and Item 5 — **Pending**, which forces every Group I
 cause to be assessed rather than silently assumed ruled out. See
 `references/scoring/item-5-exclusion.md`.

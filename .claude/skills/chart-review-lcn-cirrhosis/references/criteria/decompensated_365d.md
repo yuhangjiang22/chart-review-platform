@@ -1,6 +1,6 @@
 ---
 field_id: decompensated_365d
-prompt: Any hepatic decompensation within 365 days of index? (computed)
+prompt: Any hepatic decompensation within 365 days of the reference date? (computed)
 answer_schema:
   enum: [yes, no]
 cardinality: one
@@ -10,8 +10,9 @@ derivation: 'ascites_365d == "definite" OR ohe_365d == "definite" OR ohe_365d ==
 
 # Computed: decompensated_365d
 
-**Computed - do not answer directly.** `yes` when a decompensation event in
-the 365-day lookback reaches the tier that COUNTS for that complication
+**Computed - do not answer directly.** A reference-date snapshot, like the
+other computed verdicts: `yes` when the most recent graded event of any type
+reaches the tier that COUNTS for that complication
 (v2 spec, operational definition 6, per the registry NCT05740358):
 
 - **ascites/hydrothorax** - `definite` only

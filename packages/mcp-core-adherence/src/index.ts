@@ -208,28 +208,58 @@ export const setQuestionAnswerArgsSchema = z.object({
   answer: z.union([z.string(), z.number(), z.boolean(), z.null()]),
   confidence: z.number().min(0).max(1).optional(),
   evidence: z.array(evidenceSchema).optional(),
-  reasoning: z.string().optional(),
+  // REQUIRED: the stated justification is the unit a reasoning-evaluation study
+  // scores. Optional, the agent skips it under load and the gap is unfillable
+  // without re-running the cohort.
+  reasoning: z.string().trim().min(1, "reasoning is required — state why this answer follows from the evidence"),
 });
 export type SetQuestionAnswerArgs = z.infer<typeof setQuestionAnswerArgsSchema>;
 
-function coerce(raw: unknown, q: QuestionDefinition): QuestionAnswer["answer"] {
-  if (raw === undefined || raw === null) return null;
+/** UNANSWERABLE is the agent passing null — "I looked and could not determine
+ *  it". A non-null value the schema does not admit is a different thing: a
+ *  MISTAKE, usually a wrong question_id or a free-text answer to a closed
+ *  question. Collapsing the second into the first stored a mistake as a
+ *  finding and told the agent it had succeeded, so it never corrected itself.
+ *  `reject` carries the reason back to the write path, which refuses the call. */
+type Coerced =
+  | { ok: true; value: QuestionAnswer["answer"] }
+  | { ok: false; reject: string };
+
+function coerce(raw: unknown, q: QuestionDefinition): Coerced {
+  if (raw === undefined || raw === null) return { ok: true, value: null };
   const s = q.answer_schema;
-  if (!s) return raw as QuestionAnswer["answer"];
+  if (!s) return { ok: true, value: raw as QuestionAnswer["answer"] };
   if (s.type === "boolean" && typeof raw !== "boolean") {
-    if (raw === "true" || raw === 1) return true;
-    if (raw === "false" || raw === 0) return false;
-    return null;
+    if (raw === "true" || raw === 1) return { ok: true, value: true };
+    if (raw === "false" || raw === 0) return { ok: true, value: false };
+    return { ok: false, reject: `expects true or false, got ${JSON.stringify(raw)}` };
   }
   if (s.type === "number" && typeof raw !== "number") {
     const n = Number(raw);
-    return Number.isFinite(n) ? n : null;
+    if (Number.isFinite(n)) return { ok: true, value: n };
+    return {
+      ok: false,
+      reject: `expects a number, got ${JSON.stringify(raw)}. Pass null if the chart does not support a value.`,
+    };
   }
   if (s.enum && !s.enum.includes(raw as string | number | boolean)) {
-    return null;
+    return {
+      ok: false,
+      reject: `${JSON.stringify(raw)} is not one of its permitted values [${s.enum.join(", ")}]. ` +
+        `Check you are using the right question_id; pass null if the chart does not support any of them.`,
+    };
   }
-  if (typeof raw === "string" || typeof raw === "number" || typeof raw === "boolean") return raw;
-  return null;
+  if (typeof raw === "string" || typeof raw === "number" || typeof raw === "boolean") {
+    return { ok: true, value: raw };
+  }
+  return { ok: false, reject: `cannot accept a value of type ${typeof raw}` };
+}
+
+/** Event-answer path: same coercion, but this call site builds an array and has
+ *  its own rejection pass, so a refusal surfaces there. */
+function coerceOrNull(raw: unknown, q: QuestionDefinition): QuestionAnswer["answer"] {
+  const c = coerce(raw, q);
+  return c.ok ? c.value : null;
 }
 
 /** The three write-path guards, shared by BOTH write paths.
@@ -500,8 +530,22 @@ export async function setQuestionAnswer(
     );
   }
 
-  const coerced = coerce(args.answer, q);
-  // Coerce-to-null is OK (means "I couldn't determine") — agents are
+  const coercion = coerce(args.answer, q);
+  if (!coercion.ok) {
+    // Echo the question's own TEXT back. A rejected value is as often the wrong
+    // question_id as the wrong value, and the enum alone does not reveal which:
+    // on a live lung run the agent committed MT0d's tobacco answer under MT0c,
+    // was shown only MT0c's stage enum, and concluded the PLATFORM had "exposed
+    // an incorrect stage-valued schema" — then escaped by writing "unknown",
+    // which is in that enum and means nothing here. Seeing "MT0c: What is the
+    // stage of the lung cancer at diagnosis?" names the real mistake.
+    return err(
+      `question ${args.question_id} ("${q.text}") ${coercion.reject}`,
+      { question_id: args.question_id, question_text: q.text, permitted: q.answer_schema?.enum },
+    );
+  }
+  const coerced = coercion.value;
+  // An explicit null is still OK (means "I couldn't determine") — agents are
   // explicitly told to prefer null over guessing.
 
   // OMOP-PROVENANCE (UPGRADE, non-blocking): answers determined from a
@@ -640,7 +684,8 @@ const eventAnswerSchema = z.object({
   answer: z.union([z.string(), z.number(), z.boolean(), z.null()]),
   confidence: z.number().min(0).max(1).optional(),
   evidence: z.array(evidenceSchema).optional(),
-  reasoning: z.string().optional(),
+  // REQUIRED — see setQuestionAnswerArgsSchema.
+  reasoning: z.string().trim().min(1, "reasoning is required — state why this answer follows from the evidence"),
 });
 
 export const setEventAnswerArgsSchema = z.object({
@@ -735,7 +780,7 @@ export async function setEventAnswer(
     storedByQuestion.set(a.question_id, {
       question_id: a.question_id,
       tier: q.tier,
-      answer: coerce(a.answer, q),
+      answer: coerceOrNull(a.answer, q),
       confidence: a.confidence,
       evidence: check.verified.length > 0 ? check.verified : undefined,
       reasoning: a.reasoning,

@@ -1,6 +1,6 @@
 ---
 field_id: g1_hcv_ruled_out
-prompt: For Item 5 (Group I), is acute hepatitis C ruled out — by a negative test or an explicit note exclusion?
+prompt: For Item 5 (Group I), is acute hepatitis C ruled out? (`no` only when an active diagnosis is documented; untested / not assessed counts as ruled out)
 answer_schema:
   enum: [yes, no]
 cardinality: one

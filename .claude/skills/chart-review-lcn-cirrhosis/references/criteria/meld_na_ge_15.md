@@ -17,6 +17,14 @@ MELD-Na from the structured labs at every candidate date, so your job here is
 the note-documented picture: a charted MELD-Na, or a computation from labs.
 
 ## Extraction guidance
+**Start from the `fnd_severity_ref` foundation row** (first rows of the
+`observations` table): it gives the most recent bilirubin, INR, creatinine,
+sodium and albumin within 180 days of the reference date, with their dates and
+measurement row ids, and the MELD-Na already computed from them. Verify it
+against the cited measurement rows and answer from it unless a note documents
+a different value at reference. If the row is ABSENT, the labs are not charted
+near reference and `not_assessable` is correct.
+
 **Always commit one value:**
 - **`yes`** — a documented MELD-Na >=15 current at reference, or computed >=15
   from labs at/near reference (bilirubin, INR, creatinine, sodium; say

@@ -17,7 +17,7 @@ questions:
     tier: 0
     answer_schema:
       type: string
-      enum: [adenocarcinoma, squamous, small_cell, nsclc_nos, other, unclear]
+      enum: [adenocarcinoma, squamous, small_cell, nsclc_nos, large_cell, other, unclear]
     guideline_reference: "Histology — drives the molecular-testing indication (small_cell is generally not required)."
     retrieval_hints: "Pathology 'Diagnosis'/'Histologic type'. small_cell = SCLC; squamous, adenocarcinoma, nsclc_nos are NSCLC."
 
@@ -26,9 +26,9 @@ questions:
     tier: 0
     answer_schema:
       type: string
-      enum: ["I", "II", "IIIA", "IIIB", "IV", "limited", "extensive", "unknown"]
+      enum: ["I", "II", "III", "IIIA", "IIIB", "IV", "limited", "extensive", "unknown"]
     guideline_reference: "Stage — advanced/metastatic NSCLC (IIIB/IV) has the strongest molecular-testing indication."
-    retrieval_hints: "AJCC stage in pathology/oncology staging notes. limited/extensive apply to small_cell."
+    retrieval_hints: "AJCC stage in pathology/oncology staging notes. limited/extensive apply to small_cell. Use the EARLIEST stage documented for this diagnosis — the stage assigned at initial diagnosis / staging work-up. Do NOT use a later stage from a progression or follow-up note, even when that note states it more plainly. Record the stage at the granularity the chart gives: if it says IIIA or IIIB answer that; if it only says III, answer III."
 
   - question_id: MT0d
     text: "What is the patient's tobacco use history?"
@@ -37,4 +37,4 @@ questions:
       type: string
       enum: ["current smoker", "former smoker", "never smoker", "unknown"]
     guideline_reference: "Smoking history — never smokers have higher actionable-mutation prevalence."
-    retrieval_hints: "Social history / HPI smoking status."
+    retrieval_hints: "Social history / HPI smoking status. Charts routinely carry CONTRADICTORY smoking-status fields across notes — sometimes on the same day. Do not answer from the first note you find: check whether other notes disagree. Tie-break, strongest evidence first: (1) a documented cessation EVENT (\"quit in 2009\", a quit date) establishes former smoker and OUTRANKS any status field, which is often stale or unmaintained; (2) otherwise an explicit structured status (\"Tobacco use: ...\"), preferring the note closest to the diagnosis date; (3) narrative prose last. When sources genuinely conflict, say so in the rationale and name the note you followed."
