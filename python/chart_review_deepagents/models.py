@@ -108,7 +108,7 @@ def make_model(model_key=None, serial_tool_calls=True):
     class _RetryingChatOpenAI(_RetryingModelMixin, ChatOpenAI):
         pass
 
-    return _RetryingChatOpenAI(
+    kwargs = dict(
         base_url=conn["base_url"],
         api_key=conn["api_key"],
         model=conn["model"],
@@ -116,3 +116,40 @@ def make_model(model_key=None, serial_tool_calls=True):
         # See note above — absorbs transient vLLM 429s instead of crashing.
         max_retries=12,
     )
+    kwargs.update(conn.get("sampling") or {})
+    model = _RetryingChatOpenAI(**kwargs)
+    window = conn.get("max_input_tokens") or _server_context_window(conn)
+    if window:
+        # Tell deepagents how big the context actually is. Without this its
+        # summarization middleware finds no model profile and falls back to a
+        # FIXED 170_000-token trigger — above the window of every server we run
+        # (Qwen3.8-27B-FP8: 131_072), so it can never compact preventively. The
+        # only path left is its ContextOverflowError fallback, i.e. AFTER vLLM
+        # has already 400'd the request; it then offloads the evicted history to
+        # /conversation_history/<session>.md, embeds that path in the summary,
+        # and the model re-reads that file in a loop and restarts the review
+        # until it hits the graph recursion limit. With a profile the middleware
+        # switches to fraction-based defaults and compacts at 0.85 * window.
+        model.profile = {**(model.profile or {}), "max_input_tokens": int(window)}
+    return model
+
+
+def _server_context_window(conn):
+    """Ask an OpenAI-compatible server for the served model's max_model_len.
+    vLLM reports it on /v1/models. Returns None if anything at all goes wrong —
+    this is a nicety, never a reason to fail a run."""
+    import json as _json
+    import urllib.request
+
+    try:
+        req = urllib.request.Request(
+            conn["base_url"].rstrip("/") + "/models",
+            headers={"Authorization": f"Bearer {conn.get('api_key') or 'EMPTY'}"})
+        with urllib.request.urlopen(req, timeout=5) as r:
+            data = _json.loads(r.read())
+        for entry in data.get("data") or []:
+            if entry.get("id") == conn["model"]:
+                return entry.get("max_model_len")
+    except Exception:
+        return None
+    return None

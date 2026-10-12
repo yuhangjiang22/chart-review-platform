@@ -25,6 +25,9 @@ var/
 .env
 .env.local
 .env.backup-*
+# Timestamped backups the tooling actually writes (.env.bak.<epoch>) — the
+# .env.backup-* pattern above never matched them, and they carry live API keys.
+.env.bak*
 
 # Real-patient note directories — never push to a public/shared repo.
 # These patterns were previously enforced by the parent repo's .gitignore;

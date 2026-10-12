@@ -69,8 +69,12 @@ def test_resolve_vllm_defaults_api_key_empty(tmp_path):
     p.write_text(json.dumps({"llama": {"backend": "vllm", "base_url": "http://h:8000/v1",
                                        "model": "meta/Llama"}}))
     conn = registry.resolve("llama", env={}, models_path=p)
+    # Optional keys an entry may omit come back as None, not absent — make_model
+    # reads them unconditionally. (This exact-dict assertion went stale when
+    # `sampling` was added and again with `max_input_tokens`.)
     assert conn == {"backend": "vllm", "base_url": "http://h:8000/v1",
-                    "api_key": "EMPTY", "model": "meta/Llama"}
+                    "api_key": "EMPTY", "model": "meta/Llama",
+                    "sampling": None, "max_input_tokens": None}
 
 
 def test_resolve_unknown_key_raises(tmp_path):

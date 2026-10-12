@@ -131,4 +131,17 @@ def resolve(key, env=None, models_path=None):
     return {"backend": "vllm",
             "base_url": base_url,
             "api_key": env.get(entry.get("api_key_env", "VLLM_API_KEY"), "EMPTY") or "EMPTY",
-            "model": entry["model"]}
+            "model": entry["model"],
+            # Optional per-model decoding overrides (temperature, top_p,
+            # max_tokens, presence_penalty, extra_body). Open reasoning models
+            # loop forever under the greedy default (Qwen3: "do not use greedy
+            # decoding in thinking mode"), so their entries set this.
+            # <SAMPLING_ENV> (JSON) replaces it, so a run can match the model
+            # currently behind the endpoint without editing models.json.
+            "sampling": (json.loads(env[entry["sampling_env"]])
+                         if env.get(entry.get("sampling_env", "")) else entry.get("sampling")),
+            # Optional context-window pin. Left None, make_model asks the server
+            # (/v1/models -> max_model_len) — which is what you want when one
+            # registry entry fronts several presets with different windows.
+            # Set it only to override what the server reports.
+            "max_input_tokens": entry.get("max_input_tokens")}
