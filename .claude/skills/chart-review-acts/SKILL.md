@@ -56,10 +56,15 @@ must NOT set them: the APOE allele flags (`apoe2`/`apoe3`/`apoe4`) derive from
     `references/CDC_Vaccine_Reference_Table.md` +
     `Active_Amyloid_Tau_Immunization_Reference_Table.md`. `[]` when no vaccine.
 
-1. `list_notes`; use **`search_notes`** for high-signal terms (MCI, dementia,
-   Alzheimer, APOE, ε4, MoCA, MMSE, CDR, Hachinski, NPI, GDS, Cornell, DRS,
-   TICS, postmenopausal, LMP, smoking, pack, education). `read_note`/`read_notes`
-   to read candidates in full.
+1. `list_notes`.
+   Then, for EACH criterion in `references/criteria/*.md`, you MUST call
+   `search_notes` at least once for each phrase listed in that criterion's
+   "Extraction guidance" and "Examples" sections before deciding the answer.
+   Treat those phrases as the authoritative keyword set for the criterion.
+   Skipping the search is not permitted: a field whose `search_notes` returned
+   zero hits may be committed as `unknown` / `none` / `null` per the schema,
+   but the agent transcript must contain the attempted searches as evidence.
+   `read_note`/`read_notes` any hit that looks relevant to the field's rules.
 2. `list_criteria` + `read_criteria([...])` for each field's schema + guidance.
    **Follow each criterion's rules exactly.**
 3. For each DOCUMENTED field, commit one answer via
