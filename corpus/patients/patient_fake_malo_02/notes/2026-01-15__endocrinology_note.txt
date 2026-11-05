@@ -1,0 +1,8 @@
+*** SYNTHETIC RECORD - NOT A REAL PATIENT. Generated for MALO (N1T-MC-MALO) pipeline testing. Any resemblance to a real person is coincidental. ***
+
+ENDOCRINOLOGY CLINIC - 2026-01-15
+
+61-year-old man with type 2 diabetes, HbA1c 8.4% despite metformin and empagliflozin.
+
+PLAN: Start semaglutide (Ozempic) 0.25 mg subcutaneous weekly today, 2026-01-15,
+titrating to 1 mg weekly over eight weeks. Counselled on nausea and injection technique.

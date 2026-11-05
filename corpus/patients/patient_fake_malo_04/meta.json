@@ -1,0 +1,13 @@
+{
+ "patient_id": "patient_fake_malo_04",
+ "category": "malo_synth",
+ "phi": false,
+ "demographics": {
+  "age": 49,
+  "sex": "M"
+ },
+ "index_date": "2026-05-12",
+ "index_date_basis": "date of the most recent note; a working stand-in for the screening visit",
+ "generated_by": "synthetic MALO fixture (N1T-MC-MALO rev 24); NOT real patient data",
+ "fixture_notes": "Both screening measures just below their floors - the case the real run got wrong. IN3 LSM 9.1 kPa is below the 10 kPa floor -> not met, NOT unknown. IN4 MRI-PDFF 6.8% is below 8% -> not met, NOT unknown."
+}

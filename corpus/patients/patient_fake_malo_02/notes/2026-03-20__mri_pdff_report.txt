@@ -1,0 +1,8 @@
+*** SYNTHETIC RECORD - NOT A REAL PATIENT. Generated for MALO (N1T-MC-MALO) pipeline testing. Any resemblance to a real person is coincidental. ***
+
+MRI LIVER PDFF - 2026-03-20
+
+Liver normal in contour, no nodularity, no cirrhosis. Spleen 11.2 cm, normal.
+No ascites. No varices.
+
+MRI-PDFF (liver fat content): 15.1%

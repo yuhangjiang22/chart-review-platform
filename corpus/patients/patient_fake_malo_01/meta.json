@@ -1,0 +1,13 @@
+{
+ "patient_id": "patient_fake_malo_01",
+ "category": "malo_synth",
+ "phi": false,
+ "demographics": {
+  "age": 54,
+  "sex": "F"
+ },
+ "index_date": "2026-03-18",
+ "index_date_basis": "date of the most recent note; a working stand-in for the screening visit",
+ "generated_by": "synthetic MALO fixture (N1T-MC-MALO rev 24); NOT real patient data",
+ "fixture_notes": "Eligible profile. IN2 ELF 9.8 (9-10.8) met; IN3 LSM 14.2 kPa (10-<20) met; IN4 MRI-PDFF 12.4% (>=8) met. EX4 no cirrhosis/portal hypertension not met; EX43 no incretin agonist ever not met; EX9 alcohol below threshold not met."
+}

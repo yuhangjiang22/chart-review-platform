@@ -1,0 +1,22 @@
+*** SYNTHETIC RECORD - NOT A REAL PATIENT. Generated for MALO (N1T-MC-MALO) pipeline testing. Any resemblance to a real person is coincidental. ***
+
+HEPATOLOGY CONSULTATION - 2025-11-04
+
+REASON FOR REFERRAL: Elevated transaminases and hepatic steatosis on imaging.
+
+HPI: 54-year-old woman referred by primary care for persistently elevated ALT over
+18 months. Type 2 diabetes for 6 years on metformin 1000 mg BID. BMI 33.1.
+No alcohol use - she reports none in the last ten years and none before that beyond
+occasional social drinking. No herbal or weight-loss supplements. No NSAIDs.
+
+REVIEW OF OTHER LIVER DISEASE: Hepatitis B surface antigen negative, hepatitis C
+antibody negative (2025-09-12). ANA negative, smooth muscle antibody negative,
+AMA negative. Ferritin 142 ng/mL, transferrin saturation 24%. Ceruloplasmin normal.
+Alpha-1 antitrypsin phenotype MM. No history of drug-induced liver injury.
+
+SOCIAL HISTORY: Alcohol - denies. Tobacco - never. Substance abuse - denies.
+
+ASSESSMENT: Metabolic dysfunction-associated steatotic liver disease with probable
+steatohepatitis. No clinical or biochemical evidence of decompensation.
+
+PLAN: FibroScan, Enhanced Liver Fibrosis panel, MRI-PDFF.

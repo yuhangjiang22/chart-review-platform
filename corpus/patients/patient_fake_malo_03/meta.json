@@ -1,0 +1,13 @@
+{
+ "patient_id": "patient_fake_malo_03",
+ "category": "malo_synth",
+ "phi": false,
+ "demographics": {
+  "age": 58,
+  "sex": "F"
+ },
+ "index_date": "2026-02-24",
+ "index_date_basis": "date of the most recent note; a working stand-in for the screening visit",
+ "generated_by": "synthetic MALO fixture (N1T-MC-MALO rev 24); NOT real patient data",
+ "fixture_notes": "Excluded on cirrhosis with portal hypertension. IN3 LSM 28.4 kPa is above the <20 ceiling -> not met. EX4 nodular liver, splenomegaly 16.2 cm, ascites, varices -> met. EX1 varices banded -> met."
+}

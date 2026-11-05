@@ -1,0 +1,9 @@
+*** SYNTHETIC RECORD - NOT A REAL PATIENT. Generated for MALO (N1T-MC-MALO) pipeline testing. Any resemblance to a real person is coincidental. ***
+
+VIBRATION-CONTROLLED TRANSIENT ELASTOGRAPHY - 2026-04-28
+
+LIVER STIFFNESS MEASUREMENT (LSM): 9.1 kPa
+CONTROLLED ATTENUATION PARAMETER (CAP): 276 dB/m
+Valid measurements 10 of 10, IQR/median 11%.
+
+INTERPRETATION: LSM 9.1 kPa. Below the threshold for advanced fibrosis.

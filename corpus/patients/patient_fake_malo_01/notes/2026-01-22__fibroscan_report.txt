@@ -1,0 +1,11 @@
+*** SYNTHETIC RECORD - NOT A REAL PATIENT. Generated for MALO (N1T-MC-MALO) pipeline testing. Any resemblance to a real person is coincidental. ***
+
+VIBRATION-CONTROLLED TRANSIENT ELASTOGRAPHY (FibroScan) - 2026-01-22
+
+Probe: M. Valid measurements 10 of 10. IQR/median 12%.
+
+LIVER STIFFNESS MEASUREMENT (LSM): 14.2 kPa
+CONTROLLED ATTENUATION PARAMETER (CAP): 338 dB/m
+
+INTERPRETATION: LSM 14.2 kPa is consistent with advanced fibrosis (F3). CAP 338 dB/m
+indicates moderate to severe steatosis. No features of cirrhosis on this study.

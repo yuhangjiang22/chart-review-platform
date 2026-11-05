@@ -1,0 +1,13 @@
+*** SYNTHETIC RECORD - NOT A REAL PATIENT. Generated for MALO (N1T-MC-MALO) pipeline testing. Any resemblance to a real person is coincidental. ***
+
+CT ABDOMEN AND PELVIS WITH CONTRAST - 2025-12-09
+
+LIVER: Nodular surface contour and coarsened echotexture consistent with cirrhosis.
+No focal suspicious lesion.
+SPLEEN: Splenomegaly, 16.2 cm.
+PERITONEUM: Small volume perihepatic ascites.
+VASCULATURE: Portal vein patent, 15 mm. Recanalised paraumbilical vein.
+Gastroesophageal varices present.
+
+IMPRESSION: Cirrhosis with sequelae of portal hypertension - splenomegaly, ascites,
+varices, recanalised paraumbilical vein.

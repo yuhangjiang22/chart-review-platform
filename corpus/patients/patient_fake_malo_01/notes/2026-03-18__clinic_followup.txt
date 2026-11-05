@@ -1,0 +1,19 @@
+*** SYNTHETIC RECORD - NOT A REAL PATIENT. Generated for MALO (N1T-MC-MALO) pipeline testing. Any resemblance to a real person is coincidental. ***
+
+HEPATOLOGY FOLLOW-UP - 2026-03-18
+
+Results reviewed with patient: LSM 14.2 kPa, ELF 9.8, MRI-PDFF 12.4%.
+
+MEDICATIONS: metformin 1000 mg oral tablet BID; atorvastatin 20 mg daily;
+lisinopril 10 mg daily. No GLP-1 receptor agonist, GIP/GLP-1 receptor agonist or
+amylin analogue now or at any time. No vitamin E, no pioglitazone, no resmetirom.
+No systemic glucocorticoids.
+
+ALLERGIES: No known drug allergies.
+
+PAST MEDICAL HISTORY: Type 2 diabetes mellitus, hyperlipidaemia, hypertension.
+No depression or other psychiatric disorder. No cancer. No organ transplant and
+not on any transplant list. No prior bariatric surgery or device-based therapy for
+obesity, and none planned.
+
+ASSESSMENT: MASLD with advanced fibrosis, compensated.

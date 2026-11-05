@@ -1,0 +1,13 @@
+{
+ "patient_id": "patient_fake_malo_02",
+ "category": "malo_synth",
+ "phi": false,
+ "demographics": {
+  "age": 61,
+  "sex": "M"
+ },
+ "index_date": "2026-04-07",
+ "index_date_basis": "date of the most recent note; a working stand-in for the screening visit",
+ "generated_by": "synthetic MALO fixture (N1T-MC-MALO rev 24); NOT real patient data",
+ "fixture_notes": "Excluded on incretin use with an unambiguous date. IN3 LSM 16.8 met; IN4 MRI-PDFF 15.1% met; EX43 semaglutide started 2026-01-15 and ongoing, inside any 6-month window ending at the index date -> met."
+}

@@ -1,0 +1,17 @@
+*** SYNTHETIC RECORD - NOT A REAL PATIENT. Generated for MALO (N1T-MC-MALO) pipeline testing. Any resemblance to a real person is coincidental. ***
+
+MRI LIVER WITH PROTON DENSITY FAT FRACTION - 2026-03-02
+
+TECHNIQUE: Multi-echo gradient echo acquisition. MRE not performed.
+
+FINDINGS:
+Liver: Normal size and contour. No nodularity. No focal lesion. No evidence of
+cirrhosis. Portal vein patent, 11 mm, normal direction of flow.
+Spleen: Normal size, 10.8 cm.
+Peritoneum: No ascites.
+No varices identified.
+
+MRI-PDFF (liver fat content): 12.4%
+
+IMPRESSION: Hepatic steatosis with liver fat content of 12.4% by MRI-PDFF.
+No imaging evidence of cirrhosis or portal hypertension.

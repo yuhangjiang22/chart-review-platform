@@ -1,0 +1,14 @@
+*** SYNTHETIC RECORD - NOT A REAL PATIENT. Generated for MALO (N1T-MC-MALO) pipeline testing. Any resemblance to a real person is coincidental. ***
+
+HEPATOLOGY CLINIC - 2026-04-07
+
+MASLD with advanced fibrosis. LSM 16.8 kPa, MRI-PDFF 15.1%.
+
+MEDICATIONS: metformin 1000 mg BID; empagliflozin 10 mg daily;
+semaglutide (Ozempic) 1 mg subcutaneous weekly - started 2026-01-15, continuing,
+dose stable since 2026-03-12.
+
+He has been on the GLP-1 receptor agonist continuously since January of this year.
+
+SOCIAL: Alcohol - 2 beers per month. Tobacco - former, quit 2011. No drug use.
+ALLERGIES: No known drug allergies.

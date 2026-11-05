@@ -1,0 +1,11 @@
+*** SYNTHETIC RECORD - NOT A REAL PATIENT. Generated for MALO (N1T-MC-MALO) pipeline testing. Any resemblance to a real person is coincidental. ***
+
+ENHANCED LIVER FIBROSIS (ELF) PANEL - 2026-02-10
+
+Hyaluronic acid 58 ng/mL
+PIIINP 9.4 ug/L
+TIMP-1 221 ng/mL
+
+ELF SCORE: 9.8
+
+INTERPRETATION: ELF 9.8 falls in the moderate range, consistent with advanced fibrosis.

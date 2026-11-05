@@ -1,0 +1,13 @@
+*** SYNTHETIC RECORD - NOT A REAL PATIENT. Generated for MALO (N1T-MC-MALO) pipeline testing. Any resemblance to a real person is coincidental. ***
+
+HEPATOLOGY CLINIC - 2026-02-24
+
+Cirrhosis secondary to MASH. Child-Pugh A. MELD-Na 11.
+
+FibroScan 2026-02-10: LSM 28.4 kPa, CAP 301 dB/m.
+
+MEDICATIONS: carvedilol 6.25 mg BID; furosemide 20 mg daily; spironolactone 50 mg daily.
+No GLP-1 receptor agonist. No vitamin E, no pioglitazone.
+
+Liver transplant consideration: not an active consideration at the current MELD.
+ALLERGIES: penicillin (rash).

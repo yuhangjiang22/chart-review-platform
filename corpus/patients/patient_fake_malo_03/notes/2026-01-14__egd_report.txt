@@ -1,0 +1,8 @@
+*** SYNTHETIC RECORD - NOT A REAL PATIENT. Generated for MALO (N1T-MC-MALO) pipeline testing. Any resemblance to a real person is coincidental. ***
+
+ESOPHAGOGASTRODUODENOSCOPY - 2026-01-14
+
+FINDINGS: Three columns of large esophageal varices with red wale signs. Banded -
+six bands placed. No active bleeding. Portal hypertensive gastropathy, moderate.
+
+IMPRESSION: Large esophageal varices, banded. Secondary prophylaxis with carvedilol.

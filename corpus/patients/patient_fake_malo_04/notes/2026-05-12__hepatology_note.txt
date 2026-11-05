@@ -1,0 +1,11 @@
+*** SYNTHETIC RECORD - NOT A REAL PATIENT. Generated for MALO (N1T-MC-MALO) pipeline testing. Any resemblance to a real person is coincidental. ***
+
+HEPATOLOGY CLINIC - 2026-05-12
+
+49-year-old man, BMI 29.4, prediabetes. Referred for mildly elevated ALT.
+
+LSM 9.1 kPa and MRI-PDFF 6.8% - both below the thresholds for this protocol.
+
+MEDICATIONS: rosuvastatin 10 mg daily. No GLP-1 receptor agonist.
+SOCIAL: Alcohol - none. Tobacco - never. Substance abuse - denies.
+ALLERGIES: No known drug allergies.
