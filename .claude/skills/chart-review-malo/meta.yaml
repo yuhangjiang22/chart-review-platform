@@ -1,0 +1,20 @@
+task_type: trial_eligibility_prescreen
+uses_structured_data: false
+review_unit: patient
+status: draft
+manual_version: 24
+source_protocol: N1T-MC-MALO Amendment (a), dated 22-Sep-2025
+source_decomposition: MALO_chart_review.json (NCT07165028, revision 24), from Hongyu Chen
+overview_prose: >-
+  Pre-screening against the eligibility criteria of Lilly trial N1T-MC-MALO
+  (NCT07165028), a MASLD/MASH trial. Each criteria file is one TRAIT from the
+  decomposition component's output, not one protocol criterion - the Circe
+  ALL/ANY/AT_LEAST/AT_MOST logic between traits is applied at aggregation, not by
+  the agent. The agent answers one small factual question per trait and cites the
+  evidence it used. It never decides eligibility.
+  Scope: the 122 traits NOT marked Structured_only; the other
+  91 are answered from structured data by a different lane.
+phases:
+  - author
+  - try
+  - validate

@@ -1,0 +1,38 @@
+---
+field_id: malo_ex43_t2ef68c33
+prompt: "Does the chart document: treatment with GLP-1 receptor agonists within 6 months prior to screening visit (Visit 1)?"
+answer_schema:
+  enum: [condition_met, condition_not_met, unknown, not_applicable]
+cardinality: one
+group: ex43
+polarity: exclusion
+source_trait_id: "t2ef68c33"
+source_criterion_id: EX43
+---
+
+# Trait: treatment with GLP-1 receptor agonists within 6 months prior to screening visit (Visit 1)
+
+## Protocol criterion this trait came from
+
+**EX43** (exclusion), verbatim:
+
+> Treatment with
+>  GLP-1 receptor agonists
+>  GIP/GLP-1 receptor agonists
+>  GLP-1/Glucagon receptor agonists or
+>  GIP/GLP-1/Glucagon receptor agonists
+> within 6 months prior to screening visit (Visit 1) or between screening and
+> randomization visit (Visit 3)
+>  Pramlintide
+>  Amylin receptor agonists
+> within 3 months prior to screening visit (Visit 1) or between screening and
+> randomization visit (Visit 3)
+
+## How to answer
+
+Answer only this trait. Use the criterion text above, and any definition
+above, as context for what the words mean — not as extra conditions to check.
+
+No decision rules have been written for this trait. If it turns on a term the
+protocol does not define, record the chart's own wording in `rationale` and
+answer `unknown` rather than applying a threshold of your own.

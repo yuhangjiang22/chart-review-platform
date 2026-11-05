@@ -1,0 +1,280 @@
+{
+ "task_id": "malo",
+ "note": "One pass per group so retrieval has to serve the criteria in scope. Groups keep each protocol criterion whole and target ~10 traits per pass. Derived from MALO_chart_review.json rev 24; regenerate if the decomposition changes.",
+ "groups": [
+  {
+   "id": "g01",
+   "label": "IN1+IN3+IN4+IN5",
+   "criteria": [
+    "IN1",
+    "IN3",
+    "IN4",
+    "IN5"
+   ],
+   "fields": [
+    "malo_in1_t97a32e18",
+    "malo_in1_t2bc7fd4e",
+    "malo_in3_t6ea94a67",
+    "malo_in4_t09343288",
+    "malo_in4_t1948c975",
+    "malo_in5_tfdb526a9",
+    "malo_in5_tdbee2e11",
+    "malo_in5_t699b0aae",
+    "malo_in5_tb5f91733",
+    "malo_in5_t4fb005f4"
+   ]
+  },
+  {
+   "id": "g02",
+   "label": "EX1+EX4+EX5",
+   "criteria": [
+    "EX1",
+    "EX4",
+    "EX5"
+   ],
+   "fields": [
+    "malo_ex1_t9f76e1db",
+    "malo_ex4_tf0184846",
+    "malo_ex4_da4513c48_1",
+    "malo_ex4_da4513c48_2",
+    "malo_ex4_da4513c48_3",
+    "malo_ex4_t62a5a193",
+    "malo_ex5_d3e485f76_5",
+    "malo_ex5_d3e485f76_13",
+    "malo_ex5_de05dd02d_1",
+    "malo_ex5_de05dd02d_2"
+   ]
+  },
+  {
+   "id": "g03",
+   "label": "EX8+EX9+EX12+EX13+EX14",
+   "criteria": [
+    "EX8",
+    "EX9",
+    "EX12",
+    "EX13",
+    "EX14"
+   ],
+   "fields": [
+    "malo_ex8_t863958e1",
+    "malo_ex8_t8942ea38",
+    "malo_ex9_t9ca69d08",
+    "malo_ex9_tefd16873",
+    "malo_ex12_t90f71f1a",
+    "malo_ex13_t4dcbb048",
+    "malo_ex14_t229f5af5",
+    "malo_ex14_t4d736248",
+    "malo_ex14_td53cbd35",
+    "malo_ex14_tdfe6522c"
+   ]
+  },
+  {
+   "id": "g04",
+   "label": "EX17+EX20+EX21",
+   "criteria": [
+    "EX17",
+    "EX20",
+    "EX21"
+   ],
+   "fields": [
+    "malo_ex17_t921cd56f",
+    "malo_ex17_d93441b05_2",
+    "malo_ex17_d93441b05_3",
+    "malo_ex17_d93441b05_4",
+    "malo_ex20_tefb2695a",
+    "malo_ex21_t49618c4a",
+    "malo_ex21_te297fefd",
+    "malo_ex21_t3d9b2325",
+    "malo_ex21_t39df7144"
+   ]
+  },
+  {
+   "id": "g05",
+   "label": "EX23+EX25+EX26+EX28+EX29",
+   "criteria": [
+    "EX23",
+    "EX25",
+    "EX26",
+    "EX28",
+    "EX29"
+   ],
+   "fields": [
+    "malo_ex23_tf824293b",
+    "malo_ex23_d8c2d2b7c_1",
+    "malo_ex23_t11859542",
+    "malo_ex25_te57e37f8",
+    "malo_ex26_t6a425796",
+    "malo_ex26_tb6107184",
+    "malo_ex28_tc95f4c5e",
+    "malo_ex28_tf0c2ae75",
+    "malo_ex29_tea908dae"
+   ]
+  },
+  {
+   "id": "g06",
+   "label": "EX31+EX32+EX33+EX34",
+   "criteria": [
+    "EX31",
+    "EX32",
+    "EX33",
+    "EX34"
+   ],
+   "fields": [
+    "malo_ex31_tdbfe7a47",
+    "malo_ex31_t2456ecd0",
+    "malo_ex32_tf1ddab3a",
+    "malo_ex33_t50624267",
+    "malo_ex33_taaebe8a0",
+    "malo_ex33_t5980c419",
+    "malo_ex34_t2a35b7ae",
+    "malo_ex34_te31b1431",
+    "malo_ex34_t80d37255",
+    "malo_ex34_taa899e9e"
+   ]
+  },
+  {
+   "id": "g07",
+   "label": "EX35+EX36+EX40+EX41",
+   "criteria": [
+    "EX35",
+    "EX36",
+    "EX40",
+    "EX41"
+   ],
+   "fields": [
+    "malo_ex35_t3f98b79f",
+    "malo_ex36_t92c6ff3f",
+    "malo_ex40_t9002accc",
+    "malo_ex41_tbddf32b9"
+   ]
+  },
+  {
+   "id": "g08",
+   "label": "EX42",
+   "criteria": [
+    "EX42"
+   ],
+   "fields": [
+    "malo_ex42_te7814cb8",
+    "malo_ex42_t370bce53",
+    "malo_ex42_t2f7709f3",
+    "malo_ex42_tdf57833e",
+    "malo_ex42_d9d5dcf25_1",
+    "malo_ex42_t2417a063",
+    "malo_ex42_t75996e8c",
+    "malo_ex42_t821d0415"
+   ]
+  },
+  {
+   "id": "g09",
+   "label": "EX43",
+   "criteria": [
+    "EX43"
+   ],
+   "fields": [
+    "malo_ex43_t2ef68c33",
+    "malo_ex43_taca6586d",
+    "malo_ex43_t5f8890b6",
+    "malo_ex43_t414eea1f",
+    "malo_ex43_t42a8cd18",
+    "malo_ex43_t50f0ae3f",
+    "malo_ex43_t47c54a44",
+    "malo_ex43_tfbb44088",
+    "malo_ex43_t3e76ae8b",
+    "malo_ex43_tb8fca927",
+    "malo_ex43_t4b900330",
+    "malo_ex43_t2eb87fbe"
+   ]
+  },
+  {
+   "id": "g10",
+   "label": "EX44+EX45",
+   "criteria": [
+    "EX44",
+    "EX45"
+   ],
+   "fields": [
+    "malo_ex44_t62d77ee5",
+    "malo_ex44_t53e4565d",
+    "malo_ex44_tc3ac8a65",
+    "malo_ex44_te00cb327",
+    "malo_ex45_t1bb90ea6",
+    "malo_ex45_tf79f8e55",
+    "malo_ex45_t48e86af7"
+   ]
+  },
+  {
+   "id": "g11",
+   "label": "EX46+EX47",
+   "criteria": [
+    "EX46",
+    "EX47"
+   ],
+   "fields": [
+    "malo_ex46_tf958d4ae",
+    "malo_ex46_t59dfe53e",
+    "malo_ex46_tb2dc1521",
+    "malo_ex46_t40baad3b",
+    "malo_ex46_t25d5cac7",
+    "malo_ex46_ta4c4cbe4",
+    "malo_ex46_t2440ae10",
+    "malo_ex46_t7220bbf4",
+    "malo_ex47_t4d8ffc0f"
+   ]
+  },
+  {
+   "id": "g12",
+   "label": "EX48+EX49+EX50",
+   "criteria": [
+    "EX48",
+    "EX49",
+    "EX50"
+   ],
+   "fields": [
+    "malo_ex48_t688f4990",
+    "malo_ex48_t6cec3173",
+    "malo_ex48_tf16f8611",
+    "malo_ex48_t813339bb",
+    "malo_ex49_tbae66db2",
+    "malo_ex50_t452f1269"
+   ]
+  },
+  {
+   "id": "g13",
+   "label": "EX51",
+   "criteria": [
+    "EX51"
+   ],
+   "fields": [
+    "malo_ex51_t5e9681dc",
+    "malo_ex51_da13124c8_1",
+    "malo_ex51_da13124c8_2",
+    "malo_ex51_t37d869e6",
+    "malo_ex51_defa26751_1",
+    "malo_ex51_defa26751_2",
+    "malo_ex51_defa26751_3",
+    "malo_ex51_t9e8f90c3",
+    "malo_ex51_td41ac547"
+   ]
+  },
+  {
+   "id": "g14",
+   "label": "EX52+EX53",
+   "criteria": [
+    "EX52",
+    "EX53"
+   ],
+   "fields": [
+    "malo_ex52_t6878fbc2",
+    "malo_ex52_tdbf40d21",
+    "malo_ex52_d2ba27fdd_1",
+    "malo_ex52_d2ba27fdd_2",
+    "malo_ex52_d2ba27fdd_3",
+    "malo_ex52_d2ba27fdd_4",
+    "malo_ex52_d2ba27fdd_5",
+    "malo_ex53_t7a250279",
+    "malo_ex53_td5069aa7"
+   ]
+  }
+ ]
+}
