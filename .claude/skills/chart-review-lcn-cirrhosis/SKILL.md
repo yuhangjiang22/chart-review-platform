@@ -122,12 +122,16 @@ proposal) are derived from your leaves. To change them, fix a leaf.
 ## Workflow
 
 1. **Notes first** (the definition doc: "use notes first, ICD code might be
-   used later"). `list_notes`; `search_notes` for high-signal terms
-   ("cirrhosis", "nodular", "splenomegaly", "FibroScan", "kPa", "varices",
-   "EGD", "ascites", "paracentesis", "encephalopathy", "lactulose",
-   "hematemesis", "melena", "MELD", "Child-Pugh", "TIPS", "biopsy",
-   "METAVIR"); `read_note` on candidates. Radiology, endoscopy, pathology and
-   hepatology notes are the primary sources.
+   used later"). `list_notes`.
+   Then, for EACH criterion in `references/criteria/*.md`, you MUST call
+   `search_notes` at least once for each phrase listed in that criterion's
+   "Extraction guidance" and "Examples" sections before deciding the answer.
+   Treat those phrases as the authoritative keyword set for the criterion.
+   Skipping the search is not permitted: a field whose `search_notes` returned
+   zero hits may be committed as `unknown` / `none` / `null` per the schema,
+   but the agent transcript must contain the attempted searches as evidence.
+   `read_note` any hit that looks relevant. Radiology, endoscopy, pathology
+   and hepatology notes are the primary sources.
 2. **Structured data corroborates.** `read_structured_data`:
    `measurements` (platelets, FIB-4 inputs — AST/ALT/platelets/age —, MELD-Na
    components, elastography values when coded), `procedures` (biopsy, EGD,
