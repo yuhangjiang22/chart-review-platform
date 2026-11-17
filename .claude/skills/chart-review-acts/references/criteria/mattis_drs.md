@@ -7,6 +7,9 @@ answer_schema:
   maximum: 144
 cardinality: one
 group: cognitive_scales
+uses:
+  keyword_sets:
+    - kw_mattis_drs
 ---
 
 # Criterion: mattis_drs

@@ -15,6 +15,9 @@ answer_schema:
       Verification_Status: { enum: [confirmed, unconfirmed, refuted, entered-in-error] }
 cardinality: one
 group: allergy
+uses:
+  keyword_sets:
+    - kw_allergen
 ---
 
 # Criterion: allergen

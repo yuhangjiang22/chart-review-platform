@@ -6,6 +6,9 @@ answer_schema:
 cardinality: one
 group: smoking
 is_applicable_when: 'smoking_status == "former"'
+uses:
+  keyword_sets:
+    - kw_smoking_tobacco
 ---
 
 # Criterion: quit_time

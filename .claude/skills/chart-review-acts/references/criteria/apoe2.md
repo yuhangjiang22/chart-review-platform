@@ -9,6 +9,9 @@ answer_schema:
 cardinality: one
 group: genotype
 derivation: 'apoe_genotype in ["e2/e2","e2/e3","e2/e4","e2_carrier"] ? "1" : apoe_genotype in ["e3/e3","e3/e4","e4/e4"] ? "0" : "NA"'
+uses:
+  keyword_sets:
+    - kw_apoe
 ---
 
 # Criterion: apoe2 (computed)

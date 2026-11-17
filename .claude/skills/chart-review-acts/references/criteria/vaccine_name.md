@@ -12,6 +12,9 @@ answer_schema:
       Administration_Date: {}
 cardinality: one
 group: vaccine
+uses:
+  keyword_sets:
+    - kw_vaccine
 ---
 
 # Criterion: vaccine_name

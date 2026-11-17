@@ -7,6 +7,9 @@ answer_schema:
   maximum: 41
 cardinality: one
 group: cognitive_scales
+uses:
+  keyword_sets:
+    - kw_tics
 ---
 
 # Criterion: tics_score

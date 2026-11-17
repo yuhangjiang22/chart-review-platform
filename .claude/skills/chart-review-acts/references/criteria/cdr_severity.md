@@ -9,6 +9,9 @@ derivation: 'cdr_global == "0" ? "normal" : cdr_global == "0.5" ? "very_mild" : 
 required: false
 role: interpretive
 required_note: "NOT REQUIRED — interpretation band auto-derived from cdr_global; guideline lists severity as context only."
+uses:
+  keyword_sets:
+    - kw_cdr
 ---
 
 # Criterion: cdr_severity (computed)

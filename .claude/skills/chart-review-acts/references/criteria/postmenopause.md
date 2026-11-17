@@ -7,6 +7,9 @@ answer_schema:
     - "0"
 cardinality: one
 group: reproductive
+uses:
+  keyword_sets:
+    - kw_menopause
 ---
 
 # Criterion: postmenopause

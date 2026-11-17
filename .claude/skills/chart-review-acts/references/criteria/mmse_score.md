@@ -7,6 +7,9 @@ answer_schema:
   maximum: 30
 cardinality: one
 group: cognitive_scales
+uses:
+  keyword_sets:
+    - kw_mmse
 ---
 
 # Criterion: mmse_score

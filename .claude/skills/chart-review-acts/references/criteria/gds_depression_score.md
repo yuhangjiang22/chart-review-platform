@@ -7,6 +7,9 @@ answer_schema:
   maximum: 30
 cardinality: one
 group: depression_scales
+uses:
+  keyword_sets:
+    - kw_gds
 ---
 
 # Criterion: gds_depression_score
