@@ -33,21 +33,30 @@ export function findQuoteOffsetsImpl(
     };
   }
 
-  // Path 1: exact substring.
-  const exactStart = text.indexOf(snippet);
+  // Both match paths are case-insensitive: the LLM often re-types a quote
+  // with different capitalization (TitleCase section headers vs an all-caps
+  // chart, "MoCA" vs "moca"), and a strict case-sensitive match stalls the
+  // agent in a set→find→loop retry storm. The returned `verbatim_quote` is
+  // always the ORIGINAL text at the matched offsets, so downstream faithfulness
+  // checks still see what the chart actually said.
+  const textLc = text.toLowerCase();
+  const snippetLc = snippet.toLowerCase();
+
+  // Path 1: exact substring (case-insensitive).
+  const exactStart = textLc.indexOf(snippetLc);
   if (exactStart >= 0) {
     return {
       ok: true,
       note_id: filename.replace(/\.txt$/, ""),
       span_offsets: [exactStart, exactStart + snippet.length],
-      verbatim_quote: snippet,
+      verbatim_quote: text.slice(exactStart, exactStart + snippet.length),
       match: "exact",
     };
   }
 
-  // Path 2: whitespace-tolerant.
+  // Path 2: whitespace-tolerant (case-insensitive).
   const normalize = (s: string) => s.replace(/\s+/g, " ").trim();
-  const target = normalize(snippet);
+  const target = normalize(snippetLc);
   if (target.length === 0) {
     return {
       ok: false,
@@ -58,13 +67,13 @@ export function findQuoteOffsetsImpl(
   const seedNoWs = target.slice(0, Math.min(30, target.length)).replace(/ /g, "");
   const MAX_SCAN = Math.min(text.length, 200_000);
   for (let start = 0; start < MAX_SCAN; start++) {
-    if (/\s/.test(text[start])) continue;
-    if (text[start] !== seedNoWs[0]) continue;
+    if (/\s/.test(textLc[start])) continue;
+    if (textLc[start] !== seedNoWs[0]) continue;
     let i = start;
     let j = 0;
     let lastWasSpace = false;
     while (i < text.length && j < target.length) {
-      const ti = text[i];
+      const ti = textLc[i];
       const tj = target[j];
       if (/\s/.test(ti)) {
         if (!lastWasSpace) {

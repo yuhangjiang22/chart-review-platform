@@ -887,10 +887,27 @@ export function canonicalizeStringAnswer(
  * deterministic tool output, auditable in the transcript, and adjudicable by the
  * reviewer. The default (absent flag) stays note-grounded.
  */
+/** Minimal note-evidence view the citation gate reads. All fields are optional
+ *  because `evidenceSchema` accepts `nullish` for every field at the wire level;
+ *  the gate itself discriminates `source === "note"` and tolerates missing bits. */
+interface NoteCitation {
+  source?: string;
+  verbatim_quote?: string | null;
+  note_id?: string | null;
+  span_offsets?: readonly [number, number] | number[] | null;
+}
+
+/** Resolver that returns the real note text at [start, end) for a note_id,
+ *  or `null` if the note/offsets can't be read. Supplied by the impure caller
+ *  (`applyUiAction`, which has `patientId` in scope). When omitted the gate
+ *  only checks `verbatim_quote` — the original pure-function behavior. */
+export type ReadNoteSpan = (noteId: string, start: number, end: number) => string | null;
+
 export function assertNumericAnswerCited(
   field: { id: string; answer_schema?: unknown; numeric_grounding?: string },
   answer: unknown,
-  evidence: Array<{ source?: string; verbatim_quote?: string }> | undefined,
+  evidence: NoteCitation[] | undefined,
+  readNoteSpan?: ReadNoteSpan,
 ): void {
   const schema = field.answer_schema as { type?: string; enum?: unknown[] } | undefined;
   const t = schema?.type;
@@ -901,19 +918,47 @@ export function assertNumericAnswerCited(
   const n = typeof answer === "number" ? answer : Number(String(answer).trim());
   if (!Number.isFinite(n)) return; // non-numbers are assertAnswerInRange's job
   const token = String(n).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  // the answer's numeric value must appear as a standalone number in a cited span
+  // the answer's numeric value must appear as a standalone number somewhere
+  // in the cited evidence — either in the agent-written quote or in the real
+  // note text at the cited offsets.
   const re = new RegExp(`(?<![\\d.])${token}(?![\\d.])`);
-  const grounded = (evidence ?? [])
-    .filter((e) => e?.source === "note")
-    .some((e) => re.test(e?.verbatim_quote ?? ""));
-  if (!grounded) {
-    throw new ReviewStateError(
-      "numeric_not_cited",
-      `numeric field "${field.id}" was answered ${JSON.stringify(answer)} but no cited note quote contains that number. ` +
-        "If the chart documents no value for this scale, leave the answer null (do NOT write 0 or a placeholder). " +
-        "If a value IS documented, cite the exact note span that contains the number.",
-    );
+  const noteEv = (evidence ?? []).filter((e) => e?.source === "note");
+
+  // Fast path: the agent's verbatim_quote claims the number. This is the
+  // original behavior and covers every non-paraphrased citation.
+  if (noteEv.some((e) => re.test(e?.verbatim_quote ?? ""))) return;
+
+  // Fallback: the agent paraphrased the snippet (so the quote itself doesn't
+  // carry the digit) but the real span DOES. Reading the note at the cited
+  // offsets and checking the actual text preserves the anti-fabrication
+  // guarantee — fabrication means no real note span contains the number —
+  // while unsticking the paraphrase-driven set→find→loop retry storm the
+  // deepagents stack is prone to.
+  if (readNoteSpan) {
+    for (const e of noteEv) {
+      const noteId = e.note_id ?? "";
+      if (!noteId) continue;
+      const spans = e.span_offsets;
+      if (!Array.isArray(spans) || spans.length < 2) continue;
+      const start = spans[0];
+      const end = spans[1];
+      if (typeof start !== "number" || typeof end !== "number" || end <= start) continue;
+      let actual: string | null;
+      try {
+        actual = readNoteSpan(noteId, start, end);
+      } catch {
+        continue;
+      }
+      if (actual && re.test(actual)) return;
+    }
   }
+
+  throw new ReviewStateError(
+    "numeric_not_cited",
+    `numeric field "${field.id}" was answered ${JSON.stringify(answer)} but no cited note quote or span contains that number. ` +
+      "If the chart documents no value for this scale, leave the answer null (do NOT write 0 or a placeholder). " +
+      "If a value IS documented, cite the exact note span that contains the number.",
+  );
 }
 
 interface EntitySchema {
@@ -1292,16 +1337,9 @@ export function transitionReviewState(
       assertAnswerInEnum(field, action.payload.answer);
       assertAnswerInRange(field, action.payload.answer);
       assertAnswerEntities(field, action.payload.answer, by === "agent");
-      // Numeric-grounding gate applies to AGENT writes only — reviewers are the
-      // trusted adjudicators and may enter a chart-read value without machine
-      // citation; the gate exists to stop an agent fabricating an undocumented score.
-      if (by === "agent") {
-        assertNumericAnswerCited(
-          field,
-          action.payload.answer,
-          action.payload.evidence as Array<{ source?: string; verbatim_quote?: string }> | undefined,
-        );
-      }
+      // The numeric-citation gate lives in applyUiAction so it can resolve
+      // the real note text at the cited span (paraphrase fallback). The
+      // pure transition only runs enum/range/entity checks.
       const canonicalPayload = {
         ...action.payload,
         answer: canonicalizeStringAnswer(
@@ -1561,6 +1599,31 @@ export function applyUiAction(
   if (action.type === "set_field_assessment" && by === "agent") {
     const f = task.fields.find((x) => x.id === action.payload.field_id);
     if (f) assertEntityEvidenceFaithful(patientId, f, action.payload.answer);
+  }
+  // Numeric-citation gate (agent writes only). Reviewers are trusted
+  // adjudicators and may enter a chart-read value without machine citation;
+  // the gate exists to stop an agent fabricating an undocumented score.
+  // Fast path checks verbatim_quote; fallback reads the real note span so
+  // a paraphrased quote whose span DOES contain the number is accepted.
+  // See the function's doc for why fabrication is still caught.
+  if (action.type === "set_field_assessment" && by === "agent") {
+    const f = task.fields.find((x) => x.id === action.payload.field_id);
+    if (f) {
+      assertNumericAnswerCited(
+        f,
+        action.payload.answer,
+        action.payload.evidence as NoteCitation[] | undefined,
+        (noteId, start, end) => {
+          try {
+            const filename = noteId.endsWith(".txt") ? noteId : `${noteId}.txt`;
+            const txt = readNote(patientId, filename);
+            return txt.slice(start, end);
+          } catch {
+            return null;
+          }
+        },
+      );
+    }
   }
 
   const current = loadOrCreate(patientId, task);
