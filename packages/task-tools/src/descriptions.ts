@@ -14,8 +14,8 @@ export const TOOL_DESCRIPTIONS: Record<string, string> = {
   get_note_section: "Pull just a note's relevant sections (Assessment/Labs/HPI…) — cheaper than full text.",
   // Criteria (phenotype)
   list_criteria: "List the rubric's criteria (the fields to answer).",
-  read_criterion: "Read one criterion's definition + extraction guidance.",
-  read_criteria: "Read several criteria at once.",
+  read_criterion: "Read one criterion's definition + extraction guidance. When the criterion declares `uses.keyword_sets`, the response also carries `pre_retrieved_evidence` — note snippets the platform has already fetched by running search_notes for every term in those sets. Answer from these hits (plus any further search_notes / read_note calls you make); never claim retrieved evidence that is not present in a hit list.",
+  read_criteria: "Read several criteria at once. Each criterion entry may carry `pre_retrieved_evidence` with platform-fetched note snippets, same contract as read_criterion.",
   // Write / evidence (phenotype)
   find_quote_offsets: "Locate a verbatim quote's character offsets in a note (for faithful citation).",
   set_field_assessment: "Commit an answer + rationale + evidence for one criterion (faithfulness-gated write).",

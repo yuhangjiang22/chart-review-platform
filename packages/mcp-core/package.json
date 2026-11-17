@@ -20,6 +20,7 @@
     "@chart-review/patients": "*",
     "@chart-review/rubric": "*",
     "@chart-review/tasks": "*",
+    "yaml": "^2.6.0",
     "zod": "^3.23.0"
   }
 }
