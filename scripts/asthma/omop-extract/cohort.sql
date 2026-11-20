@@ -1,6 +1,6 @@
 /*********************************************************************************
 * cohort.sql — Pediatric asthma adherence cohort  (OHDSI SQL / SqlRender source)
-*                                                        instrument v0.5
+*                                                        instrument v0.6
 *
 * Render for YOUR dialect with OHDSI SqlRender, e.g. (R):
 *   SqlRender::render(sql, cdm_database_schema='omop_cdm', min_age=2, max_age=17,
@@ -14,7 +14,7 @@
 * concept_ancestor; standard visit_concept_ids). No dialect-specific syntax —
 * date math uses SqlRender's DATEADD/YEAR (translated per dialect).
 *
-* ── DEFINITION (instrument v0.5) ───────────────────────────────────────────────
+* ── DEFINITION (instrument v0.6) ───────────────────────────────────────────────
 *   - Asthma: condition_concept_id IN descendants of SNOMED 317009 (ICD-10 J45.x
 *     AND ICD-9 493.x map in via the standard concept — coding-scheme independent).
 *   - An encounter is ASTHMA-RELATED when an asthma condition_occurrence is linked
@@ -30,6 +30,9 @@
 *     >= @min_prior_observation_days before index_date (OMOP observation_period).
 *   - AND has >= @min_notes_12mo notes in the lookback window. DEFAULT 0, i.e.
 *     OFF — see WHY THE NOTE FLOOR IS OPT-IN below.
+*   - EXCLUDED if the patient has ANY condition record of cystic fibrosis,
+*     bronchiectasis or bronchopulmonary dysplasia — see CHRONIC LUNG DISEASE
+*     EXCLUSION below.
 *
 * ── WHY THE PRIOR-OBSERVATION REQUIREMENT ─────────────────────────────────────
 * Without it, a child whose records begin four months before index is scored
@@ -92,6 +95,23 @@
 * draw, so you know what a given floor costs before you pay it. Sites that store
 * documents elsewhere should filter on their own count instead.
 *
+* ── CHRONIC LUNG DISEASE EXCLUSION ────────────────────────────────────────────
+* The protocol's Cohort Definition excludes patients "with a primary diagnosis of
+* cystic fibrosis, bronchiectasis, or other chronic lung disease that would
+* confound asthma management assessment". Implemented as any condition record,
+* at any date, under one of three standard SNOMED concepts (plus descendants):
+*     441267   Cystic fibrosis
+*     256449   Bronchiectasis
+*     4283942  Bronchopulmonary dysplasia of newborn
+* Any record, not "primary": OMOP does not carry a reliable primary-diagnosis
+* flag across sites, and these are lifelong conditions, so one record is enough.
+* None of the three concept trees overlaps the asthma tree (checked against the
+* OMOP vocabulary). The broader SNOMED "Chronic lung disease" (4186898) is NOT
+* used: its descendants include an asthma concept, so it would remove asthma
+* patients. Adding further conditions is a study-level decision — coordinate it
+* centrally, never per site. Verify the three ids resolve in your vocabulary
+* release (conformance.sql does not check them).
+*
 * SEVERITY is deliberately NOT emitted. It is a clinical judgment, not a codeable
 * field, and its structured proxies (controller class and dose, exacerbation
 * count) are computed downstream in the extract step, which already has the drug
@@ -110,6 +130,14 @@ asthma_pts AS (
   SELECT DISTINCT co.person_id
   FROM @cdm_database_schema.condition_occurrence co
   INNER JOIN asthma a ON co.condition_concept_id = a.cid
+),
+-- Chronic lung disease exclusion (see header): any record, any date.
+confounded AS (
+  SELECT DISTINCT co.person_id
+  FROM @cdm_database_schema.condition_occurrence co
+  INNER JOIN @cdm_database_schema.concept_ancestor ca
+    ON ca.descendant_concept_id = co.condition_concept_id
+  WHERE ca.ancestor_concept_id IN (441267, 256449, 4283942)
 ),
 -- Encounters an asthma diagnosis is actually attached to. The link is
 -- visit_occurrence_id, NOT a same-day match: a same-day rule flags every
@@ -208,6 +236,7 @@ FROM idx_age ia
 INNER JOIN lookback lb ON lb.person_id = ia.person_id
 INNER JOIN obs ob ON ob.person_id = ia.person_id
 LEFT JOIN notes nt ON nt.person_id = ia.person_id
+LEFT JOIN confounded cf ON cf.person_id = ia.person_id
 WHERE ia.age_at_index BETWEEN @min_age AND @max_age
   AND lb.n_asthma_encounters_12mo >= @min_asthma_encounters
   -- At least one non-ED encounter: the study audits OUTPATIENT guideline
@@ -225,6 +254,8 @@ WHERE ia.age_at_index BETWEEN @min_age AND @max_age
   -- has NULL here, and `NULL >= 0` is UNKNOWN — which would drop exactly the
   -- patients the default is supposed to keep.
   AND COALESCE(nt.n_notes_12mo, 0) >= @min_notes_12mo
+  -- Chronic lung disease exclusion (see header).
+  AND cf.person_id IS NULL
   -- Study window on the index date. Default is post-2020 (>= 2021-01-01) so EVERY
   -- patient falls under ONE guideline edition — the 2020 NAEPP Focused Update —
   -- and no one is scored against SMART/LAMA before it existed. Widen (e.g.
