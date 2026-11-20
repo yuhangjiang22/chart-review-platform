@@ -14,6 +14,8 @@ An LLM agent reads every patient's chart and drafts each answer **with the exact
 
 </div>
 
+> **Participating site for the pediatric asthma adherence study?** Start at [`scripts/asthma/SITE-GUIDE.md`](scripts/asthma/SITE-GUIDE.md) and run a tagged release (`asthma-vX.Y.Z`), not `main`.
+
 ---
 
 Clinical chart review — reading a record to answer a fixed set of structured questions — is a bottleneck in observational research: slow, expensive, and hard to reproduce. This platform puts an LLM **agent** in front of the human reviewer as a *first-drafter*. Three properties make it more than "an LLM with a form":

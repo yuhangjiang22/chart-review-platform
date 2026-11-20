@@ -131,6 +131,12 @@ export function mergeAdherenceImport(
     ruleEventsProvenance?: RuleEventsProvenance;
     adherenceExcluded?: boolean;
     adherenceExclusionReason?: string;
+    /** Which model produced the draft (stamped by the batch runner). The
+     *  calibration package reads these from the review_state, so the import
+     *  must carry them across — it did not, and every package built from a
+     *  real run reported "(unrecorded)". */
+    agentModel?: string;
+    agentBackend?: string;
     agentQuestionAnswers: Record<string, unknown[]>;
     agentRuleVerdicts: Record<string, unknown[]>;
     agentRuleEvents: Record<string, RuleEvent[]>;
@@ -138,7 +144,7 @@ export function mergeAdherenceImport(
 ): Record<string, unknown> {
   const {
     questionAnswers, ruleVerdicts, ruleEvents, ruleRollups, ruleEventsProvenance,
-    adherenceExcluded, adherenceExclusionReason,
+    adherenceExcluded, adherenceExclusionReason, agentModel, agentBackend,
     agentQuestionAnswers, agentRuleVerdicts, agentRuleEvents,
   } = input;
 
@@ -184,6 +190,13 @@ export function mergeAdherenceImport(
 
   if (adherenceExcluded !== undefined) out.adherence_excluded = adherenceExcluded;
   if (adherenceExclusionReason) out.adherence_exclusion_reason = adherenceExclusionReason;
+
+  // Model identity: the new draft's when it carries one, else whatever was
+  // recorded before (a draft from an older runner has none).
+  const model = agentModel ?? (existing.agent_model as string | undefined);
+  const backend = agentBackend ?? (existing.agent_backend as string | undefined);
+  if (model) out.agent_model = model;
+  if (backend) out.agent_backend = backend;
 
   // Event-level concordance (spec 2026-08-24): reviewer-sourced events win
   // by event_id on reimport; agent_rule_events MERGES per-agent key (see
@@ -415,6 +428,7 @@ export const jobsRoutes: RouteEntry[] = [
         rule_events_provenance?: RuleEventsProvenance;
         excluded?: boolean;
         exclusion_reason?: string;
+        agent_model?: string; agent_backend?: string;
         task_kind?: string;
         encounters?: unknown[];
       };
@@ -433,6 +447,8 @@ export const jobsRoutes: RouteEntry[] = [
       let ruleEventsProvenance: RuleEventsProvenance | undefined;
       let adherenceExcluded: boolean | undefined;
       let adherenceExclusionReason: string | undefined;
+      let agentModel: string | undefined;
+      let agentBackend: string | undefined;
       // Per-agent shadow drafts for adherence so the UI can render A/B
       // provenance per question. The canonical question_answers stays
       // first-agent-wins (the reviewer's starting point); these are
@@ -478,6 +494,9 @@ export const jobsRoutes: RouteEntry[] = [
           adherenceExcluded = draft.excluded;
           adherenceExclusionReason = draft.exclusion_reason;
         }
+        // First-agent-wins, like the canonical answers it describes.
+        if (typeof draft.agent_model === "string" && agentModel === undefined) agentModel = draft.agent_model;
+        if (typeof draft.agent_backend === "string" && agentBackend === undefined) agentBackend = draft.agent_backend;
         if (Array.isArray(draft.span_labels)) {
           for (const s of draft.span_labels) {
             const sid = String(s.span_id ?? "");
@@ -569,7 +588,7 @@ export const jobsRoutes: RouteEntry[] = [
           reviewState,
           mergeAdherenceImport(existing, {
             questionAnswers, ruleVerdicts, ruleEvents, ruleRollups, ruleEventsProvenance,
-            adherenceExcluded, adherenceExclusionReason,
+            adherenceExcluded, adherenceExclusionReason, agentModel, agentBackend,
             agentQuestionAnswers, agentRuleVerdicts, agentRuleEvents,
           }),
         );

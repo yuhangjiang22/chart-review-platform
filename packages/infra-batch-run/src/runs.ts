@@ -460,7 +460,7 @@ import { pathFor } from "@chart-review/storage";
 // SECRET-BEARING endpoint resolver — it reads python/models.json + env to
 // return the LLM connection details the direct-LLM NER extractor needs. It is
 // never wired into an Express route (unlike the presence-only `listModels`).
-import { resolveModelEndpoint } from "../../../server/lib/model-registry.js";
+import { resolveModelEndpoint, listModels } from "../../../server/lib/model-registry.js";
 
 /** Load the per-note labeling prompt body from the task's skill bundle
  *  (references/pernote_prompt.md). Falls back to a minimal instruction when the
@@ -1893,14 +1893,17 @@ async function runOneAgent(
         //
         // Identity only. The endpoint and the key are the site's own and are
         // irrelevant to comparability.
-        agent_model: effectiveModel,
+        // A non-PHI patient with no per-agent model leaves effectiveModel
+        // undefined and the sidecar picks the registry default — so record
+        // that default's key, or the draft says nothing about which model ran.
+        agent_model: effectiveModel ?? listModels().default ?? undefined,
         // The RESOLVED backend, not $DEEPAGENTS_LLM_BACKEND. That variable is
         // the global default for a model the registry has no entry for; a model
         // it DOES know routes by its own entry, so reading the variable recorded
         // "vllm" for a gpt-5.4-mini call that went to Azure. A wrong backend is
         // worse than none — it is exactly the field a reader would trust to tell
         // two sites' results apart. Caught on the first real run that used it.
-        agent_backend: resolveModelEndpoint(effectiveModel ?? "")?.mode
+        agent_backend: resolveModelEndpoint(effectiveModel ?? listModels().default ?? "")?.mode
           ?? process.env.DEEPAGENTS_LLM_BACKEND,
       });
       adherenceDraftWritten = true;

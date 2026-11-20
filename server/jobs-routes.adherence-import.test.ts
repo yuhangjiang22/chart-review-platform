@@ -155,3 +155,28 @@ describe("the Agent column shows the LATEST run", () => {
     expect(shadows.agent_2!.map((e) => e.event_id)).toEqual(["e2"]);
   });
 });
+
+describe("which model produced the draft survives the import", () => {
+  // The calibration package reads agent_model / agent_backend from the session's
+  // review_state, not from the run draft. The import dropped both, so every
+  // calibration package built from a real run reported "(unrecorded)" — found by
+  // the first end-to-end site rehearsal (2026-11-20), not by the round-trip test,
+  // which hand-placed the fields in the state it then read back.
+  it("carries agent_model and agent_backend from the draft into the state", () => {
+    const out = mergeAdherenceImport({}, draftInput({
+      questionAnswers: [qa("Q1", true, "agent")],
+      agentModel: "gpt-4o", agentBackend: "azure",
+    }));
+    expect(out.agent_model).toBe("gpt-4o");
+    expect(out.agent_backend).toBe("azure");
+  });
+
+  it("keeps the previously recorded model when a draft carries none", () => {
+    const out = mergeAdherenceImport(
+      { agent_model: "gpt-4o", agent_backend: "azure" },
+      draftInput({ questionAnswers: [qa("Q1", true, "agent")] }),
+    );
+    expect(out.agent_model).toBe("gpt-4o");
+    expect(out.agent_backend).toBe("azure");
+  });
+});
