@@ -7,6 +7,9 @@ answer_schema:
   maximum: 38
 cardinality: one
 group: depression_scales
+uses:
+  keyword_sets:
+    - kw_cornell_csdd
 ---
 
 # Criterion: cornell_csdd

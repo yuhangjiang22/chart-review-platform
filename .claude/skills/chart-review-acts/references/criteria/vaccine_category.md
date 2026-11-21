@@ -7,6 +7,9 @@ cardinality: many
 group: vaccine
 required: false
 derivation: 'entity_attr(vaccine_name, Category)'
+uses:
+  keyword_sets:
+    - kw_vaccine
 ---
 
 # Criterion: vaccine_category (computed)

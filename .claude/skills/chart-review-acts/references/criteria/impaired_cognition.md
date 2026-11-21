@@ -7,6 +7,9 @@ answer_schema:
     - "0"
 cardinality: one
 group: cognition
+uses:
+  keyword_sets:
+    - kw_impaired_cognition
 ---
 
 # Criterion: impaired_cognition

@@ -5,6 +5,9 @@ answer_schema:
   enum: ["0", "0.5", "1", "2", "3"]
 cardinality: one
 group: staging
+uses:
+  keyword_sets:
+    - kw_cdr
 ---
 
 # Criterion: cdr_global

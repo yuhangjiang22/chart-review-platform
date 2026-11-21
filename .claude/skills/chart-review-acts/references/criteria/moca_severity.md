@@ -9,6 +9,9 @@ derivation: 'moca_score >= 26 ? "normal" : moca_score >= 18 ? "mild" : moca_scor
 required: false
 role: interpretive
 required_note: "NOT REQUIRED — interpretation band auto-derived from moca_score; guideline lists severity as context only."
+uses:
+  keyword_sets:
+    - kw_moca
 ---
 
 # Criterion: moca_severity (computed)

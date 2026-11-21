@@ -1,6 +1,12 @@
 import fs from "fs";
 import path from "path";
-import { guidelineDir, guidelinesRoot, loadSkillBundle, isSkillBundleAt } from "@chart-review/rubric";
+import {
+  guidelineDir,
+  guidelinesRoot,
+  loadSkillBundle,
+  isSkillBundleAt,
+  type OperationalLayer,
+} from "@chart-review/rubric";
 
 /**
  * Top-level task kind discriminator. Used to dispatch phase routes, MCP
@@ -59,6 +65,11 @@ export interface CompiledTask {
   final_output?: string;
   overview_prose?: string;
   fields: CompiledField[];
+  /** Accumulated operational knowledge (keyword_sets, code_sets, edge_cases,
+   *  exemplars, note_type_filters) populated by loadSkillBundle at task load.
+   *  Optional at the type level because some draft or test-fixture tasks may
+   *  not expose the layer; present for every runtime-compiled task. */
+  operational?: OperationalLayer;
 }
 
 /**

@@ -12,6 +12,7 @@
 // protocol. Adapters only translate transport-specific message shapes.
 
 import { z } from "zod";
+import { parse as parseYaml } from "yaml";
 import { findQuoteOffsetsImpl } from "@chart-review/find-quote-offsets";
 import type { CompiledTask } from "@chart-review/tasks";
 import {
@@ -865,6 +866,110 @@ export async function listCriteriaTool(
   }
 }
 
+// ── Path A: keyword-set pre-fetch ─────────────────────────────────────
+//
+// When a criterion's YAML frontmatter declares `uses.keyword_sets: [...]`,
+// read_criterion / read_criteria pre-run `search_notes` for every term in
+// each referenced set and attach the hits to the tool response as
+// `pre_retrieved_evidence`. The LLM therefore sees concrete note snippets
+// at the moment it asks for the criterion and cannot "skip-and-fabricate"
+// the search step (the audit-log confabulation documented in platform
+// issue #3). Criteria with no `uses:` block get no pre-fetch and the
+// response shape is unchanged — opt-in per criterion.
+
+const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
+
+/** Extract `uses.keyword_sets` from a criterion markdown's YAML frontmatter.
+ *  Returns `[]` if frontmatter is missing, malformed, or has no uses block. */
+function parseCriterionKeywordSetRefs(markdown: string): string[] {
+  const m = FRONTMATTER_RE.exec(markdown);
+  if (!m) return [];
+  let fm: unknown;
+  try { fm = parseYaml(m[1]); } catch { return []; }
+  if (!fm || typeof fm !== "object") return [];
+  const uses = (fm as { uses?: unknown }).uses;
+  if (!uses || typeof uses !== "object") return [];
+  const ks = (uses as { keyword_sets?: unknown }).keyword_sets;
+  if (!Array.isArray(ks)) return [];
+  return ks.filter((x): x is string => typeof x === "string" && x.length > 0);
+}
+
+/** Per-criterion caps: enough to help a short-note chart, bounded enough
+ *  to keep the tool response below ~8 KiB even when every term hits. */
+const PREFETCH_MAX_HITS_PER_TERM = 3;
+const PREFETCH_MAX_TOTAL_HITS = 40;
+
+interface PrefetchedHit {
+  term: string;
+  filename: string;
+  offset: number;
+  snippet: string;
+}
+
+interface PrefetchedEvidence {
+  keyword_sets_consulted: string[];
+  keyword_sets_missing: string[];
+  terms_searched: number;
+  total_hits: number;
+  hits: PrefetchedHit[];
+  /** True when the (filename, offset) hit cap was reached and some hits were dropped. */
+  truncated: boolean;
+}
+
+/** Resolve each referenced keyword_set id against the compiled operational
+ *  layer and run `searchNotesTool` once per term. Hits that share
+ *  (filename, offset) with an earlier hit are dropped — same chart span,
+ *  different term — and the kept hit's `term` records the first term that
+ *  surfaced it. */
+async function prefetchKeywordHits(
+  session: McpSession,
+  keywordSetIds: string[],
+): Promise<PrefetchedEvidence> {
+  const consulted: string[] = [];
+  const missing: string[] = [];
+  const seen = new Set<string>();
+  const hits: PrefetchedHit[] = [];
+  let termsSearched = 0;
+  let truncated = false;
+
+  const operational = session.task.operational;
+  const sets = operational?.keyword_sets ?? {};
+
+  outer: for (const setId of keywordSetIds) {
+    const set = sets[setId];
+    if (!set) { missing.push(setId); continue; }
+    consulted.push(setId);
+    const terms = Array.isArray(set.terms) ? set.terms : [];
+    for (const term of terms) {
+      if (typeof term !== "string" || term.length === 0) continue;
+      termsSearched++;
+      const result = await searchNotesTool(session, {
+        keyword: term,
+        max_matches: PREFETCH_MAX_HITS_PER_TERM,
+      });
+      if (result.isError) continue;
+      let parsed: { matches?: Array<{ filename: string; offset: number; snippet: string }> } = {};
+      try { parsed = JSON.parse(result.content[0]?.text ?? "{}"); } catch { continue; }
+      for (const m of parsed.matches ?? []) {
+        if (hits.length >= PREFETCH_MAX_TOTAL_HITS) { truncated = true; break outer; }
+        const key = `${m.filename}@${m.offset}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        hits.push({ term, filename: m.filename, offset: m.offset, snippet: m.snippet });
+      }
+    }
+  }
+
+  return {
+    keyword_sets_consulted: consulted,
+    keyword_sets_missing: missing,
+    terms_searched: termsSearched,
+    total_hits: hits.length,
+    hits,
+    truncated,
+  };
+}
+
 export const readCriterionArgsSchema = z.object({
   field_id: z.string(),
 });
@@ -896,10 +1001,15 @@ export async function readCriterionTool(
       };
     }
     const content = fs.readFileSync(fp, "utf8");
+    const refs = parseCriterionKeywordSetRefs(content);
+    const payload: Record<string, unknown> = {
+      ok: true, field_id: args.field_id, content,
+    };
+    if (refs.length > 0) {
+      payload.pre_retrieved_evidence = await prefetchKeywordHits(session, refs);
+    }
     return {
-      content: [{ type: "text", text: JSON.stringify({
-        ok: true, field_id: args.field_id, content,
-      }) }],
+      content: [{ type: "text", text: JSON.stringify(payload) }],
     };
   } catch (e) {
     return {
@@ -979,7 +1089,13 @@ export async function readCriteriaTool(
       continue;
     }
     try {
-      results.push({ field_id, content: fs.readFileSync(fp, "utf8") });
+      const content = fs.readFileSync(fp, "utf8");
+      const refs = parseCriterionKeywordSetRefs(content);
+      const entry: Record<string, unknown> = { field_id, content };
+      if (refs.length > 0) {
+        entry.pre_retrieved_evidence = await prefetchKeywordHits(session, refs);
+      }
+      results.push(entry);
     } catch (e) {
       results.push({ field_id, ok: false, error: (e as Error).message });
     }

@@ -7,6 +7,9 @@ answer_schema:
   maximum: 144
 cardinality: one
 group: neuropsych_scales
+uses:
+  keyword_sets:
+    - kw_npi
 ---
 
 # Criterion: npi_total

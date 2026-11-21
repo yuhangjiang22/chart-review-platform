@@ -7,6 +7,9 @@ answer_schema:
   maximum: 18
 cardinality: one
 group: cognitive_scales
+uses:
+  keyword_sets:
+    - kw_hachinski
 ---
 
 # Criterion: hachinski_score

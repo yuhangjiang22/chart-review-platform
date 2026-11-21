@@ -7,6 +7,9 @@ answer_schema:
   maximum: 40
 cardinality: one
 group: demographics
+uses:
+  keyword_sets:
+    - kw_education
 ---
 
 # Criterion: education_years

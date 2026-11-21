@@ -9,6 +9,9 @@ derivation: 'mmse_score >= 24 ? "normal" : mmse_score >= 19 ? "mild" : mmse_scor
 required: false
 role: interpretive
 required_note: "NOT REQUIRED — interpretation band auto-derived from mmse_score; guideline lists severity as context only."
+uses:
+  keyword_sets:
+    - kw_mmse
 ---
 
 # Criterion: mmse_severity (computed)

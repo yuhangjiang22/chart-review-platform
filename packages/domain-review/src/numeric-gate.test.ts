@@ -118,3 +118,61 @@ describe("applyUiAction with a numeric field", () => {
     ).toThrow();
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// assertNumericAnswerCited — span fallback.
+// When the agent paraphrased the quote (verbatim_quote no longer carries the
+// digit) but the cited span in the note DOES contain the number, the gate now
+// resolves the real span via the readNoteSpan resolver and accepts. This
+// unsticks the smoking_duration / MoCA set→find→loop retry storm the
+// Path A pilot surfaced, while still catching fabrication (span has no digit
+// either → the throw path still fires).
+// ─────────────────────────────────────────────────────────────────────────────
+describe("assertNumericAnswerCited span fallback", () => {
+  const paraphrased = [{
+    source: "note",
+    note_id: "n1",
+    span_offsets: [0, 25] as [number, number],
+    verbatim_quote: "patient scored low on MoCA",  // paraphrase, no digit
+  }];
+
+  it("accepts a paraphrased quote when the real span contains the number", () => {
+    // Pretend note n1 starts with "MoCA 22/30 - mild deficits" at offsets 0..25.
+    const readSpan = (_n: string, s: number, e: number) =>
+      "MoCA 22/30 - mild deficits".slice(s, e);
+    expect(() =>
+      assertNumericAnswerCited(moca, 22, paraphrased, readSpan),
+    ).not.toThrow();
+  });
+
+  it("still throws (fabrication) when neither the quote nor the real span carries the number", () => {
+    const readSpan = (_n: string, s: number, e: number) =>
+      "no cognitive testing done this visit".slice(s, e);
+    expect(() =>
+      assertNumericAnswerCited(moca, 22, paraphrased, readSpan),
+    ).toThrow(/no cited note quote or span/);
+  });
+
+  it("still throws when the span resolver returns null (note not found)", () => {
+    const readSpan = () => null;
+    expect(() =>
+      assertNumericAnswerCited(moca, 22, paraphrased, readSpan),
+    ).toThrow(/no cited note quote or span/);
+  });
+
+  it("falls back only on note evidence — omop is still rejected", () => {
+    const omopEv = [{ source: "omop", verbatim_quote: "paraphrased" } as never];
+    const readSpan = () => "22 points scored";
+    expect(() =>
+      assertNumericAnswerCited(moca, 22, omopEv, readSpan),
+    ).toThrow();
+  });
+
+  it("respects the existing fast path — quote carries number, resolver never called", () => {
+    let called = 0;
+    const readSpan = () => { called++; return "unrelated"; };
+    const good = [{ source: "note", note_id: "n1", span_offsets: [0, 10] as [number, number], verbatim_quote: "MoCA 22/30" }];
+    expect(() => assertNumericAnswerCited(moca, 22, good, readSpan)).not.toThrow();
+    expect(called).toBe(0);
+  });
+});

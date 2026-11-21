@@ -5,6 +5,9 @@ answer_schema:
   enum: ["1", "2", "3", "4", "5", "6", "7"]
 cardinality: one
 group: staging
+uses:
+  keyword_sets:
+    - kw_gds
 ---
 
 # Criterion: gds_stage

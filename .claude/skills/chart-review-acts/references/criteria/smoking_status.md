@@ -5,6 +5,9 @@ answer_schema:
   enum: ["current", "former", "never", "unknown"]
 cardinality: one
 group: demographics
+uses:
+  keyword_sets:
+    - kw_smoking_tobacco
 ---
 
 # Criterion: smoking_status

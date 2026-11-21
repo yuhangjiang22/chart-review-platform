@@ -18,6 +18,9 @@ group: genotype
 required: false
 role: intermediate
 required_note: "NECESSARY — sole input that derives the required apoe2/apoe3/apoe4 outputs; not itself a guideline output."
+uses:
+  keyword_sets:
+    - kw_apoe
 ---
 
 # Criterion: apoe_genotype (the extracted APOE source)

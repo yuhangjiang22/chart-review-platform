@@ -8,6 +8,9 @@ answer_schema:
 cardinality: one
 group: smoking
 is_applicable_when: 'smoking_status in ["current", "former"]'
+uses:
+  keyword_sets:
+    - kw_smoking_tobacco
 ---
 
 # Criterion: pack_year

@@ -5,6 +5,9 @@ answer_schema:
   type: string
 cardinality: one
 group: reproductive
+uses:
+  keyword_sets:
+    - kw_menopause
 ---
 
 # Criterion: lmp_date
